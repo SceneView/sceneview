@@ -995,7 +995,7 @@ body {
     <div class="section">
       <div class="section-title">
         <span class="icon" style="background:var(--success-light);color:var(--success)">🔍</span>
-        Ce que la telemetry révèlera
+        Ce que la telemetry révèle
       </div>
       <div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
         <div class="card">
@@ -1645,10 +1645,10 @@ async function fetchTelemetry() {
         chartInstances.telTimeseries = new Chart(tsCtx, {
           type: 'line',
           data: {
-            labels: timeseries.data.map(d => new Date(d.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })),
+            labels: timeseries.data.map(d => new Date(d.time + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })),
             datasets: [{
               label: 'Events / jour',
-              data: timeseries.data.map(d => d.count),
+              data: timeseries.data.map(d => d.value),
               borderColor: '#005bc1', backgroundColor: '#005bc120',
               fill: true, tension: 0.4, pointRadius: 2, borderWidth: 2,
             }]
