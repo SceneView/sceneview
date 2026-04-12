@@ -162,8 +162,14 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-04-12, session issue-audit — 420/420 issues audited, 0 open issues/PRs)
+### Current state (last updated: 2026-04-13, session relaxed-faraday — Empire Dashboard + GA4 + Telemetry + Funnel)
 
+- ✅ **Empire Analytics Dashboard** (`tools/empire-dashboard.html`): 7-tab dashboard (Portfolio, Tendances, Acquisition, Funnel, Monetisation, Usage/Telemetry, Actions). Live npm data via registry API, GitHub stars, Chart.js charts, MRR projections, telemetry worker integration, dark/light mode. Launch config in `.claude/launch.json`. Open: `open tools/empire-dashboard.html`
+- ✅ **GA4 LIVE on sceneview.github.io** — Property "SceneView Website" (`G-HX1JWGSMTH`), stream ID 14357002837. Custom events: tab_click, cta_click, code_copy. MkDocs also wired with feedback widget.
+- ✅ **Telemetry Worker DEPLOYED** — `sceneview-telemetry.mcp-tools-lab.workers.dev`, health OK. Real data: 6 events, 4 unique users, top tools: generate_scene, debug_issue, create_scene. STATS_TOKEN in `profile-private/credentials/sceneview-telemetry.env`.
+- ✅ **sceneview-mcp@4.0.0-rc.6 published on @latest** — CTA sponsor now includes Pro pricing link (`/pricing` on gateway). All 13.7k monthly users see the conversion CTA.
+- ✅ **Conversion funnel complete**: npm install → use free tools → 10th call CTA → pricing page → Stripe checkout (`cs_live_...`) → API key. Verified end-to-end. Links on: website nav, GitHub README, npm README, in-tool CTA.
+- ✅ **npm dist-tags**: `{ latest: '4.0.0-rc.6', beta: '4.0.0-beta.1', next: '4.0.0-rc.5' }`.
 - ✅ **0 open issues, 0 open PRs** — exhaustive audit of all 420 issues complete. 419 confirmed fixed, 1 found & fixed (#388 NodeAnimator, commit `3ae4d839`).
 - ✅ **95 GitHub Discussions answered** with v4.0 solutions, migration guidance, and workarounds.
 - ✅ **PR #814 merged** (`dcdb98df`): render-tests Engine-sharing fix (closes #803) + AR camera exposure API (closes #792). +117 new tests.
