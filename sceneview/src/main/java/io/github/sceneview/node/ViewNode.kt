@@ -185,14 +185,14 @@ class ViewNode(
     }
 
     override fun destroy() {
-
         windowManager.removeView(layout)
+
+        super.destroy()
 
         materialLoader.destroyMaterialInstance(materialInstance)
         engine.safeDestroyTexture(texture)
         engine.safeDestroyStream(stream)
 
-        super.destroy()
     }
 
     /**

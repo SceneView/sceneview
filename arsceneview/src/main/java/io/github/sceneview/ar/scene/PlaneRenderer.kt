@@ -35,7 +35,7 @@ import io.github.sceneview.texture.ImageTexture
  */
 class PlaneRenderer(
     val engine: Engine,
-    materialLoader: MaterialLoader,
+    private val materialLoader: MaterialLoader,
     private val scene: Scene
 ) {
 
@@ -200,11 +200,9 @@ class PlaneRenderer(
         visualizers.forEach { (_, planeVisualizer) -> planeVisualizer.destroy() }
 
         materialInstances.forEach { engine.safeDestroyMaterialInstance(it) }
-        engine.safeDestroyMaterialInstance(planeMaterial.defaultInstance)
-        engine.safeDestroyMaterial(planeMaterial)
+        materialLoader.destroyMaterial(planeMaterial)
+        materialLoader.destroyMaterial(shadowMaterial)
         engine.safeDestroyTexture(planeTexture)
-        engine.safeDestroyMaterialInstance(shadowMaterial.defaultInstance)
-        engine.safeDestroyMaterial(shadowMaterial)
     }
 
     /**

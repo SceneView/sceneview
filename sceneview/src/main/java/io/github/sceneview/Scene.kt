@@ -63,6 +63,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import dev.romainguy.kotlin.math.Float2
+import androidx.core.net.toUri
+import io.github.sceneview.logging.logWarning
 
 /**
  * A Filament 3D scene declared as Compose UI.
@@ -471,7 +473,7 @@ fun rememberModelInstance(
     assetFileLocation: String
 ): ModelInstance? {
     val context = LocalContext.current
-    return produceState<ModelInstance?>(
+    return produceState<Model?>(
         initialValue = null,
         key1 = modelLoader,
         key2 = assetFileLocation
@@ -480,8 +482,23 @@ fun rememberModelInstance(
         val buffer = withContext(Dispatchers.IO) {
             runCatching { context.assets.readBuffer(assetFileLocation) }.getOrNull()
         } ?: return@produceState
-        value = runCatching { modelLoader.createModelInstance(buffer) }.getOrNull()
-    }.value
+        value = runCatching { modelLoader.createModel(buffer) }
+            .onFailure {
+                logWarning("ModelLoad", "Failed to load model from asset '$assetFileLocation' ${it}")
+            }
+            .getOrNull()
+    }.value.also {
+        if (it != null) {
+            // Ensure we destroy the model properly, to avoid leaking when recomposition destroys node but not the
+            // whole scene/modelLoader. If the assetFile doesn't change, we won't reload and `modelInstance` is
+            // still reused
+            DisposableEffect(it) {
+                onDispose {
+                    modelLoader.destroyModel(it)
+                }
+            }
+        }
+    }?.instance
 }
 
 /**
@@ -507,21 +524,32 @@ fun rememberModelInstance(
         ModelLoader.getFolderPath(fileLocation, it)
     }
 ): ModelInstance? {
-    val uri = android.net.Uri.parse(fileLocation)
+    val uri = fileLocation.toUri()
     // Fast path: plain asset file name (no scheme) → use synchronous asset reader
     if (uri.scheme == null) {
         return rememberModelInstance(modelLoader, assetFileLocation = fileLocation)
     }
     // URL / file URI / content URI → use suspend loadModelInstance which handles http(s)
-    return produceState<ModelInstance?>(
+    return produceState<Model?>(
         initialValue = null,
         key1 = modelLoader,
         key2 = fileLocation
     ) {
         value = runCatching {
-            modelLoader.loadModelInstance(fileLocation, resourceResolver)
+            modelLoader.loadModel(fileLocation, resourceResolver)
         }.getOrNull()
-    }.value
+    }.value.also {
+        if (it != null) {
+            // Ensure we destroy the model properly, to avoid leaking when recomposition destroys node but not the
+            // whole scene/modelLoader. If the assetFile doesn't change, we won't reload and `modelInstance` is
+            // still reused
+            DisposableEffect(it) {
+                onDispose {
+                    modelLoader.destroyModel(it)
+                }
+            }
+        }
+    }?.instance
 }
 
 // ── Video helper ──────────────────────────────────────────────────────────────────────────────────
