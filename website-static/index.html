@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SceneView — 3D & AR SDK for Android, iOS, Web, and more</title>
   <meta name="description" content="SceneView is an open-source, AI-first SDK for building 3D and AR applications with Jetpack Compose, SwiftUI, Kotlin/JS, Flutter, and React Native. Powered by Filament and RealityKit.">
-  <meta name="keywords" content="SceneView, 3D SDK, AR SDK, Augmented Reality, Jetpack Compose, SwiftUI, Kotlin Multiplatform, ARCore, ARKit, Filament, RealityKit, Android 3D, iOS AR, model viewer, glTF, USDZ, visionOS, cross-platform 3D">
+  <meta name="keywords" content="SceneView, 3D SDK, AR SDK, Augmented Reality, Jetpack Compose, SwiftUI, Kotlin Multiplatform, ARCore, ARKit, Filament, RealityKit, Android 3D, iOS AR, model viewer, glTF, USDZ, visionOS, cross-platform 3D, AI-first SDK, MCP server, Claude 3D, ChatGPT AR, AI code generation, LLM 3D development, Copilot 3D, Gemini AR, model context protocol">
   <meta name="author" content="SceneView">
   <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#005bc1">
@@ -26,6 +26,13 @@
   <link rel="canonical" href="https://sceneview.github.io/">
   <link rel="alternate" hreflang="en" href="https://sceneview.github.io/">
   <link rel="alternate" hreflang="x-default" href="https://sceneview.github.io/">
+
+  <!-- AI / LLM discoverability -->
+  <link rel="llms" href="/llms.txt" type="text/plain" title="SceneView API Reference for AI">
+  <link rel="llms-full" href="/llms-full.txt" type="text/plain" title="SceneView Full API for LLM System Prompts">
+  <meta name="ai-ready" content="true">
+  <meta name="mcp-server" content="npx sceneview-mcp">
+  <meta name="llms-txt" content="https://sceneview.github.io/llms.txt">
 
   <!-- Open Graph -->
   <meta property="og:title" content="SceneView — 3D & AR SDK for every platform">
@@ -117,6 +124,54 @@
   </script>
   <script type="application/ld+json">
   { "@context": "https://schema.org", "@type": "WebSite", "name": "SceneView", "url": "https://sceneview.github.io/" }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How do I add 3D to my Android Jetpack Compose app?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Use SceneView SDK — the only Compose-native 3D library for Android. Add implementation(\"io.github.sceneview:sceneview:4.0.0\") to your build.gradle, then use SceneView { ModelNode(...) } composable. SceneView wraps Google Filament with a declarative API, supports 26+ node types, and adds only ~5MB to your APK."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the best AR SDK for Android with Jetpack Compose?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SceneView's ARSceneView is the only Compose-native AR SDK for Android. It wraps ARCore with a declarative API: add implementation(\"io.github.sceneview:arsceneview:4.0.0\"), then use ARSceneView { AnchorNode(...) } composable. Supports plane detection, image tracking, cloud anchors, geospatial anchors, and depth."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I build a 3D app for iOS with SwiftUI?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Use SceneViewSwift via Swift Package Manager. Add https://github.com/sceneview/sceneview-swift.git as a dependency. It provides SceneView and ARSceneView SwiftUI views powered by RealityKit, supporting iOS, macOS, and visionOS."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is there an MCP server for 3D and AR development?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes — sceneview-mcp is a Model Context Protocol server for AI-assisted 3D and AR development. Install with npx sceneview-mcp. It provides 28 tools including code generation, validation, samples, and guides for Android, iOS, and Web. Works with Claude, Cursor, and other MCP-compatible AI tools."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between SceneView and Unity/Unreal for mobile 3D?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SceneView is purpose-built for mobile apps (not games). It adds ~5MB vs 50-100MB+ for Unity/Unreal, uses native UI frameworks (Jetpack Compose, SwiftUI), and integrates with the Android/iOS ecosystem. Unity/Unreal are better for complex games; SceneView is better for 3D features in regular apps (product viewers, AR, data visualization)."
+        }
+      }
+    ]
+  }
   </script>
   <link href="assets/fonts/fonts.css" rel="stylesheet">
 </head>

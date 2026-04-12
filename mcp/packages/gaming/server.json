@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.sceneview/mcp",
-  "description": "3D & AR SDK for Android, iOS, Web — API docs, samples, validation, and code generation.",
+  "name": "io.github.sceneview/gaming-3d",
+  "description": "MCP server for Gaming 3D development — character viewers, level editors, physics games, particle effects, 3D inventories. Built on SceneView SDK.",
   "repository": {
     "url": "https://github.com/sceneview/sceneview",
     "source": "github"
   },
-  "version": "4.0.0",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "sceneview-mcp",
-      "version": "4.0.0",
+      "identifier": "gaming-3d-mcp",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       }
