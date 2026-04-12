@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.sceneview/mcp",
-  "description": "3D & AR SDK for Android, iOS, Web — API docs, samples, validation, and code generation.",
+  "name": "io.github.sceneview/rerun-3d",
+  "description": "MCP server for Rerun.io integration with SceneView — AR debug logging, Python sidecars, web viewer embeds, spatial data visualization.",
   "repository": {
     "url": "https://github.com/sceneview/sceneview",
     "source": "github"
   },
-  "version": "4.0.0",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "sceneview-mcp",
-      "version": "4.0.0",
+      "identifier": "rerun-3d-mcp",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       }

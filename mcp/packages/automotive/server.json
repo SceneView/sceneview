@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sceneview/automotive-3d",
+  "description": "MCP server for Automotive 3D visualization — car configurators, HUD overlays, 3D dashboards, AR showrooms, parts catalogs, EV charging stations. Built on SceneView SDK.",
+  "repository": {
+    "url": "https://github.com/sceneview/sceneview",
+    "source": "github"
+  },
+  "version": "1.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "automotive-3d-mcp",
+      "version": "1.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

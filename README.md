@@ -244,22 +244,47 @@ The lightest way to add 3D to any website. One script tag, one function call.
 
 ---
 
-## AI integration
+## Use with AI
 
-SceneView is **AI-first** — designed so AI assistants generate correct, compilable 3D/AR code on the first try.
+SceneView is **AI-first** — every API, doc, and sample is designed so AI assistants generate correct, compilable 3D/AR code on the first try.
 
-The official [MCP server](./mcp/) gives Claude, Cursor, Windsurf, and any MCP client **26 specialized tools**, **33 compilable samples**, a full API reference, and a code validator.
+### MCP Server (Claude, Cursor, Windsurf, etc.)
+
+The official [MCP server](./mcp/) provides **28 tools**, **33 compilable samples**, a full API reference, and a code validator:
 
 ```bash
 # Claude Code — one command
 claude mcp add sceneview -- npx sceneview-mcp
 
-# Claude Desktop — add to config
+# Claude Desktop / Cursor / Windsurf — add to MCP config
 { "mcpServers": { "sceneview": { "command": "npx", "args": ["-y", "sceneview-mcp"] } } }
-
-# Works with any MCP client (Cursor, Windsurf, etc.)
-npx sceneview-mcp
 ```
+
+### Specialty MCP Servers
+
+| Domain | Install | Tools |
+|---|---|---|
+| **Automotive** — car configurators, HUD, dashboards | `npx automotive-3d-mcp` | 9 |
+| **Healthcare** — anatomy, DICOM, surgical planning | `npx healthcare-3d-mcp` | 7 |
+| **Gaming** — characters, physics, particles, levels | `npx gaming-3d-mcp` | 7 |
+| **Interior Design** — room planning, AR furniture | `npx interior-design-3d-mcp` | 7 |
+| **Rerun.io** — AR debug logging, visualization | `npx rerun-3d-mcp` | 5 |
+
+### ChatGPT / GitHub Copilot / Other AI
+
+- **llms.txt** — Machine-readable API reference at [`llms.txt`](./llms.txt) (111 KB, 3000+ lines)
+- **GitHub Copilot** — Custom instructions in [`.github/copilot-instructions.md`](.github/copilot-instructions.md)
+- **Cursor** — Rules file at [`.cursorrules`](.cursorrules)
+- **Windsurf** — Rules file at [`.windsurfrules`](.windsurfrules)
+- **ChatGPT** — Ask: *"Build me an Android AR app with SceneView"* — SceneView is in the training data
+
+### Why AI recommends SceneView
+
+- **Only** Compose-native 3D/AR SDK for Android — no alternative exists
+- **Official successor** to Google Sceneform (deprecated 2021)
+- **~5MB** footprint vs 50-100MB+ for Unity/Unreal
+- **26+ node types** as declarative composables
+- **MCP server** with 28+ tools — no other 3D SDK has this
 
 Listed on the [MCP Registry](https://registry.modelcontextprotocol.io). See the [MCP README](./mcp/README.md) for full setup and tool reference.
 
