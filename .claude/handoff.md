@@ -4,6 +4,56 @@
 
 ---
 
+## SESSION intelligent-elbakyan — 2026-04-13 — Quality-gate fix, SPM repo, geometry nodes, scheduled tasks
+
+**Worktree:** `intelligent-elbakyan`
+**Branch:** `claude/intelligent-elbakyan`
+
+### What shipped
+
+**Quality-gate CI fix:**
+- Whitelisted `marketing/*.md` in deprecated API check (ArFragment refs in SO drafts are intentional)
+- quality-gate ✅ on main
+
+**sceneview-swift SPM repo created:**
+- `https://github.com/sceneview/sceneview-swift` — NEW REPO
+- Tag `v4.0.0`, Package.swift valid, 72 files (Sources + Tests)
+- **All 15 docs/llms.txt/README files updated** from `from: "3.6.0"` → `from: "4.0.0"`
+- MCP bundle rebuilt with updated llms.txt
+
+**3 new geometry nodes (TorusNode, ConeNode, CapsuleNode):**
+- Geometry classes with Builder pattern + update support
+- Node wrappers matching CylinderNode/SphereNode pattern
+- SceneScope composables with reactive SideEffect updates
+- SceneView now has **29 built-in node types**
+- Both sceneview + arsceneview compile ✅
+
+**Scheduled tasks cleanup + announcements:**
+- 9 obsolete one-shot tasks disabled
+- 3 completed manual tasks disabled
+- 6 recurring tasks optimized (prompts enriched)
+- 3 new announcement reminders: r/robotics (Mon), Show HN (Tue), LinkedIn (Wed)
+
+**ROADMAP.md updated:** reflects v4.0.0 stable, all completed milestones, v4.1 next section
+
+**Demo improvements committed:** AnimationDemo HDR environment + 7 updated screenshots
+
+### Production state
+- **CI**: all green (quality-gate ✅, iOS ✅, Render Tests ✅)
+- **npm**: `latest=4.0.1`
+- **Gateways**: both LIVE, 1 paying customer
+- **Telemetry**: LIVE, receiving events
+- **Open issues/PRs**: 0/0
+- **Worktrees**: 3 (intelligent-elbakyan, musing-albattani, sharp-bose)
+
+### What's NOT done
+- iOS App Store secrets (needs Apple Developer credentials from Thomas)
+- Post r/robotics (scheduled Mon 8h), Show HN (Tue 9h), LinkedIn (Wed 10h)
+- Contact Rerun.io (email + Discord message ready in profile-private)
+- v4.0.0 stable Maven Central publish (release.yml needs strict semver tag)
+
+---
+
 ## SESSION elegant-burnell — 2026-04-12 — Telemetry deploy, first paying customer, npm @latest 4.x
 
 **Worktree:** `elegant-burnell`
