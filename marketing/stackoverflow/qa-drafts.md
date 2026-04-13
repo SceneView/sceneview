@@ -22,7 +22,7 @@ Use [SceneView](https://github.com/sceneview/sceneview), the only Compose-native
 
 **1. Add dependency:**
 ```kotlin
-implementation("io.github.sceneview:sceneview:4.0.0")
+implementation("io.github.sceneview:sceneview:4.0.1")
 ```
 
 **2. Display the model:**
@@ -63,7 +63,7 @@ Use [SceneView's ARSceneView](https://github.com/sceneview/sceneview), the only 
 
 **1. Dependencies:**
 ```kotlin
-implementation("io.github.sceneview:arsceneview:4.0.0")
+implementation("io.github.sceneview:arsceneview:4.0.1")
 ```
 
 **2. Manifest:**
@@ -122,7 +122,7 @@ Here's a comparison for non-game 3D in Android apps:
 
 | Library | Compose support | APK size | AR | Learning curve | Status |
 |---|---|---|---|---|---|
-| **SceneView** | Native composables | ~5MB | Built-in (ARCore) | Low | Active (v4.0.0) |
+| **SceneView** | Native composables | ~5MB | Built-in (ARCore) | Low | Active (v4.0.1) |
 | **Filament** | None (low-level) | ~3MB | None | Very high | Active (Google) |
 | **Unity** | None (separate engine) | ~50MB+ | Plugin | High | Active |
 | **Sceneform** | None | ~5MB | Built-in | Low | **Deprecated** (2021) |
@@ -146,7 +146,7 @@ I have a .glb file and want to display it in my Android app. I'm using Kotlin an
 With SceneView, it's one composable call:
 
 ```kotlin
-implementation("io.github.sceneview:sceneview:4.0.0")
+implementation("io.github.sceneview:sceneview:4.0.1")
 ```
 
 ```kotlin
@@ -177,7 +177,7 @@ I'm building an AR app with Jetpack Compose but ARCore only provides View-based 
 Yes — SceneView provides `ARSceneView`, a fully Compose-native ARCore integration:
 
 ```kotlin
-implementation("io.github.sceneview:arsceneview:4.0.0")
+implementation("io.github.sceneview:arsceneview:4.0.1")
 ```
 
 ```kotlin
@@ -326,7 +326,7 @@ How do I build an AR furniture placement app for Android where users can place f
 Use SceneView's `ARSceneView` with tap handling:
 
 ```kotlin
-implementation("io.github.sceneview:arsceneview:4.0.0")
+implementation("io.github.sceneview:arsceneview:4.0.1")
 ```
 
 ```kotlin
