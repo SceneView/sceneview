@@ -2113,6 +2113,11 @@ let data = SceneSnapshot.pngData(image) // or jpegData(image, quality: 0.9)
 | Environment | `rememberEnvironment(loader) { }` | `.environment(.studio)` |
 | Cube | `CubeNode(size)` | `GeometryNode.cube(size:color:)` |
 | Sphere | `SphereNode(radius)` | `GeometryNode.sphere(radius:)` |
+| Cylinder | `CylinderNode(radius, height)` | `GeometryNode.cylinder(radius:height:)` |
+| Plane | `PlaneNode(size)` | `GeometryNode.plane(width:height:)` |
+| Cone | `ConeNode(radius, height)` | `GeometryNode.cone(radius:height:)` |
+| Torus | `TorusNode(majorRadius, minorRadius)` | `GeometryNode.torus(majorRadius:minorRadius:)` |
+| Capsule | `CapsuleNode(radius, height)` | `GeometryNode.capsule(radius:height:)` |
 | Light | `LightNode(type, apply = { })` | `LightNode.directional(color:intensity:)` |
 | Text | `TextNode(text = "...")` | `TextNode(text:fontSize:color:depth:)` |
 | Line | `LineNode(start, end, materialInstance)` | `LineNode(from:to:color:)` |
