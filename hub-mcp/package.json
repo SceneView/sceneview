@@ -1,7 +1,7 @@
 {
   "name": "hub-mcp",
-  "version": "0.2.1",
-  "description": "MCP Tools Hub — 52 AI tools across 11 libraries (architecture, real estate, finance, education, legal, healthcare, automotive, and more). Free tier runs locally; Pro tools forward to the hosted gateway.",
+  "version": "0.3.0",
+  "description": "MCP Tools Hub — 78 AI tools across 11 libraries (architecture, real estate, finance, education, legal, healthcare, automotive, and more). Free tier with 20 tools runs locally; Pro tools forward to the hosted gateway.",
   "type": "module",
   "bin": {
     "hub-mcp": "dist/index.js"

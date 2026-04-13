@@ -20,7 +20,7 @@ import { TOOL_DEFINITIONS, isFreeTool, isProTool, } from "./tools.js";
 import { dispatchProxyToolCall, isProxyConfigured, DEFAULT_PRICING_URL, } from "./proxy.js";
 import { recordInit, recordToolCall, flushTelemetry } from "./telemetry.js";
 // ─── Constants ──────────────────────────────────────────────────────────────
-const PACKAGE_VERSION = "0.2.1";
+const PACKAGE_VERSION = "0.3.0";
 const FREE_TOOL_COUNT = TOOL_DEFINITIONS.filter((t) => isFreeTool(t.name)).length;
 const TOTAL_TOOL_COUNT = TOOL_DEFINITIONS.length;
 // ─── Startup banner (stderr only — stdout is JSON-RPC) ─────────────────────

@@ -1,11 +1,11 @@
 /**
  * Static tool registry for the hub-mcp lite package.
  *
- * Contains the full catalogue of 52 tools across 11 libraries, with
+ * Contains the full catalogue of 78 tools across 11 libraries, with
  * their MCP tool definitions (name, description, inputSchema) and
  * tier classification (free vs pro).
  *
- * Free tools (13) execute locally as stubs in lite mode. Pro tools (39)
+ * Free tools (20) execute locally as stubs in lite mode. Pro tools (58)
  * are forwarded to the hosted gateway when an API key is set.
  *
  * The tool definitions here are a snapshot of hub-gateway/src/libraries/*.ts
@@ -31,20 +31,29 @@ export const FREE_TOOLS: ReadonlySet<string> = new Set([
   // architecture
   "architecture__generate_3d_concept",
   "architecture__cost_estimate",
+  "architecture__search_parcels",        // bridge-API: cadastre.gouv.fr
   // ecommerce-3d
   "ecommerce3d__list_categories",
   // education
   "education__build_quiz",
-  // finance
+  "education__search_papers",            // bridge-API: OpenAlex
+  // finance (was @thomasgorisse/finance-mcp, now personal-finance-mcp)
   "finance__compound_interest",
+  "finance__get_stock_quote",            // bridge-API: market data
+  "finance__get_exchange_rates",         // bridge-API: ECB/forex
   // french-admin
   "french_admin__list_democraties",
+  "french_admin__rechercher_entreprise", // bridge-API: api.gouv.fr
+  "french_admin__valider_adresse",       // bridge-API: api-adresse.data.gouv.fr
   // health-fitness
   "health_fitness__exercise_form_cues",
+  "health_fitness__search_nutrition",    // bridge-API: nutritionix/USDA
   // legal-docs
   "legal_docs__list_templates",
+  "legal_docs__generate_en_privacy_policy", // bridge: EN privacy policy generator
   // realestate
   "realestate__estimate_value",
+  "realestate__search_property_transactions", // bridge-API: DVF open data
   // social-media
   "social_media__suggest_hashtags",
   // automotive-3d (unprefixed — parity with stdio package)
@@ -73,7 +82,7 @@ export function getToolTier(name: string): "free" | "pro" {
 // package name and tool count.
 
 export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
-  // ── architecture-mcp (10 tools: 2 free, 8 pro) ───────────────────────────
+  // ── architecture-mcp (14 tools: 3 free, 11 pro) ──────────────────────────
   {
     name: "architecture__generate_3d_concept",
     description: "Generate a 3D architectural concept from a text description. Returns style-specific materials, passive design strategies, massing recommendations, and color palette.",
@@ -124,8 +133,28 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     description: "Analyze building energy efficiency, materials sustainability, water conservation, and carbon footprint. Provides certification gap analysis (LEED/BREEAM/Passive House).",
     inputSchema: { type: "object", properties: { building_type: { type: "string" }, area_sqm: { type: "number" }, climate: { type: "string" }, materials: { type: "array" }, energy_source: { type: "string" } }, required: ["building_type", "area_sqm"] },
   },
+  {
+    name: "architecture__search_parcels",
+    description: "Search cadastral parcels by address or coordinates via cadastre.gouv.fr API. Returns parcel IDs, boundaries, and zoning info.",
+    inputSchema: { type: "object", properties: { address: { type: "string" }, lat: { type: "number" }, lon: { type: "number" }, commune: { type: "string" } } },
+  },
+  {
+    name: "architecture__get_parcel_info",
+    description: "Get detailed parcel information (area, section, zoning constraints, building rights) from a cadastral parcel ID.",
+    inputSchema: { type: "object", properties: { parcelId: { type: "string" }, commune: { type: "string" } }, required: ["parcelId"] },
+  },
+  {
+    name: "architecture__search_dpe",
+    description: "Search DPE (Diagnostic de Performance Energetique) energy ratings for buildings via ADEME open data. Filter by address, commune, or DPE class.",
+    inputSchema: { type: "object", properties: { address: { type: "string" }, commune: { type: "string" }, dpeClass: { type: "string" }, limit: { type: "number" } } },
+  },
+  {
+    name: "architecture__get_dpe_stats",
+    description: "Get aggregated DPE energy rating statistics for a commune or department. Returns distribution by class, average consumption, and renovation recommendations.",
+    inputSchema: { type: "object", properties: { commune: { type: "string" }, department: { type: "string" } } },
+  },
 
-  // ── realestate-mcp (4 tools: 1 free, 3 pro) ──────────────────────────────
+  // ── realestate-mcp (7 tools: 2 free, 5 pro) ──────────────────────────────
   {
     name: "realestate__search_listings",
     description: "Search real estate listings by location, price range, beds/baths, and property type.",
@@ -146,8 +175,23 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     description: "List 3D staging assets (furniture, fixtures, decor) compatible with SceneView's AR preview.",
     inputSchema: { type: "object", properties: { roomType: { type: "string" }, style: { type: "string" } } },
   },
+  {
+    name: "realestate__search_property_transactions",
+    description: "Search real property transactions (DVF open data) by commune, date range, and property type. Returns sale prices, dates, and property details.",
+    inputSchema: { type: "object", properties: { commune: { type: "string" }, codePostal: { type: "string" }, dateMin: { type: "string" }, dateMax: { type: "string" }, propertyType: { type: "string" }, limit: { type: "number" } }, required: ["commune"] },
+  },
+  {
+    name: "realestate__get_price_per_sqm",
+    description: "Get median price per square meter for a commune or neighborhood using DVF transaction data. Returns stats by property type and trend over time.",
+    inputSchema: { type: "object", properties: { commune: { type: "string" }, codePostal: { type: "string" }, propertyType: { type: "string" }, period: { type: "string" } }, required: ["commune"] },
+  },
+  {
+    name: "realestate__compare_neighborhoods",
+    description: "Compare real estate metrics (price/sqm, transaction volume, price trends) across multiple communes or neighborhoods using DVF data.",
+    inputSchema: { type: "object", properties: { communes: { type: "array" }, propertyType: { type: "string" }, period: { type: "string" } }, required: ["communes"] },
+  },
 
-  // ── french-admin-mcp (4 tools: 1 free, 3 pro) ────────────────────────────
+  // ── french-admin-mcp (9 tools: 3 free, 6 pro) ────────────────────────────
   {
     name: "french_admin__list_democraties",
     description: "List supported French administrative demarches (impots, caf, ameli, pole_emploi, urssaf, service_public).",
@@ -168,6 +212,31 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     description: "Check eligibility for CAF benefits (APL, prime d'activite, AAH, RSA) given household situation.",
     inputSchema: { type: "object", properties: { situation: { type: "string" }, nbEnfants: { type: "number" }, revenuMensuel: { type: "number" }, loyer: { type: "number" }, codePostal: { type: "string" } }, required: ["situation", "revenuMensuel"] },
   },
+  {
+    name: "french_admin__rechercher_entreprise",
+    description: "Search French companies by name, SIREN, or SIRET via api.gouv.fr (API Entreprise). Returns registration info, legal form, NAF code, and address.",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, codePostal: { type: "string" }, departement: { type: "string" }, limit: { type: "number" } }, required: ["query"] },
+  },
+  {
+    name: "french_admin__details_entreprise",
+    description: "Get detailed company info (dirigeants, effectif, chiffre d'affaires, beneficiaires effectifs) from a SIREN or SIRET via api.gouv.fr.",
+    inputSchema: { type: "object", properties: { siren: { type: "string" }, siret: { type: "string" } } },
+  },
+  {
+    name: "french_admin__valider_adresse",
+    description: "Validate and normalize a French postal address via api-adresse.data.gouv.fr (BAN). Returns standardized address, coordinates, and confidence score.",
+    inputSchema: { type: "object", properties: { address: { type: "string" }, codePostal: { type: "string" }, city: { type: "string" } }, required: ["address"] },
+  },
+  {
+    name: "french_admin__geocodage_inverse",
+    description: "Reverse geocode GPS coordinates to a French postal address via api-adresse.data.gouv.fr (BAN). Returns nearest address, commune, and code postal.",
+    inputSchema: { type: "object", properties: { lat: { type: "number" }, lon: { type: "number" } }, required: ["lat", "lon"] },
+  },
+  {
+    name: "french_admin__info_commune",
+    description: "Get detailed commune info (population, code INSEE, arrondissement, EPCI, departement, region) via geo.api.gouv.fr.",
+    inputSchema: { type: "object", properties: { nom: { type: "string" }, codePostal: { type: "string" }, codeInsee: { type: "string" } } },
+  },
 
   // ── ecommerce-3d-mcp (3 tools: 1 free, 2 pro) ───────────────────────────
   {
@@ -186,7 +255,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     inputSchema: { type: "object", properties: { sku: { type: "string" } }, required: ["sku"] },
   },
 
-  // ── legal-docs-mcp (3 tools: 1 free, 2 pro) ─────────────────────────────
+  // ── legal-docs-mcp (6 tools: 2 free, 4 pro) ─────────────────────────────
   {
     name: "legal_docs__list_templates",
     description: "List contract templates (NDA, employment, freelance, SaaS ToS, privacy policy, licence agreement). Informational, not legal counsel.",
@@ -202,8 +271,23 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     description: "Review an NDA draft and return a structured checklist of missing elements. Informational only.",
     inputSchema: { type: "object", properties: { draftMarkdown: { type: "string" } }, required: ["draftMarkdown"] },
   },
+  {
+    name: "legal_docs__generate_en_privacy_policy",
+    description: "Generate an English-language privacy policy from structured inputs (company name, data collected, third parties, retention). GDPR + CCPA compliant template. Informational only.",
+    inputSchema: { type: "object", properties: { companyName: { type: "string" }, websiteUrl: { type: "string" }, dataCollected: { type: "array" }, thirdParties: { type: "array" }, retentionDays: { type: "number" }, jurisdiction: { type: "string" } }, required: ["companyName"] },
+  },
+  {
+    name: "legal_docs__generate_en_tos",
+    description: "Generate English-language Terms of Service from structured inputs (service description, liability limits, governing law). Informational only.",
+    inputSchema: { type: "object", properties: { companyName: { type: "string" }, serviceDescription: { type: "string" }, governingLaw: { type: "string" }, liabilityLimit: { type: "string" }, arbitration: { type: "boolean" } }, required: ["companyName", "serviceDescription"] },
+  },
+  {
+    name: "legal_docs__generate_dmca_notice",
+    description: "Generate a DMCA takedown notice from structured inputs (copyrighted work, infringing URL, contact info). Informational only.",
+    inputSchema: { type: "object", properties: { copyrightOwner: { type: "string" }, copyrightedWork: { type: "string" }, infringingUrl: { type: "string" }, contactEmail: { type: "string" } }, required: ["copyrightOwner", "copyrightedWork", "infringingUrl"] },
+  },
 
-  // ── finance-mcp (3 tools: 1 free, 2 pro) ─────────────────────────────────
+  // ── finance-mcp (6 tools: 3 free, 3 pro) ─────────────────────────────────
   {
     name: "finance__market_quote",
     description: "Look up the latest market quote for a ticker symbol across equities, ETFs, and crypto. Read-only.",
@@ -219,8 +303,23 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     description: "Compute the future value of a savings plan with periodic contributions and a target annual rate.",
     inputSchema: { type: "object", properties: { principal: { type: "number" }, monthlyContribution: { type: "number" }, annualRatePercent: { type: "number" }, years: { type: "number" } }, required: ["principal", "annualRatePercent", "years"] },
   },
+  {
+    name: "finance__get_stock_quote",
+    description: "Get a real-time stock quote (price, change, volume, market cap) for a ticker symbol via a market data API. Read-only, NEVER places orders.",
+    inputSchema: { type: "object", properties: { symbol: { type: "string" }, exchange: { type: "string" } }, required: ["symbol"] },
+  },
+  {
+    name: "finance__get_crypto_price",
+    description: "Get current cryptocurrency price, 24h change, and market cap for a coin ID (bitcoin, ethereum, etc.) via CoinGecko API. Read-only.",
+    inputSchema: { type: "object", properties: { coinId: { type: "string" }, vsCurrency: { type: "string" } }, required: ["coinId"] },
+  },
+  {
+    name: "finance__get_exchange_rates",
+    description: "Get current exchange rates for a base currency against one or more target currencies via ECB/forex data. Read-only.",
+    inputSchema: { type: "object", properties: { baseCurrency: { type: "string" }, targetCurrencies: { type: "array" } }, required: ["baseCurrency"] },
+  },
 
-  // ── education-mcp (3 tools: 1 free, 2 pro) ───────────────────────────────
+  // ── education-mcp (6 tools: 2 free, 4 pro) ───────────────────────────────
   {
     name: "education__generate_lesson_plan",
     description: "Generate a structured lesson plan for a subject, grade level, and duration. Returns objectives, warm-up, activities, assessment, and homework.",
@@ -235,6 +334,21 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     name: "education__curriculum_align",
     description: "Align a lesson plan against a named standard (Common Core, IB, Cambridge, French Socle Commun) and report covered / missing strands.",
     inputSchema: { type: "object", properties: { lessonPlanMarkdown: { type: "string" }, standard: { type: "string" } }, required: ["lessonPlanMarkdown", "standard"] },
+  },
+  {
+    name: "education__search_papers",
+    description: "Search academic papers via OpenAlex API by keyword, author, or DOI. Returns title, authors, abstract, citation count, and open access URL.",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, author: { type: "string" }, doi: { type: "string" }, limit: { type: "number" }, sort: { type: "string" } }, required: ["query"] },
+  },
+  {
+    name: "education__get_author_profile",
+    description: "Get an academic author profile from OpenAlex (publications, h-index, citations, institutional affiliations, co-authors).",
+    inputSchema: { type: "object", properties: { authorName: { type: "string" }, orcid: { type: "string" } } },
+  },
+  {
+    name: "education__get_citation_stats",
+    description: "Get citation statistics and impact metrics for a paper (DOI) or author from OpenAlex. Returns citation count, citing works, and field-normalized impact.",
+    inputSchema: { type: "object", properties: { doi: { type: "string" }, authorId: { type: "string" } } },
   },
 
   // ── social-media-mcp (3 tools: 1 free, 2 pro) ────────────────────────────
@@ -254,7 +368,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     inputSchema: { type: "object", properties: { niche: { type: "string" }, platforms: { type: "array" }, postsPerWeek: { type: "number" } }, required: ["niche", "platforms"] },
   },
 
-  // ── health-fitness-mcp (3 tools: 1 free, 2 pro) ──────────────────────────
+  // ── health-fitness-mcp (8 tools: 2 free, 6 pro) ──────────────────────────
   {
     name: "health_fitness__workout_plan",
     description: "Generate a weekly workout plan for a goal (strength, hypertrophy, endurance, fat_loss). Informational, not medical advice.",
@@ -269,6 +383,31 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     name: "health_fitness__exercise_form_cues",
     description: "Return form cues and common mistakes for an exercise by name (squat, deadlift, bench_press, pull_up, running).",
     inputSchema: { type: "object", properties: { exercise: { type: "string" } }, required: ["exercise"] },
+  },
+  {
+    name: "health_fitness__get_strava_activities",
+    description: "Fetch recent Strava activities (runs, rides, swims) with distance, duration, pace, and heart rate. Requires Strava API token. Informational only.",
+    inputSchema: { type: "object", properties: { activityType: { type: "string" }, limit: { type: "number" }, after: { type: "string" } } },
+  },
+  {
+    name: "health_fitness__get_strava_athlete_stats",
+    description: "Get Strava athlete stats (YTD totals, all-time totals, recent totals for run/ride/swim). Requires Strava API token. Informational only.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "health_fitness__analyze_strava_trends",
+    description: "Analyze training trends from Strava data: weekly volume, pace progression, heart rate zones, rest days, and overtraining risk. Informational, not medical advice.",
+    inputSchema: { type: "object", properties: { period: { type: "string" }, activityType: { type: "string" } } },
+  },
+  {
+    name: "health_fitness__search_nutrition",
+    description: "Search food nutrition data (calories, macros, micronutrients) via USDA/Nutritionix API. Returns per-serving and per-100g values. Informational only.",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, servingSize: { type: "string" } }, required: ["query"] },
+  },
+  {
+    name: "health_fitness__log_meal_nutrition",
+    description: "Log a meal and compute total nutrition (calories, protein, carbs, fat, fiber) from a list of food items with quantities. Informational only.",
+    inputSchema: { type: "object", properties: { items: { type: "array" }, mealType: { type: "string" } }, required: ["items"] },
   },
 
   // ── automotive-3d-mcp (9 tools: 2 free, 7 pro) ───────────────────────────
