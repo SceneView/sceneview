@@ -90,3 +90,77 @@ Launching app...
   Found 'Collision' at (128, 1167), tapping...
   Waiting 4s for rendering...
   Screenshot saved: 16_collision.png (404380 bytes)
+
+[17/24] Testing: ViewNode
+  Found 'ViewNode' at (143, 1359), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 17_viewnode.png (869237 bytes)
+  Lost focus, relaunching...
+Force-stopping app...
+Launching app...
+
+[18/24] Testing: Physics
+  Found 'Physics' at (119, 949), tapping...
+  Waiting 6s for rendering...
+  Screenshot saved: 18_physics.png (1029055 bytes)
+
+[19/24] Testing: Post Processing
+  Found 'Post Processing' at (205, 1141), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 19_post_processing.png (1882380 bytes)
+
+[20/24] Testing: Custom Mesh
+  Found 'Custom Mesh' at (179, 1333), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 20_custom_mesh.png (583009 bytes)
+
+[21/24] Testing: Shape
+  Found 'Shape' at (104, 1525), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 21_shape.png (420446 bytes)
+
+[22/24] Testing: Reflection Probes
+  Found 'Reflection Probes' at (218, 1717), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 22_reflection_probes.png (1763404 bytes)
+
+[23/24] Testing: Secondary Camera
+  Found 'Secondary Camera' at (229, 1909), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 23_secondary_camera.png (887828 bytes)
+
+[24/24] Testing: Debug Overlay
+  Found 'Debug Overlay' at (185, 2101), tapping...
+  Waiting 4s for rendering...
+  Screenshot saved: 24_debug_overlay.png (1843533 bytes)
+
+============================================================
+QA SUMMARY
+============================================================
+  [PASS] Model Viewer: OK
+  [PASS] Geometry Primitives: OK
+  [PASS] Animation: OK
+  [PASS] Multi Model: OK
+  [PASS] Lighting: OK
+  [PASS] Dynamic Sky: OK
+  [PASS] Fog: OK
+  [PASS] Environment Gallery: OK
+  [PASS] Text Labels: OK
+  [PASS] Lines & Paths: OK
+  [PASS] Image: OK
+  [PASS] Billboard: OK
+  [PASS] Video: OK
+  [PASS] Camera Controls: OK
+  [PASS] Gesture Editing: OK
+  [PASS] Collision: OK
+  [PASS] ViewNode: OK
+  [PASS] Physics: OK
+  [PASS] Post Processing: OK
+  [PASS] Custom Mesh: OK
+  [PASS] Shape: OK
+  [PASS] Reflection Probes: OK
+  [PASS] Secondary Camera: OK
+  [PASS] Debug Overlay: OK
+
+Total: 24 OK, 0 CRASH, 0 NOT_FOUND
+Screenshots saved to: /Users/thomasgorisse/Projects/sceneview/samples/screenshots/android
