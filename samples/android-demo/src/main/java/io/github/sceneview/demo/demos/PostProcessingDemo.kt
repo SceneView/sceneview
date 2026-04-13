@@ -80,7 +80,7 @@ fun PostProcessingDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    scaleToUnits = 1.0f
+                    scaleToUnits = 0.5f
                 )
             }
         }

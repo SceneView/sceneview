@@ -107,13 +107,13 @@ for i in "${!DEMOS[@]}"; do
     # Clear logcat
     adb logcat -c 2>/dev/null
 
-    # Dump UI to find the demo item
-    adb shell uiautomator dump /sdcard/ui.xml 2>/dev/null
-
-    # Find demo coordinates using Python
-    COORDS=$(adb shell cat /sdcard/ui.xml | python3 -c "
-import sys, xml.etree.ElementTree as ET, re
-tree = ET.parse(sys.stdin)
+    # Helper: dump UI and find demo coordinates
+    find_demo() {
+        adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+        adb pull /sdcard/ui.xml /tmp/qa_ui.xml >/dev/null 2>&1
+        python3 -c "
+import xml.etree.ElementTree as ET, re
+tree = ET.parse('/tmp/qa_ui.xml')
 target = '$demo'
 for node in tree.iter('node'):
     text = node.get('text','')
@@ -125,28 +125,16 @@ for node in tree.iter('node'):
             cy = (int(m[1]) + int(m[3])) // 2
             print(f'{cx},{cy}')
             break
-" 2>/dev/null)
+" 2>/dev/null
+    }
+
+    COORDS=$(find_demo)
 
     if [[ -z "$COORDS" ]]; then
         # Demo not visible — scroll down and retry
         adb shell "input swipe 540 1800 540 600 120" 2>/dev/null
         sleep 1
-        adb shell uiautomator dump /sdcard/ui.xml 2>/dev/null
-        COORDS=$(adb shell cat /sdcard/ui.xml | python3 -c "
-import sys, xml.etree.ElementTree as ET, re
-tree = ET.parse(sys.stdin)
-target = '$demo'
-for node in tree.iter('node'):
-    text = node.get('text','')
-    if text == target:
-        bounds = node.get('bounds','')
-        m = re.findall(r'\d+', bounds)
-        if len(m) == 4:
-            cx = (int(m[0]) + int(m[2])) // 2
-            cy = (int(m[1]) + int(m[3])) // 2
-            print(f'{cx},{cy}')
-            break
-" 2>/dev/null)
+        COORDS=$(find_demo)
     fi
 
     if [[ -z "$COORDS" ]]; then
@@ -156,22 +144,7 @@ for node in tree.iter('node'):
             sleep 0.5
         done
         sleep 1
-        adb shell uiautomator dump /sdcard/ui.xml 2>/dev/null
-        COORDS=$(adb shell cat /sdcard/ui.xml | python3 -c "
-import sys, xml.etree.ElementTree as ET, re
-tree = ET.parse(sys.stdin)
-target = '$demo'
-for node in tree.iter('node'):
-    text = node.get('text','')
-    if text == target:
-        bounds = node.get('bounds','')
-        m = re.findall(r'\d+', bounds)
-        if len(m) == 4:
-            cx = (int(m[0]) + int(m[2])) // 2
-            cy = (int(m[1]) + int(m[3])) // 2
-            print(f'{cx},{cy}')
-            break
-" 2>/dev/null)
+        COORDS=$(find_demo)
     fi
 
     if [[ -z "$COORDS" ]]; then

@@ -67,30 +67,30 @@ fun GeometryDemo(onBack: () -> Unit) {
             if (showCube) {
                 CubeNode(
                     materialInstance = redMaterial,
-                    size = Float3(0.3f, 0.3f, 0.3f),
-                    position = Position(x = -0.5f, y = 0.2f)
+                    size = Float3(0.15f, 0.15f, 0.15f),
+                    position = Position(x = -0.3f, y = 0.1f)
                 )
             }
             if (showSphere) {
                 SphereNode(
                     materialInstance = blueMaterial,
-                    radius = 0.18f,
-                    position = Position(x = 0.0f, y = 0.2f)
+                    radius = 0.1f,
+                    position = Position(x = -0.1f, y = 0.1f)
                 )
             }
             if (showCylinder) {
                 CylinderNode(
                     materialInstance = greenMaterial,
-                    radius = 0.15f,
-                    height = 0.35f,
-                    position = Position(x = 0.5f, y = 0.2f)
+                    radius = 0.08f,
+                    height = 0.2f,
+                    position = Position(x = 0.1f, y = 0.1f)
                 )
             }
             if (showPlane) {
                 PlaneNode(
                     materialInstance = yellowMaterial,
-                    size = Float3(1.5f, 1.5f, 1f),
-                    position = Position(x = 0f, y = -0.1f)
+                    size = Float3(0.3f, 0.3f, 1f),
+                    position = Position(x = 0.3f, y = 0.1f)
                 )
             }
         }

@@ -84,7 +84,7 @@ fun GestureEditingDemo(onBack: () -> Unit) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 1.0f,
+                        scaleToUnits = 0.3f,
                         centerOrigin = Position(x = 0f, y = 0f, z = 0f),
                         isEditable = editable
                     )

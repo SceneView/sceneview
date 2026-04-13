@@ -99,7 +99,7 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    scaleToUnits = 1.5f,
+                    scaleToUnits = 0.5f,
                     position = Position(y = 0f)
                 )
             }

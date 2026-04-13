@@ -78,8 +78,8 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 avocado?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 0.8f,
-                        position = Position(x = -1.5f, y = 0f)
+                        scaleToUnits = 0.3f,
+                        position = Position(x = -0.4f, y = 0f)
                     )
                 }
             }
@@ -87,7 +87,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 lantern?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 0.8f,
+                        scaleToUnits = 0.3f,
                         position = Position(x = 0f, y = 0f)
                     )
                 }
@@ -96,8 +96,8 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 helmet?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 0.8f,
-                        position = Position(x = 1.5f, y = 0f)
+                        scaleToUnits = 0.3f,
+                        position = Position(x = 0.4f, y = 0f)
                     )
                 }
             }

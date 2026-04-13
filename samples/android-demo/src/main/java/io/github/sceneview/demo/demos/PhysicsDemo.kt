@@ -24,6 +24,7 @@ import io.github.sceneview.math.Size
 import io.github.sceneview.node.Node as NodeImpl
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 
 /**
@@ -39,6 +40,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
 
     DemoScaffold(
         title = "Physics",
@@ -67,6 +69,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxSize(),
                 engine = engine,
                 materialLoader = materialLoader,
+                environmentLoader = environmentLoader,
                 cameraManipulator = rememberCameraManipulator()
             ) {
                 val groundMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.DarkGray) }

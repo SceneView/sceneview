@@ -113,7 +113,7 @@ fun CameraControlsDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    scaleToUnits = 1.0f,
+                    scaleToUnits = 0.5f,
                     centerOrigin = Position(0.0f, 0.0f, 0.0f)
                 )
             }

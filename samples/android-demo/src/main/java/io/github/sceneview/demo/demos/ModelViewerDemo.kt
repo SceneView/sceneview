@@ -51,7 +51,7 @@ fun ModelViewerDemo(onBack: () -> Unit) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 1.0f,
+                        scaleToUnits = 0.3f,
                         rotation = Rotation(y = rotationY)
                     )
                 }
