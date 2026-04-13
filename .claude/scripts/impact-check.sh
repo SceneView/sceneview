@@ -79,10 +79,24 @@ fi
 echo ""
 echo -e "${CYAN}--- Cross-platform parity (Android vs Swift) ---${NC}"
 
+# Android: file-based node types (exclude base classes)
 ANDROID_NODES=$(ls sceneview/src/main/java/io/github/sceneview/node/*Node.kt 2>/dev/null | \
-    xargs -I{} basename {} .kt | sort)
-SWIFT_NODES=$(ls SceneViewSwift/Sources/SceneViewSwift/Nodes/*Node.swift 2>/dev/null | \
-    xargs -I{} basename {} .swift | sort)
+    xargs -I{} basename {} .kt | \
+    grep -Ev '^(Node|RenderableNode|GeometryNode)$' | sort)
+
+# Swift: file-based node types + geometry factories in GeometryNode.swift
+SWIFT_FILE_NODES=$(ls SceneViewSwift/Sources/SceneViewSwift/Nodes/*Node.swift 2>/dev/null | \
+    xargs -I{} basename {} .swift | \
+    grep -Ev '^GeometryNode$' | sort)
+# Extract geometry factory names and map to Android-equivalent node names
+SWIFT_GEOM_FACTORIES=$(grep 'public static func' SceneViewSwift/Sources/SceneViewSwift/Nodes/GeometryNode.swift 2>/dev/null | \
+    sed -n 's/.*public static func \([a-z]*\)(.*/\1/p' | sort -u | \
+    grep -v loadTexture | \
+    while read name; do
+        # Capitalize first letter and add "Node" suffix → e.g. "torus" → "TorusNode"
+        echo "$name" | awk '{print toupper(substr($0,1,1)) substr($0,2) "Node"}'
+    done)
+SWIFT_NODES=$(printf '%s\n' "$SWIFT_FILE_NODES" $SWIFT_GEOM_FACTORIES | sort -u)
 
 ANDROID_ONLY=$(comm -23 <(echo "$ANDROID_NODES") <(echo "$SWIFT_NODES") 2>/dev/null | tr '\n' ' ')
 SWIFT_ONLY=$(comm -13 <(echo "$ANDROID_NODES") <(echo "$SWIFT_NODES") 2>/dev/null | tr '\n' ' ')
