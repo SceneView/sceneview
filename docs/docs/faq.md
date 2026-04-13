@@ -150,7 +150,7 @@ Yes — create the engine at a higher scope (e.g., ViewModel or CompositionLocal
 
 ### Does SceneView support iOS?
 
-Yes. SceneViewSwift (v3.6.2 alpha) provides a native SwiftUI library powered by RealityKit and ARKit. It supports iOS 17+, macOS 14+, and visionOS 1+. Install via Swift Package Manager. See the [Apple Quickstart](quickstart-ios.md).
+Yes. SceneViewSwift (v4.0.0 alpha) provides a native SwiftUI library powered by RealityKit and ARKit. It supports iOS 17+, macOS 14+, and visionOS 1+. Install via Swift Package Manager. See the [Apple Quickstart](quickstart-ios.md).
 
 ### What model formats work on iOS?
 

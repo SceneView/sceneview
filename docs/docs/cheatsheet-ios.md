@@ -28,7 +28,7 @@ import SceneViewSwift
 ## SceneView (3D)
 
 ```swift
-// Declarative (recommended — v3.6.0+)
+// Declarative (recommended — v4.0.0+)
 SceneView {
     GeometryNode.cube(size: 0.3, color: .red)
         .position(.init(x: -1, y: 0, z: -2))
@@ -199,7 +199,7 @@ SceneView { root in
 }
 ```
 
-### Per-entity gestures (v3.6.0+)
+### Per-entity gestures (v4.0.0+)
 
 ```swift
 // Fluent API on Entity

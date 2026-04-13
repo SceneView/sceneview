@@ -11,7 +11,7 @@ description: "What's coming in SceneView 4.0: Kotlin Multiplatform core, Android
 <img src="assets/images/v4-architecture.svg" alt="SceneView 4.0 multi-platform architecture" style="width: 100%; max-width: 800px; border-radius: 24px;">
 </div>
 
-!!! info "v3.6.2 is production-ready today"
+!!! info "v4.0.0 is production-ready today"
     You don't need to wait for 4.0. Everything below adds capabilities on top — it doesn't
     replace anything. [Get started now](index.md#install-in-30-seconds).
 
@@ -52,13 +52,13 @@ With Android XR launching, SceneView v4 will add:
 ### New Platforms
 
 !!! note "iOS, macOS, visionOS already available"
-    SceneViewSwift v3.6.2 (alpha) ships today with RealityKit rendering.
+    SceneViewSwift v4.0.0 (alpha) ships today with RealityKit rendering.
     v4.0 focuses on Android XR, cross-framework bridges, and deeper KMP integration.
 
 | Platform | Composable | Renderer | Status |
 |---|---|---|---|
-| Android | `SceneView { }` | Filament (OpenGL ES / Vulkan) | Stable (v3.6.2) |
-| iOS / macOS / visionOS | `SceneView { }` (SwiftUI) | RealityKit (Metal) | Alpha (v3.6.2) |
+| Android | `SceneView { }` | Filament (OpenGL ES / Vulkan) | Stable (v4.0.0) |
+| iOS / macOS / visionOS | `SceneView { }` (SwiftUI) | RealityKit (Metal) | Alpha (v4.0.0) |
 | Android XR | `XRScene { }` | Filament (Vulkan) | v4.0 |
 | Desktop | `SceneView { }` (Compose Desktop) | Filament (OpenGL / Vulkan) | Planned |
 | Web | `SceneView { }` (Compose HTML) | Filament (WebGPU) | Research |
