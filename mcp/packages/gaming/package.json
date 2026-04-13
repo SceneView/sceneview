@@ -40,7 +40,8 @@
   "files": [
     "dist/**/*.js",
     "!dist/**/*.test.js",
-    "!dist/**/__fixtures__/**"
+    "!dist/**/__fixtures__/**",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"

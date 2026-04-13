@@ -71,12 +71,14 @@ function callTool(key: string, name: string): Request {
 }
 
 describe("access module — pure functions", () => {
-  it("FREE_TOOLS covers every library (14 total)", () => {
-    // 8 stubbed libraries: 1 each = 8
-    // Real architecture (npm): 2 (generate_3d_concept + cost_estimate)
+  it("FREE_TOOLS covers every library (23 total)", () => {
+    // Real architecture (npm): 3 (generate_3d_concept + cost_estimate + search_parcels)
+    // Stubbed libraries — discovery + bridge-API tools:
+    //   ecommerce3d: 1, education: 2, finance: 3, french_admin: 3,
+    //   health_fitness: 2, legal_docs: 2, realestate: 2, social_media: 1 = 16
     // Real automotive (monorepo): 2 (list_car_models + validate_automotive_code)
     // Real healthcare (monorepo): 2 (list_medical_models + validate_medical_code)
-    expect(FREE_TOOLS.size).toBe(14);
+    expect(FREE_TOOLS.size).toBe(23);
   });
 
   it("getToolTier returns `free` for whitelisted tools", () => {
