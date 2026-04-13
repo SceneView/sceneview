@@ -31,7 +31,7 @@ googleMaterial = "1.13.0"
 media3 = "1.10.0"
 
 # TV
-tvFoundation = "1.0.0-beta01"
+tvFoundation = "1.0.0-rc01"
 tvMaterial = "1.0.1"
 
 # Play Services
