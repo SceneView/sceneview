@@ -86,19 +86,19 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 // so the camera can see both the plane and the falling spheres above it.
                 PlaneNode(
                     materialInstance = groundMaterial,
-                    size = Size(x = 3.0f, y = 3.0f),
-                    position = Position(y = -1.0f)
+                    size = Size(x = 1.5f, y = 1.5f),
+                    position = Position(y = -0.5f)
                 )
 
                 for (i in 0 until sphereCount) {
-                    val xOffset = (i % 5 - 2) * 0.4f
-                    val startY = 1.5f + i * 0.5f
+                    val xOffset = (i % 5 - 2) * 0.3f
+                    val startY = 0.5f + i * 0.4f
 
                     // Capture the Node reference via apply so PhysicsNode can drive it.
                     var nodeRef by remember(i) { mutableStateOf<NodeImpl?>(null) }
 
                     Node(
-                        position = Position(x = xOffset, y = startY, z = -1f),
+                        position = Position(x = xOffset, y = startY, z = 0f),
                         apply = { nodeRef = this }
                     ) {
                         SphereNode(
@@ -112,6 +112,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
                         PhysicsNode(
                             node = node,
                             restitution = 0.7f,
+                            floorY = -0.5f,
                             radius = 0.15f
                         )
                     }
