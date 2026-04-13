@@ -24,10 +24,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
@@ -35,6 +38,7 @@ import io.github.sceneview.rememberModelLoader
 /**
  * Demonstrates model animation playback controls: play/pause, speed, and loop mode.
  */
+@OptIn(ExperimentalSceneViewApi::class)
 @Composable
 fun AnimationDemo(onBack: () -> Unit) {
     var isPlaying by remember { mutableStateOf(true) }
@@ -45,6 +49,9 @@ fun AnimationDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/animated_dragon.glb")
+
+    // Load an HDR environment for better lighting on the dragon model
+    val hdrEnvironment = rememberHDREnvironment(environmentLoader, "environments/studio_warm_2k.hdr")
 
     DemoScaffold(
         title = "Animation",
@@ -101,12 +108,13 @@ fun AnimationDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
+            environment = hdrEnvironment ?: rememberEnvironment(environmentLoader),
             cameraManipulator = rememberCameraManipulator()
         ) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    scaleToUnits = 1.0f,
+                    scaleToUnits = 0.3f,
                     autoAnimate = isPlaying,
                     animationSpeed = speed,
                     animationLoop = loop

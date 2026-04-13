@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Size
 import io.github.sceneview.node.Node as NodeImpl
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -78,21 +79,23 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     )
                 }
 
-                // Ground plane for visual reference
+                // Ground plane for visual reference — positioned below center and sized
+                // so the camera can see both the plane and the falling spheres above it.
                 PlaneNode(
                     materialInstance = groundMaterial,
-                    position = Position(y = 0f)
+                    size = Size(x = 3.0f, y = 3.0f),
+                    position = Position(y = -1.0f)
                 )
 
                 for (i in 0 until sphereCount) {
                     val xOffset = (i % 5 - 2) * 0.4f
-                    val startY = 3f + i * 0.5f
+                    val startY = 1.5f + i * 0.5f
 
                     // Capture the Node reference via apply so PhysicsNode can drive it.
                     var nodeRef by remember(i) { mutableStateOf<NodeImpl?>(null) }
 
                     Node(
-                        position = Position(x = xOffset, y = startY, z = -2f),
+                        position = Position(x = xOffset, y = startY, z = -1f),
                         apply = { nodeRef = this }
                     ) {
                         SphereNode(
