@@ -168,7 +168,7 @@ The tool is read-only, never writes to disk, and gracefully handles missing dire
 
 | Resource URI | What it provides |
 |---|---|
-| `sceneview://api` | Complete SceneView 3.6.0 API reference (the full `llms.txt`) |
+| `sceneview://api` | Complete SceneView 4.0.0 API reference (the full `llms.txt`) |
 | `sceneview://known-issues` | Live open issues from GitHub (cached 10 min) |
 
 ---
@@ -208,7 +208,7 @@ The assistant calls `render_3d_preview` and returns an interactive link to a bro
 - Have no knowledge of SceneView's iOS/Swift API at all
 
 **With** this MCP server, AI assistants:
-- Always use the current SceneView 3.6.0 API surface
+- Always use the current SceneView 4.0.0 API surface
 - Generate correct **Compose-native** 3D/AR code for Android
 - Generate correct **SwiftUI-native** code for iOS/macOS/visionOS
 - Know about all 35+ node types and their exact parameters
