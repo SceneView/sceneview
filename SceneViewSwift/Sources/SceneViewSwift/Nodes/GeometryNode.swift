@@ -182,6 +182,104 @@ public struct GeometryNode: Sendable {
         return GeometryNode(entity: entity)
     }
 
+    // MARK: - Torus
+
+    /// Creates a torus geometry by procedurally generating the mesh.
+    ///
+    /// - Parameters:
+    ///   - majorRadius: Distance from the center of the torus to the center of the tube.
+    ///   - minorRadius: Radius of the tube itself.
+    ///   - majorSegments: Number of segments around the main ring. Default 48.
+    ///   - minorSegments: Number of segments around the tube cross-section. Default 24.
+    ///   - color: Simple material color.
+    /// - Returns: A `GeometryNode` containing a torus mesh.
+    public static func torus(
+        majorRadius: Float = 0.4,
+        minorRadius: Float = 0.15,
+        majorSegments: Int = 48,
+        minorSegments: Int = 24,
+        color: SimpleMaterial.Color = .white
+    ) -> GeometryNode {
+        let mesh = generateTorusMesh(
+            majorRadius: majorRadius,
+            minorRadius: minorRadius,
+            majorSegments: majorSegments,
+            minorSegments: minorSegments
+        )
+        let material = SimpleMaterial(color: color, isMetallic: false)
+        let entity = ModelEntity(mesh: mesh, materials: [material])
+        entity.generateCollisionShapes(recursive: false)
+        return GeometryNode(entity: entity)
+    }
+
+    /// Creates a torus with PBR material.
+    public static func torus(
+        majorRadius: Float = 0.4,
+        minorRadius: Float = 0.15,
+        majorSegments: Int = 48,
+        minorSegments: Int = 24,
+        material: GeometryMaterial
+    ) -> GeometryNode {
+        let mesh = generateTorusMesh(
+            majorRadius: majorRadius,
+            minorRadius: minorRadius,
+            majorSegments: majorSegments,
+            minorSegments: minorSegments
+        )
+        let entity = ModelEntity(mesh: mesh, materials: [material.rkMaterial])
+        entity.generateCollisionShapes(recursive: false)
+        return GeometryNode(entity: entity)
+    }
+
+    // MARK: - Capsule
+
+    /// Creates a capsule geometry (cylinder with hemisphere caps).
+    ///
+    /// - Parameters:
+    ///   - radius: Radius of the capsule (cylinder and hemisphere caps).
+    ///   - height: Total height including the two hemisphere caps.
+    ///   - capSegments: Number of vertical segments per hemisphere cap. Default 12.
+    ///   - radialSegments: Number of segments around the circumference. Default 24.
+    ///   - color: Simple material color.
+    /// - Returns: A `GeometryNode` containing a capsule mesh.
+    public static func capsule(
+        radius: Float = 0.25,
+        height: Float = 1.0,
+        capSegments: Int = 12,
+        radialSegments: Int = 24,
+        color: SimpleMaterial.Color = .white
+    ) -> GeometryNode {
+        let mesh = generateCapsuleMesh(
+            radius: radius,
+            height: height,
+            capSegments: capSegments,
+            radialSegments: radialSegments
+        )
+        let material = SimpleMaterial(color: color, isMetallic: false)
+        let entity = ModelEntity(mesh: mesh, materials: [material])
+        entity.generateCollisionShapes(recursive: false)
+        return GeometryNode(entity: entity)
+    }
+
+    /// Creates a capsule with PBR material.
+    public static func capsule(
+        radius: Float = 0.25,
+        height: Float = 1.0,
+        capSegments: Int = 12,
+        radialSegments: Int = 24,
+        material: GeometryMaterial
+    ) -> GeometryNode {
+        let mesh = generateCapsuleMesh(
+            radius: radius,
+            height: height,
+            capSegments: capSegments,
+            radialSegments: radialSegments
+        )
+        let entity = ModelEntity(mesh: mesh, materials: [material.rkMaterial])
+        entity.generateCollisionShapes(recursive: false)
+        return GeometryNode(entity: entity)
+    }
+
     // MARK: - Transform helpers
 
     /// Returns self positioned at the given coordinates.
@@ -221,6 +319,195 @@ public struct GeometryNode: Sendable {
         }
         #endif
         return self
+    }
+
+    // MARK: - Mesh generation (private)
+
+    /// Generates a torus mesh using parametric surface equations.
+    private static func generateTorusMesh(
+        majorRadius: Float,
+        minorRadius: Float,
+        majorSegments: Int,
+        minorSegments: Int
+    ) -> MeshResource {
+        var positions: [SIMD3<Float>] = []
+        var normals: [SIMD3<Float>] = []
+        var uvs: [SIMD2<Float>] = []
+        var indices: [UInt32] = []
+
+        for i in 0...majorSegments {
+            let u = Float(i) / Float(majorSegments) * 2 * .pi
+            let cosU = cos(u)
+            let sinU = sin(u)
+
+            for j in 0...minorSegments {
+                let v = Float(j) / Float(minorSegments) * 2 * .pi
+                let cosV = cos(v)
+                let sinV = sin(v)
+
+                let x = (majorRadius + minorRadius * cosV) * cosU
+                let y = minorRadius * sinV
+                let z = (majorRadius + minorRadius * cosV) * sinU
+
+                positions.append(SIMD3<Float>(x, y, z))
+
+                let nx = cosV * cosU
+                let ny = sinV
+                let nz = cosV * sinU
+                normals.append(SIMD3<Float>(nx, ny, nz))
+
+                uvs.append(SIMD2<Float>(
+                    Float(i) / Float(majorSegments),
+                    Float(j) / Float(minorSegments)
+                ))
+            }
+        }
+
+        let stride = minorSegments + 1
+        for i in 0..<majorSegments {
+            for j in 0..<minorSegments {
+                let a = UInt32(i * stride + j)
+                let b = UInt32(i * stride + j + 1)
+                let c = UInt32((i + 1) * stride + j + 1)
+                let d = UInt32((i + 1) * stride + j)
+
+                indices.append(contentsOf: [a, b, c, a, c, d])
+            }
+        }
+
+        var descriptor = MeshDescriptor(name: "GeometryNode_Torus")
+        descriptor.positions = MeshBuffers.Positions(positions)
+        descriptor.normals = MeshBuffers.Normals(normals)
+        descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(uvs)
+        descriptor.primitives = .triangles(indices)
+
+        return (try? MeshResource.generate(from: [descriptor]))
+            ?? MeshResource.generateSphere(radius: majorRadius)
+    }
+
+    /// Generates a capsule mesh (cylinder body + two hemisphere caps).
+    private static func generateCapsuleMesh(
+        radius: Float,
+        height: Float,
+        capSegments: Int,
+        radialSegments: Int
+    ) -> MeshResource {
+        let cylinderHeight = max(height - 2 * radius, 0)
+        let halfCylinder = cylinderHeight / 2
+
+        var positions: [SIMD3<Float>] = []
+        var normals: [SIMD3<Float>] = []
+        var uvs: [SIMD2<Float>] = []
+        var indices: [UInt32] = []
+
+        // Top hemisphere cap
+        for i in 0...capSegments {
+            let phi = Float(i) / Float(capSegments) * (.pi / 2) // 0 to pi/2
+            let sinPhi = sin(phi)
+            let cosPhi = cos(phi)
+
+            for j in 0...radialSegments {
+                let theta = Float(j) / Float(radialSegments) * 2 * .pi
+                let cosTheta = cos(theta)
+                let sinTheta = sin(theta)
+
+                let x = radius * sinPhi * cosTheta
+                let y = halfCylinder + radius * cosPhi
+                let z = radius * sinPhi * sinTheta
+
+                positions.append(SIMD3<Float>(x, y, z))
+                normals.append(SIMD3<Float>(sinPhi * cosTheta, cosPhi, sinPhi * sinTheta))
+                uvs.append(SIMD2<Float>(
+                    Float(j) / Float(radialSegments),
+                    1.0 - Float(i) / Float(capSegments) * 0.25
+                ))
+            }
+        }
+
+        // Cylinder body (2 rings: top and bottom)
+        for i in 0...1 {
+            let y = i == 0 ? halfCylinder : -halfCylinder
+            for j in 0...radialSegments {
+                let theta = Float(j) / Float(radialSegments) * 2 * .pi
+                let cosTheta = cos(theta)
+                let sinTheta = sin(theta)
+
+                positions.append(SIMD3<Float>(radius * cosTheta, y, radius * sinTheta))
+                normals.append(SIMD3<Float>(cosTheta, 0, sinTheta))
+                uvs.append(SIMD2<Float>(
+                    Float(j) / Float(radialSegments),
+                    i == 0 ? 0.75 : 0.5
+                ))
+            }
+        }
+
+        // Bottom hemisphere cap
+        for i in 0...capSegments {
+            let phi = Float(i) / Float(capSegments) * (.pi / 2) // 0 to pi/2
+            let sinPhi = sin(phi)
+            let cosPhi = cos(phi)
+
+            for j in 0...radialSegments {
+                let theta = Float(j) / Float(radialSegments) * 2 * .pi
+                let cosTheta = cos(theta)
+                let sinTheta = sin(theta)
+
+                let x = radius * sinPhi * cosTheta
+                let y = -halfCylinder - radius * cosPhi
+                let z = radius * sinPhi * sinTheta
+
+                positions.append(SIMD3<Float>(x, y, z))
+                normals.append(SIMD3<Float>(sinPhi * cosTheta, -cosPhi, sinPhi * sinTheta))
+                uvs.append(SIMD2<Float>(
+                    Float(j) / Float(radialSegments),
+                    0.25 - Float(i) / Float(capSegments) * 0.25
+                ))
+            }
+        }
+
+        let stride = radialSegments + 1
+
+        // Top cap indices
+        for i in 0..<capSegments {
+            for j in 0..<radialSegments {
+                let a = UInt32(i * stride + j)
+                let b = UInt32(i * stride + j + 1)
+                let c = UInt32((i + 1) * stride + j + 1)
+                let d = UInt32((i + 1) * stride + j)
+                indices.append(contentsOf: [a, c, b, a, d, c])
+            }
+        }
+
+        // Cylinder body indices
+        let cylBase = UInt32((capSegments + 1) * stride)
+        for j in 0..<UInt32(radialSegments) {
+            let a = cylBase + j
+            let b = cylBase + j + 1
+            let c = cylBase + UInt32(stride) + j + 1
+            let d = cylBase + UInt32(stride) + j
+            indices.append(contentsOf: [a, c, b, a, d, c])
+        }
+
+        // Bottom cap indices
+        let botBase = UInt32((capSegments + 1) * stride + 2 * stride)
+        for i in 0..<UInt32(capSegments) {
+            for j in 0..<UInt32(radialSegments) {
+                let a = botBase + i * UInt32(stride) + j
+                let b = botBase + i * UInt32(stride) + j + 1
+                let c = botBase + (i + 1) * UInt32(stride) + j + 1
+                let d = botBase + (i + 1) * UInt32(stride) + j
+                indices.append(contentsOf: [a, b, c, a, c, d])
+            }
+        }
+
+        var descriptor = MeshDescriptor(name: "GeometryNode_Capsule")
+        descriptor.positions = MeshBuffers.Positions(positions)
+        descriptor.normals = MeshBuffers.Normals(normals)
+        descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(uvs)
+        descriptor.primitives = .triangles(indices)
+
+        return (try? MeshResource.generate(from: [descriptor]))
+            ?? MeshResource.generateSphere(radius: radius)
     }
 }
 
