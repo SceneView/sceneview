@@ -21,12 +21,21 @@ import { canCallTool, getToolTier } from "../mcp/access.js";
 import { insertUsageRecord, monthBucket } from "../db/usage.js";
 import { incrementQuotaCache } from "../rate-limit/quotas.js";
 import { touchApiKey } from "../db/api-keys.js";
+import { mcpPublicRoutes } from "./mcp-public.js";
 
 type McpBindings = { Bindings: Env; Variables: AuthVariables };
 
 /** Creates a router group mounted under `/mcp`. */
 export function mcpRoutes(): Hono<McpBindings> {
   const app = new Hono<McpBindings>();
+
+  // Anonymous public sub-route — MUST be registered BEFORE the wildcard
+  // auth middleware below so `/mcp/public` doesn't hit the 401 gate.
+  // Marketplaces (Smithery, mcp.so, ChatGPT MCP picker, Claude Desktop's
+  // remote MCP connector) need an unauthenticated URL to list the server;
+  // this route serves the free tools to anonymous clients with an
+  // IP-based rate limit. See `routes/mcp-public.ts` for the full context.
+  app.route("/public", mcpPublicRoutes());
 
   // Apply the middleware chain to every /mcp request.
   app.use("*", authMiddleware(), rateLimitMiddleware());
