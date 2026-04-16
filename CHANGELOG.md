@@ -1,5 +1,32 @@
 # Changelog
 
+## v4.0.1 — Swift Geometry Primitives, Filament 1.71.0, Hub MCP v0.3.0
+
+**Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.
+
+### New — Swift Geometry Primitives
+
+- `torus()` and `capsule()` added to `SceneViewSwift` geometry API, matching the Android/KMP surface
+- `ConeNode`, `TorusNode`, `CapsuleNode` documented in docs/nodes.md
+
+### Fixed — Filament 1.71.0 Materials
+
+- Recompiled 6 `.filamat` materials for Filament 1.71.0 (closes #818)
+- All material binaries updated in `arsceneview/src/main/assets/`
+
+### Improved — Hub MCP v0.3.0 (78 tools)
+
+- 78 tools across 11 bridge-API MCPs (up from 52)
+- `gaming-3d-mcp` and `interior-design-3d-mcp` `files[]` glob fix — tarball no longer ships incomplete
+- FREE_TOOLS count corrected (14 → 23)
+
+### Improved — Android Samples
+
+- Layout and `scaleToUnits` tuned across all 24 Android demo scenes for better camera framing
+- PhysicsDemo layout refined for Pixel 9 QA
+
+---
+
 ## v4.0.0 — Declarative Compose DSL, Rerun.io AR Debug, MCP Gateway & Cross-Platform Bridges
 
 **Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.
