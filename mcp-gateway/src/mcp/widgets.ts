@@ -194,7 +194,23 @@ const WIDGET_3D_VIEWER_HTML = `<!DOCTYPE html>
       };
 
       var data = fromHost() || fromQuery() || {};
-      if (data.title) document.getElementById("title").textContent = data.title;
+      // Sanitise the title: trim, cap length, and de-dupe accidental
+      // repetition like "Ferrari F40Ferrari F40 2" caused by URL bar
+      // autocomplete or stacked navigations during preview.
+      function cleanTitle(raw) {
+        if (!raw) return "";
+        var s = String(raw).trim();
+        if (s.length > 60) s = s.slice(0, 60);
+        // If the string is exactly its first half repeated, keep the half.
+        var half = Math.floor(s.length / 2);
+        if (half > 0 && s.slice(0, half) === s.slice(half, half * 2)) {
+          s = s.slice(0, half).trim();
+        }
+        return s;
+      }
+      var titleEl = document.getElementById("title");
+      var clean = cleanTitle(data.title);
+      titleEl.textContent = clean || "SceneView 3D Viewer";
 
       var loader = document.getElementById("loader");
       var canvas = document.getElementById("canvas");
