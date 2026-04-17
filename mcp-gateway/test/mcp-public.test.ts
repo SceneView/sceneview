@@ -42,7 +42,7 @@ function env(): Env {
 function postPublic(
   body: unknown,
   headers: Record<string, string> = {},
-): Promise<Response> {
+) {
   return app.request(
     "/mcp/public",
     {

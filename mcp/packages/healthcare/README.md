@@ -18,7 +18,7 @@ Give Claude (or any MCP-compatible AI assistant) the ability to generate complet
 
 ## Installation
 
-### Claude Desktop
+### Option A — stdio via `npx` (Claude Desktop, Claude Code, Cursor, Windsurf)
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -31,6 +31,25 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
     }
   }
 }
+```
+
+### Option B — hosted HTTP MCP URL (ChatGPT, Claude Desktop "Remote MCP", Cursor URL)
+
+The 6 healthcare tools are also exposed (along with sceneview-mcp + automotive/gaming/interior/rerun verticals — 63 tools total) on the shared SceneView gateway:
+
+```
+https://sceneview-mcp.mcp-tools-lab.workers.dev/mcp/public
+```
+
+- Anonymous, no API key required
+- All 6 healthcare tools are Pro tier — they return a JSON-RPC ACCESS_DENIED with a `/pricing` pointer until you subscribe
+- Rate limit: 60 req/h per IP
+
+For the **authenticated Pro tier** (full quota, all tools dispatch):
+
+```
+https://sceneview-mcp.mcp-tools-lab.workers.dev/mcp
+Authorization: Bearer sv_live_...
 ```
 
 ### From source

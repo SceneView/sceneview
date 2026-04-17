@@ -24,6 +24,7 @@ import * as AutomotiveTools from "../../../mcp/packages/automotive/src/tools.js"
 import * as GamingTools from "../../../mcp/packages/gaming/src/tools.js";
 import * as HealthcareTools from "../../../mcp/packages/healthcare/src/tools.js";
 import * as InteriorTools from "../../../mcp/packages/interior/src/tools.js";
+import * as RerunTools from "../../../mcp/packages/rerun/src/tools.js";
 
 import type {
   DispatchContext,
@@ -64,6 +65,12 @@ const LIBRARIES: ToolLibrary[] = [
     label: "interior-design-3d-mcp",
     definitions: InteriorTools.TOOL_DEFINITIONS,
     dispatch: (name, args, ctx) => InteriorTools.dispatchTool(name, args, ctx),
+  },
+  {
+    id: "rerun",
+    label: "rerun-3d-mcp",
+    definitions: RerunTools.TOOL_DEFINITIONS,
+    dispatch: (name, args, ctx) => RerunTools.dispatchTool(name, args, ctx),
   },
 ];
 
