@@ -27,6 +27,19 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+/**
+ * Behaviour annotations forwarded verbatim to MCP clients via `tools/list`.
+ * Mirror of the same interface in `mcp/src/tools/types.ts` — see that file
+ * for the full rationale (OpenAI / Smithery review demand these so they
+ * don't have to ask for free-form per-tool justifications).
+ */
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+  title?: string;
+}
+
 /** Tool metadata exposed to MCP clients via `tools/list`. */
 export interface ToolDefinition {
   name: string;
@@ -37,6 +50,13 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /**
+   * MCP behaviour hints — enforced at runtime by the registry contract test
+   * (`test/registry.test.ts`). Optional in the type only to keep the
+   * migration easy for any future library that hasn't been updated yet;
+   * the runtime test refuses to ship a registry where any tool omits them.
+   */
+  annotations?: ToolAnnotations;
 }
 
 /**

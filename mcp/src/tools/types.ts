@@ -19,6 +19,39 @@ export interface ToolResult {
 }
 
 /**
+ * Behaviour annotations forwarded verbatim to MCP clients via `tools/list`.
+ *
+ * These are the standard hints from the MCP spec
+ * (https://modelcontextprotocol.io/specification/2025-03-26/server/tools#tool):
+ *
+ * - `readOnlyHint`: the tool only reads / returns data, never mutates state.
+ *   For SceneView tools this is true everywhere — we generate code, return
+ *   docs, validate snippets, but never touch the user's filesystem or any
+ *   remote state.
+ * - `openWorldHint`: the tool reaches out to systems beyond the local server.
+ *   False for the vast majority of SceneView tools (they're pure functions of
+ *   bundled docs/templates). True ONLY for the few that talk to a third
+ *   party — e.g. `search_models` queries Sketchfab.
+ * - `destructiveHint`: the tool can have destructive side effects (delete,
+ *   overwrite, etc.). Always false for SceneView — every tool is additive
+ *   (returns text the AI can then choose to write). Meaningful only when
+ *   `readOnlyHint == false`, but we set it explicitly so OpenAI / Smithery
+ *   reviewers don't have to write a justification per tool.
+ *
+ * Tools that omit annotations are treated as `read=false / openWorld=true /
+ * destructive=true` by reviewers, which forces a free-form justification per
+ * tool. With 63 multiplexed tools that's unmanageable, so every entry MUST
+ * declare its annotations.
+ */
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+  /** Optional human-readable title surfaced in some clients' tool pickers. */
+  title?: string;
+}
+
+/**
  * JSONSchema-ish input schema attached to a tool definition.
  *
  * We intentionally type this loosely (`unknown` arguments) because the real
@@ -34,6 +67,15 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /**
+   * Behaviour hints for the MCP client. Typed as optional for the migration
+   * but enforced at runtime by a contract test
+   * (`tools/annotations.test.ts` here, mirrored in
+   * `mcp-gateway/test/registry.test.ts`) — every shipped tool MUST set them.
+   * The default sane combo is
+   * `{ readOnlyHint: true, openWorldHint: false, destructiveHint: false }`.
+   */
+  annotations?: ToolAnnotations;
 }
 
 /**

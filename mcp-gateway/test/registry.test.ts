@@ -36,6 +36,34 @@ describe("registry — getAllTools", () => {
     const b = getAllTools();
     expect(b.length).toBe(before);
   });
+
+  it("every multiplexed tool ships MCP behaviour annotations", () => {
+    // Without these, the OpenAI App Store + Smithery review demand a manual
+    // free-form justification per tool — with 60+ multiplexed tools that is
+    // unmanageable. Type is optional for forward-compatibility, so this
+    // runtime assertion is the actual gate.
+    const missing = getAllTools()
+      .filter((t) => {
+        const a = (t as { annotations?: unknown }).annotations as
+          | {
+              readOnlyHint?: unknown;
+              openWorldHint?: unknown;
+              destructiveHint?: unknown;
+            }
+          | undefined;
+        return (
+          !a ||
+          typeof a.readOnlyHint !== "boolean" ||
+          typeof a.openWorldHint !== "boolean" ||
+          typeof a.destructiveHint !== "boolean"
+        );
+      })
+      .map((t) => t.name);
+    expect(
+      missing,
+      `These tools are missing readOnlyHint / openWorldHint / destructiveHint annotations: ${missing.join(", ")}`,
+    ).toEqual([]);
+  });
 });
 
 describe("registry — getRegistrySummary", () => {

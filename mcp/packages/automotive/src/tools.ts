@@ -93,6 +93,13 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+  title?: string;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -102,6 +109,8 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /** MCP behaviour hints — see mcp/src/tools/types.ts for the full rationale. */
+  annotations?: ToolAnnotations;
 }
 
 export interface DispatchContext {
@@ -151,6 +160,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["bodyStyle"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_hud_overlay",
@@ -188,6 +202,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["elements"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_dashboard_3d",
@@ -224,6 +243,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["gauges"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_ar_showroom",
@@ -255,6 +279,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["location"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
   {
@@ -292,6 +321,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["category"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_ev_charging_station_viewer",
@@ -320,6 +354,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: [],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
   {
@@ -357,6 +396,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: [],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "list_car_models",
@@ -377,6 +421,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: [],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "validate_automotive_code",
@@ -391,6 +440,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["code"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
 ];

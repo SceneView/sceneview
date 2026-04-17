@@ -56,6 +56,13 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+  title?: string;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -65,6 +72,12 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /**
+   * MCP behaviour hints — see mcp/src/tools/types.ts for the full rationale.
+   * Optional in the type to keep migrations easy; runtime contract test in
+   * mcp-gateway/test/registry.test.ts asserts every tool defines them.
+   */
+  annotations?: ToolAnnotations;
 }
 
 export interface DispatchContext {
@@ -102,6 +115,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["platform"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "generate_ar_logger",
@@ -135,6 +153,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["language", "dataTypes"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "generate_python_sidecar",
@@ -158,6 +181,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Automatically spawn the Rerun viewer process. Default: true.",
         },
       },
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
   {
@@ -193,6 +221,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["rrdUrl"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "explain_concept",
@@ -208,6 +241,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["concept"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
 ];

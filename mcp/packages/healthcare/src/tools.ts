@@ -80,6 +80,13 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+  title?: string;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -89,6 +96,8 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /** MCP behaviour hints — see mcp/src/tools/types.ts for the full rationale. */
+  annotations?: ToolAnnotations;
 }
 
 export interface DispatchContext {
@@ -135,6 +144,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["system"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_molecule_viewer",
@@ -177,6 +191,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["moleculeType"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_medical_imaging",
@@ -214,6 +233,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["modality"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_surgical_planning",
@@ -249,6 +273,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["surgeryType"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
   {
@@ -291,6 +320,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["viewType"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "list_medical_models",
@@ -311,6 +345,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: [],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "validate_medical_code",
@@ -325,6 +364,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["code"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
 ];

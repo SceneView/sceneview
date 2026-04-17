@@ -82,6 +82,13 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+  title?: string;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -91,6 +98,8 @@ export interface ToolDefinition {
     required?: string[];
     additionalProperties?: boolean;
   };
+  /** MCP behaviour hints — see mcp/src/tools/types.ts for the full rationale. */
+  annotations?: ToolAnnotations;
 }
 
 export interface DispatchContext {
@@ -150,6 +159,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["roomType"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_furniture_placement",
@@ -191,6 +205,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["category"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "get_material_switcher",
@@ -229,6 +248,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["surface"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
   {
@@ -269,6 +293,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["lights"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
   {
@@ -311,6 +340,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: ["tourStyle"],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "list_furniture_models",
@@ -331,6 +365,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       required: [],
     },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
   },
   {
     name: "validate_interior_code",
@@ -345,6 +384,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["code"],
+    },
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
     },
   },
 ];
