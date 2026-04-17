@@ -67,7 +67,7 @@ describe("registry — getAllTools", () => {
 });
 
 describe("registry — getRegistrySummary", () => {
-  it("reports all 6 libraries with a non-zero tool count each", () => {
+  it("reports all 7 libraries with a non-zero tool count each", () => {
     const summary = getRegistrySummary();
     expect(summary.libraries.map((l) => l.id).sort()).toEqual([
       "automotive",
@@ -76,6 +76,7 @@ describe("registry — getRegistrySummary", () => {
       "interior",
       "rerun",
       "sceneview",
+      "widgets",
     ]);
     for (const lib of summary.libraries) {
       expect(lib.toolCount).toBeGreaterThan(0);

@@ -8,6 +8,7 @@ export type Tier = "free" | "pro";
 
 const FREE_TOOLS: readonly string[] = [
   "get_started",
+  "view_3d_model",
   "list_samples",
   "get_sample",
   "get_setup",

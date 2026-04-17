@@ -40,6 +40,31 @@ app.get("/.well-known/openai-apps-challenge", (c) =>
   }),
 );
 
+// ── Widget preview routes ──────────────────────────────────────────────────
+//
+// The MCP `resources/read` method is the canonical way for OpenAI to fetch
+// the widget bundle, but humans (and screenshot capture tools) cannot easily
+// drive a JSON-RPC call from a browser. Mirror each widget at a normal
+// `/widget/<name>.html` HTTP path so anyone can preview the UI live by
+// pasting a URL — e.g.
+//
+//   /widget/3d-viewer.html?modelUrl=https://sceneview.github.io/models/Astronaut.glb&title=Astronaut
+//
+// The widget reads the same query-string fallback it uses for direct
+// preview, so the standalone view matches what ChatGPT renders.
+
+import { WIDGETS } from "./mcp/widgets.js";
+
+app.get("/widget/:name", (c) => {
+  const name = c.req.param("name");
+  const uri = `ui://widget/${name}`;
+  const widget = WIDGETS[uri];
+  if (!widget) {
+    return c.text(`Unknown widget: ${name}`, 404);
+  }
+  return c.html(widget.html);
+});
+
 // ── MCP endpoint ────────────────────────────────────────────────────────────
 
 app.route("/mcp", mcpRoutes());

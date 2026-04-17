@@ -25,6 +25,7 @@ import * as GamingTools from "../../../mcp/packages/gaming/src/tools.js";
 import * as HealthcareTools from "../../../mcp/packages/healthcare/src/tools.js";
 import * as InteriorTools from "../../../mcp/packages/interior/src/tools.js";
 import * as RerunTools from "../../../mcp/packages/rerun/src/tools.js";
+import * as WidgetTools from "./widget-tools.js";
 
 import type {
   DispatchContext,
@@ -71,6 +72,15 @@ const LIBRARIES: ToolLibrary[] = [
     label: "rerun-3d-mcp",
     definitions: RerunTools.TOOL_DEFINITIONS,
     dispatch: (name, args, ctx) => RerunTools.dispatchTool(name, args, ctx),
+  },
+  {
+    // Gateway-native widget tools — only meaningful in the hosted HTTP
+    // transport because they reference resource URIs the stdio package
+    // cannot serve. See `mcp/widget-tools.ts` for the full rationale.
+    id: "widgets",
+    label: "sceneview-widgets",
+    definitions: WidgetTools.TOOL_DEFINITIONS,
+    dispatch: (name, args, ctx) => WidgetTools.dispatchTool(name, args, ctx),
   },
 ];
 

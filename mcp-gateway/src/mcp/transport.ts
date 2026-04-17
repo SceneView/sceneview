@@ -35,6 +35,8 @@
 
 import type { DispatchContext } from "./types.js";
 import { dispatch as registryDispatch, getAllTools } from "./registry.js";
+import { listWidgetResources, readWidgetResource } from "./widgets.js";
+import { widgetResourceFor } from "./widget-tools.js";
 import {
   loadSession,
   newSession,
@@ -270,6 +272,21 @@ async function routeMethod(
     case "tools/call":
       return handleToolsCall(req, ctx);
 
+    // ── OpenAI Apps SDK widget support (resource registry) ────────────────
+    case "resources/list":
+      return { resources: listWidgetResources() };
+
+    case "resources/read":
+      return handleResourcesRead(req);
+
+    case "resources/templates/list":
+      // No URI templates exposed today — empty list keeps the spec happy.
+      return { resourceTemplates: [] };
+
+    case "prompts/list":
+      // No prompts exposed; the gateway is purely tool + widget driven.
+      return { prompts: [] };
+
     default:
       throw jsonRpcError(
         JSON_RPC_ERRORS.METHOD_NOT_FOUND,
@@ -300,9 +317,39 @@ function handleInitialize(
     protocolVersion: PROTOCOL_VERSION,
     capabilities: {
       tools: { listChanged: false },
+      // Resources advertise the OpenAI Apps SDK widget templates served
+      // by `widgets.ts` (currently the 3D viewer at
+      // `ui://widget/3d-viewer.html`). Without this capability ChatGPT
+      // never asks `resources/read`, so the widget pointer attached to
+      // tool results would be silently ignored.
+      resources: { listChanged: false, subscribe: false },
+      // Empty prompts capability — keeps clients that probe for it happy
+      // without inventing prompt content.
+      prompts: { listChanged: false },
     },
     serverInfo: SERVER_INFO,
   };
+}
+
+/** Handles `resources/read` for widget HTML bundles. */
+function handleResourcesRead(req: JsonRpcRequest): unknown {
+  const params = (req.params ?? {}) as Record<string, unknown>;
+  const uri = params.uri;
+  if (typeof uri !== "string" || uri.length === 0) {
+    throw jsonRpcError(
+      JSON_RPC_ERRORS.INVALID_PARAMS,
+      "Missing or invalid 'uri' parameter",
+    );
+  }
+  const resource = readWidgetResource(uri);
+  if (!resource) {
+    throw jsonRpcError(
+      JSON_RPC_ERRORS.METHOD_NOT_FOUND,
+      `Resource not found: ${uri}`,
+      { uri },
+    );
+  }
+  return { contents: [resource] };
 }
 
 /** Returns the full list of multiplexed tool definitions. */
@@ -341,7 +388,27 @@ async function handleToolsCall(
     );
   }
 
-  return registryDispatch(toolName, args, ctx.dispatchContext);
+  const result = await registryDispatch(toolName, args, ctx.dispatchContext);
+
+  // Widget tools attach `_meta.ui.resourceUri` so OpenAI-Apps-aware clients
+  // know to fetch the bundled HTML widget and render it inline. Other
+  // clients ignore the unknown `_meta` keys and just see the text content.
+  const widgetUri = widgetResourceFor(toolName);
+  if (widgetUri) {
+    // Narrow through `unknown` to avoid the strict-overlap check on
+    // ToolResult (which has its own optional `_meta` field) — every
+    // consumer of the JSON-RPC response treats unknown keys as opaque.
+    const r = result as unknown as {
+      _meta?: Record<string, unknown>;
+      [k: string]: unknown;
+    };
+    r._meta = {
+      ...(r._meta ?? {}),
+      ui: { resourceUri: widgetUri },
+    };
+    return r;
+  }
+  return result;
 }
 
 // ── Helpers: request / response encoding ──────────────────────────────────
