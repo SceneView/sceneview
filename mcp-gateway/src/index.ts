@@ -20,6 +20,26 @@ app.get("/health", (c) =>
   }),
 );
 
+// ── OpenAI Apps domain verification ────────────────────────────────────────
+//
+// platform.openai.com/apps-manage issues a one-time token that must be served
+// at the well-known path on the same hostname as the MCP URL. The token is
+// host-bound — it confirms to OpenAI that whoever wrote the listing also
+// controls the worker. Once verified, OpenAI re-checks periodically; rotating
+// the token is rare so a hard-coded constant is fine and auditable.
+//
+// Token issued for the SceneView 3D & AR app id
+// asdk_app_69e17c43573c819186988306509623c2 on 2026-04-18.
+const OPENAI_APPS_CHALLENGE_TOKEN =
+  "C-cDfPE9Q15PrWJahuZSUyJCHLETC4DwV4fKZtqHMrw";
+
+app.get("/.well-known/openai-apps-challenge", (c) =>
+  c.text(OPENAI_APPS_CHALLENGE_TOKEN, 200, {
+    "content-type": "text/plain; charset=utf-8",
+    "cache-control": "public, max-age=3600",
+  }),
+);
+
 // ── MCP endpoint ────────────────────────────────────────────────────────────
 
 app.route("/mcp", mcpRoutes());
