@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Scale
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -78,9 +79,9 @@ fun BillboardDemo(onBack: () -> Unit) {
             if (showBillboard) {
                 BillboardNode(
                     bitmap = billboardBitmap,
-                    widthMeters = 0.6f,
-                    heightMeters = 0.3f,
-                    position = Position(x = -0.5f, y = 0f, z = 0f)
+                    widthMeters = 0.3f,
+                    heightMeters = 0.15f,
+                    position = Position(x = -0.25f, y = 0f, z = -1.5f)
                 )
             }
 
@@ -88,7 +89,8 @@ fun BillboardDemo(onBack: () -> Unit) {
             if (showFixed) {
                 ImageNode(
                     bitmap = fixedBitmap,
-                    position = Position(x = 0.5f, y = 0f, z = 0f)
+                    position = Position(x = 0.25f, y = 0f, z = -1.5f),
+                    scale = Scale(0.3f)
                 )
             }
         }

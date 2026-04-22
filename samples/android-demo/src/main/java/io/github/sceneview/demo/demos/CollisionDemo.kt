@@ -66,11 +66,11 @@ fun CollisionDemo(onBack: () -> Unit) {
 
     val shapes = remember {
         listOf(
-            ShapeSpec(0, isSphere = false, position = Position(x = -1.0f, y = 0f, z = 0f)),
-            ShapeSpec(1, isSphere = true, position = Position(x = -0.5f, y = 0.5f, z = 0f)),
-            ShapeSpec(2, isSphere = false, position = Position(x = 0f, y = 0f, z = 0f)),
-            ShapeSpec(3, isSphere = true, position = Position(x = 0.5f, y = 0.5f, z = 0f)),
-            ShapeSpec(4, isSphere = false, position = Position(x = 1.0f, y = 0f, z = 0f))
+            ShapeSpec(0, isSphere = false, position = Position(x = -0.6f, y = 0f, z = -2f)),
+            ShapeSpec(1, isSphere = true, position = Position(x = -0.3f, y = 0.3f, z = -2f)),
+            ShapeSpec(2, isSphere = false, position = Position(x = 0f, y = 0f, z = -2f)),
+            ShapeSpec(3, isSphere = true, position = Position(x = 0.3f, y = 0.3f, z = -2f)),
+            ShapeSpec(4, isSphere = false, position = Position(x = 0.6f, y = 0f, z = -2f))
         )
     }
 

@@ -44,7 +44,7 @@ import io.github.sceneview.rememberMaterialLoader
 @Composable
 fun CustomMeshDemo(onBack: () -> Unit) {
     var rotating by remember { mutableStateOf(true) }
-    var scale by remember { mutableFloatStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(0.5f) }
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)

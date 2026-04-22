@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
@@ -73,7 +74,8 @@ fun ViewNodeDemo(onBack: () -> Unit) {
                 windowManager = windowManager,
                 unlit = true,
                 apply = {
-                    position = Position(x = 0f, y = 0f, z = 0f)
+                    position = Position(x = 0f, y = 0f, z = -2f)
+                    scale = Float3(0.15f)
                     this.isVisible = isVisible
                 }
             ) {
