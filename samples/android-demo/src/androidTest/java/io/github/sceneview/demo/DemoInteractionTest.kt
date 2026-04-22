@@ -7,10 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.UiScrollable
-import androidx.test.uiautomator.UiSelector
 import androidx.test.uiautomator.Until
 import org.junit.After
 import org.junit.Before
@@ -21,19 +18,20 @@ import java.io.File
 /**
  * Interaction tests for the SceneView Android demos.
  *
- * **Approach**: drive the real demo app via UiAutomator, the same way a user would —
- * tap on the demo name in the home list, then tap on chips / buttons / toggles inside.
- * Screenshots are captured between each interaction with `UiDevice.takeScreenshot()` which
- * grabs the full framebuffer (including the Filament SurfaceView).
+ * **Approach**: launch each demo composable directly via [DemoHostActivity] (a debug-only
+ * harness that accepts `demo_id` as intent extra), then drive the real controls with
+ * UiAutomator as a user would. Screenshots are captured between each interaction with
+ * `UiDevice.takeScreenshot()` (full framebuffer including Filament SurfaceView).
  *
- * **Why not ComposeTestRule?** Compose's test runner dispatches coroutines on background
- * threads that Filament has not "adopted", which trips `getState:347 — This thread has
- * not been adopted`. Going through the real app process avoids this entirely — the app's
- * own Dispatchers.Main owns Filament, exactly as in production.
+ * **Why DemoHostActivity?** The earlier scroll-then-click approach was fragile for demos in
+ * the Advanced section (`physics`, `custom-mesh`, …) — `UiScrollable.scrollTextIntoView()`
+ * gave up before the Compose LazyColumn recomposed the far-down row into view. Launching
+ * the demo composable directly with an Intent bypasses the home list entirely.
  *
- * **Why not `qa-android-demos.sh`?** This Kotlin test uses UiAutomator's semantic selectors
- * (`By.text("Point")`, `By.descContains("Drop")`), retries with timeouts, and integrates into
- * `./gradlew :samples:android-demo:connectedDebugAndroidTest`. No shell-scripted scroll hack.
+ * **Why not ComposeTestRule?** Compose's test runner dispatches coroutines on a thread
+ * Filament has not "adopted", which trips `getState:347 — This thread has not been adopted`.
+ * Going through the real app process means the app's own Dispatchers.Main owns Filament,
+ * exactly as in production.
  *
  * **Pulling screenshots**:
  * ```bash
@@ -50,18 +48,8 @@ class DemoInteractionTest {
     private val timeout = 10_000L
 
     @Before
-    fun launchApp() {
-        // Go to launcher first (so any stale activity state is cleared)
+    fun goHome() {
         device.pressHome()
-
-        val launch = context.packageManager.getLaunchIntentForPackage(pkg)
-            ?: error("demo app $pkg is not installed")
-        launch.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(launch)
-
-        // Wait for the home list to appear — "SceneView" title is the scaffold header
-        device.wait(Until.hasObject(By.textStartsWith("SceneView")), timeout)
-        Thread.sleep(800)
     }
 
     @After
@@ -77,46 +65,28 @@ class DemoInteractionTest {
         device.takeScreenshot(File(dir, "$name.png"))
     }
 
-    /** Scrolls the home list until a demo row with [text] is visible, then clicks it. */
-    private fun openDemo(text: String) {
-        // Use UiScrollable with a generous swipe budget — the default 10 swipes is too low to
-        // reach the bottom of the demo list. We also reduce the swipe dead-zone so edge taps
-        // register properly on the Compose LazyColumn.
-        val scroller = UiScrollable(UiSelector().scrollable(true).instance(0))
-        scroller.setAsVerticalList()
-        scroller.setMaxSearchSwipes(60)
-        scroller.setSwipeDeadZonePercentage(0.15)
-
-        // First scroll back to top so we have a deterministic starting point regardless of
-        // what previous test left on screen
-        scroller.scrollToBeginning(30)
-        Thread.sleep(400)
-
-        scroller.scrollTextIntoView(text)
-        Thread.sleep(600)  // let LazyColumn finalise recomposition
-
-        val textNode = device.findObject(By.text(text))
-            ?: error("Row '$text' not found after scrollTextIntoView")
-        // Text nodes inside Compose Cards are not clickable — walk up to the clickable ancestor
-        val clickable = generateSequence(textNode) { it.parent }
-            .firstOrNull { it.isClickable } ?: textNode
-        clickable.click()
-        Thread.sleep(3000)  // scene load + first frame
-    }
-
-    /** Returns to the home list from inside a demo. */
-    private fun goBack() {
-        device.pressBack()
-        device.wait(Until.hasObject(By.textStartsWith("SceneView")), timeout)
-        Thread.sleep(600)
+    /**
+     * Launches [DemoHostActivity] for the given demo id (see `DemoRegistry.ALL_DEMOS`),
+     * bypassing the home list scroll entirely. Waits until the demo's title bar appears.
+     */
+    private fun openDemo(demoId: String, expectedTitle: String) {
+        val intent = Intent().apply {
+            setClassName(pkg, "$pkg.DemoHostActivity")
+            putExtra(DemoHostActivity.EXTRA_DEMO_ID, demoId)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+        // Wait for the demo's scaffold title to render (confirms Compose + Filament wired up)
+        device.wait(Until.hasObject(By.text(expectedTitle)), timeout)
+        Thread.sleep(2500)  // let Filament load model + render first frame
     }
 
     private fun tap(text: String) {
         device.wait(Until.hasObject(By.text(text)), timeout)
         val node = device.findObject(By.text(text))
             ?: error("Clickable '$text' not found on screen")
-        // If the Text itself is not clickable (e.g. inside a Button with a Text child),
-        // walk up the parent chain to find a clickable ancestor.
+        // Text inside a FilterChip / Button / Card is not clickable — walk up to the
+        // nearest clickable ancestor so the onClick handler actually fires.
         val clickable = generateSequence(node) { it.parent }
             .firstOrNull { it.isClickable } ?: node
         clickable.click()
@@ -127,32 +97,26 @@ class DemoInteractionTest {
 
     @Test
     fun lighting_allThreeLightTypes() {
-        openDemo("Lighting")
+        openDemo("lighting", "Lighting")
         screenshot("01_lighting_directional_default")
 
         tap("Point")
-        Thread.sleep(800)
         screenshot("02_lighting_point")
 
         tap("Spot")
-        Thread.sleep(800)
         screenshot("03_lighting_spot")
 
         tap("Directional")
-        Thread.sleep(800)
         screenshot("04_lighting_directional_back")
-
-        goBack()
     }
 
     // ── 2. Fog — toggle + colour presets ──────────────────────────────────────
 
     @Test
     fun fog_toggleAndPresets() {
-        openDemo("Fog")
+        openDemo("fog", "Fog")
         screenshot("05_fog_enabled_mist")
 
-        // Toggle fog off — tap the "Fog Enabled" row (Switch is the clickable)
         tap("Fog Enabled")
         screenshot("06_fog_disabled")
 
@@ -167,33 +131,21 @@ class DemoInteractionTest {
 
         tap("Deep Smoke")
         screenshot("10_fog_deep_smoke")
-
-        goBack()
     }
 
     // ── 3. Physics — drop + reset ─────────────────────────────────────────────
 
-    @org.junit.Ignore(
-        "Physics + Custom Mesh sit in the ADVANCED section near the bottom of the home " +
-                "LazyColumn. UiScrollable.scrollTextIntoView() reports 'no more content' on " +
-                "Compose LazyColumn before the far-down items recompose into the view tree, and " +
-                "manual slow swipes produce the same 'text never visible to uiautomator dump' " +
-                "behaviour. Fix path: add a DemoHostActivity in the debug flavour that accepts " +
-                "an intent extra `demo=physics` and hosts the composable directly, bypassing " +
-                "home-list navigation. Lighting, Fog, Geometry Primitives tests all pass because " +
-                "they are in the first third of the list."
-    )
     @Test
     fun physics_dropAndReset() {
-        openDemo("Physics")
+        openDemo("physics", "Physics")
         screenshot("11_physics_initial")
 
         tap("Drop")
-        Thread.sleep(1500)
+        Thread.sleep(1500)  // let physics settle
         screenshot("12_physics_dropped_1")
 
         tap("Drop")
-        Thread.sleep(500)
+        Thread.sleep(400)
         tap("Drop")
         Thread.sleep(2000)
         screenshot("13_physics_dropped_3")
@@ -201,43 +153,37 @@ class DemoInteractionTest {
         tap("Reset")
         Thread.sleep(1500)
         screenshot("14_physics_reset")
-
-        goBack()
     }
 
     // ── 4. Geometry Primitives — 4 shape chips ────────────────────────────────
 
     @Test
     fun geometryPrimitives_allShapes() {
-        openDemo("Geometry Primitives")
+        openDemo("geometry", "Geometry Primitives")
         screenshot("15_geometry_cube_default")
 
         tap("Sphere")
-        screenshot("16_geometry_sphere")
+        screenshot("16_geometry_sphere_on")
 
         tap("Cylinder")
-        screenshot("17_geometry_cylinder")
+        screenshot("17_geometry_cylinder_on")
 
         tap("Plane")
-        screenshot("18_geometry_plane")
+        screenshot("18_geometry_plane_on")
 
         tap("Cube")
-        screenshot("19_geometry_cube_back")
-
-        goBack()
+        screenshot("19_geometry_cube_off")
     }
 
     // ── 5. Custom Mesh — auto-rotate toggle + orbit drag ──────────────────────
 
-    @org.junit.Ignore("Same UiScrollable/LazyColumn limitation as physics_dropAndReset.")
     @Test
     fun customMesh_autoRotateAndOrbit() {
-        openDemo("Custom Mesh")
-        screenshot("20_customMesh_auto_rotate_on")
+        openDemo("custom-mesh", "Custom Mesh")
+        screenshot("20_customMesh_autoRotate_on")
 
-        // Toggle auto-rotate off — tap the "Auto-Rotate" row (Switch is the clickable)
         tap("Auto-Rotate")
-        screenshot("21_customMesh_auto_rotate_off")
+        screenshot("21_customMesh_autoRotate_off")
 
         // Orbit the camera by swiping horizontally on the SurfaceView area
         device.swipe(
@@ -247,7 +193,5 @@ class DemoInteractionTest {
         )
         Thread.sleep(600)
         screenshot("22_customMesh_after_orbit_drag")
-
-        goBack()
     }
 }
