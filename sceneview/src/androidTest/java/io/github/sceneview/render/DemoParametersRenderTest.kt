@@ -56,12 +56,12 @@ import kotlin.math.sin
  */
 @RunWith(AndroidJUnit4::class)
 @Ignore(
-    "Filament capturePixels() crashes SwiftShader CI emulator (Process crashed). "
-            + "Tests pass on real GPU devices/emulators. Tracked in #803. "
-            + "Run manually on a physical device with:\n"
-            + "./gradlew :sceneview:connectedDebugAndroidTest "
-            + "-Pandroid.testInstrumentationRunnerArguments.class="
-            + "io.github.sceneview.render.DemoParametersRenderTest"
+    "Filament swapchain readPixels() is not supported on the Apple M3 Metal emulator " +
+            "translator (readPixels callback never fires, even with CONFIG_READABLE swapchain + " +
+            "flushAndWait). Runs fine on physical devices. Tracked in #803. Run manually with:\n" +
+            "./gradlew :sceneview:connectedDebugAndroidTest " +
+            "-Pandroid.testInstrumentationRunnerArguments.class=" +
+            "io.github.sceneview.render.DemoParametersRenderTest"
 )
 class DemoParametersRenderTest {
 
@@ -73,6 +73,13 @@ class DemoParametersRenderTest {
             maxDiffPixelsPercent = 5.0f
         )
         private val screenshots = mutableListOf<Entry>()
+
+        /**
+         * Nodes created in each test — lives on the companion so it survives across test-instance
+         * recreation. Destroyed between tests so the next test's `resetScene()` doesn't leave
+         * dangling Renderable→MaterialInstance refs that would crash MaterialLoader.destroy().
+         */
+        private val createdNodes = mutableListOf<io.github.sceneview.node.Node>()
 
         @JvmStatic
         @BeforeClass
@@ -153,7 +160,26 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
 
     @Before
     fun resetScene() {
+        // Destroy every node created in the previous test so its Renderable releases the
+        // MaterialInstance reference. Otherwise materialLoader.destroy() (or the next material
+        // create) trips a Filament precondition: "destroying MaterialInstance X still in use".
+        harness.runOnMain {
+            createdNodes.forEach { node ->
+                try {
+                    harness.scene.removeEntity(node.entity)
+                    node.destroy()
+                } catch (_: Exception) { /* already destroyed */ }
+            }
+        }
+        createdNodes.clear()
         harness.resetScene()
+    }
+
+    /** Adds the node to the shared scene AND registers it for cleanup before the next test. */
+    private fun <T : io.github.sceneview.node.Node> addAndTrack(node: T): T {
+        harness.scene.addEntity(node.entity)
+        createdNodes.add(node)
+        return node
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -178,7 +204,6 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
         viewConfig: () -> Unit = {},
         setupScene: () -> Unit
     ): Bitmap {
-        var bitmap: Bitmap? = null
         harness.runOnMain {
             harness.scene.skybox = Skybox.Builder()
                 .color(bgColor[0], bgColor[1], bgColor[2], 1f)
@@ -187,9 +212,10 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
             viewConfig()
             setupScene()
             harness.renderFrames(5)
-            bitmap = harness.capturePixels()
         }
-        val bmp = bitmap!!
+        // capturePixels() orchestrates its own main-thread begin/end frame internally,
+        // then flushAndWait + latch.await off-main so the backend thread can complete.
+        val bmp = harness.capturePixels()
         val file = comparator.saveToDisk(bmp, "${group}_${name}")
         val nonBg = countNonBackgroundPixels(bmp, bgColor)
         val percent = nonBg * 100 / (bmp.width * bmp.height)
@@ -250,13 +276,13 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 harness.engine, Cube.DEFAULT_SIZE, Position(0f),
                 materialInstances = listOf(mat)
             )
-            harness.scene.addEntity(cube.entity)
+            addAndTrack(cube)
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(-0.5f, -1f, -1f)
                 intensity(100_000f)
                 color(1f, 0.5f, 0.2f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         // Warm light should produce red channel > blue channel
         val r = Color.red(bmp.getPixel(128, 128))
@@ -280,13 +306,13 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 harness.engine, Cube.DEFAULT_SIZE, Position(0f),
                 materialInstances = listOf(mat)
             )
-            harness.scene.addEntity(cube.entity)
+            addAndTrack(cube)
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(-0.5f, -1f, -1f)
                 intensity(100_000f)
                 color(0.3f, 0.5f, 1f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         val r = Color.red(bmp.getPixel(128, 128))
         val b = Color.blue(bmp.getPixel(128, 128))
@@ -309,12 +335,12 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 harness.engine, Cube.DEFAULT_SIZE, Position(0f),
                 materialInstances = listOf(mat)
             )
-            harness.scene.addEntity(cube.entity)
+            addAndTrack(cube)
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(0f, -1f, -1f)
                 intensity(500_000f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         val brightness = averageBrightness(bmp, 128, 128, 15)
         assertTrue(
@@ -336,12 +362,12 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 harness.engine, Cube.DEFAULT_SIZE, Position(0f),
                 materialInstances = listOf(mat)
             )
-            harness.scene.addEntity(cube.entity)
+            addAndTrack(cube)
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(0f, -1f, -1f)
                 intensity(5_000f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         val brightness = averageBrightness(bmp, 128, 128, 15)
         assertTrue(
@@ -363,7 +389,7 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 harness.engine, Cube.DEFAULT_SIZE, Position(0f),
                 materialInstances = listOf(mat)
             )
-            harness.scene.addEntity(cube.entity)
+            addAndTrack(cube)
             val light = LightNode(harness.engine, LightManager.Type.SPOT) {
                 position(0f, 2f, 2f)
                 direction(0f, -1f, -1f)
@@ -374,7 +400,7 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                     (25f * PI.toFloat() / 180f)
                 )
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
     }
 
@@ -386,12 +412,12 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
             harness.engine, Cube.DEFAULT_SIZE, Position(0f),
             materialInstances = listOf(mat)
         )
-        harness.scene.addEntity(cube.entity)
+        addAndTrack(cube)
         val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
             direction(-0.3f, -1f, -0.5f)
             intensity(100_000f)
         }
-        harness.scene.addEntity(light.entity)
+        addAndTrack(light)
     }
 
     @Test
@@ -520,7 +546,7 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 ),
                 materialInstance = mat
             ).apply { position = Position(0f, 0f, -1f) }
-            harness.scene.addEntity(tri.entity)
+            addAndTrack(tri)
         }
     }
 
@@ -546,7 +572,7 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 polygonPath = points,
                 materialInstance = mat
             ).apply { position = Position(0f, 0f, -1f) }
-            harness.scene.addEntity(star.entity)
+            addAndTrack(star)
         }
     }
 
@@ -570,7 +596,7 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 polygonPath = points,
                 materialInstance = mat
             ).apply { position = Position(0f, 0f, -1f) }
-            harness.scene.addEntity(hex.entity)
+            addAndTrack(hex)
         }
     }
 
@@ -592,7 +618,7 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 Position(0f, 0f, 0f),
                 materialInstances = listOf(mat)
             )
-            harness.scene.addEntity(core.entity)
+            addAndTrack(core)
             // 6 axial atoms
             val offsets = listOf(
                 Position(scale * 1.5f, 0f, 0f),
@@ -607,13 +633,13 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                     harness.engine, Sphere.DEFAULT_RADIUS * scale * 0.5f, pos,
                     materialInstances = listOf(mat)
                 )
-                harness.scene.addEntity(atom.entity)
+                addAndTrack(atom)
             }
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(-0.3f, -1f, -0.5f)
                 intensity(100_000f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         // Top and bottom atoms should be IN the viewport (not cropped at scale 0.5)
         val topPixel = averageBrightness(bmp, 128, 40, 10)
@@ -651,13 +677,13 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                 Position(0.25f, 0f, -1.5f),
                 materialInstances = listOf(blueMat)
             )
-            harness.scene.addEntity(left.entity)
-            harness.scene.addEntity(right.entity)
+            addAndTrack(left)
+            addAndTrack(right)
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(0f, -0.3f, -1f)
                 intensity(100_000f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         // Left half should be greener than blue; right half bluer than green
         val leftG = Color.green(bmp.getPixel(64, 128))
@@ -706,13 +732,13 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
                         materialInstances = listOf(mat)
                     )
                 }
-                harness.scene.addEntity(node.entity)
+                addAndTrack(node)
             }
             val light = LightNode(harness.engine, LightManager.Type.DIRECTIONAL) {
                 direction(-0.3f, -1f, -0.5f)
                 intensity(100_000f)
             }
-            harness.scene.addEntity(light.entity)
+            addAndTrack(light)
         }
         // Each of the 5 shape X-centres should show green pixels
         val xPixelCentres = listOf(52, 89, 128, 167, 204)

@@ -73,8 +73,13 @@ class RenderTestHarness(
             viewport = Viewport(0, 0, width, height)
             this.scene = this@RenderTestHarness.scene
         }
-        // Headless swap chain (no window surface)
-        swapChain = engine.createSwapChain(width, height, SwapChainFlags.CONFIG_DEFAULT)
+        // Headless swap chain with CONFIG_READABLE — required so readPixels() can read back the
+        // swap-chain colour attachment. Without this flag, the Apple M3 Metal emulator
+        // translator silently refuses the readback and the async callback never fires.
+        swapChain = engine.createSwapChain(
+            width, height,
+            SwapChainFlags.CONFIG_DEFAULT or SwapChainFlags.CONFIG_READABLE
+        )
     }
 
     /**
@@ -106,19 +111,36 @@ class RenderTestHarness(
             .order(ByteOrder.nativeOrder())
         val latch = CountDownLatch(1)
 
-        renderer.readPixels(
-            0, 0, width, height,
-            Texture.PixelBufferDescriptor(
-                buffer,
-                Texture.Format.RGBA,
-                Texture.Type.UBYTE,
-                1, 0, 0, 0,
-                null, Runnable { latch.countDown() }
-            )
-        )
+        // readPixels MUST be called between beginFrame() and endFrame() — Filament asserts this
+        // since (at least) 1.70.x. Previously this method called readPixels first and then
+        // renderFrames(1) to flush, which aborts with
+        //   "readPixels() on a SwapChain must be called after beginFrame() and before endFrame()"
+        //
+        // Threading: we enqueue the readPixels on the main thread (required because Filament
+        // entity / renderer calls are main-thread only). THEN we flushAndWait() OUTSIDE the
+        // main-thread block so the backend thread can actually process the frame and fire our
+        // callback — flushing while holding main would deadlock the callback delivery.
+        runOnMain {
+            val frameTimeNanos = System.nanoTime()
+            if (renderer.beginFrame(swapChain, frameTimeNanos)) {
+                renderer.render(view)
+                renderer.readPixels(
+                    0, 0, width, height,
+                    Texture.PixelBufferDescriptor(
+                        buffer,
+                        Texture.Format.RGBA,
+                        Texture.Type.UBYTE,
+                        1, 0, 0, 0,
+                        null, Runnable { latch.countDown() }
+                    )
+                )
+                renderer.endFrame()
+            }
+        }
 
-        // Render one more frame to flush the readPixels command
-        renderFrames(1)
+        // Drain the backend command queue. Running off-main so the backend thread can finish
+        // processing the readPixels command and fire its callback without blocking on us.
+        engine.flushAndWait()
 
         check(latch.await(5, TimeUnit.SECONDS)) {
             "readPixels callback did not fire within 5 seconds"
