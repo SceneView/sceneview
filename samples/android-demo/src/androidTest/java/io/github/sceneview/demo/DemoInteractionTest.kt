@@ -93,6 +93,28 @@ class DemoInteractionTest {
         Thread.sleep(800)
     }
 
+    /**
+     * Drags a Compose [Slider] whose label starts with [labelPrefix]. Prefix (not full text)
+     * because slider labels typically include the current value (`"Density: 0.15"`) which
+     * changes each frame during a drag, so looking up the exact label after a drag is flaky.
+     *
+     * [fraction] is in `[0, 1]` — 0 drags the thumb to the minimum end, 1 to the maximum.
+     */
+    private fun dragSlider(labelPrefix: String, fraction: Float) {
+        val labelNode = device.findObject(By.textStartsWith(labelPrefix))
+            ?: error("Slider label starting with '$labelPrefix' not found on screen")
+        val b = labelNode.visibleBounds
+        // Slider track: ~48 dp below the label baseline on Material 3, spanning the scaffold
+        // controls column (~92% of screen width in most demos).
+        val density = device.displayWidth / 411f  // Pixel 7a is 411 dp wide
+        val trackY = b.bottom + (20 * density).toInt()  // ~20 dp below the label
+        val trackLeft = (device.displayWidth * 0.04f).toInt()
+        val trackRight = (device.displayWidth * 0.96f).toInt()
+        val targetX = trackLeft + ((trackRight - trackLeft) * fraction.coerceIn(0f, 1f)).toInt()
+        device.swipe((trackLeft + trackRight) / 2, trackY, targetX, trackY, 30)
+        Thread.sleep(800)
+    }
+
     // ── 1. Lighting — 3 light-type chips ──────────────────────────────────────
 
     @Test
@@ -393,5 +415,19 @@ class DemoInteractionTest {
         tap("Line")
         tap("Path")
         screenshot("65_linesPaths_both_back")
+    }
+
+    // ── 16. Fog — density slider drag ─────────────────────────────────────────
+
+    @Test
+    fun fog_densitySliderFromZeroToMax() {
+        openDemo("fog", "Fog")
+        screenshot("66_fog_density_default_015")
+
+        dragSlider("Density:", fraction = 1.0f)
+        screenshot("67_fog_density_max")
+
+        dragSlider("Density:", fraction = 0.0f)
+        screenshot("68_fog_density_min")
     }
 }

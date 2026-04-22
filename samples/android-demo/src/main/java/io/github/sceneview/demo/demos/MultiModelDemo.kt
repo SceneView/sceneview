@@ -79,7 +79,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.3f,
-                        position = Position(x = -0.4f, y = 0f)
+                        position = Position(x = -0.3f, y = 0f, z = -1f)
                     )
                 }
             }
@@ -88,7 +88,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.3f,
-                        position = Position(x = 0f, y = 0f)
+                        position = Position(x = 0f, y = 0f, z = -1f)
                     )
                 }
             }
@@ -97,7 +97,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.3f,
-                        position = Position(x = 0.4f, y = 0f)
+                        position = Position(x = 0.3f, y = 0f, z = -1f)
                     )
                 }
             }
