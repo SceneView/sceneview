@@ -102,3 +102,32 @@ open tools/qa-screenshots/render-tests/demo-parameters-report.html
 ```
 
 Expected runtime: ~10s for all 20 tests on a real device (vs ~10 min of ADB UI automation).
+
+## Zero-infra regression net — `DemoFramingTest.kt` (JVM unit test)
+
+The render-test suite above still needs a physical-device GPU. For the narrower question *"does the geometry of my 4 fixes actually put shapes inside the viewport?"* the answer is math — no Filament, no device, no emulator. Added `sceneview/src/test/java/io/github/sceneview/render/DemoFramingTest.kt`:
+
+- Hand-rolled perspective projection (`f = cot(fovY/2)`, aspect = `width / height`)
+- Camera model matching the Pixel 9 `SceneView` pane: position `(0, 0, 3)`, FOV_v 45°, aspect 0.5 (portrait phone)
+- Projects each node's centre (and bounding-box corners for critical features) to NDC and asserts `x, y ∈ [-1, 1]`
+- **10 tests, 0.02 s total** on `./gradlew :sceneview:testDebugUnitTest`:
+
+| Test | Validates |
+|---|---|
+| `billboard_afterFix_bothQuadsFullyInFrame` | my Billboard fix: 2 quads at `x=±0.25, z=-1.5`, `w=0.3` all corners in viewport |
+| `billboard_beforeFix_wasClippedAtEdges` | regression guard: the broken state (`x=±0.5, w=0.6, z=0`) does overflow |
+| `collision_afterFix_allFiveShapesFullyInFrame` | my Collision fix: 5 shapes at `x=±0.6, ±0.3, 0, z=-2` all framed |
+| `collision_beforeFix_outerShapesWereOffScreen` | regression guard: outer shapes at `x=±1.0, z=0` do overflow |
+| `customMesh_afterFix_moleculeFitsInViewportAtScale05` | my CustomMesh fix: core + top + bottom + front + back atoms all project inside viewport |
+| `customMesh_beforeFix_topAndBottomAtomsCropped` | regression guard: top/bottom atoms at `y=±1.5` are off-screen at scale 1.0 |
+| `viewNode_afterFix_compactCardInViewport` | my ViewNode fix: card at `z=-2`, `scale=0.15` fits |
+| `shapeDemo_trianglePolygonFullyInFrame` | triangle polygon vertices in viewport |
+| `shapeDemo_starOuterVerticesFullyInFrame` | 5-point star outer vertices in viewport |
+| `shapeDemo_hexagonVerticesFullyInFrame` | hexagon vertices in viewport |
+
+### What it does and does not catch
+
+✅ Geometric / framing regressions — any future `Position(…)` or `scale(…)` change that would push the 4 fixed demos back off-screen.
+✅ Zero CI infrastructure — runs in the existing `:sceneview:testDebugUnitTest` that already passes on every PR.
+❌ Rendering bugs (wrong material, dark output, broken IBL, Filament shader regressions) — those need a real GPU.
+❌ Exact pixel matching — the tests tolerate small aspect-ratio variations (the real Pixel 9 pane aspect ≈ 0.5, may vary with scaffold height).
