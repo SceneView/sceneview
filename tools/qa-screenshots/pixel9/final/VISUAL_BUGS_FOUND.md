@@ -72,3 +72,33 @@
 Per CLAUDE.md: "Every design decision should be optimized so that when a developer asks an AI 'build me an AR app', the AI can produce correct, complete, working code on the first try."
 
 These 4 demos are the reference examples an AI would copy-paste. If `ViewNodeDemo` ships with `position = Position(0,0,0)` and no scale, **every generated ViewNode example will render as unreadable pixels** in the user's app. Fixing the demos fixes the training signal.
+
+## Parameter-matrix coverage — new regression net (2026-04-22)
+
+The static Pixel 9 screenshots capture the *initial* render of each demo. They say nothing about what happens when the user moves a slider, flips a toggle, or switches a chip — which is what users actually do. To close that gap without 2 h of ADB UI automation, this session added **`sceneview/src/androidTest/java/io/github/sceneview/render/DemoParametersRenderTest.kt`** (20 `@Test`, ~600 lines) that mirrors the demos' scene construction and captures pixels through the existing `RenderTestHarness` (Filament offscreen pbuffer, ~500ms/frame).
+
+Coverage:
+- **LightingDemo** × 5 — directional warm/cold, low/high intensity, spot light
+- **FogDemo** × 5 — disabled baseline, low/heavy density, warm haze preset, eerie green preset
+- **ShapeDemo** × 3 — Triangle, Star, Hexagon polygons
+- **CustomMeshDemo** × 1 — molecule at `scale 0.5` with assertions that top+bottom atoms are in the viewport (validates my fix)
+- **BillboardDemo** × 1 — assertions that left quad is green-dominant, right is blue-dominant, edges stay dark (validates my fix — no clipping)
+- **CollisionDemo** × 1 — loops through the 5 expected shape x-centres and asserts each one is lit (validates my fix — all 5 in frame)
+- **PostProcessingDemo** × 4 — SSAO on/off, FXAA on/off
+
+### Running the suite
+
+Suite is `@Ignore`-d because `capturePixels()` crashes SwiftShader (#803) — reproduced today on `emulator-5554` (Pixel_7a AVD 16): `Process crashed` after 1/20 tests. Tests run on physical devices / real GPU emulators:
+
+```bash
+# On a Pixel 9 connected over USB or WiFi ADB:
+./gradlew :sceneview:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=io.github.sceneview.render.DemoParametersRenderTest
+
+# Pull the generated report + bitmaps:
+adb pull /sdcard/Android/data/io.github.sceneview.test/files/render-test-output/ \
+  tools/qa-screenshots/render-tests/
+open tools/qa-screenshots/render-tests/demo-parameters-report.html
+```
+
+Expected runtime: ~10s for all 20 tests on a real device (vs ~10 min of ADB UI automation).
