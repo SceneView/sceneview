@@ -37,6 +37,11 @@ fun LinesPathsDemo(onBack: () -> Unit) {
     var showLine by remember { mutableStateOf(true) }
     var showPath by remember { mutableStateOf(true) }
     var pointCount by remember { mutableFloatStateOf(12f) }
+    // Filament's LINES primitive is hardware-capped at 1 GPU pixel on most backends, so a line
+    // "width" slider cannot drive the native line width. Instead we render per-point sphere beads
+    // whose radius is controlled by this slider — visually equivalent to a thick dotted-line stroke
+    // at the cost of one SphereNode per point. Set to 0 to disable the beads entirely.
+    var lineWidth by remember { mutableFloatStateOf(0.03f) }
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
@@ -64,6 +69,16 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                 valueRange = 3f..30f,
                 steps = 27
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Line Width: ${"%.2f".format(lineWidth)} m",
+                style = MaterialTheme.typography.labelLarge
+            )
+            Slider(
+                value = lineWidth,
+                onValueChange = { lineWidth = it },
+                valueRange = 0f..0.1f
+            )
         }
     ) {
         SceneView(
@@ -79,14 +94,34 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                 materialLoader.createColorInstance(Color.Green)
             }
 
-            // Single line segment
+            // Single line segment — 1 px on most GPUs, so we also draw a pair of spheres at the
+            // endpoints (scaled by lineWidth) to give the line a visible thickness.
             if (showLine) {
+                val lineStart = Position(x = -1.0f, y = -0.5f, z = 0f)
+                val lineEnd = Position(x = 1.0f, y = 0.5f, z = 0f)
+                val lineOrigin = Position(x = 0f, y = 0.4f)
                 LineNode(
-                    start = Position(x = -1.0f, y = -0.5f, z = 0f),
-                    end = Position(x = 1.0f, y = 0.5f, z = 0f),
+                    start = lineStart,
+                    end = lineEnd,
                     materialInstance = redMaterial,
-                    position = Position(x = 0f, y = 0.4f)
+                    position = lineOrigin
                 )
+                if (lineWidth > 0f) {
+                    // Interpolate beads along the segment — makes the line look thick / dotted
+                    val beadCount = 10
+                    for (i in 0..beadCount) {
+                        val t = i.toFloat() / beadCount
+                        SphereNode(
+                            radius = lineWidth,
+                            materialInstance = redMaterial,
+                            position = Position(
+                                x = lineOrigin.x + lineStart.x + (lineEnd.x - lineStart.x) * t,
+                                y = lineOrigin.y + lineStart.y + (lineEnd.y - lineStart.y) * t,
+                                z = lineOrigin.z + lineStart.z + (lineEnd.z - lineStart.z) * t
+                            )
+                        )
+                    }
+                }
             }
 
             // Polyline path forming a spiral / circle pattern
@@ -103,12 +138,29 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                         )
                     }
                 }
+                val pathOrigin = Position(x = 0f, y = -0.3f)
                 PathNode(
                     points = pathPoints,
                     closed = true,
                     materialInstance = greenMaterial,
-                    position = Position(x = 0f, y = -0.3f)
+                    position = pathOrigin
                 )
+                if (lineWidth > 0f) {
+                    // Thick-path representation: one sphere bead at each path point, scaled by
+                    // the lineWidth slider. Gives the path a visible stroke width independent
+                    // of GPU line-rasterisation limits.
+                    pathPoints.forEach { p ->
+                        SphereNode(
+                            radius = lineWidth,
+                            materialInstance = greenMaterial,
+                            position = Position(
+                                x = pathOrigin.x + p.x,
+                                y = pathOrigin.y + p.y,
+                                z = pathOrigin.z + p.z
+                            )
+                        )
+                    }
+                }
             }
         }
     }

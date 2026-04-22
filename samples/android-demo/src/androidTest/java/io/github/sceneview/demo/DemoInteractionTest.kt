@@ -417,6 +417,21 @@ class DemoInteractionTest {
         screenshot("65_linesPaths_both_back")
     }
 
+    // ── 17. Lines & Paths — line-width slider ─────────────────────────────────
+
+    @Test
+    fun linesPaths_lineWidthSlider() {
+        openDemo("lines-paths", "Lines & Paths")
+        screenshot("69_linesPaths_width_default")
+
+        // Width starts at 0.03 m — drag to max (0.1 m) then to min (0 m)
+        dragSlider("Line Width:", fraction = 1.0f)
+        screenshot("70_linesPaths_width_max")
+
+        dragSlider("Line Width:", fraction = 0.0f)
+        screenshot("71_linesPaths_width_zero")
+    }
+
     // ── 16. Fog — density slider drag ─────────────────────────────────────────
 
     @Test
