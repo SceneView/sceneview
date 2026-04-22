@@ -17,12 +17,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
 import io.github.sceneview.node.Node as NodeImpl
 import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
@@ -41,6 +43,11 @@ fun PhysicsDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
+    // Camera slightly above scene, angled down so the floor + falling spheres are both framed
+    val cameraNode = rememberCameraNode(engine) {
+        position = Position(0f, 1.5f, 3f)
+        lookAt(Position(0f, 0f, 0f))
+    }
 
     DemoScaffold(
         title = "Physics",
@@ -70,8 +77,21 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 engine = engine,
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
-                cameraManipulator = rememberCameraManipulator()
+                cameraNode = cameraNode,
+                cameraManipulator = rememberCameraManipulator(
+                    orbitHomePosition = cameraNode.worldPosition
+                )
             ) {
+                // Explicit directional light — without this, the PBR colored-material spheres
+                // rendered against the default empty environment appear almost black and the
+                // demo looks broken (only the floor plane's DarkGray is visible).
+                LightNode(
+                    type = LightManager.Type.DIRECTIONAL,
+                    direction = io.github.sceneview.math.Direction(-0.3f, -1f, -0.5f),
+                    apply = {
+                        intensity(100_000f)
+                    }
+                )
                 val groundMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.DarkGray) }
                 val sphereMaterials = remember(materialLoader) {
                     listOf(
