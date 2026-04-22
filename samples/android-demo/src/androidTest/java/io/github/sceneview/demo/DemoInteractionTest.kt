@@ -445,4 +445,94 @@ class DemoInteractionTest {
         dragSlider("Density:", fraction = 0.0f)
         screenshot("68_fog_density_min")
     }
+
+    // ── 18. Dynamic Sky — time + turbidity sliders ────────────────────────────
+
+    @Test
+    fun dynamicSky_timeAndTurbidity() {
+        openDemo("dynamic-sky", "Dynamic Sky")
+        screenshot("72_sky_default")
+
+        dragSlider("Time of Day:", fraction = 0.1f)   // dawn
+        screenshot("73_sky_dawn")
+
+        dragSlider("Time of Day:", fraction = 0.9f)   // dusk
+        screenshot("74_sky_dusk")
+
+        dragSlider("Turbidity:", fraction = 1.0f)
+        screenshot("75_sky_high_turbidity")
+    }
+
+    // ── 19. Reflection Probes — radius + Y sliders ────────────────────────────
+
+    @Test
+    fun reflectionProbes_sliders() {
+        openDemo("reflection-probes", "Reflection Probes")
+        screenshot("76_probes_default")
+
+        dragSlider("Probe Radius:", fraction = 1.0f)
+        screenshot("77_probes_max_radius")
+
+        dragSlider("Probe Radius:", fraction = 0.0f)
+        screenshot("78_probes_min_radius")
+    }
+
+    // ── 20. Image — scale slider ──────────────────────────────────────────────
+
+    @org.junit.Ignore(
+        "Same library bug as billboard_visibilityChips — ImageNode teardown crashes Filament " +
+                "with `Invalid texture still bound to MaterialInstance: 'Transparent Textured'` " +
+                "and aborts the test runner. Un-ignore once sceneview/ fixes ImageNode destroy " +
+                "ordering."
+    )
+    @Test
+    fun image_scaleSlider() {
+        openDemo("image", "Image Node")
+        screenshot("79_image_default_scale")
+
+        dragSlider("Scale:", fraction = 1.0f)
+        screenshot("80_image_max_scale")
+
+        dragSlider("Scale:", fraction = 0.0f)
+        screenshot("81_image_min_scale")
+    }
+
+    // ── 21. Text Labels — font-size slider ────────────────────────────────────
+
+    @org.junit.Ignore(
+        "Same library bug as billboard_visibilityChips — TextNode teardown crashes Filament " +
+                "with `Invalid texture still bound to MaterialInstance: 'Transparent Textured'` " +
+                "and aborts the test runner. Un-ignore once sceneview/ fixes TextNode destroy " +
+                "ordering."
+    )
+    @Test
+    fun textLabels_fontSizeSlider() {
+        openDemo("text", "Text Nodes")
+        screenshot("82_text_default")
+
+        dragSlider("Font Size:", fraction = 1.0f)
+        screenshot("83_text_max_size")
+
+        dragSlider("Font Size:", fraction = 0.0f)
+        screenshot("84_text_min_size")
+    }
+
+    // ── 22. Collision — reset-colors button + shape taps ──────────────────────
+
+    @Test
+    fun collision_shapeTapAndReset() {
+        openDemo("collision", "Collision & Hit Test")
+        screenshot("85_collision_default")
+
+        val w = device.displayWidth
+        val h = device.displayHeight
+        // Tap 3 positions in the 3D viewport to hit-test several shapes
+        device.click((w * 0.20).toInt(), (h * 0.30).toInt()); Thread.sleep(400)
+        device.click((w * 0.50).toInt(), (h * 0.30).toInt()); Thread.sleep(400)
+        device.click((w * 0.80).toInt(), (h * 0.30).toInt()); Thread.sleep(400)
+        screenshot("86_collision_after_taps")
+
+        tap("Reset Colors")
+        screenshot("87_collision_after_reset")
+    }
 }
