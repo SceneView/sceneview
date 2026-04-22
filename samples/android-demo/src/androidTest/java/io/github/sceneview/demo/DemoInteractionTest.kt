@@ -194,4 +194,89 @@ class DemoInteractionTest {
         Thread.sleep(600)
         screenshot("22_customMesh_after_orbit_drag")
     }
+
+    // ── 6. Shape — Triangle / Star / Hexagon chips ────────────────────────────
+
+    @Test
+    fun shape_allPolygons() {
+        openDemo("shape", "Shape Node")
+        screenshot("23_shape_triangle_default")
+
+        tap("Star")
+        screenshot("24_shape_star")
+
+        tap("Hexagon")
+        screenshot("25_shape_hexagon")
+
+        tap("Triangle")
+        screenshot("26_shape_triangle_back")
+    }
+
+    // ── 7. Multi Model — 3 visibility chips ───────────────────────────────────
+
+    @Test
+    fun multiModel_visibilityChips() {
+        openDemo("multi-model", "Multiple Models")
+        screenshot("27_multiModel_all_visible")
+
+        tap("Avocado")
+        screenshot("28_multiModel_no_avocado")
+
+        tap("Helmet")
+        screenshot("29_multiModel_no_avocado_no_helmet")
+
+        tap("Avocado")
+        tap("Helmet")
+        screenshot("30_multiModel_all_back")
+    }
+
+    // ── 8. Post Processing — 4 toggle rows ────────────────────────────────────
+
+    @Test
+    fun postProcessing_allToggles() {
+        openDemo("post-processing", "Post-Processing")
+        screenshot("31_postProc_all_off_default")
+
+        tap("SSAO (Ambient Occlusion)")
+        screenshot("32_postProc_ssao_on")
+
+        tap("FXAA (Fast Approx. AA)")
+        screenshot("33_postProc_ssao_fxaa_on")
+
+        tap("Temporal Dithering")
+        screenshot("34_postProc_ssao_fxaa_dither_on")
+
+        tap("SSAO (Ambient Occlusion)")
+        tap("FXAA (Fast Approx. AA)")
+        tap("Temporal Dithering")
+        screenshot("35_postProc_all_back_off")
+    }
+
+    // ── 9. Debug Overlay — show-overlay toggle ────────────────────────────────
+
+    @Test
+    fun debugOverlay_showToggle() {
+        openDemo("debug-overlay", "Debug Overlay")
+        screenshot("36_debugOverlay_on_default")
+
+        tap("Show Overlay")
+        screenshot("37_debugOverlay_off")
+
+        tap("Show Overlay")
+        screenshot("38_debugOverlay_on_back")
+    }
+
+    // ── 10. Animation — loop / once chips ─────────────────────────────────────
+
+    @Test
+    fun animation_loopVsOnce() {
+        openDemo("animation", "Animation")
+        screenshot("39_animation_loop_default")
+
+        tap("Once")
+        screenshot("40_animation_once")
+
+        tap("Loop")
+        screenshot("41_animation_loop_back")
+    }
 }
