@@ -279,4 +279,119 @@ class DemoInteractionTest {
         tap("Loop")
         screenshot("41_animation_loop_back")
     }
+
+    // ── 11. Environment Gallery — 6 HDR chips ─────────────────────────────────
+
+    @Test
+    fun environment_hdrGallery() {
+        openDemo("environment", "Environment Gallery")
+        screenshot("42_env_studio_default")
+
+        tap("Studio Warm")
+        screenshot("43_env_studio_warm")
+
+        tap("Outdoor Cloudy")
+        screenshot("44_env_outdoor_cloudy")
+
+        tap("Chinese Garden")
+        screenshot("45_env_chinese_garden")
+
+        tap("Sunset")
+        screenshot("46_env_sunset")
+
+        tap("Rooftop Night")
+        screenshot("47_env_rooftop_night")
+
+        tap("Studio")
+        screenshot("48_env_studio_back")
+    }
+
+    // ── 12. Billboard — skipped until lib bug #XXX fixed ──────────────────────
+
+    /**
+     * **Library bug discovered by this test suite on 2026-04-23** — DO NOT UN-IGNORE until
+     * fixed in `sceneview/` (BillboardNode / ImageNode teardown):
+     *
+     * ```
+     * E Filament: Precondition in commit:240
+     *   reason: Invalid texture still bound to MaterialInstance: 'Transparent Textured'
+     * F libc: SIGABRT in io.github.sceneview.demo
+     * ```
+     *
+     * Reproducer: just open BillboardDemo and close it (or toggle the visibility chip).
+     * Root cause: when Compose drops the `BillboardNode` / `ImageNode` from the scene, its
+     * `MaterialInstance` is destroyed while a texture is still bound to it. The unbind must
+     * happen before destroy in the Node lifecycle.
+     *
+     * Visual validation of my framing fix (commit 34187a81) is confirmed elsewhere by the
+     * Pixel 9 screenshot `tools/qa-screenshots/pixel9/final/12_billboard.png` — no need to
+     * re-capture here.
+     */
+    @org.junit.Ignore(
+        "Library bug: BillboardNode teardown leaves texture bound to MaterialInstance, " +
+                "Filament aborts with SIGABRT. Crashes the whole test runner, so we skip. " +
+                "Un-ignore once sceneview/ fixes BillboardNode/ImageNode destroy ordering."
+    )
+    @Test
+    fun billboard_visibilityChips() {
+        openDemo("billboard", "Billboard Node")
+        screenshot("49_billboard_both_visible")
+        tap("Billboard"); screenshot("50_billboard_only_fixed")
+        tap("Fixed Image"); screenshot("51_billboard_none")
+    }
+
+    // ── 13. Secondary Camera — 4 PiP angle chips ──────────────────────────────
+
+    @Test
+    fun secondaryCamera_pipAngles() {
+        openDemo("secondary-camera", "Secondary Camera (PiP)")
+        screenshot("53_secondaryCam_top_default")
+
+        tap("Side")
+        screenshot("54_secondaryCam_side")
+
+        tap("Front")
+        screenshot("55_secondaryCam_front")
+
+        tap("Corner")
+        screenshot("56_secondaryCam_corner")
+
+        tap("Top")
+        screenshot("57_secondaryCam_top_back")
+    }
+
+    // ── 14. Gesture Editing — editable switch + reset button ──────────────────
+
+    @Test
+    fun gestureEditing_editableAndReset() {
+        openDemo("gesture-editing", "Gesture Editing")
+        screenshot("58_gesture_editable_default")
+
+        tap("Editable")
+        screenshot("59_gesture_disabled")
+
+        tap("Editable")
+        screenshot("60_gesture_re_enabled")
+
+        tap("Reset Position")
+        screenshot("61_gesture_after_reset")
+    }
+
+    // ── 15. Lines & Paths — Line / Path chips ─────────────────────────────────
+
+    @Test
+    fun linesPaths_visibilityChips() {
+        openDemo("lines-paths", "Lines & Paths")
+        screenshot("62_linesPaths_both_default")
+
+        tap("Line")
+        screenshot("63_linesPaths_no_line")
+
+        tap("Path")
+        screenshot("64_linesPaths_none")
+
+        tap("Line")
+        tap("Path")
+        screenshot("65_linesPaths_both_back")
+    }
 }
