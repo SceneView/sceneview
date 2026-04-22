@@ -18,6 +18,8 @@ android {
         targetSdk 36
         versionCode project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 350
         versionName project.hasProperty('versionName') ? project.property('versionName') : "4.0.1"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -99,4 +101,12 @@ dependencies {
     testImplementation libs.androidx.test.junit
     testImplementation platform(libs.androidx.compose.bom)
     testImplementation libs.androidx.compose.ui
+
+    // Compose instrumentation tests (real emulator, exercises Filament + Compose UI)
+    androidTestImplementation platform(libs.androidx.compose.bom)
+    androidTestImplementation libs.androidx.compose.ui.test.junit4
+    androidTestImplementation libs.androidx.test.ext.junit
+    androidTestImplementation libs.androidx.test.runner
+    androidTestImplementation libs.androidx.test.uiautomator
+    debugImplementation libs.androidx.compose.ui.test.manifest
 }
