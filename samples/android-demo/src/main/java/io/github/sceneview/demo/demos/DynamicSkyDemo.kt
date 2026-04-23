@@ -14,11 +14,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.DynamicSkyNode
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
@@ -36,6 +38,12 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+    // Outdoor HDR gives the demo a visible sky backdrop — the DynamicSkyNode below still
+    // drives the scene's *sun* light direction + colour on top of this static skybox.
+    val environment = rememberEnvironment(environmentLoader) {
+        environmentLoader.createHDREnvironment("environments/outdoor_cloudy_2k.hdr")
+            ?: createEnvironment(environmentLoader)
+    }
 
     DemoScaffold(
         title = "Dynamic Sky",
@@ -67,6 +75,7 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
+            environment = environment,
             cameraManipulator = rememberCameraManipulator()
         ) {
             DynamicSkyNode(
