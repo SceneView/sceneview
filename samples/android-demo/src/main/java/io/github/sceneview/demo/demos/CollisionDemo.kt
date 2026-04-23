@@ -74,9 +74,12 @@ fun CollisionDemo(onBack: () -> Unit) {
     }
 
     val gestureListener = rememberOnGestureListener(
-        onSingleTapConfirmed = { _: MotionEvent, node: Node? ->
+        // `onSingleTapUp` fires on release, no 300 ms double-tap disambiguation window.
+        // Matches the ViewNodeDemo fix — users (and tests) firing several single taps in
+        // quick succession should see each one register instead of being dropped as a
+        // possible double-tap.
+        onSingleTapUp = { _: MotionEvent, node: Node? ->
             if (node != null) {
-                // Find which shape index this node belongs to by checking its name.
                 val idx = node.name?.removePrefix("shape_")?.toIntOrNull()
                 if (idx != null) {
                     highlightedIndices = if (idx in highlightedIndices) {

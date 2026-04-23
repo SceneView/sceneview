@@ -317,6 +317,7 @@ class DemoInteractionTest {
         tap("Mist")
         dragSlider("Density:", fraction = 1.0f); screenshot("10a_fog_density_max")
         dragSlider("Density:", fraction = 0.0f); screenshot("10b_fog_density_min")
+        dragSlider("Density:", fraction = 0.5f); screenshot("10c_fog_density_mid")
     }
 
     // ── 3. Physics — drop + reset ─────────────────────────────────────────────
@@ -383,6 +384,7 @@ class DemoInteractionTest {
         // Scale slider — min / max / default-ish (0.5)
         dragSlider("Scale:", fraction = 0.0f); screenshot("22a_customMesh_scale_min")
         dragSlider("Scale:", fraction = 1.0f); screenshot("22b_customMesh_scale_max")
+        dragSlider("Scale:", fraction = 0.5f); screenshot("22c_customMesh_scale_mid")
     }
 
     // ── 6. Shape — Triangle / Star / Hexagon chips ────────────────────────────
@@ -596,6 +598,7 @@ class DemoInteractionTest {
 
         dragSlider("Line Width:", fraction = 1.0f); screenshot("70_linesPaths_width_max")
         dragSlider("Line Width:", fraction = 0.0f); screenshot("71_linesPaths_width_zero")
+        dragSlider("Line Width:", fraction = 0.5f); screenshot("71c_linesPaths_width_mid")
 
         // Path Points slider sweep
         dragSlider("Path Points:", fraction = 0.0f); screenshot("71a_linesPaths_points_min")
@@ -612,8 +615,17 @@ class DemoInteractionTest {
         dragSlider("Time of Day:", fraction = 0.1f)   // dawn
         screenshot("73_sky_dawn")
 
+        dragSlider("Time of Day:", fraction = 0.5f)   // noon — mid value exercises the
+        screenshot("73a_sky_noon")                     // zenith sun-position path
+
         dragSlider("Time of Day:", fraction = 0.9f)   // dusk
         screenshot("74_sky_dusk")
+
+        dragSlider("Turbidity:", fraction = 0.0f)     // clear atmosphere
+        screenshot("74a_sky_low_turbidity")
+
+        dragSlider("Turbidity:", fraction = 0.5f)     // mid — typical overcast sky
+        screenshot("74b_sky_mid_turbidity")
 
         dragSlider("Turbidity:", fraction = 1.0f)
         screenshot("75_sky_high_turbidity")
@@ -632,9 +644,15 @@ class DemoInteractionTest {
         dragSlider("Probe Radius:", fraction = 0.0f)
         screenshot("78_probes_min_radius")
 
+        dragSlider("Probe Radius:", fraction = 0.5f)   // mid radius — realistic room
+        screenshot("78c_probes_mid_radius")
+
         // Probe Y Position slider — second slider of the demo
         dragSlider("Probe Y Position:", fraction = 0.0f)
         screenshot("78a_probes_y_min")
+
+        dragSlider("Probe Y Position:", fraction = 0.5f)  // mid Y — typical eye-level probe
+        screenshot("78d_probes_y_mid")
 
         dragSlider("Probe Y Position:", fraction = 1.0f)
         screenshot("78b_probes_y_max")
@@ -652,6 +670,9 @@ class DemoInteractionTest {
 
         dragSlider("Scale:", fraction = 0.0f)
         screenshot("81_image_min_scale")
+
+        dragSlider("Scale:", fraction = 0.5f)
+        screenshot("81a_image_mid_scale")
     }
 
     // ── 21. Text Labels — font-size slider ────────────────────────────────────
@@ -666,6 +687,9 @@ class DemoInteractionTest {
 
         dragSlider("Font Size:", fraction = 0.0f)
         screenshot("84_text_min_size")
+
+        dragSlider("Font Size:", fraction = 0.5f)
+        screenshot("84b_text_mid_size")
 
         // "Display Text" OutlinedTextField — the demo seeds it with "Hello SceneView",
         // so we look up the field by that current value (not the label) to get the input
@@ -682,14 +706,19 @@ class DemoInteractionTest {
         openDemo("view-node", "View Node")
         screenshot("88_viewNode_visible_default")
 
-        // ViewNode's "Tap me" button is rendered INSIDE the Filament SurfaceView, not as a
-        // native Android view — uiautomator can't see it. Click the SurfaceView at the card's
-        // rendered centre instead.
-        val cardCenterX = device.displayWidth / 2
-        val cardCenterY = (device.displayHeight * 0.35).toInt()
-        device.click(cardCenterX, cardCenterY); Thread.sleep(400)
-        device.click(cardCenterX, cardCenterY); Thread.sleep(400)
-        device.click(cardCenterX, cardCenterY); Thread.sleep(500)
+        // ViewNode's "Tap me" Button is rendered inside a Compose hierarchy attached to
+        // the 3D-textured quad. UiAutomator cannot see it — the 3D projection never
+        // routes input events back into the Compose tree. The demo works around this by
+        // hoisting the `tapCount` state and wiring a SceneView gesture listener
+        // (`onSingleTapUp = { tapCount++ }`) so any tap on the viewport surface also
+        // increments the counter. We click three distinct positions so three genuine
+        // up-events fire (tapping the same pixel back-to-back can coalesce into a
+        // double-tap sequence on some gesture stacks).
+        val cx = device.displayWidth / 2
+        val cy = (device.displayHeight * 0.35).toInt()
+        device.click(cx - 40, cy); Thread.sleep(500)
+        device.click(cx, cy + 40); Thread.sleep(500)
+        device.click(cx + 40, cy); Thread.sleep(700)
         screenshot("89_viewNode_tapped_3")
 
         tap("Visible")
@@ -764,10 +793,22 @@ class DemoInteractionTest {
 
         val w = device.displayWidth
         val h = device.displayHeight
-        // Tap 3 positions in the 3D viewport to hit-test several shapes
-        device.click((w * 0.20).toInt(), (h * 0.30).toInt()); Thread.sleep(400)
-        device.click((w * 0.50).toInt(), (h * 0.30).toInt()); Thread.sleep(400)
-        device.click((w * 0.80).toInt(), (h * 0.30).toInt()); Thread.sleep(400)
+        // Each shape sits at z=-2, so the camera at z≈3 renders them at roughly the
+        // vertical centre of the viewport. The screen-space layout is:
+        //
+        //   row 1 (spheres, y≈+0.3 world): around y ≈ 38% of screen
+        //   row 2 (cubes,   y≈+0.0 world): around y ≈ 44% of screen
+        //
+        // We tap once per row at three x-positions so at least 4 of the 5 shapes get hit,
+        // which produces a different screenshot byte-pattern than the default (byte-size
+        // diff was ~30 B at 30 % Y — the clicks were landing above every shape).
+        val rowSpheresY = (h * 0.38).toInt()
+        val rowCubesY   = (h * 0.44).toInt()
+        device.click((w * 0.25).toInt(), rowSpheresY); Thread.sleep(300)
+        device.click((w * 0.65).toInt(), rowSpheresY); Thread.sleep(300)
+        device.click((w * 0.20).toInt(), rowCubesY);   Thread.sleep(300)
+        device.click((w * 0.50).toInt(), rowCubesY);   Thread.sleep(300)
+        device.click((w * 0.80).toInt(), rowCubesY);   Thread.sleep(400)
         screenshot("86_collision_after_taps")
 
         tap("Reset Colors")
