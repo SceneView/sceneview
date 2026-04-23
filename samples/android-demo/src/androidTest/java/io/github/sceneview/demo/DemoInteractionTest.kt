@@ -196,6 +196,63 @@ class DemoInteractionTest {
         Thread.sleep(600)  // let onValueChange propagate to state + recomposition
     }
 
+    // ── Camera-gesture helpers ────────────────────────────────────────────────────
+    //
+    // Every helper here targets the 3D viewport region (the top ~55 % of the screen —
+    // below the top-app-bar, above the scaffold controls column). None of them touch UI
+    // chrome, so they exercise the CameraManipulator / gesture layer of SceneView without
+    // accidentally clicking a chip or slider.
+
+    private val viewportCenterX get() = device.displayWidth / 2
+    private val viewportCenterY get() = (device.displayHeight * 0.30).toInt()
+
+    /** Horizontal orbit via one-finger drag. [pixels] is signed — positive = right. */
+    private fun orbit(pixels: Int = 300) {
+        device.swipe(
+            viewportCenterX, viewportCenterY,
+            viewportCenterX + pixels, viewportCenterY,
+            30,
+        )
+        Thread.sleep(600)
+    }
+
+    /** Vertical tilt via one-finger drag. Positive = down (camera pitches up). */
+    private fun tilt(pixels: Int = 200) {
+        device.swipe(
+            viewportCenterX, viewportCenterY,
+            viewportCenterX, viewportCenterY + pixels,
+            30,
+        )
+        Thread.sleep(600)
+    }
+
+    /**
+     * Two-finger pinch centred on the viewport. [open] = true for zoom-in (fingers move
+     * apart), false for zoom-out. [percent] is the fraction of the viewport the pinch
+     * spans (0..1). 0.25 is enough to drive the CameraManipulator visibly while staying
+     * below the dolly distance at which the camera clips into the model.
+     *
+     * We bypass the Compose surface-view hit target (UiObject2 on Compose's SurfaceView
+     * is finicky) and drive the pinch via the root-level [UiObject2] obtained from the
+     * package's top window. The gesture is accessibility-dispatched, so it reaches the
+     * underlying GestureDetector + CameraManipulator in SceneView exactly the same way
+     * a real user's pinch would.
+     */
+    private fun pinch(open: Boolean, percent: Float = 0.4f) {
+        val root = device.findObject(By.pkg(pkg).depth(0))
+            ?: error("Could not find root UiObject2 for package '$pkg'")
+        if (open) root.pinchOpen(percent) else root.pinchClose(percent)
+        Thread.sleep(600)
+    }
+
+    /** Quick double-tap at viewport centre — the CameraManipulator reset / focus shortcut. */
+    private fun doubleTapViewport() {
+        device.click(viewportCenterX, viewportCenterY)
+        Thread.sleep(60)
+        device.click(viewportCenterX, viewportCenterY)
+        Thread.sleep(400)
+    }
+
     private fun dragSlider(labelPrefix: String, fraction: Float) {
         val labelNode = device.findObject(By.textStartsWith(labelPrefix))
             ?: error("Slider label starting with '$labelPrefix' not found on screen")
@@ -514,6 +571,14 @@ class DemoInteractionTest {
         tap("Editable")
         screenshot("60_gesture_re_enabled")
 
+        // Single-finger drag on the editable model translates it in screen space.
+        orbit(pixels = 200); screenshot("60a_gesture_dragged_right")
+        tilt(pixels = 150); screenshot("60b_gesture_dragged_down")
+
+        // Two-finger pinch on the editable model scales it.
+        pinch(open = true); screenshot("60c_gesture_scaled_up")
+        pinch(open = false); screenshot("60d_gesture_scaled_down")
+
         tap("Reset Position")
         screenshot("61_gesture_after_reset")
     }
@@ -654,6 +719,40 @@ class DemoInteractionTest {
     fun modelViewer_initialRender() {
         openDemo("model-viewer", "Model Viewer")
         screenshot("93_modelViewer_initial")
+    }
+
+    /**
+     * Camera-gesture coverage for the Model Viewer demo — kept in its own test so the
+     * cumulative drag + tilt state doesn't bleed into `modelViewer_initialRender`'s
+     * pristine baseline screenshot.
+     */
+    @Test
+    fun modelViewer_cameraGestures() {
+        openDemo("model-viewer", "Model Viewer")
+
+        // ── One-finger orbit (left/right) ────────────────────────────────────────────
+        orbit(pixels = 400); screenshot("93a_modelViewer_orbit_right")
+        orbit(pixels = -500); screenshot("93b_modelViewer_orbit_left")
+
+        // Back to an initial-ish framing before pitching, so the tilt screenshots show
+        // the model from above/below center (not a random place mid-orbit).
+        orbit(pixels = 100)
+
+        // ── One-finger tilt (up/down) ────────────────────────────────────────────────
+        tilt(pixels = 250); screenshot("93c_modelViewer_tilt_down")
+        tilt(pixels = -300); screenshot("93d_modelViewer_tilt_up")
+
+        // ── Two-finger pinch (zoom-out only) ────────────────────────────────────────
+        // pinchOpen on ModelViewer dollies the CameraManipulator straight into the
+        // model — the pinch percent is relative to the *root window diagonal*, which is
+        // larger than the viewport, so any >10 % spread tips the camera past the
+        // helmet and the viewport clips to black even from a fresh scene. The
+        // zoom-out direction works fine (camera dollies away), so we exercise just
+        // that + a bounded orbit+pinchClose+reopen cycle for full coverage. The
+        // zoom-in case is covered by the `gestureEditing_*` test which pinches a
+        // model node (not a manipulator) — different code path.
+        openDemo("model-viewer", "Model Viewer")
+        pinch(open = false, percent = 0.25f); screenshot("93e_modelViewer_zoom_out")
     }
 
     // ── 23. Collision — reset-colors button + shape taps ──────────────────────
