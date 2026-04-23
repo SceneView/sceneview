@@ -231,56 +231,7 @@ infix fun Float.almostEquals(other: Float): Boolean {
     return abs(this - other) <= epsilon
 }
 
-fun Float2.compareTo(v: Float, delta: Float = 0.0f) = Float2(
-    x.compareTo(v, delta),
-    y.compareTo(v, delta)
-)
-
-fun Float2.equals(v: Float, delta: Float = 0.0f) = x.equals(v, delta) && y.equals(v, delta)
-
-fun Float2.compareTo(v: Float2, delta: Float = 0.0f) = Float2(
-    x.compareTo(v.x, delta),
-    y.compareTo(v.y, delta)
-)
-
-fun Float2.equals(v: Float2, delta: Float = 0.0f) = x.equals(v.x, delta) && y.equals(v.y, delta)
-
-fun Float3.compareTo(v: Float, delta: Float = 0.0f) = Float3(
-    xy.compareTo(v, delta),
-    z.compareTo(v, delta)
-)
-
-fun Float3.equals(v: Float, delta: Float = 0.0f) = xy.equals(v, delta) && z.equals(v, delta)
-
-fun Float3.compareTo(v: Float3, delta: Float = 0.0f) = Float3(
-    xy.compareTo(v.xy, delta),
-    z.compareTo(v.z, delta)
-)
-
-fun Float3.equals(v: Float3, delta: Float = 0.0f) =
-    xy.equals(v.xy, delta) && z.equals(v.z, delta)
-
-fun Float4.compareTo(v: Float, delta: Float = 0.0f) = Float4(
-    xyz.compareTo(v, delta),
-    w.compareTo(v, delta)
-)
-
-fun Float4.equals(v: Float, delta: Float = 0.0f) = xyz.equals(v, delta) && w.equals(v, delta)
-
-fun Float4.compareTo(v: Float4, delta: Float = 0.0f) = Float4(
-    xyz.compareTo(v.xyz, delta),
-    w.compareTo(v.w, delta)
-)
-
-fun Float4.equals(v: Float4, delta: Float = 0.0f) =
-    xyz.equals(v.xyz, delta) && w.equals(v.w, delta)
-
-fun Mat4.compareTo(m: Mat4, delta: Float = 0.0f) = Mat4(
-    x.compareTo(m.x, delta),
-    y.compareTo(m.y, delta),
-    z.compareTo(m.z, delta),
-    w.compareTo(m.w, delta)
-)
-
-fun Mat4.equals(m: Mat4, delta: Float = 0.0f) =
-    x.equals(m.x, delta) && y.equals(m.y, delta) && z.equals(m.z, delta) && w.equals(m.w, delta)
+// Compare-with-tolerance helpers for Float2/Float3/Float4/Mat4 used to live here, but
+// kotlin-math 1.8 shipped them as members with identical signatures. The extensions were
+// shadowed and never actually invoked — the Kotlin compiler emitted "This extension is
+// shadowed by a member" for each one. Removed in favour of the upstream members.
