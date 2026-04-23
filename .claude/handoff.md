@@ -4,6 +4,65 @@
 
 ---
 
+## SESSION reverent-jang — 2026-04-23 — Android teardown bugs + smoke-test harness + full QA coverage
+
+**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/hopeful-elgamal-c7433f`
+**Branch:** `claude/hopeful-elgamal-c7433f` — 22 commits ahead of main (GitHub ban → no push)
+
+### What shipped
+
+**Library fixes (sceneview + arsceneview):**
+- `ViewNode.destroy()` — reordered to call `super.destroy()` BEFORE `destroyMaterialInstance(materialInstance)`. Filament aborts with "destroying MaterialInstance 'view' still in use by Renderable" if the node's Renderable component still references it.
+- `PlaneRenderer.destroy()` — now routes materials through `materialLoader.destroyMaterial(...)` (the guarded path that removes from `materials` list). Previously bypassed the loader → `MaterialLoader.destroy()` crashed on teardown with "Calling method on destroyed Material". Also dropped the manual `destroyMaterialInstance(defaultInstance)` which was a guaranteed double-free (Engine.destroyMaterial cascades).
+- `ARCameraStream.destroy()` — same fix pattern. No more explicit defaultInstance destroy; route materials through `materialLoader.destroyMaterial`. Textures now reliably destroyed AFTER materials (fixes "Invalid texture still bound to MaterialInstance: 'depth'" abort).
+- `MaterialLoader.destroyMaterial` / `destroyMaterialInstance` — wrapped native destroy calls in `runCatching` as defense-in-depth against out-of-order teardown (Engine teardown beating the MaterialLoader DisposableEffect).
+
+**Test infrastructure:**
+- `DemoInteractionTest` baseline: 23 → extended with 10 new sub-function captures (Lighting intensity, Animation speed, PostProc MSAA, CustomMesh scale, LinesPaths path points, Reflection probe Y). 33 screenshots total for these tests.
+- NEW `DemoSmokeTest` class: 8 smoke tests for the 7 AR demos + Camera Controls. Each verifies the demo launches without a JNI crash on Apple M3 Metal translator AVD (where ARCore and Filament Manipulator aren't available).
+- JPEG screenshot pipeline via MediaStore — writes to `/sdcard/Download/sceneview-qa/*.jpg` (survives APK uninstall, no scoped-storage permission dance). Tracked screenshots dropped 52 MB PNG → 6.7 MB JPEG at indistinguishable visual quality.
+- `openDemo` settle bumped 2.5 s → 4 s → 6 s to cover first-frame GLB decode + GPU upload on the slow Metal translator.
+- `ScreenshotTest.kt` rewritten — old 6 tests referenced `AboutScreen`/`SamplesScreen` (retired when the app moved to DemoHostActivity). Replaced with 4 `DemoListScreen` tests (light/dark/large-font/tablet). Fresh Roborazzi goldens generated.
+
+### Stability / quality gates
+
+- **31/31 interaction + smoke tests PASS**, verified on 4 consecutive back-to-back runs (~10 min each).
+- `:sceneview:connectedDebugAndroidTest` — 68 tests (4 skipped due to Filament `readPixels` broken on Metal translator).
+- `:arsceneview:connectedDebugAndroidTest` — BUILD SUCCESSFUL.
+- Library unit tests: `:sceneview:test`, `:arsceneview:testDebugUnitTest`, `:sceneview-core:allTests` — all green.
+- `:samples:android-demo:bundleRelease` — OK (required `-Xmx8g -XX:MaxMetaspaceSize=1g` for R8; may be worth bumping `gradle.properties` default if this recurs).
+- `:sceneview-web:assemble` — BUILD SUCCESSFUL.
+- MCP: `2902 vitest tests pass` across 132 files.
+- `pre-push-check.sh` — 9/9 PASS.
+- `quality-gate.sh --quick` — PASS (1 pre-existing warning on third-party CDN in HTML, unrelated).
+- `impact-check.sh` — PASS (1 pre-existing warning on Swift-only nodes, unrelated).
+- Fresh Roborazzi goldens committed for `DemoListScreen` (light/dark/large-font/tablet).
+
+### Commits
+
+```
+2403d20d chore(mcp): regenerate llms-txt bundle and lockfile to 4.0.1
+fcc65c7b test(android-demo): rewrite stale Roborazzi ScreenshotTest for DemoListScreen
+16273dd7 test(android-demo): bump openDemo settle to 6s for reliable first-frame capture
+54fee6fa fix(arsceneview): AR teardown double-free + extend interaction test coverage
+35c78e26 test(android-demo): refresh QA screenshots as JPEG (52 MB -> 6.5 MB)
+dcbf02b1 test(android-demo): persist interaction screenshots via MediaStore
+b14b5942 fix(sceneview): ViewNode teardown order + interaction test JPEG pipeline
+```
+
+### Pièges qui reviendront
+- R8 OOM (Metaspace) sur `bundleRelease` avec 512m par défaut — passer `-Xmx8g -XX:MaxMetaspaceSize=1g` ou bumper `gradle.properties` définitivement.
+- Apple M3 Metal translator AVD ne résout pas `Manipulator.nCreateBuilder` (`CameraControlsDemo` viewport reste noir, mais l'app ne crashe pas).
+- Filament `readPixels` callback ne firent pas sur Metal translator — les offscreen render-tests restent `@Ignore` dans `sceneview/src/androidTest/`.
+- MediaStore écriture JPEG obligatoire sur API 30+ depuis le test APK UID — `FileOutputStream` direct vers `/sdcard/Download/` échoue EACCES.
+- Premier frame Filament (Engine + GLB decode + GPU upload) prend ~6 s sur cet émulateur → ne pas redescendre sous 6 s dans `openDemo`.
+
+### Not done (deferred)
+- Physics demo : la sphère diagnostic statique rend OK mais les sphères physiques ne sont pas visibles sur les screenshots (problème de timing simulation / position). Pas dans le scope de cette session.
+- Push GitHub bloqué par le ban — tous les commits restent locaux jusqu'à déblocage.
+
+---
+
 ## SESSION intelligent-elbakyan — 2026-04-13 — Quality-gate fix, SPM repo, geometry nodes, scheduled tasks
 
 **Worktree:** `intelligent-elbakyan`
