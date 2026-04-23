@@ -180,27 +180,20 @@ class DemoInteractionTest {
     }
 
     /**
-     * Types [text] into the currently-focused editable field, replacing anything already
-     * there. Works on Compose `OutlinedTextField` — [clickLabel] is the field's text label
-     * (e.g. "Display Text") that we tap first to acquire focus.
+     * Types [text] into a Compose `OutlinedTextField`, replacing anything already there.
+     *
+     * [currentValue] is the *current text* of the field (not its label). UiObject2.text
+     * = … drives the accessibility setText action which handles focus + IME + commit
+     * atomically — the older `click + input keyevent` recipe did not move focus on a
+     * Compose `OutlinedTextField` (the synthetic click landed on the BasicText composable
+     * rather than the underlying AndroidComposeView's focus target) and every keyevent
+     * that followed was dispatched to an unfocused surface.
      */
-    private fun typeInto(clickLabel: String, text: String) {
-        val field = device.findObject(By.text(clickLabel))
-            ?: error("Text field with label '$clickLabel' not found")
-        val clickable = generateSequence(field) { it.parent }
-            .firstOrNull { it.isClickable } ?: field
-        clickable.click()
-        Thread.sleep(400)
-        // Select all then overwrite — pressing backspace for every existing character would
-        // flake whenever the field had a non-empty initial value we didn't know about.
-        device.executeShellCommand("input keyevent KEYCODE_MOVE_END")
-        repeat(64) { device.executeShellCommand("input keyevent KEYCODE_DEL") }
-        // `input text` tokenises on whitespace; escape spaces so "Hello World" types cleanly.
-        device.executeShellCommand("input text '${text.replace(" ", "%s")}'")
-        Thread.sleep(400)
-        // Dismiss the on-screen IME so the next tap doesn't land on a key
-        device.pressBack()
-        Thread.sleep(400)
+    private fun typeInto(currentValue: String, text: String) {
+        val field = device.wait(Until.findObject(By.text(currentValue)), timeout)
+            ?: error("Text field with current value '$currentValue' not found")
+        field.text = text
+        Thread.sleep(600)  // let onValueChange propagate to state + recomposition
     }
 
     private fun dragSlider(labelPrefix: String, fraction: Float) {
@@ -609,9 +602,10 @@ class DemoInteractionTest {
         dragSlider("Font Size:", fraction = 0.0f)
         screenshot("84_text_min_size")
 
-        // "Display Text" OutlinedTextField — type a fresh string to validate the text
-        // content reflows into the 3D TextNode on the next frame.
-        typeInto("Display Text", "SceneView")
+        // "Display Text" OutlinedTextField — the demo seeds it with "Hello SceneView",
+        // so we look up the field by that current value (not the label) to get the input
+        // itself rather than the floating label element.
+        typeInto("Hello SceneView", "SceneView Works")
         Thread.sleep(600)
         screenshot("84a_text_custom_input")
     }
