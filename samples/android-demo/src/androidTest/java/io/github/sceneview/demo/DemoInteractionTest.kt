@@ -1,10 +1,11 @@
 package io.github.sceneview.demo
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import java.io.FileOutputStream
+import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -37,9 +38,13 @@ import java.io.File
  *
  * **Pulling screenshots**:
  * ```bash
- * adb pull /sdcard/Android/data/io.github.sceneview.demo/files/sceneview-qa/ \
- *   tools/qa-screenshots/interactions/
+ * adb pull /sdcard/Download/sceneview-qa/ tools/qa-screenshots/interactions/
  * ```
+ *
+ * JPEGs are written directly to the public `Download/sceneview-qa/` folder via the
+ * MediaStore API (not `java.io.File` — scoped storage blocks that for third-party apps
+ * on API 30+, and the app-private `getExternalFilesDir()` gets wiped when
+ * `connectedAndroidTest` uninstalls the demo APK).
  */
 @RunWith(AndroidJUnit4::class)
 class DemoInteractionTest {
@@ -63,32 +68,60 @@ class DemoInteractionTest {
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     /**
-     * Saves a full-device screenshot as JPEG to the demo app's external files dir:
-     * `/sdcard/Android/data/io.github.sceneview.demo/files/sceneview-qa/<name>.jpg`.
+     * Saves a full-device screenshot as JPEG to `Download/sceneview-qa/<name>.jpg` via
+     * the MediaStore API (the only post-uninstall-persistent location a third-party app
+     * can write to on scoped-storage Android without special permissions).
      *
-     * Rationale for the path: on scoped-storage Android (API 30+) the test APK's direct
-     * `java.io` writes to `/sdcard/Download/` hit EACCES, while `UiDevice.takeScreenshot`
-     * succeeds because it routes through the instrumentation shell UID. The app-private
-     * external dir is writable by both the shell route and our own FileOutputStream —
-     * no permissions required, and `adb pull` still works.
+     * `UiDevice.takeScreenshot` always writes PNG regardless of extension / `quality`
+     * parameter (the int is the PNG deflate level, not a JPEG quality). A 1080×2400 PNG
+     * at ~700 kB × 86 captures = 60 MB per run. Going through `Bitmap.compress(JPEG, 75)`
+     * cuts that to ~200 kB per shot at indistinguishable visual quality on Filament +
+     * UI chrome content.
      *
-     * Rationale for JPEG: `UiDevice.takeScreenshot` always writes PNG regardless of file
-     * extension or the `quality` parameter (the int controls PNG deflate level, not JPEG).
-     * A 1080×2400 PNG runs ~700 kB per capture — a 22-demo run committed 52 MB. Going
-     * through Bitmap.compress(JPEG, 75) produces ~200 kB captures at indistinguishable
-     * visual quality on photographic-style content (Filament renders + UI chrome).
+     * The tmp PNG is staged in the app-private external dir (free-scoped-storage, wiped
+     * on uninstall), decoded, recompressed as JPEG, then inserted into MediaStore.Downloads.
      */
     private fun screenshot(name: String) {
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
-        val dir = File(targetContext.getExternalFilesDir(null), "sceneview-qa")
-        if (!dir.exists()) dir.mkdirs()
-        val tmpPng = File(dir, ".tmp_$name.png")
+        val tmpDir = File(targetContext.getExternalFilesDir(null), "sceneview-qa-tmp")
+        if (!tmpDir.exists()) tmpDir.mkdirs()
+        val tmpPng = File(tmpDir, ".tmp_$name.png")
         device.takeScreenshot(tmpPng)
         val bmp = BitmapFactory.decodeFile(tmpPng.absolutePath)
             ?: error("Failed to decode screenshot PNG for '$name'")
-        FileOutputStream(File(dir, "$name.jpg")).use { out ->
-            bmp.compress(Bitmap.CompressFormat.JPEG, 75, out)
+
+        val resolver = targetContext.contentResolver
+        val filename = "$name.jpg"
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val selection = "${MediaStore.Downloads.RELATIVE_PATH}=? AND " +
+            "${MediaStore.Downloads.DISPLAY_NAME}=?"
+        val args = arrayOf("Download/sceneview-qa/", filename)
+        resolver.query(collection, arrayOf(MediaStore.Downloads._ID), selection, args, null)
+            ?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val oldUri = android.content.ContentUris.withAppendedId(collection, id)
+                    resolver.delete(oldUri, null, null)
+                }
+            }
+
+        val pending = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, filename)
+            put(MediaStore.Downloads.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Downloads.RELATIVE_PATH, "Download/sceneview-qa/")
+            put(MediaStore.Downloads.IS_PENDING, 1)
         }
+        val uri = resolver.insert(collection, pending)
+            ?: error("MediaStore insert returned null for '$name'")
+        resolver.openOutputStream(uri)?.use { out ->
+            bmp.compress(Bitmap.CompressFormat.JPEG, 75, out)
+        } ?: error("MediaStore openOutputStream returned null for '$name'")
+        resolver.update(
+            uri,
+            ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+            null,
+            null,
+        )
         bmp.recycle()
         tmpPng.delete()
     }
