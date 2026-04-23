@@ -28,6 +28,7 @@ import io.github.sceneview.SurfaceType
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
@@ -51,6 +52,17 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
     var cameraPreset by remember { mutableStateOf(CameraPreset.TOP) }
+
+    // Dedicated camera for the PiP SceneView. Created once, then repositioned each
+    // recomposition when the preset changes.
+    val pipCameraNode = rememberCameraNode(engine) {
+        position = CameraPreset.TOP.position
+        lookAt(Position(0f, 0f, 0f))
+    }
+    androidx.compose.runtime.SideEffect {
+        pipCameraNode.position = cameraPreset.position
+        pipCameraNode.lookAt(Position(0f, 0f, 0f))
+    }
 
     DemoScaffold(
         title = "Secondary Camera (PiP)",
@@ -85,17 +97,11 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
                     centerOrigin = Position(0f, 0f, 0f)
                 )
             }
-            // The secondary camera is added to the scene graph.
-            // It does NOT become the active rendering camera of this SceneView.
-            SecondaryCamera(
-                apply = {
-                    position = cameraPreset.position
-                    lookAt(Position(0f, 0f, 0f))
-                }
-            )
         }
 
-        // PiP overlay — a second SceneView rendered with TextureSurface for alpha compositing
+        // PiP overlay — a second SceneView rendered with TextureSurface for alpha compositing.
+        // Its cameraNode is bound to [pipCameraNode], so switching "Top / Side / Front / Corner"
+        // actually changes what the PiP shows (top-down, side profile, front, perspective).
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -110,7 +116,8 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
                 surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
-                materialLoader = materialLoader
+                materialLoader = materialLoader,
+                cameraNode = pipCameraNode
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
