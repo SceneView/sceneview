@@ -110,9 +110,17 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     position = Position(y = -0.5f)
                 )
 
+                // Diagnostic static sphere (no physics) — if even this is not visible, the bug
+                // is in the rendering pipeline, not the physics simulation.
+                SphereNode(
+                    radius = 0.1f,
+                    materialInstance = sphereMaterials[0],  // red
+                    position = Position(x = -0.5f, y = 0.2f, z = 0f)
+                )
+
                 for (i in 0 until sphereCount) {
-                    val xOffset = (i % 5 - 2) * 0.3f
-                    val startY = 0.5f + i * 0.4f
+                    val xOffset = (i % 5 - 2) * 0.15f
+                    val startY = 0.6f + i * 0.25f
 
                     // Capture the Node reference via apply so PhysicsNode can drive it.
                     var nodeRef by remember(i) { mutableStateOf<NodeImpl?>(null) }
@@ -122,7 +130,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
                         apply = { nodeRef = this }
                     ) {
                         SphereNode(
-                            radius = 0.15f,
+                            radius = 0.08f,
                             materialInstance = sphereMaterials[i % 4]
                         )
                     }
@@ -133,7 +141,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
                             node = node,
                             restitution = 0.7f,
                             floorY = -0.5f,
-                            radius = 0.15f
+                            radius = 0.08f
                         )
                     }
                 }

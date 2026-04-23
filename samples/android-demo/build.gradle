@@ -102,11 +102,11 @@ dependencies {
     testImplementation platform(libs.androidx.compose.bom)
     testImplementation libs.androidx.compose.ui
 
-    // Compose instrumentation tests (real emulator, exercises Filament + Compose UI)
-    androidTestImplementation platform(libs.androidx.compose.bom)
-    androidTestImplementation libs.androidx.compose.ui.test.junit4
+    // UiAutomator-based interaction tests. Drives the real demo app process through
+    // DemoHostActivity (debug flavour) — no ComposeTestRule, no Filament thread-adoption
+    // races. Screenshots grabbed via UiDevice cover the full framebuffer including the
+    // SurfaceView that Compose's captureToImage() cannot see.
     androidTestImplementation libs.androidx.test.ext.junit
     androidTestImplementation libs.androidx.test.runner
     androidTestImplementation libs.androidx.test.uiautomator
-    debugImplementation libs.androidx.compose.ui.test.manifest
 }

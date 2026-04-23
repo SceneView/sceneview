@@ -185,14 +185,16 @@ class ViewNode(
     }
 
     override fun destroy() {
-
+        // Order matters — super.destroy() (Node/RenderableNode) removes the Renderable
+        // component that references our MaterialInstance. Destroying the MI before that
+        // trips Filament's commit check:
+        //   "destroying MaterialInstance 'view' which is still in use by Renderable"
+        // Same lifecycle pattern as ImageNode. Texture + Stream are deliberately not
+        // destroyed here — the Engine teardown reclaims them safely, and destroying a
+        // SurfaceTexture-backed external texture early races with Android's surface pool.
         windowManager.removeView(layout)
-
-        materialLoader.destroyMaterialInstance(materialInstance)
-        engine.safeDestroyTexture(texture)
-        engine.safeDestroyStream(stream)
-
         super.destroy()
+        materialLoader.destroyMaterialInstance(materialInstance)
     }
 
     /**

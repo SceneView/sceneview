@@ -2,7 +2,9 @@ package io.github.sceneview.demo
 
 import android.content.Context
 import android.content.Intent
-import android.os.Environment
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.FileOutputStream
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -35,7 +37,8 @@ import java.io.File
  *
  * **Pulling screenshots**:
  * ```bash
- * adb pull /sdcard/Download/sceneview-qa/ tools/qa-screenshots/interactions/
+ * adb pull /sdcard/Android/data/io.github.sceneview.demo/files/sceneview-qa/ \
+ *   tools/qa-screenshots/interactions/
  * ```
  */
 @RunWith(AndroidJUnit4::class)
@@ -59,10 +62,35 @@ class DemoInteractionTest {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    /**
+     * Saves a full-device screenshot as JPEG to the demo app's external files dir:
+     * `/sdcard/Android/data/io.github.sceneview.demo/files/sceneview-qa/<name>.jpg`.
+     *
+     * Rationale for the path: on scoped-storage Android (API 30+) the test APK's direct
+     * `java.io` writes to `/sdcard/Download/` hit EACCES, while `UiDevice.takeScreenshot`
+     * succeeds because it routes through the instrumentation shell UID. The app-private
+     * external dir is writable by both the shell route and our own FileOutputStream —
+     * no permissions required, and `adb pull` still works.
+     *
+     * Rationale for JPEG: `UiDevice.takeScreenshot` always writes PNG regardless of file
+     * extension or the `quality` parameter (the int controls PNG deflate level, not JPEG).
+     * A 1080×2400 PNG runs ~700 kB per capture — a 22-demo run committed 52 MB. Going
+     * through Bitmap.compress(JPEG, 75) produces ~200 kB captures at indistinguishable
+     * visual quality on photographic-style content (Filament renders + UI chrome).
+     */
     private fun screenshot(name: String) {
-        val dir = File(Environment.getExternalStorageDirectory(), "Download/sceneview-qa")
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val dir = File(targetContext.getExternalFilesDir(null), "sceneview-qa")
         if (!dir.exists()) dir.mkdirs()
-        device.takeScreenshot(File(dir, "$name.png"))
+        val tmpPng = File(dir, ".tmp_$name.png")
+        device.takeScreenshot(tmpPng)
+        val bmp = BitmapFactory.decodeFile(tmpPng.absolutePath)
+            ?: error("Failed to decode screenshot PNG for '$name'")
+        FileOutputStream(File(dir, "$name.jpg")).use { out ->
+            bmp.compress(Bitmap.CompressFormat.JPEG, 75, out)
+        }
+        bmp.recycle()
+        tmpPng.delete()
     }
 
     /**
