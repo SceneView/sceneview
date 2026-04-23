@@ -793,22 +793,19 @@ class DemoInteractionTest {
 
         val w = device.displayWidth
         val h = device.displayHeight
-        // Each shape sits at z=-2, so the camera at z≈3 renders them at roughly the
-        // vertical centre of the viewport. The screen-space layout is:
-        //
-        //   row 1 (spheres, y≈+0.3 world): around y ≈ 38% of screen
-        //   row 2 (cubes,   y≈+0.0 world): around y ≈ 44% of screen
-        //
-        // We tap once per row at three x-positions so at least 4 of the 5 shapes get hit,
-        // which produces a different screenshot byte-pattern than the default (byte-size
-        // diff was ~30 B at 30 % Y — the clicks were landing above every shape).
-        val rowSpheresY = (h * 0.38).toInt()
-        val rowCubesY   = (h * 0.44).toInt()
-        device.click((w * 0.25).toInt(), rowSpheresY); Thread.sleep(300)
-        device.click((w * 0.65).toInt(), rowSpheresY); Thread.sleep(300)
-        device.click((w * 0.20).toInt(), rowCubesY);   Thread.sleep(300)
-        device.click((w * 0.50).toInt(), rowCubesY);   Thread.sleep(300)
-        device.click((w * 0.80).toInt(), rowCubesY);   Thread.sleep(400)
+        // Two-row mapping confirmed by hit-test log on Pixel_7a portrait (default
+        // camera at z=4, shapes at z=-2):
+        //   spheres (world y=+0.3) → display abs y ≈ 720  ≈ 0.30 × h
+        //   cubes   (world y= 0 )  → display abs y ≈ 886  ≈ 0.37 × h (viewport centre)
+        // X mapping from world:
+        //   x=-0.6→0.25 | x=-0.3→0.37 | x=0→0.50 | x=0.3→0.63 | x=0.6→0.75
+        val sphereY = (h * 0.30).toInt()
+        val cubeY   = (h * 0.37).toInt()
+        device.click((w * 0.25).toInt(), cubeY);   Thread.sleep(300)  // cube   0
+        device.click((w * 0.37).toInt(), sphereY); Thread.sleep(300)  // sphere 1
+        device.click((w * 0.50).toInt(), cubeY);   Thread.sleep(300)  // cube   2
+        device.click((w * 0.63).toInt(), sphereY); Thread.sleep(300)  // sphere 3
+        device.click((w * 0.75).toInt(), cubeY);   Thread.sleep(400)  // cube   4
         screenshot("86_collision_after_taps")
 
         tap("Reset Colors")

@@ -447,11 +447,17 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevCubeGeometry = remember { mutableStateOf(listOf<Any?>(size, center)) }
+        val prevCubeMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(size, center)
             if (current != prevCubeGeometry.value) {
                 node.updateGeometry(center = center, size = size)
                 prevCubeGeometry.value = current
+            }
+            // Propagate MaterialInstance reassignments — see SphereNode for rationale.
+            if (materialInstance != null && materialInstance != prevCubeMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevCubeMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -500,11 +506,21 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevSphereGeometry = remember { mutableStateOf(listOf<Any?>(radius, center, stacks, slices)) }
+        val prevSphereMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, center, stacks, slices)
             if (current != prevSphereGeometry.value) {
                 node.updateGeometry(radius = radius, center = center, stacks = stacks, slices = slices)
                 prevSphereGeometry.value = current
+            }
+            // Propagate MaterialInstance reassignments from the caller — without this,
+            // swapping `materialInstance = highlightMaterial` on recomposition leaves the
+            // node with its construction-time material forever. Filament's
+            // `setMaterialInstanceAt(primitiveIndex, newInstance)` is cheap (no geometry
+            // rebuild), so doing it unconditionally on change is fine.
+            if (materialInstance != null && materialInstance != prevSphereMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevSphereMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
