@@ -123,6 +123,45 @@ b8fcf225 feat(android-demo): regenerate launcher icons from branded source
 **Nouveau piège documenté :**
 - Pixel_7a AVD a 6 GB `/data/user/0`, dont ~5 GB pris par les system apps → seulement ~600 MB dispo pour notre APK + test APK (~250 MB). Si `installDebug` échoue avec `INSTALL_FAILED_INSUFFICIENT_STORAGE`, nettoyer `/sdcard/Download/sceneview-qa/*.jpg` (générés par les tests), `pm trim-caches`, puis potentiellement wiper l'AVD. Recréer l'AVD avec `sdcard_size=2048M` + `disk.dataPartition.size=12G` est la solution long terme.
 
+### Session addendum 3 — 2026-04-23 night (polish pass — Gradle 10 ready + MaterialInstance generalized)
+
+Trois fixes propagation + housekeeping suite aux découvertes de la session 2 :
+
+**Eliminated the Scale(x = 1f) virus from public-facing docs** (`4e2bd753`) :
+- `website-static/llms.txt` — served at `sceneview.github.io/llms.txt`
+- `website-static/.well-known/llms.txt` — LLM discovery alt path
+- `gpt/knowledge-api.md` — uploaded as ChatGPT knowledge corpus
+- Regenerated `mcp/dist/generated/llms-txt.js` + `mcp/llms.txt` via `npm run prepare`
+- Kept the Math.kt KDoc + MathTest.kt regression guard intact (those use `Scale(x = 1f)` deliberately to document the gotcha)
+
+**Gradle 10-ready Groovy DSL migration** (`6483c2aa`) :
+- `namespace "..."` → `namespace = "..."` (5 modules)
+- `minifyEnabled true` → `minifyEnabled = true`, `shrinkResources true` → `shrinkResources = true` (android-demo)
+- `compose true` → `compose = true` (sceneview, arsceneview, android-demo, android-tv-demo, common)
+- `buildConfig true` → `buildConfig = true` (android-demo)
+- Flutter / React Native bridge modules intentionally skipped (alpha, lower priority)
+
+**MaterialInstance propagation generalized** (`cbfb8a60`) — 970ddff1 only covered SphereNode + CubeNode. Applied the same `prev*Material` + `setMaterialInstanceAt(0, …)` SideEffect pattern to all 9 remaining geometry composables :
+- CylinderNode, ConeNode, TorusNode, CapsuleNode
+- PlaneNode, LineNode, PathNode, ShapeNode
+- MeshNode (was especially blocked — material was its only state-based surface)
+
+Pre-fix any caller doing `val mat by remember { mutableStateOf(...) }; XxxNode(materialInstance = mat)` + later reassignment saw Compose recomposition happen but the node kept its construction-time material forever. Post-fix every geometry primitive handles reactive material swaps uniformly.
+
+**Re-run validation :**
+- `:samples:android-demo:connectedDebugAndroidTest` — **32/32 PASS** (8 min 57 s). No regression.
+- `:sceneview:compileReleaseKotlin` — OK
+- `pre-push-check.sh` — 9/9 PASS
+
+**Commits session night:**
+```
+cbfb8a60 fix(sceneview): propagate MaterialInstance reassignments to all geometry nodes
+6483c2aa chore(build): migrate Groovy DSL to property = value syntax (Gradle 10 ready)
+4e2bd753 docs: eliminate remaining Scale(x = 1f) occurrences in public docs
+```
+
+**Total branch state: 42 commits ahead of main**, all local pending GitHub ban resolution.
+
 ---
 
 ## SESSION intelligent-elbakyan — 2026-04-13 — Quality-gate fix, SPM repo, geometry nodes, scheduled tasks
