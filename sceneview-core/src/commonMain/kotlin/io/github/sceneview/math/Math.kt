@@ -31,7 +31,23 @@ typealias Position2 = Float2
 typealias Position = Float3
 /** Euler angle rotation in degrees (pitch, yaw, roll). */
 typealias Rotation = Float3
-/** Non-uniform scale (x, y, z). */
+/**
+ * Non-uniform scale (x, y, z).
+ *
+ * **Gotcha** — prefer the positional single-arg form `Scale(1f)` over the named
+ * form `Scale(x = 1f)` when you want a uniform scale:
+ *
+ *   - `Scale(1f)` resolves to kotlin-math's `Float3(v: Float)` constructor and
+ *     fills all three components → `(1, 1, 1)`.
+ *   - `Scale(x = 1f)` resolves to the three-arg primary constructor with
+ *     defaults `y = 0f, z = 0f` → `(1, 0, 0)`. Filament treats that as a
+ *     singular transform: quaternion decomposition returns NaN, any child
+ *     volume collapses, and frame-loop drivers (physics, animation) feed the
+ *     NaN back through their integrators, silently breaking the whole scene
+ *     subtree.
+ *
+ * Lesson from the `PhysicsDemo` spheres-invisible bug.
+ */
 typealias Scale = Float3
 /** Unit direction vector (x, y, z). */
 typealias Direction = Float3
