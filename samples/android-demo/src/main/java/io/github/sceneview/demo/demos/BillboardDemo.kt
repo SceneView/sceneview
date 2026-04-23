@@ -41,10 +41,10 @@ fun BillboardDemo(onBack: () -> Unit) {
 
     // Create simple colored bitmaps for the billboard and fixed image
     val billboardBitmap = remember {
-        createLabelBitmap("Billboard", 0xFF4CAF50.toInt())
+        createLabelBitmap("Billboard", 0xFF005BC1.toInt())  // SceneView Primary
     }
     val fixedBitmap = remember {
-        createLabelBitmap("Fixed", 0xFF2196F3.toInt())
+        createLabelBitmap("Fixed", 0xFF6446CD.toInt())  // SceneView Accent
     }
 
     DemoScaffold(
