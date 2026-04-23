@@ -25,7 +25,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.math.Color as SceneColor
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
 import io.github.sceneview.rememberEngine
@@ -50,10 +50,11 @@ fun ARPoseDemo(onBack: () -> Unit) {
     var z by remember { mutableFloatStateOf(-1.0f) }
     var isTracking by remember { mutableStateOf(false) }
 
-    // Colored material for the cube indicator
+    // Colored material for the pose indicator cube — SceneView Accent purple, with a
+    // touch of metallic for the AR-debug readability that the previous orange provided.
     val cubeMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(
-            color = SceneColor(1.0f, 0.4f, 0.2f, 1.0f),
+            color = SceneViewColors.Accent,
             metallic = 0.5f,
             roughness = 0.3f,
             reflectance = 0.5f

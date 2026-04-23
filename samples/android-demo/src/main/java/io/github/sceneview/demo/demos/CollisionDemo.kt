@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
@@ -46,15 +47,13 @@ fun CollisionDemo(onBack: () -> Unit) {
     val collisionSystem = rememberCollisionSystem(view)
 
     // Pre-create materials for default and highlighted states.
+    // On-brand: Primary blue by default, Accent purple when a shape is hit — same hero
+    // gradient as the product identity.
     val defaultMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = androidx.compose.ui.graphics.Color(0xFF4CAF50) // Green
-        )
+        materialLoader.createColorInstance(color = SceneViewColors.Primary)
     }
     val highlightedMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = androidx.compose.ui.graphics.Color(0xFFFF5722) // Deep Orange
-        )
+        materialLoader.createColorInstance(color = SceneViewColors.Accent)
     }
 
     // Node layout: 3 cubes and 2 spheres in a row.

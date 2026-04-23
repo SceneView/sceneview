@@ -47,4 +47,23 @@ object SceneViewColors {
      * [Primary] to [TintSoft] so adjacent elements always contrast enough to read.
      */
     val Ramp4 = listOf(Primary, Accent, TintLight, TintSoft)
+
+    /**
+     * Semi-transparent Primary — for AR overlays (face mesh, detected planes, …) that
+     * should tint real camera imagery without occluding it. Alpha 0.4 matches the legacy
+     * `#66005BC1`-ish feel that ARFaceDemo used before.
+     */
+    val PrimaryOverlay = Primary.copy(alpha = 0.4f)
+
+    /**
+     * Semi-transparent Accent — secondary AR overlay tint for callouts / highlighted
+     * geometry, kept distinct from [PrimaryOverlay] so stacked passes remain readable.
+     */
+    val AccentOverlay = Accent.copy(alpha = 0.4f)
+
+    /**
+     * Semi-transparent TintLight — used for landscape-scale AR geometry (streetscape
+     * buildings) where a very low alpha is needed so the camera feed shows through.
+     */
+    val LandscapeOverlay = TintLight.copy(alpha = 0.3f)
 }
