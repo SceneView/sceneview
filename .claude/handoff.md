@@ -77,6 +77,52 @@ Continuation of the same worktree after the user asked for "vraies images/vidéo
 - **Result** : 31/31 PASS (9 min), 119 JPEGs @ 8.5 MB, pre-push gate 9/9.
 - **Extra commit on branch :** `7e594364 feat(android-demo): real branded assets + SceneView color palette + extended coverage`
 
+### Session addendum 2 — 2026-04-23 evening (library bug hunt + Physics fix + 32/32 steady state)
+
+Continuation after the 2nd crash rollup. Total branch is now **23 commits ahead of main**.
+
+**Library fixes shipped (sceneview):**
+- **`6de91a47` — CRITIQUE : Node / ModelNode default scale était `(1, 0, 0)`, pas `(1, 1, 1)`.** Cause racine dans `SceneScope.kt` : `scale: Scale = Scale(x = 1f)` — `Scale = Float3` et `Float3(x = 1f)` appelle le constructeur 3-args (y=0, z=0), pas le constructeur uniform-fill `Float3(v: Float)`. Tout `Node { ... }` ou `ModelNode { ... }` composable sans scale explicite rendait des meshes dégénérés à volume zéro. Démonstré par `PhysicsDemo` (sphères invisibles dans les screenshots). Fix = `Scale(1f)` (constructeur 1-arg uniform-fill).
+- **`ec070ec6` — regression guard** dans `sceneview-core` qui vérifie `Scale(1f) == Scale(1f, 1f, 1f)` vs le piège `Scale(x = 1f) == Scale(1f, 0f, 0f)`.
+- **`48d74083` — KDoc warning** sur `Scale` dans `sceneview-core` documentant le gotcha d'API kotlin-math 1.8.
+- **`1e9497e5` — llms.txt** mis à jour pour recommander `Scale(1f)` (pas `Scale(x = 1f)`).
+- **`970ddff1` — MaterialInstance propagation** : `SphereNode` + `CubeNode` réagissent maintenant au changement de `materialInstance` via `SideEffect`. Avant, le Node gardait son ancien instance.
+- **`2e4ef01f` — robust tap handling** sur `ViewNode` + `CollisionDemo` + slider mid-values dans les tests (le nouveau 32e test).
+- **`440b9a3c` — camera gesture + multi-touch** coverage dans `DemoInteractionTest`.
+- **`fdabb07d` — Compose TextField `typeInto`** utilise `UiObject2.setText` (plus robuste que `adb shell input text`).
+
+**Brand pass:**
+- **`b8fcf225` — launcher icons** régénérés depuis le logo branded.
+- **`6b873ad4` — migration `#1A73E8` (Google blue) → `#005BC1`** (SceneView Primary) dans tout le code (16 fichiers, incluant DESIGN.md, assets, widgets, MCP dashboard).
+- **`484d30b8` — SceneViewSwift `AccentColor`** aligné sur la palette brand.
+- **`8a88b053` — Collision + AR demos** migrés sur la brand palette.
+
+**Physics deferred → RÉSOLU.** Les captures committées (`samples/screenshots/android/18_physics.png` et `physics_demo.png`) étaient stale (montraient la plane seule sans sphères, à cause du bug Scale). `30cbce64` remplace avec les frames frais du `DemoInteractionTest` (dropped_3) qui montrent la sphère diagnostic statique + 4 sphères physiques sur la brand ramp.
+
+**Re-run steady-state validation (après tous ces fixes) :**
+- `:samples:android-demo:connectedDebugAndroidTest` — **32/32 PASS** (10 min 21 s).
+- Aucune régression observée. Le `DemoInteractionTest` couvre maintenant camera gestures + multi-touch + slider mid-values.
+
+**Commits session evening:**
+```
+30cbce64 docs(screenshots): refresh Physics demo captures post Scale(1f) fix
+970ddff1 fix(sceneview): propagate MaterialInstance changes to SphereNode + CubeNode
+2e4ef01f feat(demo): robust tap handling on ViewNode + Collision + slider mid-values
+440b9a3c test(android-demo): add camera-gesture + multi-touch coverage
+fdabb07d test(android-demo): typeInto now drives Compose TextField via UiObject2.setText
+1e9497e5 docs(llms): update Node / ModelNode signatures to Scale(1f)
+ec070ec6 test(sceneview-core): regression guard on Scale(1f) uniform-fill semantics
+48d74083 docs(sceneview-core): warn on the Scale(x = 1f) gotcha that broke PhysicsDemo
+6de91a47 fix(sceneview): Node / ModelNode default scale was (1, 0, 0), not (1, 1, 1)
+484d30b8 fix(brand): align SceneViewSwift Examples AccentColor with brand palette
+6b873ad4 fix(brand): migrate legacy #1A73E8 (Google blue) to #005BC1 (SceneView Primary)
+b8fcf225 feat(android-demo): regenerate launcher icons from branded source
+8a88b053 feat(android-demo): brand palette sweep — Collision + AR demos
+```
+
+**Nouveau piège documenté :**
+- Pixel_7a AVD a 6 GB `/data/user/0`, dont ~5 GB pris par les system apps → seulement ~600 MB dispo pour notre APK + test APK (~250 MB). Si `installDebug` échoue avec `INSTALL_FAILED_INSUFFICIENT_STORAGE`, nettoyer `/sdcard/Download/sceneview-qa/*.jpg` (générés par les tests), `pm trim-caches`, puis potentiellement wiper l'AVD. Recréer l'AVD avec `sdcard_size=2048M` + `disk.dataPartition.size=12G` est la solution long terme.
+
 ---
 
 ## SESSION intelligent-elbakyan — 2026-04-13 — Quality-gate fix, SPM repo, geometry nodes, scheduled tasks
