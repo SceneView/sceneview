@@ -426,27 +426,30 @@ class DemoInteractionTest {
 
     @Test
     fun postProcessing_allToggles() {
+        // Defaults in PostProcessingDemo: SSAO=off, MSAA=off, FXAA=on, Dithering=on
+        // (recommended production setup — FXAA & temporal dithering are cheap and
+        // noticeably improve quality on mobile GPUs).
         openDemo("post-processing", "Post-Processing")
-        screenshot("31_postProc_all_off_default")
+        screenshot("31_postProc_defaults")
 
-        tap("SSAO (Ambient Occlusion)")
+        tap("SSAO (Ambient Occlusion)")      // SSAO → on
         screenshot("32_postProc_ssao_on")
 
-        tap("FXAA (Fast Approx. AA)")
-        screenshot("33_postProc_ssao_fxaa_on")
+        tap("FXAA (Fast Approx. AA)")        // FXAA → off
+        screenshot("33_postProc_fxaa_off")
 
-        tap("Temporal Dithering")
-        screenshot("34_postProc_ssao_fxaa_dither_on")
+        tap("Temporal Dithering")            // Dithering → off
+        screenshot("34_postProc_ssao_only")
 
-        // MSAA — the 4th toggle, missing from the earlier pass
-        tap("MSAA (4x Multi-Sample)")
-        screenshot("34a_postProc_ssao_fxaa_dither_msaa_on")
+        tap("MSAA (4x Multi-Sample)")        // MSAA → on
+        screenshot("34a_postProc_msaa_on")
 
+        // Revert all four to their defaults: MSAA off, SSAO off, FXAA on, Dithering on.
         tap("MSAA (4x Multi-Sample)")
         tap("SSAO (Ambient Occlusion)")
         tap("FXAA (Fast Approx. AA)")
         tap("Temporal Dithering")
-        screenshot("35_postProc_all_back_off")
+        screenshot("35_postProc_back_to_defaults")
     }
 
     // ── 9. Debug Overlay — show-overlay toggle ────────────────────────────────
