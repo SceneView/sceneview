@@ -167,20 +167,44 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
     fun Node(
         position: Position = Position(x = 0f),
         rotation: Rotation = Rotation(x = 0f),
-        scale: Scale = Scale(x = 1f),
+        // `Scale(1f)` (positional) calls kotlin-math's single-arg Float3(v) which fills
+        // all three components → (1, 1, 1). The named-arg form `Scale(x = 1f)` only sets x
+        // and leaves y/z at 0 → (1, 0, 0), a singular transform that cascades NaN through
+        // every subsequent matrix op (quaternion decomposition returns NaN, children
+        // inherit zero volume, physics integration produces NaN positions). Use the
+        // positional form. Every specialised node composable (SphereNode, CubeNode, …)
+        // already does this — only the bare Node composable had the buggy default.
+        scale: Scale = Scale(1f),
         isVisible: Boolean = true,
         isEditable: Boolean = false,
         apply: NodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null
     ) {
         val node = remember(engine) { NodeImpl(engine = engine).apply(apply) }
-        SideEffect {
-            node.position = position
-            node.rotation = rotation
-            node.scale = scale
-            node.isVisible = isVisible
-            node.isEditable = isEditable
+        // Push declarative props to the underlying node only when they actually change —
+        // NOT on every successful recomposition. The previous `SideEffect { node.position =
+        // position }` ran each frame and overwrote any position that a frame-loop driver
+        // (PhysicsBody, animations, camera follow) had just written via `node.onFrame`,
+        // so PhysicsDemo spheres never appeared to move.
+        //
+        // Keyed on the individual scalar components (not the Float3 wrapper) because
+        // `Float3` from `dev.romainguy.kotlin.math` uses reference equality by default —
+        // each recomposition that literally writes `Position(x = ...)` produces a *new*
+        // instance that `==`-compares as unequal to the previous one, which would
+        // re-trigger the effect and re-clobber driver state. Component-wise keys let
+        // `DisposableEffect` recognise identical values across recompositions and stay
+        // idle while a frame driver owns the node.
+        DisposableEffect(node, position.x, position.y, position.z) {
+            node.position = position; onDispose {}
         }
+        DisposableEffect(node, rotation.x, rotation.y, rotation.z) {
+            node.rotation = rotation; onDispose {}
+        }
+        DisposableEffect(node, scale.x, scale.y, scale.z) {
+            node.scale = scale; onDispose {}
+        }
+        DisposableEffect(node, isVisible) { node.isVisible = isVisible; onDispose {} }
+        DisposableEffect(node, isEditable) { node.isEditable = isEditable; onDispose {} }
         NodeLifecycle(node, content)
     }
 
@@ -244,7 +268,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
         centerOrigin: Position? = null,
         position: Position = Position(x = 0f),
         rotation: Rotation = Rotation(x = 0f),
-        scale: Scale = Scale(x = 1f),
+        // Positional `Scale(1f)` fills all three axes → (1, 1, 1). Using the named form
+        // `Scale(x = 1f)` would leave y/z at 0 and produce a singular transform — see the
+        // Node() doc for the full breakdown.
+        scale: Scale = Scale(1f),
         isVisible: Boolean = true,
         isEditable: Boolean = false,
         apply: ModelNodeImpl.() -> Unit = {},
