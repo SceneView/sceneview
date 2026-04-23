@@ -63,7 +63,7 @@ Same screenshots adapted for tablet layout.
 ## Feature Graphic
 - **Dimensions**: 1024 x 500 px
 - **Format**: PNG or JPEG (no alpha)
-- **Content**: SceneView logo on the left, "3D & AR for Jetpack Compose" tagline, dark background with blue (#1A73E8) gradient accent. Show a 3D model render on the right side.
+- **Content**: SceneView logo on the left, "3D & AR for Jetpack Compose" tagline, dark background with blue (#005BC1) gradient accent. Show a 3D model render on the right side.
 
 ## App Icon
 - **Dimensions**: 512 x 512 px
