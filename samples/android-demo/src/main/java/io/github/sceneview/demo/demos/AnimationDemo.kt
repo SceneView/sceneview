@@ -50,8 +50,13 @@ fun AnimationDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/animated_dragon.glb")
 
-    // Load an HDR environment for better lighting on the dragon model
-    val hdrEnvironment = rememberHDREnvironment(environmentLoader, "environments/studio_warm_2k.hdr")
+    // HDR environment for IBL — disable skybox so the studio lightbox doesn't dominate
+    // the viewport. We only want the lighting contribution, not the wrap-around image.
+    val hdrEnvironment = rememberHDREnvironment(
+        environmentLoader,
+        "environments/studio_warm_2k.hdr",
+        createSkybox = false,
+    )
 
     DemoScaffold(
         title = "Animation",
@@ -114,7 +119,9 @@ fun AnimationDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    scaleToUnits = 0.3f,
+                    // Fill the viewport instead of rendering a tiny figurine. 1.0f fits the
+                    // model to a 1m bounding box which matches the default camera framing.
+                    scaleToUnits = 1.0f,
                     autoAnimate = isPlaying,
                     animationSpeed = speed,
                     animationLoop = loop

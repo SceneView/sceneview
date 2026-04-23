@@ -14,13 +14,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.google.android.filament.LightManager
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
+import io.github.sceneview.node.LightNode
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 
 /**
@@ -36,6 +39,9 @@ fun GeometryDemo(onBack: () -> Unit) {
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
+    // IBL environment gives the primitives real ambient + specular highlights, so the
+    // rendering doesn't look flat. Without this the cube/cylinder/plane are unlit.
+    val environmentLoader = rememberEnvironmentLoader(engine)
 
     // On-brand ramp — Primary blue, Accent purple, light blue, soft purple — so the four
     // primitives stay visually distinct while all reading as SceneView.
@@ -64,8 +70,22 @@ fun GeometryDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
+            environmentLoader = environmentLoader,
             cameraManipulator = rememberCameraManipulator()
         ) {
+            // Key light — gives each primitive a clear shaded/lit side so the 3D form
+            // reads as depth rather than flat color silhouettes.
+            LightNode(
+                engine = engine,
+                type = LightManager.Type.DIRECTIONAL,
+                apply = {
+                    color(1.0f, 0.95f, 0.9f)
+                    intensity(80_000f)
+                    direction(0.3f, -1f, -0.5f)
+                    castShadows(false)
+                },
+            )
+
             if (showCube) {
                 CubeNode(
                     materialInstance = cubeMaterial,
