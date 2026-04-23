@@ -72,7 +72,9 @@ class DemoSmokeTest {
         }
         context.startActivity(intent)
         val found = device.wait(Until.hasObject(By.text(expectedTitle)), timeout) != null
-        Thread.sleep(4000)
+        // See rationale in DemoInteractionTest.openDemo — 6 s covers the Apple M3 Metal slow
+        // path for first-frame GLB decode + GPU upload.
+        Thread.sleep(6000)
         return found
     }
 
