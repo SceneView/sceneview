@@ -1202,7 +1202,14 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
      * @param windowManager         The [ViewNodeImpl.WindowManager] to attach the view to.
      * @param unlit                 If `true`, ignores scene lighting (always fully bright).
      * @param invertFrontFaceWinding Inverts face winding — useful for front-facing AR cameras.
-     * @param apply                 Additional configuration on the [ViewNodeImpl] instance.
+     * @param position              World-space position.
+     * @param rotation              World-space rotation (Euler angles in degrees).
+     * @param scale                 Uniform or non-uniform scale.
+     * @param isVisible             Whether the node renders this frame.
+     * @param apply                 Additional configuration on the [ViewNodeImpl] instance,
+     *                              applied once at construction time. For reactive props,
+     *                              prefer the top-level [position]/[rotation]/[scale]/[isVisible]
+     *                              parameters above, which propagate changes on recomposition.
      * @param content               Optional 3D child nodes in a [NodeScope].
      * @param viewContent           The Compose UI to render inside the 3D node.
      */
@@ -1211,6 +1218,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
         windowManager: ViewNodeImpl.WindowManager,
         unlit: Boolean = false,
         invertFrontFaceWinding: Boolean = false,
+        position: Position = Position(x = 0f),
+        rotation: Rotation = Rotation(x = 0f),
+        scale: Scale = Scale(1f),
+        isVisible: Boolean = true,
         apply: ViewNodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null,
         viewContent: @Composable () -> Unit
@@ -1225,6 +1236,18 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                 content = viewContent
             ).apply(apply)
         }
+        // Keyed on scalar components (Float3 uses reference equality so a fresh
+        // Position(x = …) on each recomposition would re-trigger even when unchanged).
+        DisposableEffect(node, position.x, position.y, position.z) {
+            node.position = position; onDispose {}
+        }
+        DisposableEffect(node, rotation.x, rotation.y, rotation.z) {
+            node.rotation = rotation; onDispose {}
+        }
+        DisposableEffect(node, scale.x, scale.y, scale.z) {
+            node.scale = scale; onDispose {}
+        }
+        DisposableEffect(node, isVisible) { node.isVisible = isVisible; onDispose {} }
         NodeLifecycle(node, content)
     }
 

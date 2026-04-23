@@ -92,11 +92,9 @@ fun ViewNodeDemo(onBack: () -> Unit) {
             ViewNode(
                 windowManager = windowManager,
                 unlit = true,
-                apply = {
-                    position = Position(x = 0f, y = 0f, z = -2f)
-                    scale = Float3(0.15f)
-                    this.isVisible = isVisible
-                }
+                position = Position(x = 0f, y = 0f, z = -2f),
+                scale = Float3(0.15f),
+                isVisible = isVisible
             ) {
                 // This Compose content is rendered onto a quad in 3D space.
                 EmbeddedCard(tapCount = tapCount, onTap = { tapCount++ })
