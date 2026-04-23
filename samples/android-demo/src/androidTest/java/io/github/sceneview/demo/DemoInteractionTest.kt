@@ -139,7 +139,11 @@ class DemoInteractionTest {
         context.startActivity(intent)
         // Wait for the demo's scaffold title to render (confirms Compose + Filament wired up)
         device.wait(Until.hasObject(By.text(expectedTitle)), timeout)
-        Thread.sleep(2500)  // let Filament load model + render first frame
+        // First-frame Filament setup (Engine resolve, material link, async GLB decode and
+        // GPU upload) is ~3.5 s end-to-end on the Apple M3 Metal translator AVD — 2.5 s was
+        // producing flaky black-viewport captures on whichever demo ran first in the suite.
+        // Bumped to 4 s with a 30-test suite (~4.5 min total) the cost is ~45 s of net wait.
+        Thread.sleep(4000)
     }
 
     private fun tap(text: String) {
@@ -191,6 +195,11 @@ class DemoInteractionTest {
 
         tap("Directional")
         screenshot("04_lighting_directional_back")
+
+        // Intensity slider sweep — min / mid / max
+        dragSlider("Intensity:", fraction = 0.0f); screenshot("04a_lighting_intensity_min")
+        dragSlider("Intensity:", fraction = 0.5f); screenshot("04b_lighting_intensity_mid")
+        dragSlider("Intensity:", fraction = 1.0f); screenshot("04c_lighting_intensity_max")
     }
 
     // ── 2. Fog — toggle + density slider + colour presets (single screen open) ─
@@ -275,6 +284,10 @@ class DemoInteractionTest {
         )
         Thread.sleep(600)
         screenshot("22_customMesh_after_orbit_drag")
+
+        // Scale slider — min / max / default-ish (0.5)
+        dragSlider("Scale:", fraction = 0.0f); screenshot("22a_customMesh_scale_min")
+        dragSlider("Scale:", fraction = 1.0f); screenshot("22b_customMesh_scale_max")
     }
 
     // ── 6. Shape — Triangle / Star / Hexagon chips ────────────────────────────
@@ -328,6 +341,11 @@ class DemoInteractionTest {
         tap("Temporal Dithering")
         screenshot("34_postProc_ssao_fxaa_dither_on")
 
+        // MSAA — the 4th toggle, missing from the earlier pass
+        tap("MSAA (4x Multi-Sample)")
+        screenshot("34a_postProc_ssao_fxaa_dither_msaa_on")
+
+        tap("MSAA (4x Multi-Sample)")
         tap("SSAO (Ambient Occlusion)")
         tap("FXAA (Fast Approx. AA)")
         tap("Temporal Dithering")
@@ -360,6 +378,10 @@ class DemoInteractionTest {
 
         tap("Loop")
         screenshot("41_animation_loop_back")
+
+        // Speed slider sweep — slow / fast
+        dragSlider("Speed:", fraction = 0.0f); screenshot("41a_animation_speed_min")
+        dragSlider("Speed:", fraction = 1.0f); screenshot("41b_animation_speed_max")
     }
 
     // ── 11. Environment Gallery — 6 HDR chips ─────────────────────────────────
@@ -467,6 +489,10 @@ class DemoInteractionTest {
 
         dragSlider("Line Width:", fraction = 1.0f); screenshot("70_linesPaths_width_max")
         dragSlider("Line Width:", fraction = 0.0f); screenshot("71_linesPaths_width_zero")
+
+        // Path Points slider sweep
+        dragSlider("Path Points:", fraction = 0.0f); screenshot("71a_linesPaths_points_min")
+        dragSlider("Path Points:", fraction = 1.0f); screenshot("71b_linesPaths_points_max")
     }
 
     // ── 18. Dynamic Sky — time + turbidity sliders ────────────────────────────
@@ -498,6 +524,13 @@ class DemoInteractionTest {
 
         dragSlider("Probe Radius:", fraction = 0.0f)
         screenshot("78_probes_min_radius")
+
+        // Probe Y Position slider — second slider of the demo
+        dragSlider("Probe Y Position:", fraction = 0.0f)
+        screenshot("78a_probes_y_min")
+
+        dragSlider("Probe Y Position:", fraction = 1.0f)
+        screenshot("78b_probes_y_max")
     }
 
     // ── 20. Image — scale slider ──────────────────────────────────────────────
