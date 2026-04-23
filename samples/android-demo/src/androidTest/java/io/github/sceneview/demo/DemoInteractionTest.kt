@@ -132,27 +132,26 @@ class DemoInteractionTest {
         screenshot("04_lighting_directional_back")
     }
 
-    // ── 2. Fog — toggle + colour presets ──────────────────────────────────────
+    // ── 2. Fog — toggle + density slider + colour presets (single screen open) ─
 
     @Test
-    fun fog_toggleAndPresets() {
+    fun fog_fullScreen() {
         openDemo("fog", "Fog")
         screenshot("05_fog_enabled_mist")
 
-        tap("Fog Enabled")
-        screenshot("06_fog_disabled")
+        // Toggle off / on
+        tap("Fog Enabled"); screenshot("06_fog_disabled")
+        tap("Fog Enabled"); screenshot("07_fog_re_enabled")
 
-        tap("Fog Enabled")
-        screenshot("07_fog_re_enabled")
+        // Colour presets
+        tap("Eerie Green"); screenshot("08_fog_eerie_green")
+        tap("Warm Haze"); screenshot("09_fog_warm_haze")
+        tap("Deep Smoke"); screenshot("10_fog_deep_smoke")
 
-        tap("Eerie Green")
-        screenshot("08_fog_eerie_green")
-
-        tap("Warm Haze")
-        screenshot("09_fog_warm_haze")
-
-        tap("Deep Smoke")
-        screenshot("10_fog_deep_smoke")
+        // Density slider (back to default preset Mist first)
+        tap("Mist")
+        dragSlider("Density:", fraction = 1.0f); screenshot("10a_fog_density_max")
+        dragSlider("Density:", fraction = 0.0f); screenshot("10b_fog_density_min")
     }
 
     // ── 3. Physics — drop + reset ─────────────────────────────────────────────
@@ -394,51 +393,19 @@ class DemoInteractionTest {
         screenshot("61_gesture_after_reset")
     }
 
-    // ── 15. Lines & Paths — Line / Path chips ─────────────────────────────────
+    // ── 15. Lines & Paths — chips + line-width slider (single screen open) ────
 
     @Test
-    fun linesPaths_visibilityChips() {
+    fun linesPaths_fullScreen() {
         openDemo("lines-paths", "Lines & Paths")
         screenshot("62_linesPaths_both_default")
 
-        tap("Line")
-        screenshot("63_linesPaths_no_line")
+        tap("Line"); screenshot("63_linesPaths_no_line")
+        tap("Path"); screenshot("64_linesPaths_none")
+        tap("Line"); tap("Path"); screenshot("65_linesPaths_both_back")
 
-        tap("Path")
-        screenshot("64_linesPaths_none")
-
-        tap("Line")
-        tap("Path")
-        screenshot("65_linesPaths_both_back")
-    }
-
-    // ── 17. Lines & Paths — line-width slider ─────────────────────────────────
-
-    @Test
-    fun linesPaths_lineWidthSlider() {
-        openDemo("lines-paths", "Lines & Paths")
-        screenshot("69_linesPaths_width_default")
-
-        // Width starts at 0.03 m — drag to max (0.1 m) then to min (0 m)
-        dragSlider("Line Width:", fraction = 1.0f)
-        screenshot("70_linesPaths_width_max")
-
-        dragSlider("Line Width:", fraction = 0.0f)
-        screenshot("71_linesPaths_width_zero")
-    }
-
-    // ── 16. Fog — density slider drag ─────────────────────────────────────────
-
-    @Test
-    fun fog_densitySliderFromZeroToMax() {
-        openDemo("fog", "Fog")
-        screenshot("66_fog_density_default_015")
-
-        dragSlider("Density:", fraction = 1.0f)
-        screenshot("67_fog_density_max")
-
-        dragSlider("Density:", fraction = 0.0f)
-        screenshot("68_fog_density_min")
+        dragSlider("Line Width:", fraction = 1.0f); screenshot("70_linesPaths_width_max")
+        dragSlider("Line Width:", fraction = 0.0f); screenshot("71_linesPaths_width_zero")
     }
 
     // ── 18. Dynamic Sky — time + turbidity sliders ────────────────────────────
@@ -500,7 +467,48 @@ class DemoInteractionTest {
         screenshot("84_text_min_size")
     }
 
-    // ── 22. Collision — reset-colors button + shape taps ──────────────────────
+    // ── 22a. ViewNode — visible toggle + coord-tap on the in-scene card ──────
+
+    @Test
+    fun viewNode_visibleAndTapCounter() {
+        openDemo("view-node", "View Node")
+        screenshot("88_viewNode_visible_default")
+
+        // ViewNode's "Tap me" button is rendered INSIDE the Filament SurfaceView, not as a
+        // native Android view — uiautomator can't see it. Click the SurfaceView at the card's
+        // rendered centre instead.
+        val cardCenterX = device.displayWidth / 2
+        val cardCenterY = (device.displayHeight * 0.35).toInt()
+        device.click(cardCenterX, cardCenterY); Thread.sleep(400)
+        device.click(cardCenterX, cardCenterY); Thread.sleep(400)
+        device.click(cardCenterX, cardCenterY); Thread.sleep(500)
+        screenshot("89_viewNode_tapped_3")
+
+        tap("Visible")
+        screenshot("90_viewNode_hidden")
+
+        tap("Visible")
+        screenshot("91_viewNode_visible_back")
+    }
+
+    // ── 22b. Video — just verify the scaffold + initial render ────────────────
+
+    @Test
+    fun video_initialRender() {
+        openDemo("video", "Video")
+        Thread.sleep(1500)  // let the video texture warm up
+        screenshot("92_video_initial")
+    }
+
+    // ── 22c. Model Viewer — just verify the scaffold + initial render ────────
+
+    @Test
+    fun modelViewer_initialRender() {
+        openDemo("model-viewer", "Model Viewer")
+        screenshot("93_modelViewer_initial")
+    }
+
+    // ── 23. Collision — reset-colors button + shape taps ──────────────────────
 
     @Test
     fun collision_shapeTapAndReset() {
