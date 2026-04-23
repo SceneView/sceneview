@@ -10,7 +10,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, } from "@modelcontextprotocol/sdk/types.js";
 import { TOOL_DEFINITIONS, dispatchTool } from "./tools.js";
-const server = new Server({ name: "healthcare-3d-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
+const server = new Server({ name: "healthcare-3d-mcp", version: "1.1.0" }, { capabilities: { tools: {} } });
 // ─── Tools ────────────────────────────────────────────────────────────────────
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: TOOL_DEFINITIONS,

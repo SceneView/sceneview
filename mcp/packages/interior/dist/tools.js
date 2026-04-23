@@ -73,6 +73,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["roomType"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_furniture_placement",
@@ -113,6 +118,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["category"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_material_switcher",
@@ -150,6 +160,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["surface"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -189,6 +204,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["lights"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -230,6 +250,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["tourStyle"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "list_furniture_models",
@@ -249,6 +274,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "validate_interior_code",
@@ -262,6 +292,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["code"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
 ];

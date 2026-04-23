@@ -18,12 +18,13 @@ export function generateMoleculeViewer(options) {
     return `package com.example.medical.molecule
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.sceneview.Scene
+import io.github.sceneview.SceneView
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelLoader
@@ -176,16 +177,26 @@ ${animate ? `    autoRotate: Boolean,
 
             Spacer(Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showHydrogens, onValueChange = onToggleHydrogens),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show hydrogens", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showHydrogens, onCheckedChange = onToggleHydrogens)
+                Switch(checked = showHydrogens, onCheckedChange = null)
             }
 ${animate ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = autoRotate, onValueChange = onToggleRotate),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Auto-rotate", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = autoRotate, onCheckedChange = onToggleRotate)
+                Switch(checked = autoRotate, onCheckedChange = null)
             }` : ""}
         }
     }
@@ -195,12 +206,13 @@ function generateArMoleculeViewer(composableName, modelPath, options) {
     return `package com.example.medical.molecule
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.sceneview.ar.ARScene
+import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberEngine

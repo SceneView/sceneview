@@ -65,6 +65,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["bodyStyle"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_hud_overlay",
@@ -101,6 +106,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["elements"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_dashboard_3d",
@@ -136,6 +146,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["gauges"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_ar_showroom",
@@ -166,6 +181,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["location"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -202,6 +222,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["category"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_ev_charging_station_viewer",
@@ -229,6 +254,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -265,6 +295,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "list_car_models",
@@ -284,6 +319,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "validate_automotive_code",
@@ -297,6 +337,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["code"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
 ];
@@ -588,8 +633,8 @@ export async function dispatchTool(toolName, rawArgs, _ctx = {}) {
                             `**Gradle dependency:**`,
                             "```kotlin",
                             args.ar
-                                ? `implementation("io.github.sceneview:arsceneview:3.6.2")`
-                                : `implementation("io.github.sceneview:sceneview:3.6.2")`,
+                                ? `implementation("io.github.sceneview:arsceneview:4.0.0-rc.1")`
+                                : `implementation("io.github.sceneview:sceneview:4.0.0-rc.1")`,
                             "```",
                             ``,
                             `**Kotlin (Jetpack Compose):**`,

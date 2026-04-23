@@ -28,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -257,10 +258,15 @@ ${materialVariants ? `            // Material selector
             }
             Spacer(Modifier.height(12.dp))` : ""}
 ${turntable ? `            // Turntable toggle
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = autoRotate, onValueChange = onAutoRotateToggle),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Auto-Rotate", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = autoRotate, onCheckedChange = onAutoRotateToggle)
+                Switch(checked = autoRotate, onCheckedChange = null)
             }` : ""}
         }
     }

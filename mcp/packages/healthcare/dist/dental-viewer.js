@@ -22,12 +22,13 @@ export function generateDentalViewer(options) {
     return `package com.example.medical.dental
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.sceneview.Scene
+import io.github.sceneview.SceneView
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelLoader
@@ -248,17 +249,27 @@ ${hasComparison ? `    showComparison: Boolean,
 
 ${showRoots ? `
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showRoots, onValueChange = onToggleRoots),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show roots", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showRoots, onCheckedChange = onToggleRoots)
+                Switch(checked = showRoots, onCheckedChange = null)
             }` : ""}
 
 ${showNerves ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showNerves, onValueChange = onToggleNerves),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show nerves", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showNerves, onCheckedChange = onToggleNerves)
+                Switch(checked = showNerves, onCheckedChange = null)
             }` : ""}
 
 ${hasTreatmentStages ? `
@@ -272,10 +283,15 @@ ${hasTreatmentStages ? `
             )` : ""}
 
 ${hasComparison ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showComparison, onValueChange = onToggleComparison),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Before / After", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showComparison, onCheckedChange = onToggleComparison)
+                Switch(checked = showComparison, onCheckedChange = null)
             }` : ""}
         }
     }
@@ -285,12 +301,13 @@ function generateArDentalViewer(composableName, viewType, arch, options) {
     return `package com.example.medical.dental
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.sceneview.ar.ARScene
+import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberEngine

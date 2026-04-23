@@ -135,7 +135,7 @@ fun PaintedCarScene(modelAsset: String = "models/cars/sports_car.glb") {
         (hasFlakes ? " and procedural metallic flakes" : "") +
         `. Base color ${baseColorHex}, metallic ${effectiveMetallic}, roughness ${effectiveRoughness}, clearcoat ${effectiveClearcoat}.`;
     const dependencies = [
-        "io.github.sceneview:sceneview:3.6.2",
+        "io.github.sceneview:sceneview:4.0.0-rc.1",
         "Filament 1.70.x (matc compiler) to build the .mat into .filamat",
     ];
     return {

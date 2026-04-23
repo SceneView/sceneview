@@ -85,9 +85,9 @@ describe("generateCarPaintShader", () => {
         // No background coroutine calls to createMaterial.
         expect(kotlinUsage).not.toMatch(/launch\s*{[^}]*createMaterial/);
     });
-    it("lists SceneView 3.6.x as a dependency", () => {
+    it("lists SceneView 4.0.x as a dependency", () => {
         const { dependencies } = generateCarPaintShader();
-        expect(dependencies.some((d) => d.includes("sceneview:3.6"))).toBe(true);
+        expect(dependencies.some((d) => d.includes("sceneview:4.0"))).toBe(true);
     });
     it("description reflects the chosen finish and base color", () => {
         const { description } = generateCarPaintShader({

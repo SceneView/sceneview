@@ -64,6 +64,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -190,10 +191,15 @@ ${features.includes("exploded-view") ? `                Text("Exploded View", st
                     valueRange = 0f..1f
                 )
                 Spacer(Modifier.height(8.dp))` : ""}
-${features.includes("cross-section") ? `                Row(verticalAlignment = Alignment.CenterVertically) {
+${features.includes("cross-section") ? `                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(value = crossSectionEnabled, onValueChange = { crossSectionEnabled = it }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text("Cross-Section", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.weight(1f))
-                    Switch(checked = crossSectionEnabled, onCheckedChange = { crossSectionEnabled = it })
+                    Switch(checked = crossSectionEnabled, onCheckedChange = null)
                 }
                 if (crossSectionEnabled) {
                     Slider(

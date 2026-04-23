@@ -19,6 +19,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -194,15 +195,25 @@ ${features.includes("color-swap") ? `            Text("Color", style = MaterialT
                 }
             }
             Spacer(Modifier.height(12.dp))` : ""}
-${features.includes("open-doors") ? `            Row(verticalAlignment = Alignment.CenterVertically) {
+${features.includes("open-doors") ? `            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = doorsOpen, onValueChange = onToggleDoors),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Open Doors", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = doorsOpen, onCheckedChange = onToggleDoors)
+                Switch(checked = doorsOpen, onCheckedChange = null)
             }` : ""}
-${features.includes("night-lighting") ? `            Row(verticalAlignment = Alignment.CenterVertically) {
+${features.includes("night-lighting") ? `            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = nightMode, onValueChange = onToggleNight),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Night Mode", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = nightMode, onCheckedChange = onToggleNight)
+                Switch(checked = nightMode, onCheckedChange = null)
             }` : ""}
 ${features.includes("measurements") ? `            Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { /* Toggle measurement mode */ }) {

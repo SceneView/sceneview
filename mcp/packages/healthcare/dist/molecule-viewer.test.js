@@ -24,7 +24,7 @@ describe("generateMoleculeViewer", () => {
     it("generates valid Kotlin code for protein", () => {
         const code = generateMoleculeViewer({ moleculeType: "protein" });
         expect(code).toContain("package com.example.medical.molecule");
-        expect(code).toContain("import io.github.sceneview.Scene");
+        expect(code).toContain("import io.github.sceneview.SceneView");
         expect(code).toContain("@Composable");
         expect(code).toContain("rememberEngine()");
         expect(code).toContain("rememberModelInstance");
@@ -41,7 +41,7 @@ describe("generateMoleculeViewer", () => {
     });
     it("generates AR code when ar=true", () => {
         const code = generateMoleculeViewer({ moleculeType: "dna", ar: true });
-        expect(code).toContain("import io.github.sceneview.ar.ARScene");
+        expect(code).toContain("import io.github.sceneview.ar.ARSceneView");
         expect(code).toContain("ARSceneView(");
         expect(code).toContain("android.permission.CAMERA");
     });
