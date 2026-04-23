@@ -23,7 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import io.github.sceneview.demo.SceneViewColors
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
@@ -49,11 +49,13 @@ fun CustomMeshDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
 
+    // Atom spheres in SceneView primary blue, bonds in the accent purple — the same hero
+    // gradient the brand palette uses.
     val sphereMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(Color.Cyan)
+        materialLoader.createColorInstance(SceneViewColors.Primary)
     }
     val bondMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(Color.Gray)
+        materialLoader.createColorInstance(SceneViewColors.Accent)
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "meshRotation")

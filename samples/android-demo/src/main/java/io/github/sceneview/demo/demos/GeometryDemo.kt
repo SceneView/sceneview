@@ -13,11 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -37,10 +37,12 @@ fun GeometryDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
 
-    val redMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.Red) }
-    val blueMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.Blue) }
-    val greenMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.Green) }
-    val yellowMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.Yellow) }
+    // On-brand ramp — Primary blue, Accent purple, light blue, soft purple — so the four
+    // primitives stay visually distinct while all reading as SceneView.
+    val cubeMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[0]) }
+    val sphereMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[1]) }
+    val cylinderMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[2]) }
+    val planeMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[3]) }
 
     DemoScaffold(
         title = "Geometry Primitives",
@@ -66,21 +68,21 @@ fun GeometryDemo(onBack: () -> Unit) {
         ) {
             if (showCube) {
                 CubeNode(
-                    materialInstance = redMaterial,
+                    materialInstance = cubeMaterial,
                     size = Float3(0.15f, 0.15f, 0.15f),
                     position = Position(x = -0.3f, y = 0.1f, z = -1f)
                 )
             }
             if (showSphere) {
                 SphereNode(
-                    materialInstance = blueMaterial,
+                    materialInstance = sphereMaterial,
                     radius = 0.1f,
                     position = Position(x = -0.1f, y = 0.1f, z = -1f)
                 )
             }
             if (showCylinder) {
                 CylinderNode(
-                    materialInstance = greenMaterial,
+                    materialInstance = cylinderMaterial,
                     radius = 0.08f,
                     height = 0.2f,
                     position = Position(x = 0.1f, y = 0.1f, z = -1f)
@@ -88,7 +90,7 @@ fun GeometryDemo(onBack: () -> Unit) {
             }
             if (showPlane) {
                 PlaneNode(
-                    materialInstance = yellowMaterial,
+                    materialInstance = planeMaterial,
                     size = Float3(0.3f, 0.3f, 1f),
                     position = Position(x = 0.3f, y = 0.1f, z = -1f)
                 )

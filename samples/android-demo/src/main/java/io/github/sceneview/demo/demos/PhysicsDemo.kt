@@ -15,11 +15,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
 import io.github.sceneview.node.Node as NodeImpl
@@ -92,14 +92,11 @@ fun PhysicsDemo(onBack: () -> Unit) {
                         intensity(100_000f)
                     }
                 )
-                val groundMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.DarkGray) }
+                val groundMaterial = remember(materialLoader) {
+                    materialLoader.createColorInstance(SceneViewColors.SurfaceDim)
+                }
                 val sphereMaterials = remember(materialLoader) {
-                    listOf(
-                        materialLoader.createColorInstance(Color.Red),
-                        materialLoader.createColorInstance(Color.Blue),
-                        materialLoader.createColorInstance(Color.Green),
-                        materialLoader.createColorInstance(Color.Yellow)
-                    )
+                    SceneViewColors.Ramp4.map { materialLoader.createColorInstance(it) }
                 }
 
                 // Ground plane for visual reference — positioned below center and sized

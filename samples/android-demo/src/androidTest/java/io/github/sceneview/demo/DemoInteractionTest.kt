@@ -166,6 +166,43 @@ class DemoInteractionTest {
      *
      * [fraction] is in `[0, 1]` — 0 drags the thumb to the minimum end, 1 to the maximum.
      */
+    /**
+     * Taps a view whose accessibility content-description matches [desc]. Used for icon-only
+     * buttons (Play / Pause, etc.) that have no visible text label — `tap(text)` can't find
+     * them. The underlying `IconButton` is already clickable so no ancestor walk is needed.
+     */
+    private fun tapByDesc(desc: String) {
+        device.wait(Until.hasObject(By.desc(desc)), timeout)
+        val node = device.findObject(By.desc(desc))
+            ?: error("Element with contentDescription '$desc' not found on screen")
+        node.click()
+        Thread.sleep(800)
+    }
+
+    /**
+     * Types [text] into the currently-focused editable field, replacing anything already
+     * there. Works on Compose `OutlinedTextField` — [clickLabel] is the field's text label
+     * (e.g. "Display Text") that we tap first to acquire focus.
+     */
+    private fun typeInto(clickLabel: String, text: String) {
+        val field = device.findObject(By.text(clickLabel))
+            ?: error("Text field with label '$clickLabel' not found")
+        val clickable = generateSequence(field) { it.parent }
+            .firstOrNull { it.isClickable } ?: field
+        clickable.click()
+        Thread.sleep(400)
+        // Select all then overwrite — pressing backspace for every existing character would
+        // flake whenever the field had a non-empty initial value we didn't know about.
+        device.executeShellCommand("input keyevent KEYCODE_MOVE_END")
+        repeat(64) { device.executeShellCommand("input keyevent KEYCODE_DEL") }
+        // `input text` tokenises on whitespace; escape spaces so "Hello World" types cleanly.
+        device.executeShellCommand("input text '${text.replace(" ", "%s")}'")
+        Thread.sleep(400)
+        // Dismiss the on-screen IME so the next tap doesn't land on a key
+        device.pressBack()
+        Thread.sleep(400)
+    }
+
     private fun dragSlider(labelPrefix: String, fraction: Float) {
         val labelNode = device.findObject(By.textStartsWith(labelPrefix))
             ?: error("Slider label starting with '$labelPrefix' not found on screen")
@@ -201,6 +238,13 @@ class DemoInteractionTest {
         dragSlider("Intensity:", fraction = 0.0f); screenshot("04a_lighting_intensity_min")
         dragSlider("Intensity:", fraction = 0.5f); screenshot("04b_lighting_intensity_mid")
         dragSlider("Intensity:", fraction = 1.0f); screenshot("04c_lighting_intensity_max")
+
+        // Color swatches — targeted via `semantics { contentDescription = "<Name> light color" }`
+        // added to the demo for a11y + UiAutomator reachability.
+        tapByDesc("Warm light color"); screenshot("04d_lighting_color_warm")
+        tapByDesc("Blue light color"); screenshot("04e_lighting_color_blue")
+        tapByDesc("Red light color"); screenshot("04f_lighting_color_red")
+        tapByDesc("White light color"); screenshot("04g_lighting_color_white")
     }
 
     // ── 2. Fog — toggle + density slider + colour presets (single screen open) ─
@@ -383,6 +427,10 @@ class DemoInteractionTest {
         // Speed slider sweep — slow / fast
         dragSlider("Speed:", fraction = 0.0f); screenshot("41a_animation_speed_min")
         dragSlider("Speed:", fraction = 1.0f); screenshot("41b_animation_speed_max")
+
+        // Play / Pause icon-only button — reached via contentDescription.
+        tapByDesc("Pause"); screenshot("41c_animation_paused")
+        tapByDesc("Play"); screenshot("41d_animation_playing")
     }
 
     // ── 11. Environment Gallery — 6 HDR chips ─────────────────────────────────
@@ -560,6 +608,12 @@ class DemoInteractionTest {
 
         dragSlider("Font Size:", fraction = 0.0f)
         screenshot("84_text_min_size")
+
+        // "Display Text" OutlinedTextField — type a fresh string to validate the text
+        // content reflows into the 3D TextNode on the next frame.
+        typeInto("Display Text", "SceneView")
+        Thread.sleep(600)
+        screenshot("84a_text_custom_input")
     }
 
     // ── 22a. ViewNode — visible toggle + coord-tap on the in-scene card ──────
@@ -593,6 +647,11 @@ class DemoInteractionTest {
         openDemo("video", "Video")
         Thread.sleep(1500)  // let the video texture warm up
         screenshot("92_video_initial")
+
+        // Play / Pause icon-only button (contentDescription toggles with state).
+        // After openDemo the player is auto-playing so the button is in "Pause" state.
+        tapByDesc("Pause"); screenshot("92a_video_paused")
+        tapByDesc("Play"); screenshot("92b_video_resumed")
     }
 
     // ── 22c. Model Viewer — just verify the scaffold + initial render ────────

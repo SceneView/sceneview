@@ -13,10 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Position2
 import io.github.sceneview.rememberCameraManipulator
@@ -72,10 +72,11 @@ fun ShapeDemo(onBack: () -> Unit) {
         "Hexagon" -> hexagonPath
         else -> trianglePath
     }
+    // On-brand ramp — Primary blue (triangle), Accent purple (star), TintLight (hexagon).
     val currentColor = when (selectedShape) {
-        "Star" -> Color.Yellow
-        "Hexagon" -> Color.Magenta
-        else -> Color.Cyan
+        "Star" -> SceneViewColors.Accent
+        "Hexagon" -> SceneViewColors.TintLight
+        else -> SceneViewColors.Primary
     }
     val shapeMaterial = remember(materialLoader, currentColor) {
         materialLoader.createColorInstance(currentColor)

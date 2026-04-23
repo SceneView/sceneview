@@ -26,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
@@ -124,6 +126,7 @@ fun LightingDemo(onBack: () -> Unit) {
                                 } else Modifier
                             )
                             .clickable { selectedColor = preset }
+                            .semantics { contentDescription = "${preset.label} light color" }
                     )
                 }
             }

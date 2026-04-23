@@ -17,10 +17,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -87,11 +87,13 @@ fun LinesPathsDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             cameraManipulator = rememberCameraManipulator()
         ) {
-            val redMaterial = remember(materialLoader) {
-                materialLoader.createColorInstance(Color.Red)
+            // On-brand line colors — Primary blue for the line segment, Accent purple for the
+            // path polyline. Same hero gradient as the product.
+            val lineMaterial = remember(materialLoader) {
+                materialLoader.createColorInstance(SceneViewColors.Primary)
             }
-            val greenMaterial = remember(materialLoader) {
-                materialLoader.createColorInstance(Color.Green)
+            val pathMaterial = remember(materialLoader) {
+                materialLoader.createColorInstance(SceneViewColors.Accent)
             }
 
             // Single line segment — 1 px on most GPUs, so we also draw a pair of spheres at the
@@ -103,7 +105,7 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                 LineNode(
                     start = lineStart,
                     end = lineEnd,
-                    materialInstance = redMaterial,
+                    materialInstance = lineMaterial,
                     position = lineOrigin
                 )
                 if (lineWidth > 0f) {
@@ -113,7 +115,7 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                         val t = i.toFloat() / beadCount
                         SphereNode(
                             radius = lineWidth,
-                            materialInstance = redMaterial,
+                            materialInstance = lineMaterial,
                             position = Position(
                                 x = lineOrigin.x + lineStart.x + (lineEnd.x - lineStart.x) * t,
                                 y = lineOrigin.y + lineStart.y + (lineEnd.y - lineStart.y) * t,
@@ -142,7 +144,7 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                 PathNode(
                     points = pathPoints,
                     closed = true,
-                    materialInstance = greenMaterial,
+                    materialInstance = pathMaterial,
                     position = pathOrigin
                 )
                 if (lineWidth > 0f) {
@@ -152,7 +154,7 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                     pathPoints.forEach { p ->
                         SphereNode(
                             radius = lineWidth,
-                            materialInstance = greenMaterial,
+                            materialInstance = pathMaterial,
                             position = Position(
                                 x = pathOrigin.x + p.x,
                                 y = pathOrigin.y + p.y,
