@@ -2,9 +2,9 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.0.0):**
-- 3D only: `io.github.sceneview:sceneview:4.0.0`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.0`
+**Android — Maven artifacts (version 4.0.1):**
+- 3D only: `io.github.sceneview:sceneview:4.0.1`
+- AR + 3D: `io.github.sceneview:arsceneview:4.0.1`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.0")
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.0") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.0.1")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.0.1") // AR (includes sceneview)
 }
 ```
 
@@ -2113,6 +2113,11 @@ let data = SceneSnapshot.pngData(image) // or jpegData(image, quality: 0.9)
 | Environment | `rememberEnvironment(loader) { }` | `.environment(.studio)` |
 | Cube | `CubeNode(size)` | `GeometryNode.cube(size:color:)` |
 | Sphere | `SphereNode(radius)` | `GeometryNode.sphere(radius:)` |
+| Cylinder | `CylinderNode(radius, height)` | `GeometryNode.cylinder(radius:height:)` |
+| Plane | `PlaneNode(size)` | `GeometryNode.plane(width:height:)` |
+| Cone | `ConeNode(radius, height)` | `GeometryNode.cone(radius:height:)` |
+| Torus | `TorusNode(majorRadius, minorRadius)` | `GeometryNode.torus(majorRadius:minorRadius:)` |
+| Capsule | `CapsuleNode(radius, height)` | `GeometryNode.capsule(radius:height:)` |
 | Light | `LightNode(type, apply = { })` | `LightNode.directional(color:intensity:)` |
 | Text | `TextNode(text = "...")` | `TextNode(text:fontSize:color:depth:)` |
 | Line | `LineNode(start, end, materialInstance)` | `LineNode(from:to:color:)` |

@@ -25,6 +25,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["scenario"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "list_samples",
@@ -38,6 +43,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -54,6 +64,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["type"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "validate_code",
@@ -68,6 +83,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["code"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_migration_guide",
@@ -76,6 +96,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -91,6 +116,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["nodeType"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_platform_roadmap",
@@ -99,6 +129,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -115,6 +150,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_ar_setup",
@@ -124,6 +164,11 @@ export const TOOL_DEFINITIONS = [
             properties: {},
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_troubleshooting",
@@ -132,6 +177,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -148,6 +198,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["type"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_web_setup",
@@ -155,6 +210,11 @@ export const TOOL_DEFINITIONS = [
         inputSchema: {
             type: "object",
             properties: {},
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -185,6 +245,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -284,6 +349,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["type"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_platform_setup",
@@ -304,6 +374,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["platform", "type"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "migrate_code",
@@ -317,6 +392,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["code"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -337,6 +417,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "generate_scene",
@@ -351,6 +436,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["description"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "list_platforms",
@@ -359,6 +449,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -369,6 +464,11 @@ export const TOOL_DEFINITIONS = [
             properties: {},
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_gesture_guide",
@@ -377,6 +477,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -387,6 +492,11 @@ export const TOOL_DEFINITIONS = [
             properties: {},
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_material_guide",
@@ -395,6 +505,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -405,6 +520,11 @@ export const TOOL_DEFINITIONS = [
             properties: {},
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_model_optimization_guide",
@@ -414,6 +534,11 @@ export const TOOL_DEFINITIONS = [
             properties: {},
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_web_rendering_guide",
@@ -422,6 +547,11 @@ export const TOOL_DEFINITIONS = [
             type: "object",
             properties: {},
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -449,6 +579,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["query"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: true,
+            destructiveHint: false,
+        },
     },
     {
         name: "analyze_project",
@@ -462,6 +597,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: [],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: true,
+            destructiveHint: false,
         },
     },
 ];

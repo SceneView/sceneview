@@ -3,6 +3,8 @@
 // Defines free vs pro tool access for SceneView MCP.
 // ─── Free tools (17) ─────────────────────────────────────────────────────────
 const FREE_TOOLS = [
+    "get_started",
+    "view_3d_model",
     "list_samples",
     "get_sample",
     "get_setup",
