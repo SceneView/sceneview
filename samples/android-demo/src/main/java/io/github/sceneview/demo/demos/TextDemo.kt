@@ -73,23 +73,23 @@ fun TextDemo(onBack: () -> Unit) {
                 position = Position(x = -0.9f, y = 0.3f)
             )
 
-            // Center: fixed label with yellow text
+            // Center: fixed label with SceneView Primary on dark surface
             TextNode(
                 text = "SceneView 4.0",
                 fontSize = fontSize,
-                textColor = android.graphics.Color.YELLOW,
-                backgroundColor = 0xCC333333.toInt(),
+                textColor = 0xFFA4C1FF.toInt(),  // SceneView TintLight (readable on dark)
+                backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.8f,
                 heightMeters = 0.25f,
                 position = Position(x = 0f, y = 0f)
             )
 
-            // Right: fixed label with cyan text
+            // Right: fixed label with SceneView Accent tint
             TextNode(
                 text = "3D Text Labels",
                 fontSize = fontSize,
-                textColor = android.graphics.Color.CYAN,
-                backgroundColor = 0xCC003333.toInt(),
+                textColor = 0xFFD2A8FF.toInt(),  // SceneView TintSoft (purple tint)
+                backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.8f,
                 heightMeters = 0.25f,
                 position = Position(x = 0.9f, y = -0.3f)
