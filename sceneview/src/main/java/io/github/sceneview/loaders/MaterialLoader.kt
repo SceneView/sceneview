@@ -302,7 +302,10 @@ class MaterialLoader(
 
     fun destroyMaterial(material: Material) {
         if (material in materials) {
-            engine.safeDestroyMaterialInstance(material.defaultInstance)
+            // Filament's `Engine.destroyMaterial` implicitly destroys the material's own
+            // `defaultInstance`. Destroying it explicitly here would be a double-destroy; the
+            // previous `safeDestroyMaterialInstance` call was a runCatching-silenced hotfix that
+            // hid the double-free. Rely on Engine.destroyMaterial to do the right thing.
             engine.safeDestroyMaterial(material)
             materials -= material
         }
@@ -323,7 +326,7 @@ class MaterialLoader(
         materials.toList().forEach { destroyMaterial(it) }
         materials.clear()
 
-        runCatching { ubershaderProvider.destroyMaterials() }
-        runCatching { ubershaderProvider.destroy() }
+        ubershaderProvider.destroyMaterials()
+        ubershaderProvider.destroy()
     }
 }

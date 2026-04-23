@@ -349,11 +349,6 @@ class DemoInteractionTest {
      * Pixel 9 screenshot `tools/qa-screenshots/pixel9/final/12_billboard.png` — no need to
      * re-capture here.
      */
-    @org.junit.Ignore(
-        "Library bug: BillboardNode teardown leaves texture bound to MaterialInstance, " +
-                "Filament aborts with SIGABRT. Crashes the whole test runner, so we skip. " +
-                "Un-ignore once sceneview/ fixes BillboardNode/ImageNode destroy ordering."
-    )
     @Test
     fun billboard_visibilityChips() {
         openDemo("billboard", "Billboard Node")
@@ -479,12 +474,6 @@ class DemoInteractionTest {
 
     // ── 20. Image — scale slider ──────────────────────────────────────────────
 
-    @org.junit.Ignore(
-        "Same library bug as billboard_visibilityChips — ImageNode teardown crashes Filament " +
-                "with `Invalid texture still bound to MaterialInstance: 'Transparent Textured'` " +
-                "and aborts the test runner. Un-ignore once sceneview/ fixes ImageNode destroy " +
-                "ordering."
-    )
     @Test
     fun image_scaleSlider() {
         openDemo("image", "Image Node")
@@ -499,12 +488,6 @@ class DemoInteractionTest {
 
     // ── 21. Text Labels — font-size slider ────────────────────────────────────
 
-    @org.junit.Ignore(
-        "Same library bug as billboard_visibilityChips — TextNode teardown crashes Filament " +
-                "with `Invalid texture still bound to MaterialInstance: 'Transparent Textured'` " +
-                "and aborts the test runner. Un-ignore once sceneview/ fixes TextNode destroy " +
-                "ordering."
-    )
     @Test
     fun textLabels_fontSizeSlider() {
         openDemo("text", "Text Nodes")

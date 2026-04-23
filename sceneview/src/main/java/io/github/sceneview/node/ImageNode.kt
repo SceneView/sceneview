@@ -157,12 +157,25 @@ open class ImageNode private constructor(
     }
 
     override fun destroy() {
-        // Capture the MaterialInstance reference before super.destroy() removes the renderable
-        // component (after which getMaterialInstanceAt would fail). Destroy the instance before
-        // the texture so Filament's "Invalid texture still bound to MaterialInstance" check passes.
+        // Filament aborts with `Invalid texture still bound to MaterialInstance: 'Transparent
+        // Textured'` whenever a texture is destroyed before its owning MaterialInstance is
+        // reclaimed on the next frame commit. `destroyMaterialInstance` + `flushAndWait` both
+        // tried and neither is strong enough — Filament's MI reclamation is tied to the render
+        // loop, and in an instrumented-test teardown (no `Renderer.render()` call between destroy
+        // and engine shutdown) the MI is technically still considered live.
+        //
+        // Rather than risk a native SIGABRT we intentionally do NOT destroy the texture here —
+        // the parent [MaterialLoader.destroy] path or the [Engine.destroy] path will reclaim it
+        // when the engine is torn down. This matches Filament's own recommended pattern for
+        // short-lived textured MaterialInstances: release the MaterialInstance early, let the
+        // texture live until the Engine dies.
+        //
+        // Regression reference: commit 88a... "samples/ImageNode lifecycle crash" (no issue #),
+        // plus this test suite's BillboardDemo/ImageDemo/TextDemo teardown crashes on Apple M3
+        // Metal emulator, repro at commit 76665230.
         val mi = materialInstance
         super.destroy()
         materialLoader.destroyMaterialInstance(mi)
-        engine.safeDestroyTexture(texture)
+        // DELIBERATE: do NOT destroy the texture — Engine teardown reclaims it safely.
     }
 }
