@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace "io.github.sceneview.demo"
+    namespace = "io.github.sceneview.demo"
 
     compileSdk 36
 
@@ -41,8 +41,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             def keystoreFile = System.getenv("SCENEVIEW_DEMO_KEYSTORE_FILE")
             if (keystoreFile != null) {
@@ -58,8 +58,8 @@ android {
         jvmTarget = JavaVersion.VERSION_21
     }
     buildFeatures {
-        compose true
-        buildConfig true
+        compose = true
+        buildConfig = true
     }
     androidResources {
         noCompress 'filamat', 'ktx'

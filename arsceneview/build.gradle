@@ -43,7 +43,7 @@ if (project.properties['filamentPluginEnabled']?.toBoolean()) {
 // *************************************************************************************************
 
 android {
-    namespace 'io.github.sceneview.ar'
+    namespace = 'io.github.sceneview.ar'
 
     compileSdk 36
 
