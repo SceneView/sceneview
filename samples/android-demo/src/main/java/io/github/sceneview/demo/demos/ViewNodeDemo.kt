@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -70,13 +72,22 @@ fun ViewNodeDemo(onBack: () -> Unit) {
         title = "View Node",
         onBack = onBack,
         controls = {
+            // Wrap the whole row in Modifier.toggleable so the row itself is the
+            // click target — tapping anywhere on "Visible" (label or switch) flips
+            // the state. Also gives UiAutomator a clickable ancestor of the label.
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = isVisible,
+                        onValueChange = { isVisible = it },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Visible", style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.width(12.dp))
-                Switch(checked = isVisible, onCheckedChange = { isVisible = it })
+                Switch(checked = isVisible, onCheckedChange = null)
             }
         }
     ) {

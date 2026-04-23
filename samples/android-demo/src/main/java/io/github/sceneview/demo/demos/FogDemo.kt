@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -61,14 +62,20 @@ fun FogDemo(onBack: () -> Unit) {
         title = "Fog",
         onBack = onBack,
         controls = {
-            // Enable / disable toggle
+            // Enable / disable toggle — toggleable on the whole row so tapping the
+            // label flips the state, and UiAutomator finds a clickable ancestor.
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = fogEnabled,
+                        onValueChange = { fogEnabled = it },
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Fog Enabled", style = MaterialTheme.typography.bodyLarge)
-                Switch(checked = fogEnabled, onCheckedChange = { fogEnabled = it })
+                Switch(checked = fogEnabled, onCheckedChange = null)
             }
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -53,12 +54,17 @@ fun GestureEditingDemo(onBack: () -> Unit) {
         onBack = onBack,
         controls = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = editable,
+                        onValueChange = { editable = it },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Editable", style = MaterialTheme.typography.labelLarge)
-                Switch(checked = editable, onCheckedChange = { editable = it })
+                Switch(checked = editable, onCheckedChange = null)
             }
 
             Spacer(modifier = Modifier.height(12.dp))

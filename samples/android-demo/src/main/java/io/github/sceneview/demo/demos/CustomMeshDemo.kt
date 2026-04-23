@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -71,12 +72,17 @@ fun CustomMeshDemo(onBack: () -> Unit) {
         onBack = onBack,
         controls = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = rotating,
+                        onValueChange = { rotating = it },
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Auto-Rotate", style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = rotating, onCheckedChange = { rotating = it })
+                Switch(checked = rotating, onCheckedChange = null)
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("Scale: ${"%.1f".format(scale)}x", style = MaterialTheme.typography.labelLarge)
