@@ -569,6 +569,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevCylinderGeometry = remember { mutableStateOf(listOf<Any?>(radius, height, center, sideCount)) }
+        val prevCylinderMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, height, center, sideCount)
             if (current != prevCylinderGeometry.value) {
@@ -576,6 +577,11 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     radius = radius, height = height, center = center, sideCount = sideCount
                 )
                 prevCylinderGeometry.value = current
+            }
+            // Propagate MaterialInstance reassignments — see SphereNode for rationale.
+            if (materialInstance != null && materialInstance != prevCylinderMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevCylinderMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -624,11 +630,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevConeGeometry = remember { mutableStateOf(listOf<Any?>(radius, height, center, sideCount)) }
+        val prevConeMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, height, center, sideCount)
             if (current != prevConeGeometry.value) {
                 node.updateGeometry(radius = radius, height = height, center = center, sideCount = sideCount)
                 prevConeGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevConeMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevConeMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -680,6 +691,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevTorusGeometry = remember { mutableStateOf(listOf<Any?>(majorRadius, minorRadius, center, majorSegments, minorSegments)) }
+        val prevTorusMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(majorRadius, minorRadius, center, majorSegments, minorSegments)
             if (current != prevTorusGeometry.value) {
@@ -688,6 +700,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     center = center, majorSegments = majorSegments, minorSegments = minorSegments
                 )
                 prevTorusGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevTorusMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevTorusMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -739,6 +755,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevCapsuleGeometry = remember { mutableStateOf(listOf<Any?>(radius, height, center, capStacks, sideSlices)) }
+        val prevCapsuleMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, height, center, capStacks, sideSlices)
             if (current != prevCapsuleGeometry.value) {
@@ -747,6 +764,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     capStacks = capStacks, sideSlices = sideSlices
                 )
                 prevCapsuleGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevCapsuleMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevCapsuleMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -795,11 +816,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevPlaneGeometry = remember { mutableStateOf(listOf<Any?>(size, center, normal)) }
+        val prevPlaneMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(size, center, normal)
             if (current != prevPlaneGeometry.value) {
                 node.updateGeometry(size = size, center = center, normal = normal)
                 prevPlaneGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevPlaneMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevPlaneMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -1247,11 +1273,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevLineGeometry = remember { mutableStateOf(listOf<Any?>(start, end)) }
+        val prevLineMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(start, end)
             if (current != prevLineGeometry.value) {
                 node.updateGeometry(start = start, end = end)
                 prevLineGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevLineMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevLineMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -1305,11 +1336,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevPathGeometry = remember { mutableStateOf(listOf<Any?>(points, closed)) }
+        val prevPathMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(points, closed)
             if (current != prevPathGeometry.value) {
                 node.updateGeometry(points = points, closed = closed)
                 prevPathGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevPathMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevPathMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -1351,6 +1387,13 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                 boundingBox = boundingBox,
                 materialInstance = materialInstance
             ).apply(apply)
+        }
+        val prevMeshMaterial = remember { mutableStateOf(materialInstance) }
+        SideEffect {
+            if (materialInstance != null && materialInstance != prevMeshMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevMeshMaterial.value = materialInstance
+            }
         }
         NodeLifecycle(node, content)
     }
@@ -1477,6 +1520,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevShapeGeometry = remember { mutableStateOf(listOf<Any?>(polygonPath, polygonHoles, delaunayPoints, normal, uvScale, color)) }
+        val prevShapeMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(polygonPath, polygonHoles, delaunayPoints, normal, uvScale, color)
             if (current != prevShapeGeometry.value) {
@@ -1489,6 +1533,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     color = color
                 )
                 prevShapeGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevShapeMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevShapeMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
