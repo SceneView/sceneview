@@ -61,6 +61,22 @@ b14b5942 fix(sceneview): ViewNode teardown order + interaction test JPEG pipelin
 - Physics demo : la sphère diagnostic statique rend OK mais les sphères physiques ne sont pas visibles sur les screenshots (problème de timing simulation / position). Pas dans le scope de cette session.
 - Push GitHub bloqué par le ban — tous les commits restent locaux jusqu'à déblocage.
 
+### Session addendum — 2026-04-23 late (branded assets + palette + icon/text test coverage)
+
+Continuation of the same worktree after the user asked for "vraies images/vidéos et couleurs SceneView" :
+
+- **Real assets :**
+  - `assets/textures/sceneview_logo.png` — 1.6 KB blue circle placeholder swapped for the 45 KB branded cube-in-brackets logo from `branding/exports/logo/logo-1024.png`.
+  - `assets/videos/sample.mp4` — regenerated with `ffmpeg` — 10 s / 1280×720 / H.264, cube orbiting in Lissajous pattern over the brand hero gradient `#005bc1 → #6446cd`.
+- **Brand palette** `samples/android-demo/src/main/java/io/github/sceneview/demo/SceneViewColors.kt` mirrors the seven tokens from `DESIGN.md` + a `Ramp4` helper. Applied to Physics / Geometry / Shape / CustomMesh / LinesPaths — all `Color.Red / Blue / Green / Yellow / Cyan / Magenta / Gray / DarkGray` references gone.
+- **A11y win** — `LightingDemo` color swatches now carry `contentDescription`. Four new `tapByDesc` tests exercise them.
+- **Icon + text input coverage** — new `tapByDesc(String)` and `typeInto(String, String)` helpers added to `DemoInteractionTest`. Used for:
+  - Animation Play / Pause (was icon-only, untestable)
+  - Video Play / Pause
+  - Text demo Display Text field (real reflow into TextNode via `adb shell input text`)
+- **Result** : 31/31 PASS (9 min), 119 JPEGs @ 8.5 MB, pre-push gate 9/9.
+- **Extra commit on branch :** `7e594364 feat(android-demo): real branded assets + SceneView color palette + extended coverage`
+
 ---
 
 ## SESSION intelligent-elbakyan — 2026-04-13 — Quality-gate fix, SPM repo, geometry nodes, scheduled tasks
