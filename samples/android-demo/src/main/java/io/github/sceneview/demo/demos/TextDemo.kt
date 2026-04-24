@@ -63,9 +63,8 @@ fun TextDemo(onBack: () -> Unit) {
             cameraManipulator = rememberCameraManipulator()
         ) {
             // Three labels stacked vertically at x=0 so all three fit inside the default
-            // camera framing on a phone portrait viewport. Horizontal spread of x=±0.9f
-            // was pushing the outer labels outside the frustum — only the centre label
-            // was ever visible, which hid the point of having three of them.
+            // camera framing on a phone portrait viewport. y=±0.35 keeps the top and
+            // bottom labels fully visible (y=±0.45 cropped them on the default FOV).
             // Top: user text with white on dark background
             TextNode(
                 text = inputText,
@@ -73,8 +72,8 @@ fun TextDemo(onBack: () -> Unit) {
                 textColor = android.graphics.Color.WHITE,
                 backgroundColor = 0xCC000000.toInt(),
                 widthMeters = 0.8f,
-                heightMeters = 0.25f,
-                position = Position(x = 0f, y = 0.45f)
+                heightMeters = 0.22f,
+                position = Position(x = 0f, y = 0.32f)
             )
 
             // Center: fixed label with SceneView Primary on dark surface
@@ -84,7 +83,7 @@ fun TextDemo(onBack: () -> Unit) {
                 textColor = 0xFFA4C1FF.toInt(),  // SceneView TintLight (readable on dark)
                 backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.8f,
-                heightMeters = 0.25f,
+                heightMeters = 0.22f,
                 position = Position(x = 0f, y = 0f)
             )
 
@@ -95,8 +94,8 @@ fun TextDemo(onBack: () -> Unit) {
                 textColor = 0xFFD2A8FF.toInt(),  // SceneView TintSoft (purple tint)
                 backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.8f,
-                heightMeters = 0.25f,
-                position = Position(x = 0f, y = -0.45f)
+                heightMeters = 0.22f,
+                position = Position(x = 0f, y = -0.32f)
             )
         }
     }
