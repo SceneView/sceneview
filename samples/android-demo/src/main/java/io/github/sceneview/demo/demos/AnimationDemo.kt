@@ -125,14 +125,7 @@ fun AnimationDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    // 0.45f scaleToUnits keeps the dragon at a manageable scale; position
-                    // y=-0.15 pushes the whole model down so its body sits at the viewport
-                    // centre instead of the wings filling the upper third while the lower
-                    // half stays empty (the dragon's bounding box has the wings high above
-                    // the body, so its bbox-centre doesn't match the visual centre of mass).
-                    scaleToUnits = 0.45f,
-                    centerOrigin = Position(0.5f, 0.5f, 0.5f),
-                    position = Position(0f, -0.15f, 0f),
+                    scaleToUnits = 0.5f,
                     autoAnimate = isPlaying,
                     animationSpeed = speed,
                     animationLoop = loop
