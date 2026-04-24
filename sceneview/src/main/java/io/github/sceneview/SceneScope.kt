@@ -356,6 +356,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
     fun LightNode(
         type: LightManager.Type,
         intensity: Float? = null,
+        color: io.github.sceneview.math.Color? = null,
         direction: Direction? = null,
         position: Position = Position(x = 0f),
         apply: LightManager.Builder.() -> Unit = {},
@@ -366,11 +367,20 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             LightNodeImpl(engine = engine, type = type, apply = {
                 intensity?.let { intensity(it) }
                 direction?.let { direction(it.x, it.y, it.z) }
+                color?.let { color(it.r, it.g, it.b) }
                 apply()
             }).apply(nodeApply)
         }
         SideEffect {
+            // Push every reactive prop on each recomposition so Compose state changes
+            // (sliders, colour pickers, toggles) actually drive the underlying Light.
+            // The builder `apply` block only runs at creation time — without this
+            // SideEffect, sliders that live-modified intensity / direction / colour
+            // silently had no effect on the rendered scene.
             node.position = position
+            intensity?.let { node.intensity = it }
+            direction?.let { node.lightDirection = it }
+            color?.let { node.color = it }
         }
         NodeLifecycle(node, content)
     }
