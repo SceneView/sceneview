@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,15 +59,22 @@ fun PostProcessingDemo(onBack: () -> Unit) {
     val view = rememberView(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Apply post-processing settings to the Filament View
-    view.ambientOcclusionOptions = view.ambientOcclusionOptions.apply {
-        enabled = ssaoEnabled
+    // Apply post-processing settings to the Filament View after composition lands —
+    // a SideEffect runs on every successful recomposition so toggles actually take
+    // effect on the next rendered frame. Writing to `view` directly inside the body
+    // would work today but is fragile: Filament's options getters currently return
+    // the same mutable struct instance, so any future change that returns a defensive
+    // copy would silently drop SSAO/FXAA/dithering writes.
+    SideEffect {
+        view.ambientOcclusionOptions = view.ambientOcclusionOptions.apply {
+            enabled = ssaoEnabled
+        }
+        view.multiSampleAntiAliasingOptions = view.multiSampleAntiAliasingOptions.apply {
+            enabled = msaaEnabled
+        }
+        view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
+        view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
     }
-    view.multiSampleAntiAliasingOptions = view.multiSampleAntiAliasingOptions.apply {
-        enabled = msaaEnabled
-    }
-    view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
-    view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
 
     val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
