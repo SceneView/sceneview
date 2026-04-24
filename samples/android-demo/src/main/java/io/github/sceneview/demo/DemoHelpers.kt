@@ -104,6 +104,65 @@ fun rememberAutoOrbit(
 }
 
 /**
+ * Pause the hero auto-rotate as soon as the user touches the viewport — they're
+ * interacting and a spinning model fights their gestures. State persists across
+ * recompositions so it stays paused for the rest of the demo session.
+ *
+ * Wire `onPause` into the SceneView's `onGestureListener`:
+ *
+ * ```kotlin
+ * val (yaw, onUserGesture) = rememberPausableHeroYaw(modelInstance != null)
+ * onGestureListener = rememberOnGestureListener(
+ *     onSingleTapUp = { _, _ -> onUserGesture() },
+ *     onDown = { _, _ -> onUserGesture() },
+ *     onScroll = { _, _, _, _, _ -> onUserGesture() },
+ * )
+ * ```
+ *
+ * Or just call `onUserGesture()` from `onTouchEvent` for the broadest coverage.
+ */
+data class HeroYawController(val yaw: Float, val onUserGesture: () -> Unit)
+
+@Composable
+fun rememberPausableHeroYaw(
+    trigger: Boolean,
+    durationMillis: Int = 20_000,
+    staticYaw: Float = 45f,
+): HeroYawController {
+    val pausedState = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val paused = pausedState.value
+    val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(trigger, DemoSettings.qaMode, paused) {
+        if (trigger && !DemoSettings.qaMode && !paused) {
+            // Resume from current yaw if previously paused — no snap.
+            val currentYaw = anim.value % 360f
+            anim.snapTo(currentYaw)
+            // Animate to next 360° boundary, then loop full sweeps.
+            anim.animateTo(
+                targetValue = currentYaw + (360f - currentYaw),
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = ((360f - currentYaw) / 360f * durationMillis).toInt()
+                        .coerceAtLeast(1),
+                    easing = androidx.compose.animation.core.LinearEasing,
+                ),
+            )
+            while (true) {
+                anim.snapTo(0f)
+                anim.animateTo(
+                    targetValue = 360f,
+                    animationSpec = androidx.compose.animation.core.tween(
+                        durationMillis = durationMillis,
+                        easing = androidx.compose.animation.core.LinearEasing,
+                    ),
+                )
+            }
+        }
+    }
+    val yaw = if (DemoSettings.qaMode) staticYaw else anim.value
+    return HeroYawController(yaw = yaw, onUserGesture = { pausedState.value = true })
+}
+
+/**
  * Smooth y-axis hero-rotation that starts from 0° **only after** [trigger] becomes true.
  *
  * Using a plain `rememberInfiniteTransition` for an auto-rotate creates a visible
