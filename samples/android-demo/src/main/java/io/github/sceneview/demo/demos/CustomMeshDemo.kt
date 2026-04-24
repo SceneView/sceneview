@@ -1,10 +1,5 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,11 +24,13 @@ import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.rememberPausableHeroYaw
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.rememberOnGestureListener
 
 /**
  * Demonstrates custom geometry using built-in geometry nodes composed together.
@@ -59,12 +56,10 @@ fun CustomMeshDemo(onBack: () -> Unit) {
         materialLoader.createColorInstance(SceneViewColors.Accent)
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "meshRotation")
-    val rotationY by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 8_000, easing = LinearEasing)),
-        label = "meshRotationY"
+    // Hero yaw auto-pauses on first camera gesture so orbit/pinch don't fight the spin.
+    // Triggered by the user's Auto-Rotate switch.
+    val (rotationY, onHeroGesture) = rememberPausableHeroYaw(
+        trigger = rotating, durationMillis = 8_000, staticYaw = 0f,
     )
 
     DemoScaffold(
@@ -97,11 +92,18 @@ fun CustomMeshDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator()
+            cameraManipulator = rememberCameraManipulator(),
+            onGestureListener = rememberOnGestureListener(
+                onSingleTapUp = { _, _ -> onHeroGesture() },
+                onDoubleTap = { _, _ -> onHeroGesture() },
+                onScroll = { _, _, _, _ -> onHeroGesture() },
+            ),
         ) {
-            // Molecule-like structure: center atom + 4 outer atoms connected by bonds
+            // Molecule-like structure: center atom + 4 outer atoms connected by bonds.
+            // Rotation y freezes at the current angle when the user toggles off, which reads
+            // better than snapping back to 0° — you can stop the molecule at any pose.
             Node(
-                rotation = if (rotating) Rotation(y = rotationY) else Rotation(),
+                rotation = Rotation(y = rotationY),
                 scale = Float3(scale)
             ) {
                 // Center atom

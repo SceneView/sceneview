@@ -1,10 +1,5 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,16 +15,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.DisposableEffect
 import io.github.sceneview.SceneView
+import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.environment.Environment
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
-import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
@@ -61,9 +57,16 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Probe environment — uses the default neutral IBL from the environment loader.
-    // In a real app you would load a different HDR for the probe zone.
-    val probeEnvironment = rememberEnvironment(environmentLoader)
+    // Probe environment — load a DIFFERENT HDR than the scene default so the probe's reflection
+    // is visually distinct when the camera enters its zone. Scene uses the loader's neutral
+    // default; probe uses a warm sunset, giving the helmet an orange cast when active.
+    val probeEnvironment: Environment = remember(environmentLoader) {
+        environmentLoader.createHDREnvironment(assetFileLocation = "environments/sunset_2k.hdr")
+            ?: createEnvironment(environmentLoader)
+    }
+    DisposableEffect(probeEnvironment) {
+        onDispose { environmentLoader.destroyEnvironment(probeEnvironment) }
+    }
 
     val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
