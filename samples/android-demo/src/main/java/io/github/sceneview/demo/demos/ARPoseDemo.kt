@@ -143,26 +143,23 @@ fun ARPoseDemo(onBack: () -> Unit) {
                 }
             ) {
                 if (isTracking) {
+                    // Cache Pose objects across recompositions — without remember, each slider
+                    // drag allocates two new Pose + four FloatArray instances per frame.
+                    val cubePose = remember(x, y, z) {
+                        Pose(floatArrayOf(x, y, z), floatArrayOf(0f, 0f, 0f, 1f))
+                    }
+                    val spherePose = remember(x, y, z) {
+                        Pose(floatArrayOf(x + 0.2f, y, z), floatArrayOf(0f, 0f, 0f, 1f))
+                    }
                     // Place a cube at the specified pose in AR world space
-                    PoseNode(
-                        pose = Pose(floatArrayOf(x, y, z), floatArrayOf(0f, 0f, 0f, 1f)),
-                        onPoseChanged = { newPose ->
-                            // Pose was updated
-                        }
-                    ) {
+                    PoseNode(pose = cubePose) {
                         CubeNode(
                             size = Size(0.1f),
                             materialInstance = cubeMaterial
                         )
                     }
-
                     // Place a second indicator slightly offset
-                    PoseNode(
-                        pose = Pose(
-                            floatArrayOf(x + 0.2f, y, z),
-                            floatArrayOf(0f, 0f, 0f, 1f)
-                        )
-                    ) {
+                    PoseNode(pose = spherePose) {
                         SphereNode(
                             radius = 0.05f,
                             materialInstance = cubeMaterial
