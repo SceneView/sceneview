@@ -60,7 +60,12 @@ fun TextDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator()
+            // Dolly the camera closer — 3 stacked 0.18 m-tall labels at the origin read
+            // cramped at the default z = 4. z = 1.2 fills the portrait viewport.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0f, 1.2f),
+                targetPosition = Position(0f, 0f, 0f),
+            ),
         ) {
             // Three labels stacked vertically at x=0 so all three fit inside the default
             // camera framing on a phone portrait viewport. y=±0.22 keeps the top and

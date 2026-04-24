@@ -108,7 +108,12 @@ fun ShapeDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator()
+            // Dolly closer — shape sits at z = -1 with radius ≤ 0.5 m, default camera
+            // at z = 4 rendered it tiny. z = 1.5 puts the shape at 2.5 m.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0f, 1.5f),
+                targetPosition = Position(0f, 0f, -1f),
+            ),
         ) {
             // key(selectedShape) forces a fresh ShapeNodeImpl when the user picks a
             // different polygon. The library's `ShapeNode` composable updates vertex /

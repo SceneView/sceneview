@@ -92,7 +92,13 @@ fun CustomMeshDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator(),
+            // Dolly closer — molecule spans ±0.6 m and renders at scale 0.5–2.5x, so at
+            // default camera z = 4 it read as a tiny cluster. z = 2 gives enough room
+            // for the 2.5× slider limit without clipping.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0.1f, 2f),
+                targetPosition = Position(0f, 0f, 0f),
+            ),
             onGestureListener = rememberOnGestureListener(
                 onSingleTapUp = { _, _ -> onHeroGesture() },
                 onDoubleTap = { _, _ -> onHeroGesture() },

@@ -116,7 +116,12 @@ fun CollisionDemo(onBack: () -> Unit) {
             environmentLoader = environmentLoader,
             view = view,
             collisionSystem = collisionSystem,
-            cameraManipulator = rememberCameraManipulator(),
+            // Dolly closer — shapes span 1.2 m at z = -2, default camera z = 4 put them
+            // at 6 m which made the tap targets tiny on phone screens.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0.2f, 1f),
+                targetPosition = Position(0f, 0.15f, -2f),
+            ),
             onGestureListener = gestureListener
         ) {
             for (shape in shapes) {

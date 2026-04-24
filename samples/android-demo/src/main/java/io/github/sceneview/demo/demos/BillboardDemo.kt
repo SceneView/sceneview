@@ -73,7 +73,12 @@ fun BillboardDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator()
+            // Dolly closer so both 0.55 m-wide panels read comfortably — at default
+            // camera z = 4 they looked small. z = 1 puts them at 2.2 m.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0f, 1f),
+                targetPosition = Position(0f, 0f, -1.2f),
+            )
         ) {
             // BillboardNode: always faces the camera. Made larger + closer so the
             // contrast with the fixed image is obvious (the fixed image rotates / shrinks

@@ -72,7 +72,13 @@ fun GeometryDemo(onBack: () -> Unit) {
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,
-            cameraManipulator = rememberCameraManipulator()
+            // Dolly the camera closer: primitives live at z = -1.5 m and span only
+            // 1.2 m horizontally, so the default camera at z = 4 framed them as tiny
+            // dots in a portrait viewport. z = 1.2 puts them at a comfortable 2.7 m.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0.2f, 1.2f),
+                targetPosition = Position(0f, 0f, -1.5f),
+            ),
         ) {
             // Key light — gives each primitive a clear shaded/lit side so the 3D form
             // reads as depth rather than flat color silhouettes.
