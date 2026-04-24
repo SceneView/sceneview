@@ -61,6 +61,9 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 Button(onClick = { sphereCount++ }) {
                     Text("Drop")
                 }
+                Button(onClick = { sphereCount += 10 }) {
+                    Text("Drop 10")
+                }
                 Button(onClick = {
                     sphereCount = 1
                     generation++
@@ -116,14 +119,19 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 )
 
                 for (i in 0 until sphereCount) {
-                    val xOffset = (i % 5 - 2) * 0.15f
-                    val startY = 0.6f + i * 0.25f
+                    // Spread spheres across the floor plane in a 5×N grid so a "Drop 10"
+                    // looks like a colourful rain instead of a single vertical column.
+                    // x stays inside [-0.6, 0.6] (matches floor plane width) and y stacks
+                    // up so newly-dropped spheres start above the previous batch.
+                    val xOffset = (i % 5 - 2) * 0.18f + (if (i / 5 % 2 == 0) 0f else 0.09f)
+                    val zOffset = ((i / 5) % 3 - 1) * 0.18f
+                    val startY = 0.6f + (i / 5) * 0.18f
 
                     // Capture the Node reference via apply so PhysicsNode can drive it.
                     var nodeRef by remember(i) { mutableStateOf<NodeImpl?>(null) }
 
                     Node(
-                        position = Position(x = xOffset, y = startY, z = 0f),
+                        position = Position(x = xOffset, y = startY, z = zOffset),
                         apply = { nodeRef = this }
                     ) {
                         SphereNode(
