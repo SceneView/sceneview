@@ -118,31 +118,40 @@ fun ViewNodeDemo(onBack: () -> Unit) {
             cameraManipulator = rememberCameraManipulator(),
             onGestureListener = gestureListener,
         ) {
-            // Front card — rotates with the hero yaw so it sweeps its parallax arc
-            // past the camera.
-            ViewNode(
-                windowManager = windowManager,
-                unlit = true,
+            // Parent Node — all the rotation happens here. Children inherit the
+            // transform, so the two cards keep a fixed back-to-back relative pose
+            // while the parent spins around Y.
+            //
+            // The two cards are offset ±0.005 m in local z: tiny enough to look
+            // like a single double-sided card to the eye, but large enough that
+            // Filament's depth buffer doesn't z-fight between them (at z=exactly
+            // equal they overlapped and the second-drawn card always "won").
+            // The back card is rotated 180° in its local frame so its face points
+            // the opposite way — as the parent sweeps, the front card's face is
+            // visible at yaw=0 and the back card's face at yaw=180.
+            Node(
                 position = Position(x = 0f, y = 0f, z = -1f),
                 rotation = Rotation(y = heroYaw),
-                scale = Float3(0.35f),
-                isVisible = isVisible
             ) {
-                EmbeddedCard(tapCount = tapCount, onTap = { tapCount++ })
-            }
-            // Back card — offset by 180° so when the scene spins the *back* of the
-            // front card is replaced by a second card with different content. This
-            // is the tell-tale sign that ViewNodes live in real 3D space, not in a
-            // HUD overlay — flat stickers can't show a different face on rotation.
-            ViewNode(
-                windowManager = windowManager,
-                unlit = true,
-                position = Position(x = 0f, y = 0f, z = -1f),
-                rotation = Rotation(y = heroYaw + 180f),
-                scale = Float3(0.35f),
-                isVisible = isVisible
-            ) {
-                BackCard(tapCount = tapCount)
+                ViewNode(
+                    windowManager = windowManager,
+                    unlit = true,
+                    position = Position(x = 0f, y = 0f, z = 0.005f),
+                    scale = Float3(0.35f),
+                    isVisible = isVisible
+                ) {
+                    EmbeddedCard(tapCount = tapCount, onTap = { tapCount++ })
+                }
+                ViewNode(
+                    windowManager = windowManager,
+                    unlit = true,
+                    position = Position(x = 0f, y = 0f, z = -0.005f),
+                    rotation = Rotation(y = 180f),
+                    scale = Float3(0.35f),
+                    isVisible = isVisible
+                ) {
+                    BackCard(tapCount = tapCount)
+                }
             }
         }
     }
