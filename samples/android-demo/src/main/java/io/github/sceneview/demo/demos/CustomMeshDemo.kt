@@ -148,18 +148,20 @@ fun CustomMeshDemo(onBack: () -> Unit) {
                     position = Position(-0.3f, 0f, 0f),
                     rotation = Rotation(z = 90f)
                 )
-                // Front atom + bond
+                // Front atom + bond — aligned on +Z so the bond is a clean 90° X
+                // rotation instead of the previous (−Y, +Z) diagonal that left the
+                // cylinder dangling at the wrong angle between the two atoms.
                 SphereNode(
                     materialInstance = sphereMaterial,
                     radius = 0.12f,
-                    position = Position(0f, -0.3f, 0.5f)
+                    position = Position(0f, 0f, 0.6f)
                 )
                 CylinderNode(
                     materialInstance = bondMaterial,
                     radius = 0.03f,
                     height = 0.4f,
-                    position = Position(0f, -0.15f, 0.25f),
-                    rotation = Rotation(x = 45f)
+                    position = Position(0f, 0f, 0.3f),
+                    rotation = Rotation(x = 90f)
                 )
             }
         }
