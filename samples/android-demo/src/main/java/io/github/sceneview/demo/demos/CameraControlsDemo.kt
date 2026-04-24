@@ -28,6 +28,7 @@ import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
@@ -55,6 +56,10 @@ fun CameraControlsDemo(onBack: () -> Unit) {
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
+    // IBL environment so the PBR helmet actually has ambient + specular — without
+    // this the damaged-helmet glTF shows up almost black against the dark surface
+    // and users can't tell the camera modes apart visually.
+    val environmentLoader = rememberEnvironmentLoader(engine)
     val cameraNode = rememberCameraNode(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
@@ -108,6 +113,7 @@ fun CameraControlsDemo(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxSize(),
                 engine = engine,
                 modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
                 cameraNode = cameraNode,
                 cameraManipulator = cameraManipulator
             ) {
