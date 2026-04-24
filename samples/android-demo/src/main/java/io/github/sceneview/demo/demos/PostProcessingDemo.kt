@@ -1,6 +1,12 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +28,9 @@ import com.google.android.filament.View.AntiAliasing
 import com.google.android.filament.View.Dithering
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.DemoSettings
+import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -58,6 +67,15 @@ fun PostProcessingDemo(onBack: () -> Unit) {
     view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
     view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
 
+    val infiniteTransition = rememberInfiniteTransition(label = "postproc-rotation")
+    val animatedYaw by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(20_000, easing = LinearEasing)),
+        label = "postproc-yaw",
+    )
+    val yaw = if (DemoSettings.qaMode) 30f else animatedYaw
+
     DemoScaffold(
         title = "Post-Processing",
         onBack = onBack,
@@ -70,20 +88,24 @@ fun PostProcessingDemo(onBack: () -> Unit) {
             ToggleRow("Temporal Dithering", ditheringEnabled) { ditheringEnabled = it }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            view = view,
-            cameraManipulator = rememberCameraManipulator()
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                view = view,
+                cameraManipulator = rememberCameraManipulator(),
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                        rotation = Rotation(y = yaw),
+                    )
+                }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }

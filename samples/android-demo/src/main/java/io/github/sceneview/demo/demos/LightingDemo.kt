@@ -29,11 +29,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.DemoSettings
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -78,6 +86,17 @@ fun LightingDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+
+    // Hero auto-rotate so the user's Light is seen hitting every angle of the helmet.
+    // Frozen at a 3/4 angle in QA mode.
+    val infiniteTransition = rememberInfiniteTransition(label = "lighting-rotation")
+    val animatedYaw by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(22_000, easing = LinearEasing)),
+        label = "lighting-yaw",
+    )
+    val yaw = if (DemoSettings.qaMode) 45f else animatedYaw
 
     DemoScaffold(
         title = "Lighting",
@@ -136,27 +155,29 @@ fun LightingDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            // Disable the default 110 klx directional main light — otherwise it adds a
-            // constant bright directional on top of the user's LightNode and the chip
-            // changes (directional vs point vs spot) produce indistinguishable visuals
-            // because the helmet is already fully lit by the constant default. The IBL
-            // from the default environmentLoader is kept for ambient fill so the helmet
-            // is always somewhat visible (neutral_ibl.ktx), and the user's LightNode
-            // adds its directional / point / spot contribution on top.
-            mainLightNode = null,
-            cameraManipulator = rememberCameraManipulator()
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f
-                )
-            }
+        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                // Disable the default 110 klx directional main light — otherwise it adds a
+                // constant bright directional on top of the user's LightNode and the chip
+                // changes (directional vs point vs spot) produce indistinguishable visuals
+                // because the helmet is already fully lit by the constant default. The IBL
+                // from the default environmentLoader is kept for ambient fill so the helmet
+                // is always somewhat visible (neutral_ibl.ktx), and the user's LightNode
+                // adds its directional / point / spot contribution on top.
+                mainLightNode = null,
+                cameraManipulator = rememberCameraManipulator(),
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                        rotation = Rotation(y = yaw),
+                    )
+                }
             LightNode(
                 type = selectedType.type,
                 intensity = intensity,
@@ -179,6 +200,8 @@ fun LightingDemo(onBack: () -> Unit) {
                     }
                 }
             )
+            }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }
