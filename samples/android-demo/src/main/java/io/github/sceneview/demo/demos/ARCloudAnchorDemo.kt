@@ -68,6 +68,10 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
     var statusMessage by remember { mutableStateOf("Tap a surface to place an anchor") }
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
     var arSession by remember { mutableStateOf<Session?>(null) }
+    // Ref to the CloudAnchorNode created inside the ARSceneView content — needed so the
+    // Host button can call node.host(session) to actually upload the anchor. Without this
+    // the Host button just updated the status text and nothing hit the Cloud Anchor API.
+    var cloudNode by remember { mutableStateOf<CloudAnchorNodeImpl?>(null) }
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
@@ -83,13 +87,19 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
             ) {
                 Button(
                     onClick = {
-                        // Host is triggered via the CloudAnchorNode's host() method.
-                        // The node must be placed first.
-                        if (localAnchor == null) {
-                            Toast.makeText(context, "Place an anchor first", Toast.LENGTH_SHORT)
-                                .show()
-                        } else {
-                            statusMessage = "Hosting anchor\u2026"
+                        val node = cloudNode
+                        val session = arSession
+                        when {
+                            localAnchor == null -> Toast.makeText(
+                                context, "Place an anchor first", Toast.LENGTH_SHORT
+                            ).show()
+                            node == null || session == null -> Toast.makeText(
+                                context, "AR session not ready", Toast.LENGTH_SHORT
+                            ).show()
+                            else -> {
+                                statusMessage = "Hosting anchor\u2026"
+                                node.host(session)
+                            }
                         }
                     },
                     enabled = localAnchor != null && hostedId == null
@@ -99,8 +109,23 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
 
                 Button(
                     onClick = {
-                        if (resolveId.isNotBlank()) {
-                            statusMessage = "Resolving $resolveId\u2026"
+                        val session = arSession
+                        if (resolveId.isBlank()) return@Button
+                        if (session == null) {
+                            Toast.makeText(
+                                context, "AR session not ready", Toast.LENGTH_SHORT
+                            ).show()
+                            return@Button
+                        }
+                        statusMessage = "Resolving $resolveId\u2026"
+                        CloudAnchorNodeImpl.resolve(engine, session, resolveId) { state, node ->
+                            if (state == Anchor.CloudAnchorState.SUCCESS && node != null) {
+                                localAnchor = node.anchor
+                                cloudAnchorId = resolveId
+                                statusMessage = "Resolved $resolveId"
+                            } else {
+                                statusMessage = "Resolve failed: $state"
+                            }
                         }
                     },
                     enabled = resolveId.isNotBlank()
@@ -181,7 +206,8 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                             } else {
                                 statusMessage = "Hosting failed: $state"
                             }
-                        }
+                        },
+                        apply = { cloudNode = this },
                     ) {
                         modelInstance?.let { instance ->
                             ModelNode(
