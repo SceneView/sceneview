@@ -16,6 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +30,7 @@ import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.environment.rememberHDREnvironment
-import io.github.sceneview.math.Position
+import io.github.sceneview.node.ModelNode as ModelNodeImpl
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
@@ -38,6 +40,12 @@ import io.github.sceneview.rememberModelLoader
 
 /**
  * Demonstrates model animation playback controls: play/pause, speed, and loop mode.
+ *
+ * The `autoAnimate` parameter on `ModelNode` is only read once at node creation, and
+ * the composable's reactive `animationName` path doesn't re-key on speed/loop
+ * changes — so we drive the animation state imperatively through a `LaunchedEffect`
+ * that watches (isPlaying, speed, loop) and calls `playAnimation` / `stopAnimation`
+ * on a captured node reference. That gives the three chips a real effect.
  */
 @OptIn(ExperimentalSceneViewApi::class)
 @Composable
@@ -53,9 +61,6 @@ fun AnimationDemo(onBack: () -> Unit) {
 
     // HDR environment for IBL — disable skybox so the studio lightbox doesn't dominate
     // the viewport. We only want the lighting contribution, not the wrap-around image.
-    // Always call rememberEnvironment so the composable structure stays stable across
-    // recompositions; the HDR result is preferred when available, otherwise the neutral
-    // default environment fills in while the HDR is loading.
     val hdrEnvironment = rememberHDREnvironment(
         environmentLoader,
         "environments/studio_warm_2k.hdr",
@@ -64,11 +69,28 @@ fun AnimationDemo(onBack: () -> Unit) {
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
+    // Captured ref to the ModelNode once it's created — used by the LaunchedEffect
+    // below to drive play/pause/speed/loop imperatively.
+    val modelNodeRef = remember { androidx.compose.runtime.mutableStateOf<ModelNodeImpl?>(null) }
+
+    // Reactive animation control: re-runs whenever any of the three controls change.
+    // Relies on a stable node ref plus the modelInstance being loaded.
+    LaunchedEffect(modelNodeRef.value, isPlaying, speed, loop) {
+        val node = modelNodeRef.value ?: return@LaunchedEffect
+        if (node.animationCount <= 0) return@LaunchedEffect
+        // Stop any currently-playing animations before applying new settings.
+        for (i in 0 until node.animationCount) node.stopAnimation(i)
+        if (isPlaying) {
+            for (i in 0 until node.animationCount) {
+                node.playAnimation(i, speed = speed, loop = loop)
+            }
+        }
+    }
+
     DemoScaffold(
         title = "Animation",
         onBack = onBack,
         controls = {
-            // Play / Pause
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -85,7 +107,6 @@ fun AnimationDemo(onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Speed slider
             Text(
                 "Speed: ${"%.1f".format(speed)}x",
                 style = MaterialTheme.typography.labelLarge
@@ -99,7 +120,6 @@ fun AnimationDemo(onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Loop toggle
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = loop,
@@ -126,10 +146,16 @@ fun AnimationDemo(onBack: () -> Unit) {
                 ModelNode(
                     modelInstance = instance,
                     scaleToUnits = 0.5f,
-                    autoAnimate = isPlaying,
-                    animationSpeed = speed,
-                    animationLoop = loop
+                    // autoAnimate = false so the ModelNode init doesn't fire-and-forget
+                    // all animations — we drive them from the LaunchedEffect above so
+                    // the speed / loop / play-pause controls have real effect.
+                    autoAnimate = false,
+                    apply = { modelNodeRef.value = this },
                 )
+                // Clean up the ref when the node leaves composition.
+                DisposableEffect(instance) {
+                    onDispose { modelNodeRef.value = null }
+                }
             }
         }
     }
