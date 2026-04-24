@@ -62,7 +62,11 @@ fun TextDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             cameraManipulator = rememberCameraManipulator()
         ) {
-            // Left: user text with white on dark background
+            // Three labels stacked vertically at x=0 so all three fit inside the default
+            // camera framing on a phone portrait viewport. Horizontal spread of x=±0.9f
+            // was pushing the outer labels outside the frustum — only the centre label
+            // was ever visible, which hid the point of having three of them.
+            // Top: user text with white on dark background
             TextNode(
                 text = inputText,
                 fontSize = fontSize,
@@ -70,7 +74,7 @@ fun TextDemo(onBack: () -> Unit) {
                 backgroundColor = 0xCC000000.toInt(),
                 widthMeters = 0.8f,
                 heightMeters = 0.25f,
-                position = Position(x = -0.9f, y = 0.3f)
+                position = Position(x = 0f, y = 0.45f)
             )
 
             // Center: fixed label with SceneView Primary on dark surface
@@ -84,7 +88,7 @@ fun TextDemo(onBack: () -> Unit) {
                 position = Position(x = 0f, y = 0f)
             )
 
-            // Right: fixed label with SceneView Accent tint
+            // Bottom: fixed label with SceneView Accent tint
             TextNode(
                 text = "3D Text Labels",
                 fontSize = fontSize,
@@ -92,7 +96,7 @@ fun TextDemo(onBack: () -> Unit) {
                 backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.8f,
                 heightMeters = 0.25f,
-                position = Position(x = 0.9f, y = -0.3f)
+                position = Position(x = 0f, y = -0.45f)
             )
         }
     }

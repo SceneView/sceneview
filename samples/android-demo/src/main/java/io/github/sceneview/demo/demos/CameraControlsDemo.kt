@@ -46,30 +46,12 @@ fun CameraControlsDemo(onBack: () -> Unit) {
         )
     }
     var selectedMode by remember { mutableStateOf(modes[0]) }
-    // Incrementing the reset key forces the manipulator to be recreated.
+    // Incrementing this key invalidates `key(resetKey)` below, which rebuilds the manipulator
+    // from scratch at its home position. Both the mode chips and the Reset button go through it.
     var resetKey by remember { mutableIntStateOf(0) }
 
     val homePosition = remember { Position(0.0f, 0.0f, 4.0f) }
     val target = remember { Position(0.0f, 0.0f, 0.0f) }
-
-    val cameraManipulator = rememberCameraManipulator(
-        orbitHomePosition = homePosition,
-        targetPosition = target,
-        creator = {
-            CameraGestureDetector.DefaultCameraManipulator(
-                Manipulator.Builder()
-                    .orbitHomePosition(homePosition)
-                    .targetPosition(target)
-                    .orbitSpeed(0.005f, 0.005f)
-                    .zoomSpeed(0.05f)
-                    .build(selectedMode.second)
-            )
-        }
-    )
-    // The creator lambda is the remember key, so we reference resetKey inside it to force
-    // recreation. This is intentionally read-only to invalidate the remember key.
-    @Suppress("UNUSED_EXPRESSION")
-    resetKey
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -103,19 +85,39 @@ fun CameraControlsDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            cameraNode = cameraNode,
-            cameraManipulator = cameraManipulator
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f,
-                    centerOrigin = Position(0.0f, 0.0f, 0.0f)
-                )
+        // key(selectedMode, resetKey) forces a fresh rememberCameraManipulator on either
+        // a mode change or a reset tap — the creator lambda captures the current mode and
+        // rebuilds the Manipulator from its home position. This is the only reliable way
+        // to swap Manipulator.Mode mid-session since Manipulator itself has no setMode API.
+        androidx.compose.runtime.key(selectedMode, resetKey) {
+            val cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = homePosition,
+                targetPosition = target,
+                creator = {
+                    CameraGestureDetector.DefaultCameraManipulator(
+                        Manipulator.Builder()
+                            .orbitHomePosition(homePosition)
+                            .targetPosition(target)
+                            .orbitSpeed(0.005f, 0.005f)
+                            .zoomSpeed(0.05f)
+                            .build(selectedMode.second)
+                    )
+                }
+            )
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                cameraNode = cameraNode,
+                cameraManipulator = cameraManipulator
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                        centerOrigin = Position(0.0f, 0.0f, 0.0f)
+                    )
+                }
             }
         }
     }

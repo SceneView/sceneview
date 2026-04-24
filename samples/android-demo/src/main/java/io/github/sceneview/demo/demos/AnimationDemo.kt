@@ -28,6 +28,7 @@ import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.environment.rememberHDREnvironment
+import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
@@ -119,9 +120,11 @@ fun AnimationDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    // Fill the viewport instead of rendering a tiny figurine. 1.0f fits the
-                    // model to a 1m bounding box which matches the default camera framing.
-                    scaleToUnits = 1.0f,
+                    // 0.6f fits the dragon (taller + wider than a unit cube) fully into
+                    // the default camera framing on Pixel 7a portrait. 1.0f was cropping
+                    // the body and wings off-screen.
+                    scaleToUnits = 0.6f,
+                    centerOrigin = Position(0f, 0f, 0f),
                     autoAnimate = isPlaying,
                     animationSpeed = speed,
                     animationLoop = loop

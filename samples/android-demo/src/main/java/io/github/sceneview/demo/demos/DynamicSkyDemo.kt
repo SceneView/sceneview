@@ -38,11 +38,14 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
-    // Outdoor HDR gives the demo a visible sky backdrop — the DynamicSkyNode below still
-    // drives the scene's *sun* light direction + colour on top of this static skybox.
+    // DynamicSkyNode is the whole point of this demo — it drives the sun direction,
+    // colour, and sky atmospheric scattering from the time-of-day slider. Using a
+    // static HDR skybox here would completely override those contributions (the HDR
+    // already bakes its own sun into both IBL and skybox pixels) so moving the Time
+    // slider did nothing visible. Start with a neutral no-skybox environment instead
+    // so the DynamicSkyNode has full authority over the visible sky.
     val environment = rememberEnvironment(environmentLoader) {
-        environmentLoader.createHDREnvironment("environments/outdoor_cloudy_2k.hdr")
-            ?: createEnvironment(environmentLoader)
+        createEnvironment(environmentLoader, isOpaque = true)
     }
 
     DemoScaffold(

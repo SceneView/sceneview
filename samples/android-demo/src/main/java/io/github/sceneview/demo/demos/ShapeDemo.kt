@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,20 +68,22 @@ fun ShapeDemo(onBack: () -> Unit) {
         }
     }
 
-    val currentPath = when (selectedShape) {
-        "Star" -> starPath
-        "Hexagon" -> hexagonPath
-        else -> trianglePath
-    }
     // On-brand ramp — Primary blue (triangle), Accent purple (star), TintLight (hexagon).
-    val currentColor = when (selectedShape) {
-        "Star" -> SceneViewColors.Accent
-        "Hexagon" -> SceneViewColors.TintLight
-        else -> SceneViewColors.Primary
+    // Pre-allocate one MaterialInstance per colour up-front. rememberMaterialLoader owns
+    // these and disposes them at the end of the SceneView — individual Node.destroy() does
+    // not touch MaterialInstances, so sharing them between siblings is safe.
+    val shapeMaterials = remember(materialLoader) {
+        mapOf(
+            "Triangle" to materialLoader.createColorInstance(SceneViewColors.Primary),
+            "Star" to materialLoader.createColorInstance(SceneViewColors.Accent),
+            "Hexagon" to materialLoader.createColorInstance(SceneViewColors.TintLight),
+        )
     }
-    val shapeMaterial = remember(materialLoader, currentColor) {
-        materialLoader.createColorInstance(currentColor)
-    }
+    val shapePaths = mapOf(
+        "Triangle" to trianglePath,
+        "Star" to starPath,
+        "Hexagon" to hexagonPath,
+    )
 
     DemoScaffold(
         title = "Shape Node",
@@ -107,11 +110,20 @@ fun ShapeDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             cameraManipulator = rememberCameraManipulator()
         ) {
-            ShapeNode(
-                polygonPath = currentPath,
-                materialInstance = shapeMaterial,
-                position = Position(y = 0f, z = -1f)
-            )
+            // key(selectedShape) forces a fresh ShapeNodeImpl when the user picks a
+            // different polygon. The library's `ShapeNode` composable updates vertex /
+            // index buffers in place via `updateGeometry`, but the underlying Filament
+            // renderable is locked to `primitiveCount = 1` at construction time — so
+            // swapping a 3-vertex triangle for a 10-point star kept the draw count at 3
+            // and produced a black viewport. Re-keying rebuilds the whole renderable so
+            // the new triangulation's draw count is picked up correctly.
+            key(selectedShape) {
+                ShapeNode(
+                    polygonPath = shapePaths.getValue(selectedShape),
+                    materialInstance = shapeMaterials.getValue(selectedShape),
+                    position = Position(y = 0f, z = -1f)
+                )
+            }
         }
     }
 }

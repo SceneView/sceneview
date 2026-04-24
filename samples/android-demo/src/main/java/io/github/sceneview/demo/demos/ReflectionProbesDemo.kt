@@ -18,6 +18,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
@@ -43,6 +44,10 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val scene: FilamentScene = rememberScene(engine)
+    // Hold the camera so we can read its world position every frame. Without this the probe's
+    // distance check always compares against Position() (origin) and the probe silently
+    // disables itself as soon as the user orbits away from the origin.
+    val cameraNode = rememberCameraNode(engine)
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
@@ -81,11 +86,13 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
             scene = scene,
+            cameraNode = cameraNode,
             cameraManipulator = rememberCameraManipulator(),
             onFrame = { _ ->
-                // Track camera position each frame for the probe's distance check.
-                // In a real app this would come from cameraNode.worldPosition.
-                // Here we pass Position() since the default camera starts near origin.
+                // Push the latest camera world position into compose state so the
+                // ReflectionProbeNode below can enable/disable itself based on
+                // actual distance instead of always comparing against the origin.
+                cameraPos = cameraNode.worldPosition
             }
         ) {
             ReflectionProbeNode(

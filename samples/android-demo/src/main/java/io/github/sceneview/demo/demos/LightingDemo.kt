@@ -67,7 +67,7 @@ fun LightingDemo(onBack: () -> Unit) {
     }
 
     var selectedType by remember { mutableStateOf(lightTypes[0]) }
-    var intensity by remember { mutableFloatStateOf(100_000f) }
+    var intensity by remember { mutableFloatStateOf(110_000f) }
     var selectedColor by remember { mutableStateOf(colorPresets[0]) }
 
     val engine = rememberEngine()
@@ -147,11 +147,18 @@ fun LightingDemo(onBack: () -> Unit) {
             }
             LightNode(
                 type = selectedType.type,
-                position = Position(0f, 2f, 2f),
+                intensity = intensity,
+                color = io.github.sceneview.math.colorOf(
+                    r = selectedColor.r,
+                    g = selectedColor.g,
+                    b = selectedColor.b
+                ),
                 direction = Direction(0f, -1f, -1f),
+                position = Position(0f, 2f, 2f),
                 apply = {
-                    intensity(intensity)
-                    color(selectedColor.r, selectedColor.g, selectedColor.b)
+                    // Fixed-at-creation shape settings — only spot/point-specific values.
+                    // intensity / direction / colour go through the reactive parameters
+                    // above so the user controls actually drive the rendered scene.
                     if (selectedType.type == LightManager.Type.FOCUSED_SPOT) {
                         spotLightCone(0.1f, 0.5f)
                         falloff(10f)

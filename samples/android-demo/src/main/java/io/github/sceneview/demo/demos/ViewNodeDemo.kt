@@ -103,8 +103,12 @@ fun ViewNodeDemo(onBack: () -> Unit) {
             ViewNode(
                 windowManager = windowManager,
                 unlit = true,
-                position = Position(x = 0f, y = 0f, z = -2f),
-                scale = Float3(0.15f),
+                // Bring the embedded card closer and scale it up — at z=-2 / scale 0.15
+                // it rendered as a ~40-dp blob that was unreadable on a phone viewport.
+                // z=-1 + 0.35 gives a card roughly 30 % of the viewport width, large
+                // enough to read the "Hello from 3D!" + "Tapped N times" text.
+                position = Position(x = 0f, y = 0f, z = -1f),
+                scale = Float3(0.35f),
                 isVisible = isVisible
             ) {
                 // This Compose content is rendered onto a quad in 3D space.
