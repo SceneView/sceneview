@@ -126,17 +126,20 @@ fun LinesPathsDemo(onBack: () -> Unit) {
                 }
             }
 
-            // Polyline path forming a spiral / circle pattern
+            // 3-D helix path — the points sweep through x/y on a circle and step out
+            // along z, so the polyline reads as a true 3D corkscrew instead of the flat
+            // 2-D ring it used to be. Much more visible from the default front camera.
             if (showPath) {
                 val count = pointCount.toInt()
                 val pathPoints = remember(count) {
                     (0 until count).map { i ->
-                        val angle = (i.toFloat() / count) * 2f * Math.PI.toFloat()
-                        val radius = 0.5f
+                        val t = i.toFloat() / (count - 1).coerceAtLeast(1)
+                        val angle = t * 4f * Math.PI.toFloat()  // 2 full turns
+                        val radius = 0.45f
                         Position(
                             x = cos(angle) * radius,
                             y = sin(angle) * radius,
-                            z = 0f
+                            z = (t - 0.5f) * 0.6f,  // helix depth -0.3 → +0.3 m
                         )
                     }
                 }

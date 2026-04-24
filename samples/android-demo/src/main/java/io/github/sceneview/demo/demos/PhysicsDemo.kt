@@ -102,12 +102,14 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     SceneViewColors.Ramp4.map { materialLoader.createColorInstance(it) }
                 }
 
-                // Ground plane for visual reference — positioned below center and sized
-                // so the camera can see both the plane and the falling spheres above it.
+                // Ground plane — must use Size(x, y=0, z) for a HORIZONTAL floor
+                // (the XZ plane). Passing Size(x, y, z=0) like before built a vertical
+                // wall in the XY plane that the camera saw edge-on as a tilted shape,
+                // not a floor.
                 PlaneNode(
                     materialInstance = groundMaterial,
-                    size = Size(x = 1.5f, y = 1.5f),
-                    position = Position(y = -0.5f)
+                    size = Size(x = 1.6f, y = 0f, z = 1.6f),
+                    position = Position(y = -0.5f),
                 )
 
                 // Diagnostic static sphere (no physics) — if even this is not visible, the bug
