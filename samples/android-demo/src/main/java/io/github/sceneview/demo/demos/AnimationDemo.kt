@@ -126,8 +126,8 @@ fun AnimationDemo(onBack: () -> Unit) {
                 ModelNode(
                     modelInstance = instance,
                     // 0.4f fits the entire dragon (body + wings + tail) into the default
-                    // camera framing. 0.6f cropped the lower body / tail below the viewport
-                    // on Pixel 7a portrait; 1.0f was even worse.
+                    // camera framing. centerOrigin (0,0,0) keeps the model fitted into
+                    // the viewport without shifting it out of frame.
                     scaleToUnits = 0.4f,
                     centerOrigin = Position(0f, 0f, 0f),
                     autoAnimate = isPlaying,

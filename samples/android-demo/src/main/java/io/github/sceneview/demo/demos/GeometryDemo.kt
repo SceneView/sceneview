@@ -86,33 +86,36 @@ fun GeometryDemo(onBack: () -> Unit) {
                 },
             )
 
+            // Centered around x=0, equal spacing 0.4 m apart, lifted slightly so
+            // they sit in the centre of the portrait viewport instead of drifting
+            // to the right like with the previous tighter spacing.
             if (showCube) {
                 CubeNode(
                     materialInstance = cubeMaterial,
-                    size = Float3(0.15f, 0.15f, 0.15f),
-                    position = Position(x = -0.3f, y = 0.1f, z = -1f)
+                    size = Float3(0.18f, 0.18f, 0.18f),
+                    position = Position(x = -0.6f, y = 0f, z = -1.5f)
                 )
             }
             if (showSphere) {
                 SphereNode(
                     materialInstance = sphereMaterial,
-                    radius = 0.1f,
-                    position = Position(x = -0.1f, y = 0.1f, z = -1f)
+                    radius = 0.13f,
+                    position = Position(x = -0.2f, y = 0f, z = -1.5f)
                 )
             }
             if (showCylinder) {
                 CylinderNode(
                     materialInstance = cylinderMaterial,
-                    radius = 0.08f,
-                    height = 0.2f,
-                    position = Position(x = 0.1f, y = 0.1f, z = -1f)
+                    radius = 0.1f,
+                    height = 0.25f,
+                    position = Position(x = 0.2f, y = 0f, z = -1.5f)
                 )
             }
             if (showPlane) {
                 PlaneNode(
                     materialInstance = planeMaterial,
-                    size = Float3(0.3f, 0.3f, 1f),
-                    position = Position(x = 0.3f, y = 0.1f, z = -1f)
+                    size = Float3(0.32f, 0.32f, 1f),
+                    position = Position(x = 0.6f, y = 0f, z = -1.5f)
                 )
             }
         }

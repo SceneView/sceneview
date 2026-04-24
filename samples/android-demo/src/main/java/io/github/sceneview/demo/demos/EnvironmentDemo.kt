@@ -75,16 +75,11 @@ fun EnvironmentDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Slow hero auto-rotate so the HDR reflections sweep visibly across the chrome
-    // surface — that's what this demo is really showcasing. Frozen in QA mode.
-    val infiniteTransition = rememberInfiniteTransition(label = "env-rotation")
-    val animatedYaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(18_000, easing = LinearEasing)),
-        label = "env-yaw",
+    // Slow hero rotation that starts only after the helmet finishes loading so the
+    // first-rendered frame matches the animated yaw (no snap-on-load artifact).
+    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+        trigger = modelInstance != null, durationMillis = 18_000, staticYaw = 30f,
     )
-    val yaw = if (DemoSettings.qaMode) 30f else animatedYaw
 
     DemoScaffold(
         title = "Environment Gallery",

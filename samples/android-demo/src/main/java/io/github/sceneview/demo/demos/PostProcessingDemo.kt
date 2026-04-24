@@ -67,14 +67,9 @@ fun PostProcessingDemo(onBack: () -> Unit) {
     view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
     view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
 
-    val infiniteTransition = rememberInfiniteTransition(label = "postproc-rotation")
-    val animatedYaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(20_000, easing = LinearEasing)),
-        label = "postproc-yaw",
+    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+        trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
     )
-    val yaw = if (DemoSettings.qaMode) 30f else animatedYaw
 
     DemoScaffold(
         title = "Post-Processing",

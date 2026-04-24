@@ -104,6 +104,50 @@ fun rememberAutoOrbit(
 }
 
 /**
+ * Smooth y-axis hero-rotation that starts from 0° **only after** [trigger] becomes true.
+ *
+ * Using a plain `rememberInfiniteTransition` for an auto-rotate creates a visible
+ * "snap" the moment a heavy GLB finishes loading: the InfiniteTransition has been
+ * ticking from the start of composition, so by the time the model's first frame
+ * renders the yaw is already at e.g. 144° — the model appears at 0° for one frame
+ * and then jumps to the current animated value. This helper avoids that by starting
+ * an [androidx.compose.animation.core.Animatable] sweep from 0° **only when**
+ * [trigger] flips to true (e.g. when modelInstance becomes non-null), so the model's
+ * first frame and the first animated frame are at the same yaw.
+ *
+ * Returns [staticYaw] (default 45°) when [DemoSettings.qaMode] is on so screenshot
+ * tests get deterministic output.
+ *
+ * @param trigger Animation starts when this flips to `true`. Pass `modelInstance != null`.
+ * @param durationMillis One full sweep in ms.
+ * @param staticYaw Yaw to use in QA mode (degrees).
+ */
+@Composable
+fun rememberHeroYaw(
+    trigger: Boolean,
+    durationMillis: Int = 20_000,
+    staticYaw: Float = 45f,
+): Float {
+    val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(trigger, DemoSettings.qaMode) {
+        if (trigger && !DemoSettings.qaMode) {
+            // Loop forever: 0° → 360° in `durationMillis`, then snap back to 0° and repeat.
+            while (true) {
+                anim.snapTo(0f)
+                anim.animateTo(
+                    targetValue = 360f,
+                    animationSpec = androidx.compose.animation.core.tween(
+                        durationMillis = durationMillis,
+                        easing = androidx.compose.animation.core.LinearEasing,
+                    ),
+                )
+            }
+        }
+    }
+    return if (DemoSettings.qaMode) staticYaw else anim.value
+}
+
+/**
  * Position on a horizontal orbit around the origin. Call [toPosition] to get an
  * `(x, y, z)` triple that swings around +Y by [yaw] degrees.
  */

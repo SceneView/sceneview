@@ -64,14 +64,9 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
     // In a real app you would load a different HDR for the probe zone.
     val probeEnvironment = rememberEnvironment(environmentLoader)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "probes-rotation")
-    val animatedYaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(20_000, easing = LinearEasing)),
-        label = "probes-yaw",
+    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+        trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
     )
-    val yaw = if (DemoSettings.qaMode) 30f else animatedYaw
 
     DemoScaffold(
         title = "Reflection Probes",

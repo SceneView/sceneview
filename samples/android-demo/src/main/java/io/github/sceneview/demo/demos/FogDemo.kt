@@ -67,14 +67,9 @@ fun FogDemo(onBack: () -> Unit) {
     val view = rememberView(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    val infiniteTransition = rememberInfiniteTransition(label = "fog-rotation")
-    val animatedYaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(20_000, easing = LinearEasing)),
-        label = "fog-yaw",
+    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+        trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
     )
-    val yaw = if (DemoSettings.qaMode) 30f else animatedYaw
 
     DemoScaffold(
         title = "Fog",

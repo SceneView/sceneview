@@ -87,16 +87,10 @@ fun LightingDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Hero auto-rotate so the user's Light is seen hitting every angle of the helmet.
-    // Frozen at a 3/4 angle in QA mode.
-    val infiniteTransition = rememberInfiniteTransition(label = "lighting-rotation")
-    val animatedYaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(22_000, easing = LinearEasing)),
-        label = "lighting-yaw",
+    // Hero rotation, deferred until the helmet has loaded (no first-frame snap).
+    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+        trigger = modelInstance != null, durationMillis = 22_000,
     )
-    val yaw = if (DemoSettings.qaMode) 45f else animatedYaw
 
     DemoScaffold(
         title = "Lighting",

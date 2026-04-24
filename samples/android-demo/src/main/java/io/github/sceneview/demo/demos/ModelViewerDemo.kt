@@ -1,19 +1,13 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberHeroYaw
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -35,15 +29,10 @@ fun ModelViewerDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    val infiniteTransition = rememberInfiniteTransition(label = "rotation")
-    val animatedYaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 20_000, easing = LinearEasing)),
-        label = "rotationY",
-    )
-    // Freeze at a 3/4 hero angle in QA mode for deterministic captures.
-    val yaw = if (DemoSettings.qaMode) 45f else animatedYaw
+    // Hero yaw starts spinning only AFTER the helmet finishes loading so the model
+    // doesn't appear at 0° for one frame and then snap to whatever angle a free-running
+    // InfiniteTransition reached during the 8-10 s GLB decode.
+    val yaw = rememberHeroYaw(trigger = modelInstance != null, durationMillis = 20_000)
 
     DemoScaffold(title = "Model Viewer", onBack = onBack) {
         Box(modifier = Modifier.fillMaxSize()) {
