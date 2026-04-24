@@ -14,13 +14,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
-import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.DynamicSkyNode
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
-import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
@@ -38,14 +36,6 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
-    // Environment with NO IBL and NO skybox — the DynamicSkyNode's sun is the single
-    // light source, so sliding Time of Day from noon (sun overhead) to dusk (below
-    // horizon) takes the helmet from fully lit to dark. The previous setup kept a
-    // neutral IBL for ambient fill, which masked every time-of-day change because the
-    // constant IBL contribution dominated whatever the sun produced.
-    val environment = rememberEnvironment(engine) {
-        createEnvironment(engine, isOpaque = true, indirectLight = null)
-    }
 
     DemoScaffold(
         title = "Dynamic Sky",
@@ -77,19 +67,20 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
-            environment = environment,
             // Disable the constant 110 klx default main light so the DynamicSkyNode's SUN is
-            // the only directional contribution. Without this, sliding the time-of-day from
-            // noon to dusk has no visible effect on the helmet — the bright default main
-            // light dominates whatever the DynamicSkyNode produces. The default IBL is kept
-            // for ambient fill so the helmet stays visible at night when the sun is below
-            // the horizon.
+            // the only directional contribution. The default IBL is kept for ambient fill
+            // so the helmet stays visible at night when the sun is below the horizon.
             mainLightNode = null,
             cameraManipulator = rememberCameraManipulator()
         ) {
             DynamicSkyNode(
                 timeOfDay = timeOfDay,
-                turbidity = turbidity
+                turbidity = turbidity,
+                // 500 klx (5x the default) so the sun visibly dominates even with the
+                // default IBL ambient — otherwise the neutral IBL's constant ~30 klx
+                // contribution masks the time-of-day changes on the metallic helmet
+                // (PBR reflections = mostly IBL). Bright sun = visible difference.
+                sunIntensity = 500_000f,
             )
 
             modelInstance?.let { instance ->

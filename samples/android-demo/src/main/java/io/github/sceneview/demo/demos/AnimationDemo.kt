@@ -125,10 +125,10 @@ fun AnimationDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    // 0.6f fits the dragon (taller + wider than a unit cube) fully into
-                    // the default camera framing on Pixel 7a portrait. 1.0f was cropping
-                    // the body and wings off-screen.
-                    scaleToUnits = 0.6f,
+                    // 0.4f fits the entire dragon (body + wings + tail) into the default
+                    // camera framing. 0.6f cropped the lower body / tail below the viewport
+                    // on Pixel 7a portrait; 1.0f was even worse.
+                    scaleToUnits = 0.4f,
                     centerOrigin = Position(0f, 0f, 0f),
                     autoAnimate = isPlaying,
                     animationSpeed = speed,

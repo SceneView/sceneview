@@ -141,6 +141,14 @@ fun LightingDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
+            // Disable the default 110 klx directional main light — otherwise it adds a
+            // constant bright directional on top of the user's LightNode and the chip
+            // changes (directional vs point vs spot) produce indistinguishable visuals
+            // because the helmet is already fully lit by the constant default. The IBL
+            // from the default environmentLoader is kept for ambient fill so the helmet
+            // is always somewhat visible (neutral_ibl.ktx), and the user's LightNode
+            // adds its directional / point / spot contribution on top.
+            mainLightNode = null,
             cameraManipulator = rememberCameraManipulator()
         ) {
             modelInstance?.let { instance ->
