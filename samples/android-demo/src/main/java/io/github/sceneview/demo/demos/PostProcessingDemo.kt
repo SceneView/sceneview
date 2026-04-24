@@ -29,15 +29,11 @@ import com.google.android.filament.View.AntiAliasing
 import com.google.android.filament.View.Dithering
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
-import io.github.sceneview.math.Rotation
-import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
-import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberView
 
 /**
@@ -76,8 +72,16 @@ fun PostProcessingDemo(onBack: () -> Unit) {
         view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
     }
 
-    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
-        trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
+    // Camera orbits the helmet; SSAO / FXAA / dithering read best on a static model
+    // where the user can catch aliasing at grazing angles as the camera moves —
+    // a spinning helmet sweeps its surface through the same screen pixels so edge
+    // aliasing is harder to compare between AA modes.
+    val cameraManipulator = io.github.sceneview.demo.rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.0f,
+        yHeight = 0.3f,
+        durationMillis = 20_000,
+        staticYaw = 30f,
     )
 
     DemoScaffold(
@@ -99,18 +103,12 @@ fun PostProcessingDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
                 view = view,
-                cameraManipulator = rememberCameraManipulator(),
-                onGestureListener = rememberOnGestureListener(
-                    onSingleTapUp = { _, _ -> onGesture() },
-                    onDoubleTap = { _, _ -> onGesture() },
-                    onScroll = { _, _, _, _ -> onGesture() },
-                ),
+                cameraManipulator = cameraManipulator,
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
-                        rotation = Rotation(y = yaw),
                     )
                 }
             }

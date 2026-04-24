@@ -30,14 +30,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
-import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.FogNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
-import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberView
 
 /**
@@ -68,8 +65,17 @@ fun FogDemo(onBack: () -> Unit) {
     val view = rememberView(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
-        trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
+    // Camera orbits the helmet — the volumetric fog is world-space, so moving the
+    // camera through the volume shows the depth falloff (fog thickens with distance)
+    // in a way that a spinning model can't. Spin → model never leaves its cell, so
+    // every frame shows roughly the same "amount" of fog between the eye and the
+    // helmet surface, and the density slider looks less effective.
+    val cameraManipulator = io.github.sceneview.demo.rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.2f,
+        yHeight = 0.3f,
+        durationMillis = 20_000,
+        staticYaw = 30f,
     )
 
     DemoScaffold(
@@ -132,11 +138,7 @@ fun FogDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 view = view,
-                onGestureListener = rememberOnGestureListener(
-                    onSingleTapUp = { _, _ -> onGesture() },
-                    onDoubleTap = { _, _ -> onGesture() },
-                    onScroll = { _, _, _, _ -> onGesture() },
-                ),
+                cameraManipulator = cameraManipulator,
             ) {
                 FogNode(
                     view = view,
@@ -148,7 +150,6 @@ fun FogDemo(onBack: () -> Unit) {
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
-                        rotation = Rotation(y = yaw),
                     )
                 }
             }
