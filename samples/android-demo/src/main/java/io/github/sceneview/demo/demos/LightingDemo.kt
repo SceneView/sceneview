@@ -67,7 +67,11 @@ fun LightingDemo(onBack: () -> Unit) {
     }
 
     var selectedType by remember { mutableStateOf(lightTypes[0]) }
-    var intensity by remember { mutableFloatStateOf(110_000f) }
+    // 200 klx default: high enough that the helmet is visibly lit on first-open even
+    // before the user touches the slider (110 klx with default IBL still rendered the
+    // helmet near-black on Pixel 7a Metal — the PBR helmet materials need ~150 klx of
+    // direct light to read clearly against the dark Surface background).
+    var intensity by remember { mutableFloatStateOf(200_000f) }
     var selectedColor by remember { mutableStateOf(colorPresets[0]) }
 
     val engine = rememberEngine()
