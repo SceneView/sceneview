@@ -53,11 +53,16 @@ fun AnimationDemo(onBack: () -> Unit) {
 
     // HDR environment for IBL — disable skybox so the studio lightbox doesn't dominate
     // the viewport. We only want the lighting contribution, not the wrap-around image.
+    // Always call rememberEnvironment so the composable structure stays stable across
+    // recompositions; the HDR result is preferred when available, otherwise the neutral
+    // default environment fills in while the HDR is loading.
     val hdrEnvironment = rememberHDREnvironment(
         environmentLoader,
         "environments/studio_warm_2k.hdr",
         createSkybox = false,
     )
+    val fallbackEnvironment = rememberEnvironment(environmentLoader)
+    val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
     DemoScaffold(
         title = "Animation",
@@ -114,7 +119,7 @@ fun AnimationDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
-            environment = hdrEnvironment ?: rememberEnvironment(environmentLoader),
+            environment = activeEnvironment,
             cameraManipulator = rememberCameraManipulator()
         ) {
             modelInstance?.let { instance ->
