@@ -79,6 +79,13 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
             environment = environment,
+            // Disable the constant 110 klx default main light so the DynamicSkyNode's SUN is
+            // the only directional contribution. Without this, sliding the time-of-day from
+            // noon to dusk has no visible effect on the helmet — the bright default main
+            // light dominates whatever the DynamicSkyNode produces. The default IBL is kept
+            // for ambient fill so the helmet stays visible at night when the sun is below
+            // the horizon.
+            mainLightNode = null,
             cameraManipulator = rememberCameraManipulator()
         ) {
             DynamicSkyNode(
