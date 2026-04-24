@@ -125,11 +125,12 @@ fun AnimationDemo(onBack: () -> Unit) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    // 0.4f fits the entire dragon (body + wings + tail) into the default
-                    // camera framing. centerOrigin (0,0,0) keeps the model fitted into
-                    // the viewport without shifting it out of frame.
-                    scaleToUnits = 0.4f,
-                    centerOrigin = Position(0f, 0f, 0f),
+                    // 0.5f scaleToUnits + centerOrigin at vertical-middle (y=0.5 in the
+                    // model's normalized bounding box) so the dragon's body sits at the
+                    // viewport centre instead of resting at "feet on the ground" with
+                    // the wings dominating the top half.
+                    scaleToUnits = 0.5f,
+                    centerOrigin = Position(0.5f, 0.5f, 0.5f),
                     autoAnimate = isPlaying,
                     animationSpeed = speed,
                     animationLoop = loop
