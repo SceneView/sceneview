@@ -61,6 +61,7 @@ export function generateSurgicalPlanning(options: SurgicalPlanningOptions): stri
   return `package com.example.medical.surgical
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -285,17 +286,27 @@ ${hasCrossSection ? `    crossSectionPosition: Float,
 
 ${implantModel ? `
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showImplant, onValueChange = onToggleImplant),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show implant", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showImplant, onCheckedChange = onToggleImplant)
+                Switch(checked = showImplant, onCheckedChange = null)
             }` : ""}
 
 ${preOpComparison ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showPreOp, onValueChange = onTogglePreOp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Pre-op overlay", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showPreOp, onCheckedChange = onTogglePreOp)
+                Switch(checked = showPreOp, onCheckedChange = null)
             }` : ""}
 
 ${hasCrossSection ? `
@@ -318,6 +329,7 @@ function generateArSurgicalPlanning(
   return `package com.example.medical.surgical
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -423,12 +435,14 @@ ${options.implantModel ? `            if (placed) {
                     shape = MaterialTheme.shapes.medium,
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .toggleable(value = showImplant, onValueChange = { showImplant = it })
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Implant", style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.width(8.dp))
-                        Switch(checked = showImplant, onCheckedChange = { showImplant = it })
+                        Switch(checked = showImplant, onCheckedChange = null)
                     }
                 }
             }` : ""}

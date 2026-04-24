@@ -46,46 +46,55 @@ fun Engine.drainFramePipeline() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Direct destroy helpers.
+//
+// All of these used to be named `safeDestroyX` and wrapped in `runCatching` as a hotfix that
+// quietly swallowed any Filament native-side exception. That masked real lifecycle bugs (nodes
+// destroyed twice, textures destroyed before the MaterialInstance that still referenced them,
+// and so on) and made the library feel "mostly working" while crashing on specific teardown
+// orderings. The `safeDestroyX` names remain for source compatibility — they now fail loud,
+// which is how a clean implementation should behave. Fix the real ordering bug at the call site
+// instead of re-adding a runCatching wrapper.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
 fun AssetLoader.safeDestroyModel(model: Model) {
-    runCatching { model.releaseSourceData() }
-    runCatching { destroyAsset(model) }
+    model.releaseSourceData()
+    destroyAsset(model)
 }
 
-fun Engine.safeDestroy() = runCatching {
+fun Engine.safeDestroy() {
     destroy()
     Log.d("Sceneview", "Engine destroyed")
 }
 
-fun Engine.safeDestroyEntity(entity: Entity) = runCatching { destroyEntity(entity) }
+fun Engine.safeDestroyEntity(entity: Entity) = destroyEntity(entity)
 
 fun Engine.destroyTransformable(@FilamentEntity entity: Entity) = transformManager.destroy(entity)
-fun Engine.safeDestroyTransformable(@FilamentEntity entity: Entity) =
-    runCatching { destroyTransformable(entity) }
+fun Engine.safeDestroyTransformable(@FilamentEntity entity: Entity) = destroyTransformable(entity)
 
-fun Engine.safeDestroyCamera(camera: Camera) = runCatching { destroyCameraComponent(camera.entity) }
+fun Engine.safeDestroyCamera(camera: Camera) = destroyCameraComponent(camera.entity)
 
 fun Engine.safeDestroyEnvironment(environment: Environment) {
     environment.indirectLight?.let { safeDestroyIndirectLight(it) }
     environment.skybox?.let { safeDestroySkybox(it) }
 }
 
-fun Engine.safeDestroyIndirectLight(indirectLight: IndirectLight) =
-    runCatching { destroyIndirectLight(indirectLight) }
+fun Engine.safeDestroyIndirectLight(indirectLight: IndirectLight) = destroyIndirectLight(indirectLight)
 
-fun Engine.safeDestroySkybox(skybox: Skybox) = runCatching { destroySkybox(skybox) }
+fun Engine.safeDestroySkybox(skybox: Skybox) = destroySkybox(skybox)
 
-fun Engine.safeDestroyMaterial(material: Material) = runCatching { destroyMaterial(material) }
+fun Engine.safeDestroyMaterial(material: Material) = destroyMaterial(material)
 fun Engine.safeDestroyMaterialInstance(materialInstance: MaterialInstance) =
-    runCatching { destroyMaterialInstance(materialInstance) }
+    destroyMaterialInstance(materialInstance)
 
-fun Engine.safeDestroyTexture(texture: Texture) = runCatching { destroyTexture(texture) }
+fun Engine.safeDestroyTexture(texture: Texture) = destroyTexture(texture)
 
-fun Engine.safeDestroyStream(stream: Stream) = runCatching { destroyStream(stream) }
+fun Engine.safeDestroyStream(stream: Stream) = destroyStream(stream)
 
 fun Engine.destroyRenderable(@FilamentEntity entity: Entity) = renderableManager.destroy(entity)
 
-fun Engine.safeDestroyRenderable(@FilamentEntity entity: Entity) =
-    runCatching { destroyRenderable(entity) }
+fun Engine.safeDestroyRenderable(@FilamentEntity entity: Entity) = destroyRenderable(entity)
 
 fun Engine.destroyGeometry(geometry: Geometry) {
     destroyVertexBuffer(geometry.vertexBuffer)
@@ -97,16 +106,13 @@ fun Engine.safeDestroyGeometry(geometry: Geometry) {
     safeDestroyIndexBuffer(geometry.indexBuffer)
 }
 
-fun Engine.safeDestroyVertexBuffer(vertexBuffer: VertexBuffer) =
-    runCatching { destroyVertexBuffer(vertexBuffer) }
+fun Engine.safeDestroyVertexBuffer(vertexBuffer: VertexBuffer) = destroyVertexBuffer(vertexBuffer)
 
-fun Engine.safeDestroyIndexBuffer(indexBuffer: IndexBuffer) =
-    runCatching { destroyIndexBuffer(indexBuffer) }
+fun Engine.safeDestroyIndexBuffer(indexBuffer: IndexBuffer) = destroyIndexBuffer(indexBuffer)
 
-fun Engine.safeDestroyMaterialLoader(materialLoader: MaterialLoader) =
-    runCatching { materialLoader.destroy() }
+fun Engine.safeDestroyMaterialLoader(materialLoader: MaterialLoader) = materialLoader.destroy()
 
-fun Engine.safeDestroyModelLoader(modelLoader: ModelLoader) = runCatching { modelLoader.destroy() }
-fun Engine.safeDestroyRenderer(renderer: Renderer) = runCatching { destroyRenderer(renderer) }
-fun Engine.safeDestroyView(view: View) = runCatching { destroyView(view) }
-fun Engine.safeDestroyScene(scene: Scene) = runCatching { destroyScene(scene) }
+fun Engine.safeDestroyModelLoader(modelLoader: ModelLoader) = modelLoader.destroy()
+fun Engine.safeDestroyRenderer(renderer: Renderer) = destroyRenderer(renderer)
+fun Engine.safeDestroyView(view: View) = destroyView(view)
+fun Engine.safeDestroyScene(scene: Scene) = destroyScene(scene)

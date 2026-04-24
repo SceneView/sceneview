@@ -126,7 +126,7 @@ fun MyARScreen() {
     centerOrigin: Position? = null,    // Position(0,0,0) = center, Position(0,-1,0) = bottom-aligned
     position: Position = Position(x = 0f),
     rotation: Rotation = Rotation(x = 0f),
-    scale: Scale = Scale(x = 1f),
+    scale: Scale = Scale(1f),
     isVisible: Boolean = true,
     isEditable: Boolean = false,       // enables pinch-to-scale, drag-to-move
     apply: ModelNode.() -> Unit = {},

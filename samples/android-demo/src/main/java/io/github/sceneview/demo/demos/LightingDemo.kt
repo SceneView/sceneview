@@ -26,12 +26,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.DemoSettings
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -65,13 +75,22 @@ fun LightingDemo(onBack: () -> Unit) {
     }
 
     var selectedType by remember { mutableStateOf(lightTypes[0]) }
-    var intensity by remember { mutableFloatStateOf(100_000f) }
+    // 200 klx default: high enough that the helmet is visibly lit on first-open even
+    // before the user touches the slider (110 klx with default IBL still rendered the
+    // helmet near-black on Pixel 7a Metal — the PBR helmet materials need ~150 klx of
+    // direct light to read clearly against the dark Surface background).
+    var intensity by remember { mutableFloatStateOf(200_000f) }
     var selectedColor by remember { mutableStateOf(colorPresets[0]) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+
+    // Hero rotation, deferred until the helmet has loaded (no first-frame snap).
+    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+        trigger = modelInstance != null, durationMillis = 22_000,
+    )
 
     DemoScaffold(
         title = "Lighting",
@@ -124,31 +143,49 @@ fun LightingDemo(onBack: () -> Unit) {
                                 } else Modifier
                             )
                             .clickable { selectedColor = preset }
+                            .semantics { contentDescription = "${preset.label} light color" }
                     )
                 }
             }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            cameraManipulator = rememberCameraManipulator()
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f
-                )
-            }
+        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                // Disable the default 110 klx directional main light — otherwise it adds a
+                // constant bright directional on top of the user's LightNode and the chip
+                // changes (directional vs point vs spot) produce indistinguishable visuals
+                // because the helmet is already fully lit by the constant default. The IBL
+                // from the default environmentLoader is kept for ambient fill so the helmet
+                // is always somewhat visible (neutral_ibl.ktx), and the user's LightNode
+                // adds its directional / point / spot contribution on top.
+                mainLightNode = null,
+                cameraManipulator = rememberCameraManipulator(),
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                        rotation = Rotation(y = yaw),
+                    )
+                }
             LightNode(
                 type = selectedType.type,
-                position = Position(0f, 2f, 2f),
+                intensity = intensity,
+                color = io.github.sceneview.math.colorOf(
+                    r = selectedColor.r,
+                    g = selectedColor.g,
+                    b = selectedColor.b
+                ),
                 direction = Direction(0f, -1f, -1f),
+                position = Position(0f, 2f, 2f),
                 apply = {
-                    intensity(intensity)
-                    color(selectedColor.r, selectedColor.g, selectedColor.b)
+                    // Fixed-at-creation shape settings — only spot/point-specific values.
+                    // intensity / direction / colour go through the reactive parameters
+                    // above so the user controls actually drive the rendered scene.
                     if (selectedType.type == LightManager.Type.FOCUSED_SPOT) {
                         spotLightCone(0.1f, 0.5f)
                         falloff(10f)
@@ -157,6 +194,8 @@ fun LightingDemo(onBack: () -> Unit) {
                     }
                 }
             )
+            }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }

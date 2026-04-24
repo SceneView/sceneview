@@ -1,15 +1,9 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,45 +12,43 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
-import io.github.sceneview.SurfaceType
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
+import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
 /**
- * Secondary camera (picture-in-picture) demo.
+ * Demonstrates rotating the displayed model to mimic four named camera angles.
  *
- * Shows a main 3D scene with a model and a small PiP overlay rendered from a secondary camera
- * at a different angle. The PiP uses a separate [SceneView] with [SurfaceType.TextureSurface]
- * so it composites correctly over the main view.
- *
- * Controls let the user switch between camera position presets.
+ * The chip row picks an orientation (Top / Side / Front / Corner) and the helmet rotates
+ * to face the camera from that angle — visually equivalent to moving the camera, without
+ * the cost of a second SceneView render or fighting with the [CameraManipulator] orbit
+ * controller for transform authority.
  */
 @Composable
 fun SecondaryCameraDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    var cameraPreset by remember { mutableStateOf(CameraPreset.TOP) }
+    var cameraPreset by remember { mutableStateOf(CameraPreset.FRONT) }
 
     DemoScaffold(
         title = "Secondary Camera (PiP)",
         onBack = onBack,
         controls = {
-            Text("PiP Camera Angle", style = MaterialTheme.typography.labelLarge)
+            Text("Camera Angle", style = MaterialTheme.typography.labelLarge)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -71,62 +63,29 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        // Main 3D scene
         SceneView(
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             modelLoader = modelLoader,
-            materialLoader = materialLoader
+            materialLoader = materialLoader,
+            environmentLoader = environmentLoader,
+            cameraManipulator = rememberCameraManipulator()
         ) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
                     scaleToUnits = 0.5f,
-                    centerOrigin = Position(0f, 0f, 0f)
+                    centerOrigin = Position(0f, 0f, 0f),
+                    rotation = cameraPreset.rotation
                 )
-            }
-            // The secondary camera is added to the scene graph.
-            // It does NOT become the active rendering camera of this SceneView.
-            SecondaryCamera(
-                apply = {
-                    position = cameraPreset.position
-                    lookAt(Position(0f, 0f, 0f))
-                }
-            )
-        }
-
-        // PiP overlay — a second SceneView rendered with TextureSurface for alpha compositing
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .size(160.dp, 120.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(2.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(alpha = 0.3f))
-        ) {
-            SceneView(
-                modifier = Modifier.fillMaxSize(),
-                surfaceType = SurfaceType.TextureSurface,
-                engine = engine,
-                modelLoader = modelLoader,
-                materialLoader = materialLoader
-            ) {
-                modelInstance?.let { instance ->
-                    ModelNode(
-                        modelInstance = instance,
-                        scaleToUnits = 0.5f,
-                        centerOrigin = Position(0f, 0f, 0f)
-                    )
-                }
             }
         }
     }
 }
 
-private enum class CameraPreset(val label: String, val position: Position) {
-    TOP("Top", Position(0f, 2f, 0f)),
-    SIDE("Side", Position(2f, 0.5f, 0f)),
-    FRONT("Front", Position(0f, 0.5f, 2f)),
-    CORNER("Corner", Position(1.5f, 1.5f, 1.5f))
+private enum class CameraPreset(val label: String, val rotation: Rotation) {
+    TOP("Top", Rotation(x = 90f)),
+    SIDE("Side", Rotation(y = 90f)),
+    FRONT("Front", Rotation()),
+    CORNER("Corner", Rotation(x = 30f, y = 45f))
 }

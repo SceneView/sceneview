@@ -167,20 +167,44 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
     fun Node(
         position: Position = Position(x = 0f),
         rotation: Rotation = Rotation(x = 0f),
-        scale: Scale = Scale(x = 1f),
+        // `Scale(1f)` (positional) calls kotlin-math's single-arg Float3(v) which fills
+        // all three components → (1, 1, 1). The named-arg form `Scale(x = 1f)` only sets x
+        // and leaves y/z at 0 → (1, 0, 0), a singular transform that cascades NaN through
+        // every subsequent matrix op (quaternion decomposition returns NaN, children
+        // inherit zero volume, physics integration produces NaN positions). Use the
+        // positional form. Every specialised node composable (SphereNode, CubeNode, …)
+        // already does this — only the bare Node composable had the buggy default.
+        scale: Scale = Scale(1f),
         isVisible: Boolean = true,
         isEditable: Boolean = false,
         apply: NodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null
     ) {
         val node = remember(engine) { NodeImpl(engine = engine).apply(apply) }
-        SideEffect {
-            node.position = position
-            node.rotation = rotation
-            node.scale = scale
-            node.isVisible = isVisible
-            node.isEditable = isEditable
+        // Push declarative props to the underlying node only when they actually change —
+        // NOT on every successful recomposition. The previous `SideEffect { node.position =
+        // position }` ran each frame and overwrote any position that a frame-loop driver
+        // (PhysicsBody, animations, camera follow) had just written via `node.onFrame`,
+        // so PhysicsDemo spheres never appeared to move.
+        //
+        // Keyed on the individual scalar components (not the Float3 wrapper) because
+        // `Float3` from `dev.romainguy.kotlin.math` uses reference equality by default —
+        // each recomposition that literally writes `Position(x = ...)` produces a *new*
+        // instance that `==`-compares as unequal to the previous one, which would
+        // re-trigger the effect and re-clobber driver state. Component-wise keys let
+        // `DisposableEffect` recognise identical values across recompositions and stay
+        // idle while a frame driver owns the node.
+        DisposableEffect(node, position.x, position.y, position.z) {
+            node.position = position; onDispose {}
         }
+        DisposableEffect(node, rotation.x, rotation.y, rotation.z) {
+            node.rotation = rotation; onDispose {}
+        }
+        DisposableEffect(node, scale.x, scale.y, scale.z) {
+            node.scale = scale; onDispose {}
+        }
+        DisposableEffect(node, isVisible) { node.isVisible = isVisible; onDispose {} }
+        DisposableEffect(node, isEditable) { node.isEditable = isEditable; onDispose {} }
         NodeLifecycle(node, content)
     }
 
@@ -244,7 +268,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
         centerOrigin: Position? = null,
         position: Position = Position(x = 0f),
         rotation: Rotation = Rotation(x = 0f),
-        scale: Scale = Scale(x = 1f),
+        // Positional `Scale(1f)` fills all three axes → (1, 1, 1). Using the named form
+        // `Scale(x = 1f)` would leave y/z at 0 and produce a singular transform — see the
+        // Node() doc for the full breakdown.
+        scale: Scale = Scale(1f),
         isVisible: Boolean = true,
         isEditable: Boolean = false,
         apply: ModelNodeImpl.() -> Unit = {},
@@ -329,6 +356,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
     fun LightNode(
         type: LightManager.Type,
         intensity: Float? = null,
+        color: io.github.sceneview.math.Color? = null,
         direction: Direction? = null,
         position: Position = Position(x = 0f),
         apply: LightManager.Builder.() -> Unit = {},
@@ -339,11 +367,20 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             LightNodeImpl(engine = engine, type = type, apply = {
                 intensity?.let { intensity(it) }
                 direction?.let { direction(it.x, it.y, it.z) }
+                color?.let { color(it.r, it.g, it.b) }
                 apply()
             }).apply(nodeApply)
         }
         SideEffect {
+            // Push every reactive prop on each recomposition so Compose state changes
+            // (sliders, colour pickers, toggles) actually drive the underlying Light.
+            // The builder `apply` block only runs at creation time — without this
+            // SideEffect, sliders that live-modified intensity / direction / colour
+            // silently had no effect on the rendered scene.
             node.position = position
+            intensity?.let { node.intensity = it }
+            direction?.let { node.lightDirection = it }
+            color?.let { node.color = it }
         }
         NodeLifecycle(node, content)
     }
@@ -420,11 +457,17 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevCubeGeometry = remember { mutableStateOf(listOf<Any?>(size, center)) }
+        val prevCubeMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(size, center)
             if (current != prevCubeGeometry.value) {
                 node.updateGeometry(center = center, size = size)
                 prevCubeGeometry.value = current
+            }
+            // Propagate MaterialInstance reassignments — see SphereNode for rationale.
+            if (materialInstance != null && materialInstance != prevCubeMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevCubeMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -473,11 +516,21 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevSphereGeometry = remember { mutableStateOf(listOf<Any?>(radius, center, stacks, slices)) }
+        val prevSphereMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, center, stacks, slices)
             if (current != prevSphereGeometry.value) {
                 node.updateGeometry(radius = radius, center = center, stacks = stacks, slices = slices)
                 prevSphereGeometry.value = current
+            }
+            // Propagate MaterialInstance reassignments from the caller — without this,
+            // swapping `materialInstance = highlightMaterial` on recomposition leaves the
+            // node with its construction-time material forever. Filament's
+            // `setMaterialInstanceAt(primitiveIndex, newInstance)` is cheap (no geometry
+            // rebuild), so doing it unconditionally on change is fine.
+            if (materialInstance != null && materialInstance != prevSphereMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevSphereMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -526,6 +579,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevCylinderGeometry = remember { mutableStateOf(listOf<Any?>(radius, height, center, sideCount)) }
+        val prevCylinderMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, height, center, sideCount)
             if (current != prevCylinderGeometry.value) {
@@ -533,6 +587,11 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     radius = radius, height = height, center = center, sideCount = sideCount
                 )
                 prevCylinderGeometry.value = current
+            }
+            // Propagate MaterialInstance reassignments — see SphereNode for rationale.
+            if (materialInstance != null && materialInstance != prevCylinderMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevCylinderMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -581,11 +640,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevConeGeometry = remember { mutableStateOf(listOf<Any?>(radius, height, center, sideCount)) }
+        val prevConeMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, height, center, sideCount)
             if (current != prevConeGeometry.value) {
                 node.updateGeometry(radius = radius, height = height, center = center, sideCount = sideCount)
                 prevConeGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevConeMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevConeMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -637,6 +701,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevTorusGeometry = remember { mutableStateOf(listOf<Any?>(majorRadius, minorRadius, center, majorSegments, minorSegments)) }
+        val prevTorusMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(majorRadius, minorRadius, center, majorSegments, minorSegments)
             if (current != prevTorusGeometry.value) {
@@ -645,6 +710,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     center = center, majorSegments = majorSegments, minorSegments = minorSegments
                 )
                 prevTorusGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevTorusMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevTorusMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -696,6 +765,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevCapsuleGeometry = remember { mutableStateOf(listOf<Any?>(radius, height, center, capStacks, sideSlices)) }
+        val prevCapsuleMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(radius, height, center, capStacks, sideSlices)
             if (current != prevCapsuleGeometry.value) {
@@ -704,6 +774,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     capStacks = capStacks, sideSlices = sideSlices
                 )
                 prevCapsuleGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevCapsuleMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevCapsuleMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -752,11 +826,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevPlaneGeometry = remember { mutableStateOf(listOf<Any?>(size, center, normal)) }
+        val prevPlaneMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(size, center, normal)
             if (current != prevPlaneGeometry.value) {
                 node.updateGeometry(size = size, center = center, normal = normal)
                 prevPlaneGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevPlaneMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevPlaneMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -1133,7 +1212,14 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
      * @param windowManager         The [ViewNodeImpl.WindowManager] to attach the view to.
      * @param unlit                 If `true`, ignores scene lighting (always fully bright).
      * @param invertFrontFaceWinding Inverts face winding — useful for front-facing AR cameras.
-     * @param apply                 Additional configuration on the [ViewNodeImpl] instance.
+     * @param position              World-space position.
+     * @param rotation              World-space rotation (Euler angles in degrees).
+     * @param scale                 Uniform or non-uniform scale.
+     * @param isVisible             Whether the node renders this frame.
+     * @param apply                 Additional configuration on the [ViewNodeImpl] instance,
+     *                              applied once at construction time. For reactive props,
+     *                              prefer the top-level [position]/[rotation]/[scale]/[isVisible]
+     *                              parameters above, which propagate changes on recomposition.
      * @param content               Optional 3D child nodes in a [NodeScope].
      * @param viewContent           The Compose UI to render inside the 3D node.
      */
@@ -1142,6 +1228,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
         windowManager: ViewNodeImpl.WindowManager,
         unlit: Boolean = false,
         invertFrontFaceWinding: Boolean = false,
+        position: Position = Position(x = 0f),
+        rotation: Rotation = Rotation(x = 0f),
+        scale: Scale = Scale(1f),
+        isVisible: Boolean = true,
         apply: ViewNodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null,
         viewContent: @Composable () -> Unit
@@ -1156,6 +1246,18 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                 content = viewContent
             ).apply(apply)
         }
+        // Keyed on scalar components (Float3 uses reference equality so a fresh
+        // Position(x = …) on each recomposition would re-trigger even when unchanged).
+        DisposableEffect(node, position.x, position.y, position.z) {
+            node.position = position; onDispose {}
+        }
+        DisposableEffect(node, rotation.x, rotation.y, rotation.z) {
+            node.rotation = rotation; onDispose {}
+        }
+        DisposableEffect(node, scale.x, scale.y, scale.z) {
+            node.scale = scale; onDispose {}
+        }
+        DisposableEffect(node, isVisible) { node.isVisible = isVisible; onDispose {} }
         NodeLifecycle(node, content)
     }
 
@@ -1204,11 +1306,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevLineGeometry = remember { mutableStateOf(listOf<Any?>(start, end)) }
+        val prevLineMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(start, end)
             if (current != prevLineGeometry.value) {
                 node.updateGeometry(start = start, end = end)
                 prevLineGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevLineMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevLineMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -1262,11 +1369,16 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevPathGeometry = remember { mutableStateOf(listOf<Any?>(points, closed)) }
+        val prevPathMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(points, closed)
             if (current != prevPathGeometry.value) {
                 node.updateGeometry(points = points, closed = closed)
                 prevPathGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevPathMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevPathMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation
@@ -1308,6 +1420,13 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                 boundingBox = boundingBox,
                 materialInstance = materialInstance
             ).apply(apply)
+        }
+        val prevMeshMaterial = remember { mutableStateOf(materialInstance) }
+        SideEffect {
+            if (materialInstance != null && materialInstance != prevMeshMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevMeshMaterial.value = materialInstance
+            }
         }
         NodeLifecycle(node, content)
     }
@@ -1434,6 +1553,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
             ).apply(apply)
         }
         val prevShapeGeometry = remember { mutableStateOf(listOf<Any?>(polygonPath, polygonHoles, delaunayPoints, normal, uvScale, color)) }
+        val prevShapeMaterial = remember { mutableStateOf(materialInstance) }
         SideEffect {
             val current = listOf<Any?>(polygonPath, polygonHoles, delaunayPoints, normal, uvScale, color)
             if (current != prevShapeGeometry.value) {
@@ -1446,6 +1566,10 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                     color = color
                 )
                 prevShapeGeometry.value = current
+            }
+            if (materialInstance != null && materialInstance != prevShapeMaterial.value) {
+                node.setMaterialInstanceAt(0, materialInstance)
+                prevShapeMaterial.value = materialInstance
             }
             node.position = position
             node.rotation = rotation

@@ -62,37 +62,41 @@ fun TextDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             cameraManipulator = rememberCameraManipulator()
         ) {
-            // Left: user text with white on dark background
+            // Three labels stacked vertically at x=0 so all three fit inside the default
+            // camera framing on a phone portrait viewport. y=±0.22 keeps the top and
+            // bottom labels fully inside the viewport (y=±0.32 still cropped the top
+            // label on the portrait FOV).
+            // Top: user text with white on dark background
             TextNode(
                 text = inputText,
                 fontSize = fontSize,
                 textColor = android.graphics.Color.WHITE,
                 backgroundColor = 0xCC000000.toInt(),
-                widthMeters = 0.8f,
-                heightMeters = 0.25f,
-                position = Position(x = -0.9f, y = 0.3f)
+                widthMeters = 0.7f,
+                heightMeters = 0.18f,
+                position = Position(x = 0f, y = 0.22f)
             )
 
-            // Center: fixed label with yellow text
+            // Center: fixed label with SceneView Primary on dark surface
             TextNode(
                 text = "SceneView 4.0",
                 fontSize = fontSize,
-                textColor = android.graphics.Color.YELLOW,
-                backgroundColor = 0xCC333333.toInt(),
-                widthMeters = 0.8f,
-                heightMeters = 0.25f,
+                textColor = 0xFFA4C1FF.toInt(),  // SceneView TintLight (readable on dark)
+                backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
+                widthMeters = 0.7f,
+                heightMeters = 0.18f,
                 position = Position(x = 0f, y = 0f)
             )
 
-            // Right: fixed label with cyan text
+            // Bottom: fixed label with SceneView Accent tint
             TextNode(
                 text = "3D Text Labels",
                 fontSize = fontSize,
-                textColor = android.graphics.Color.CYAN,
-                backgroundColor = 0xCC003333.toInt(),
-                widthMeters = 0.8f,
-                heightMeters = 0.25f,
-                position = Position(x = 0.9f, y = -0.3f)
+                textColor = 0xFFD2A8FF.toInt(),  // SceneView TintSoft (purple tint)
+                backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
+                widthMeters = 0.7f,
+                heightMeters = 0.18f,
+                position = Position(x = 0f, y = -0.22f)
             )
         }
     }

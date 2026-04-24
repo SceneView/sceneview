@@ -8,11 +8,11 @@
     <!-- Right face gradient -->
     <linearGradient id="rightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#4A90D9"/>
-      <stop offset="100%" stop-color="#1A73E8"/>
+      <stop offset="100%" stop-color="#005BC1"/>
     </linearGradient>
     <!-- Left face gradient -->
     <linearGradient id="leftGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#1A73E8"/>
+      <stop offset="0%" stop-color="#005BC1"/>
       <stop offset="100%" stop-color="#0D47A1"/>
     </linearGradient>
   </defs>
@@ -52,14 +52,14 @@
   <!-- Viewport brackets — white, rounded caps -->
   <!-- Top-left -->
   <polyline points="96,120 96,82 134,82"
-            fill="none" stroke="#1A73E8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            fill="none" stroke="#005BC1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- Top-right -->
   <polyline points="416,120 416,82 378,82"
-            fill="none" stroke="#1A73E8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            fill="none" stroke="#005BC1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- Bottom-left -->
   <polyline points="96,392 96,430 134,430"
-            fill="none" stroke="#1A73E8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            fill="none" stroke="#005BC1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- Bottom-right -->
   <polyline points="416,392 416,430 378,430"
-            fill="none" stroke="#1A73E8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            fill="none" stroke="#005BC1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

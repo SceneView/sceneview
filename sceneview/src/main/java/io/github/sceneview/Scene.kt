@@ -17,6 +17,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.withFrameNanos
@@ -374,6 +375,14 @@ fun SceneView(
 
     // ── Render loop ───────────────────────────────────────────────────────────────────────────────
 
+    // Keep the caller's onFrame lambda live across recompositions. LaunchedEffect captures its
+    // body at launch time and never re-runs while (engine, renderer, view, scene) are stable, so
+    // reading `onFrame` directly would pin the lambda from the very first composition — any caller
+    // that reads Compose state inside it (e.g. DebugOverlayDemo's `if (modelInstance != null) 1
+    // else 0`) would see only the initial null state, forever. rememberUpdatedState solves this by
+    // reading the ref inside the loop.
+    val currentOnFrame = rememberUpdatedState(onFrame)
+
     LaunchedEffect(engine, renderer, view, scene) {
         while (true) {
             if (!isResumed.get()) {
@@ -391,7 +400,7 @@ fun SceneView(
                         cameraNode.transform = manipulator.getTransform()
                     }
 
-                    onFrame?.invoke(frameTimeNanos)
+                    currentOnFrame.value?.invoke(frameTimeNanos)
                 }
 
                 lastFrameTimeNanosRef.set(frameTimeNanos)

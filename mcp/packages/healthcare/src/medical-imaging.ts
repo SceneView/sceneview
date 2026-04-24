@@ -57,6 +57,7 @@ export function generateMedicalImaging(options: MedicalImagingOptions): string {
   return `package com.example.medical.imaging
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -236,10 +237,15 @@ ${windowing ? `
                 valueRange = 1f..4000f
             )` : ""}
 ${segmentation ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showSegmentation, onValueChange = onToggleSegmentation),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show segmentation", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showSegmentation, onCheckedChange = onToggleSegmentation)
+                Switch(checked = showSegmentation, onCheckedChange = null)
             }` : ""}
         }
     }
@@ -255,6 +261,7 @@ function generateArMedicalImaging(
   return `package com.example.medical.imaging
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

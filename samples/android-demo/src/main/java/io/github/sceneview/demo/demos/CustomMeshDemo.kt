@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -23,7 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import io.github.sceneview.demo.SceneViewColors
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
@@ -44,16 +45,18 @@ import io.github.sceneview.rememberMaterialLoader
 @Composable
 fun CustomMeshDemo(onBack: () -> Unit) {
     var rotating by remember { mutableStateOf(true) }
-    var scale by remember { mutableFloatStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(0.5f) }
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
 
+    // Atom spheres in SceneView primary blue, bonds in the accent purple — the same hero
+    // gradient the brand palette uses.
     val sphereMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(Color.Cyan)
+        materialLoader.createColorInstance(SceneViewColors.Primary)
     }
     val bondMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(Color.Gray)
+        materialLoader.createColorInstance(SceneViewColors.Accent)
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "meshRotation")
@@ -69,12 +72,17 @@ fun CustomMeshDemo(onBack: () -> Unit) {
         onBack = onBack,
         controls = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = rotating,
+                        onValueChange = { rotating = it },
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Auto-Rotate", style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = rotating, onCheckedChange = { rotating = it })
+                Switch(checked = rotating, onCheckedChange = null)
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("Scale: ${"%.1f".format(scale)}x", style = MaterialTheme.typography.labelLarge)
@@ -140,18 +148,20 @@ fun CustomMeshDemo(onBack: () -> Unit) {
                     position = Position(-0.3f, 0f, 0f),
                     rotation = Rotation(z = 90f)
                 )
-                // Front atom + bond
+                // Front atom + bond — aligned on +Z so the bond is a clean 90° X
+                // rotation instead of the previous (−Y, +Z) diagonal that left the
+                // cylinder dangling at the wrong angle between the two atoms.
                 SphereNode(
                     materialInstance = sphereMaterial,
                     radius = 0.12f,
-                    position = Position(0f, -0.3f, 0.5f)
+                    position = Position(0f, 0f, 0.6f)
                 )
                 CylinderNode(
                     materialInstance = bondMaterial,
                     radius = 0.03f,
                     height = 0.4f,
-                    position = Position(0f, -0.15f, 0.25f),
-                    rotation = Rotation(x = 45f)
+                    position = Position(0f, 0f, 0.3f),
+                    rotation = Rotation(x = 90f)
                 )
             }
         }

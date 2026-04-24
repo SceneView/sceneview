@@ -67,11 +67,20 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
+            // Disable the constant 110 klx default main light so the DynamicSkyNode's SUN is
+            // the only directional contribution. The default IBL is kept for ambient fill
+            // so the helmet stays visible at night when the sun is below the horizon.
+            mainLightNode = null,
             cameraManipulator = rememberCameraManipulator()
         ) {
             DynamicSkyNode(
                 timeOfDay = timeOfDay,
-                turbidity = turbidity
+                turbidity = turbidity,
+                // 500 klx (5x the default) so the sun visibly dominates even with the
+                // default IBL ambient — otherwise the neutral IBL's constant ~30 klx
+                // contribution masks the time-of-day changes on the metallic helmet
+                // (PBR reflections = mostly IBL). Bright sun = visible difference.
+                sunIntensity = 500_000f,
             )
 
             modelInstance?.let { instance ->

@@ -27,7 +27,7 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.math.Color as SceneColor
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
@@ -55,10 +55,12 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var geometryCount by remember { mutableStateOf(0) }
 
-    // Semi-transparent material for streetscape geometry overlays
+    // Semi-transparent material for streetscape geometry overlays — SceneView TintLight at
+    // low alpha so the real camera feed of buildings/sidewalks stays readable through the
+    // overlay mesh.
     val buildingMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(
-            color = SceneColor(0.3f, 0.7f, 0.9f, 0.3f),
+            color = SceneViewColors.LandscapeOverlay,
             metallic = 0.1f,
             roughness = 0.9f,
             reflectance = 0.1f

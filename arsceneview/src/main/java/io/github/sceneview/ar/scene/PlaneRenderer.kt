@@ -22,7 +22,6 @@ import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.material.setParameter
 import io.github.sceneview.material.setTexture
 import io.github.sceneview.math.Color
-import io.github.sceneview.safeDestroyMaterial
 import io.github.sceneview.safeDestroyMaterialInstance
 import io.github.sceneview.safeDestroyTexture
 import io.github.sceneview.texture.ImageTexture
@@ -35,7 +34,7 @@ import io.github.sceneview.texture.ImageTexture
  */
 class PlaneRenderer(
     val engine: Engine,
-    materialLoader: MaterialLoader,
+    private val materialLoader: MaterialLoader,
     private val scene: Scene
 ) {
 
@@ -199,12 +198,31 @@ class PlaneRenderer(
     fun destroy() {
         visualizers.forEach { (_, planeVisualizer) -> planeVisualizer.destroy() }
 
+        // Destroy in three waves, governed by two Filament preconditions:
+        //
+        //   1. "MaterialInstance still in use by Renderable" — visualizers (renderables) must
+        //      go first. Handled above.
+        //   2. "Invalid texture still bound to MaterialInstance" — any Material that samples
+        //      `planeTexture` must be destroyed BEFORE the texture. We can't just nullify the
+        //      texture parameter on the MI (Filament has no null binding), so we rely on
+        //      destroying the Material (which cascades to its defaultInstance, unbinding
+        //      the texture) first.
+        //
+        // Go through `materialLoader.destroyMaterial` (not `engine.safeDestroyMaterial`) so
+        // the Material is also removed from MaterialLoader.materials. Otherwise the outer
+        // `MaterialLoader.destroy()` would iterate a stale list entry and call
+        // `Engine.destroyMaterial` on an already-reclaimed native object → IllegalStateException.
+        // (A `runCatching` safety net exists in MaterialLoader.destroyMaterial as defense in
+        // depth, but the primary ownership path is the correct one.)
+        //
+        // `materialInstances` holds per-plane-visualizer instances created via
+        // `planeMaterial.createInstance()`. They are owned by us — not tracked by the loader —
+        // and can be destroyed directly. Destroying them before `planeMaterial` isn't strictly
+        // required but is tidy.
         materialInstances.forEach { engine.safeDestroyMaterialInstance(it) }
-        engine.safeDestroyMaterialInstance(planeMaterial.defaultInstance)
-        engine.safeDestroyMaterial(planeMaterial)
+        materialLoader.destroyMaterial(planeMaterial)
+        materialLoader.destroyMaterial(shadowMaterial)
         engine.safeDestroyTexture(planeTexture)
-        engine.safeDestroyMaterialInstance(shadowMaterial.defaultInstance)
-        engine.safeDestroyMaterial(shadowMaterial)
     }
 
     /**

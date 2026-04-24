@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -54,12 +55,17 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
         onBack = onBack,
         controls = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = showOverlay,
+                        onValueChange = { showOverlay = it },
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Show Overlay", style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = showOverlay, onCheckedChange = { showOverlay = it })
+                Switch(checked = showOverlay, onCheckedChange = null)
             }
         }
     ) {

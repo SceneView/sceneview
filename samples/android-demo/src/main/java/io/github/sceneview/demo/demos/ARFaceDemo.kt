@@ -26,7 +26,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.math.Color as SceneColor
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
@@ -49,10 +49,11 @@ fun ARFaceDemo(onBack: () -> Unit) {
     var detectedFaces by remember { mutableStateOf<List<AugmentedFace>>(emptyList()) }
     var faceCount by remember { mutableStateOf(0) }
 
-    // Semi-transparent material for the face mesh overlay
+    // Semi-transparent material for the face mesh overlay — SceneView Primary with 0.4
+    // alpha so the camera feed stays readable under the tint.
     val faceMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(
-            color = SceneColor(0.2f, 0.6f, 1.0f, 0.4f),
+            color = SceneViewColors.PrimaryOverlay,
             metallic = 0.0f,
             roughness = 0.8f,
             reflectance = 0.1f

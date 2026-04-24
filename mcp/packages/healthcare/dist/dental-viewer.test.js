@@ -25,7 +25,7 @@ describe("generateDentalViewer", () => {
     it("generates valid Kotlin code for full-arch", () => {
         const code = generateDentalViewer({ viewType: "full-arch" });
         expect(code).toContain("package com.example.medical.dental");
-        expect(code).toContain("import io.github.sceneview.Scene");
+        expect(code).toContain("import io.github.sceneview.SceneView");
         expect(code).toContain("@Composable");
         expect(code).toContain("rememberEngine()");
     });
@@ -72,7 +72,7 @@ describe("generateDentalViewer", () => {
     });
     it("generates AR code when ar=true", () => {
         const code = generateDentalViewer({ viewType: "full-arch", ar: true });
-        expect(code).toContain("import io.github.sceneview.ar.ARScene");
+        expect(code).toContain("import io.github.sceneview.ar.ARSceneView");
         expect(code).toContain("ARSceneView(");
         expect(code).toContain("android.permission.CAMERA");
     });

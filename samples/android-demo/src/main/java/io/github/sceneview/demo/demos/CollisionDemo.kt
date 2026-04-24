@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
@@ -46,15 +47,13 @@ fun CollisionDemo(onBack: () -> Unit) {
     val collisionSystem = rememberCollisionSystem(view)
 
     // Pre-create materials for default and highlighted states.
+    // On-brand: Primary blue by default, Accent purple when a shape is hit — same hero
+    // gradient as the product identity.
     val defaultMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = androidx.compose.ui.graphics.Color(0xFF4CAF50) // Green
-        )
+        materialLoader.createColorInstance(color = SceneViewColors.Primary)
     }
     val highlightedMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = androidx.compose.ui.graphics.Color(0xFFFF5722) // Deep Orange
-        )
+        materialLoader.createColorInstance(color = SceneViewColors.Accent)
     }
 
     // Node layout: 3 cubes and 2 spheres in a row.
@@ -66,18 +65,21 @@ fun CollisionDemo(onBack: () -> Unit) {
 
     val shapes = remember {
         listOf(
-            ShapeSpec(0, isSphere = false, position = Position(x = -1.0f, y = 0f, z = 0f)),
-            ShapeSpec(1, isSphere = true, position = Position(x = -0.5f, y = 0.5f, z = 0f)),
-            ShapeSpec(2, isSphere = false, position = Position(x = 0f, y = 0f, z = 0f)),
-            ShapeSpec(3, isSphere = true, position = Position(x = 0.5f, y = 0.5f, z = 0f)),
-            ShapeSpec(4, isSphere = false, position = Position(x = 1.0f, y = 0f, z = 0f))
+            ShapeSpec(0, isSphere = false, position = Position(x = -0.6f, y = 0f, z = -2f)),
+            ShapeSpec(1, isSphere = true, position = Position(x = -0.3f, y = 0.3f, z = -2f)),
+            ShapeSpec(2, isSphere = false, position = Position(x = 0f, y = 0f, z = -2f)),
+            ShapeSpec(3, isSphere = true, position = Position(x = 0.3f, y = 0.3f, z = -2f)),
+            ShapeSpec(4, isSphere = false, position = Position(x = 0.6f, y = 0f, z = -2f))
         )
     }
 
     val gestureListener = rememberOnGestureListener(
-        onSingleTapConfirmed = { _: MotionEvent, node: Node? ->
+        // `onSingleTapUp` fires on release, no 300 ms double-tap disambiguation window.
+        // Matches the ViewNodeDemo fix — users (and tests) firing several single taps in
+        // quick succession should see each one register instead of being dropped as a
+        // possible double-tap.
+        onSingleTapUp = { _: MotionEvent, node: Node? ->
             if (node != null) {
-                // Find which shape index this node belongs to by checking its name.
                 val idx = node.name?.removePrefix("shape_")?.toIntOrNull()
                 if (idx != null) {
                     highlightedIndices = if (idx in highlightedIndices) {

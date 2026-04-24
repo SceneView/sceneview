@@ -26,7 +26,7 @@ describe("generateSurgicalPlanning", () => {
     it("generates valid Kotlin code for orthopedic surgery", () => {
         const code = generateSurgicalPlanning({ surgeryType: "orthopedic" });
         expect(code).toContain("package com.example.medical.surgical");
-        expect(code).toContain("import io.github.sceneview.Scene");
+        expect(code).toContain("import io.github.sceneview.SceneView");
         expect(code).toContain("@Composable");
         expect(code).toContain("rememberEngine()");
     });
@@ -78,7 +78,7 @@ describe("generateSurgicalPlanning", () => {
     });
     it("generates AR code when ar=true", () => {
         const code = generateSurgicalPlanning({ surgeryType: "cardiac", ar: true });
-        expect(code).toContain("import io.github.sceneview.ar.ARScene");
+        expect(code).toContain("import io.github.sceneview.ar.ARSceneView");
         expect(code).toContain("ARSceneView(");
         expect(code).toContain("android.permission.CAMERA");
     });

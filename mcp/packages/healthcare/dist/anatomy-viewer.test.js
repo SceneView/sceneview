@@ -26,7 +26,7 @@ describe("generateAnatomyViewer", () => {
     it("generates valid Kotlin code for skeleton system", () => {
         const code = generateAnatomyViewer({ system: "skeleton" });
         expect(code).toContain("package com.example.medical.anatomy");
-        expect(code).toContain("import io.github.sceneview.Scene");
+        expect(code).toContain("import io.github.sceneview.SceneView");
         expect(code).toContain("@Composable");
         expect(code).toContain("rememberEngine()");
         expect(code).toContain("rememberModelLoader");
@@ -43,7 +43,7 @@ describe("generateAnatomyViewer", () => {
     });
     it("generates AR code when ar=true", () => {
         const code = generateAnatomyViewer({ system: "skeleton", ar: true });
-        expect(code).toContain("import io.github.sceneview.ar.ARScene");
+        expect(code).toContain("import io.github.sceneview.ar.ARSceneView");
         expect(code).toContain("ARSceneView(");
         expect(code).toContain("arsceneview:3.6.0");
         expect(code).toContain("android.permission.CAMERA");

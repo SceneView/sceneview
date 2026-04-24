@@ -28,6 +28,7 @@ import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.environment.rememberHDREnvironment
+import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
@@ -50,8 +51,18 @@ fun AnimationDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/animated_dragon.glb")
 
-    // Load an HDR environment for better lighting on the dragon model
-    val hdrEnvironment = rememberHDREnvironment(environmentLoader, "environments/studio_warm_2k.hdr")
+    // HDR environment for IBL — disable skybox so the studio lightbox doesn't dominate
+    // the viewport. We only want the lighting contribution, not the wrap-around image.
+    // Always call rememberEnvironment so the composable structure stays stable across
+    // recompositions; the HDR result is preferred when available, otherwise the neutral
+    // default environment fills in while the HDR is loading.
+    val hdrEnvironment = rememberHDREnvironment(
+        environmentLoader,
+        "environments/studio_warm_2k.hdr",
+        createSkybox = false,
+    )
+    val fallbackEnvironment = rememberEnvironment(environmentLoader)
+    val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
     DemoScaffold(
         title = "Animation",
@@ -108,13 +119,13 @@ fun AnimationDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
-            environment = hdrEnvironment ?: rememberEnvironment(environmentLoader),
+            environment = activeEnvironment,
             cameraManipulator = rememberCameraManipulator()
         ) {
             modelInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
-                    scaleToUnits = 0.3f,
+                    scaleToUnits = 0.5f,
                     autoAnimate = isPlaying,
                     animationSpeed = speed,
                     animationLoop = loop

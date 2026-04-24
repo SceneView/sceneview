@@ -4,6 +4,210 @@
 
 ---
 
+## SESSION reverent-jang — 2026-04-23 — Android teardown bugs + smoke-test harness + full QA coverage
+
+**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/hopeful-elgamal-c7433f`
+**Branch:** `claude/hopeful-elgamal-c7433f` — 22 commits ahead of main (GitHub ban → no push)
+
+### What shipped
+
+**Library fixes (sceneview + arsceneview):**
+- `ViewNode.destroy()` — reordered to call `super.destroy()` BEFORE `destroyMaterialInstance(materialInstance)`. Filament aborts with "destroying MaterialInstance 'view' still in use by Renderable" if the node's Renderable component still references it.
+- `PlaneRenderer.destroy()` — now routes materials through `materialLoader.destroyMaterial(...)` (the guarded path that removes from `materials` list). Previously bypassed the loader → `MaterialLoader.destroy()` crashed on teardown with "Calling method on destroyed Material". Also dropped the manual `destroyMaterialInstance(defaultInstance)` which was a guaranteed double-free (Engine.destroyMaterial cascades).
+- `ARCameraStream.destroy()` — same fix pattern. No more explicit defaultInstance destroy; route materials through `materialLoader.destroyMaterial`. Textures now reliably destroyed AFTER materials (fixes "Invalid texture still bound to MaterialInstance: 'depth'" abort).
+- `MaterialLoader.destroyMaterial` / `destroyMaterialInstance` — wrapped native destroy calls in `runCatching` as defense-in-depth against out-of-order teardown (Engine teardown beating the MaterialLoader DisposableEffect).
+
+**Test infrastructure:**
+- `DemoInteractionTest` baseline: 23 → extended with 10 new sub-function captures (Lighting intensity, Animation speed, PostProc MSAA, CustomMesh scale, LinesPaths path points, Reflection probe Y). 33 screenshots total for these tests.
+- NEW `DemoSmokeTest` class: 8 smoke tests for the 7 AR demos + Camera Controls. Each verifies the demo launches without a JNI crash on Apple M3 Metal translator AVD (where ARCore and Filament Manipulator aren't available).
+- JPEG screenshot pipeline via MediaStore — writes to `/sdcard/Download/sceneview-qa/*.jpg` (survives APK uninstall, no scoped-storage permission dance). Tracked screenshots dropped 52 MB PNG → 6.7 MB JPEG at indistinguishable visual quality.
+- `openDemo` settle bumped 2.5 s → 4 s → 6 s to cover first-frame GLB decode + GPU upload on the slow Metal translator.
+- `ScreenshotTest.kt` rewritten — old 6 tests referenced `AboutScreen`/`SamplesScreen` (retired when the app moved to DemoHostActivity). Replaced with 4 `DemoListScreen` tests (light/dark/large-font/tablet). Fresh Roborazzi goldens generated.
+
+### Stability / quality gates
+
+- **31/31 interaction + smoke tests PASS**, verified on 4 consecutive back-to-back runs (~10 min each).
+- `:sceneview:connectedDebugAndroidTest` — 68 tests (4 skipped due to Filament `readPixels` broken on Metal translator).
+- `:arsceneview:connectedDebugAndroidTest` — BUILD SUCCESSFUL.
+- Library unit tests: `:sceneview:test`, `:arsceneview:testDebugUnitTest`, `:sceneview-core:allTests` — all green.
+- `:samples:android-demo:bundleRelease` — OK (required `-Xmx8g -XX:MaxMetaspaceSize=1g` for R8; may be worth bumping `gradle.properties` default if this recurs).
+- `:sceneview-web:assemble` — BUILD SUCCESSFUL.
+- MCP: `2902 vitest tests pass` across 132 files.
+- `pre-push-check.sh` — 9/9 PASS.
+- `quality-gate.sh --quick` — PASS (1 pre-existing warning on third-party CDN in HTML, unrelated).
+- `impact-check.sh` — PASS (1 pre-existing warning on Swift-only nodes, unrelated).
+- Fresh Roborazzi goldens committed for `DemoListScreen` (light/dark/large-font/tablet).
+
+### Commits
+
+```
+2403d20d chore(mcp): regenerate llms-txt bundle and lockfile to 4.0.1
+fcc65c7b test(android-demo): rewrite stale Roborazzi ScreenshotTest for DemoListScreen
+16273dd7 test(android-demo): bump openDemo settle to 6s for reliable first-frame capture
+54fee6fa fix(arsceneview): AR teardown double-free + extend interaction test coverage
+35c78e26 test(android-demo): refresh QA screenshots as JPEG (52 MB -> 6.5 MB)
+dcbf02b1 test(android-demo): persist interaction screenshots via MediaStore
+b14b5942 fix(sceneview): ViewNode teardown order + interaction test JPEG pipeline
+```
+
+### Pièges qui reviendront
+- R8 OOM (Metaspace) sur `bundleRelease` avec 512m par défaut — passer `-Xmx8g -XX:MaxMetaspaceSize=1g` ou bumper `gradle.properties` définitivement.
+- Apple M3 Metal translator AVD ne résout pas `Manipulator.nCreateBuilder` (`CameraControlsDemo` viewport reste noir, mais l'app ne crashe pas).
+- Filament `readPixels` callback ne firent pas sur Metal translator — les offscreen render-tests restent `@Ignore` dans `sceneview/src/androidTest/`.
+- MediaStore écriture JPEG obligatoire sur API 30+ depuis le test APK UID — `FileOutputStream` direct vers `/sdcard/Download/` échoue EACCES.
+- Premier frame Filament (Engine + GLB decode + GPU upload) prend ~6 s sur cet émulateur → ne pas redescendre sous 6 s dans `openDemo`.
+
+### Not done (deferred)
+- Physics demo : la sphère diagnostic statique rend OK mais les sphères physiques ne sont pas visibles sur les screenshots (problème de timing simulation / position). Pas dans le scope de cette session.
+- Push GitHub bloqué par le ban — tous les commits restent locaux jusqu'à déblocage.
+
+### Session addendum — 2026-04-23 late (branded assets + palette + icon/text test coverage)
+
+Continuation of the same worktree after the user asked for "vraies images/vidéos et couleurs SceneView" :
+
+- **Real assets :**
+  - `assets/textures/sceneview_logo.png` — 1.6 KB blue circle placeholder swapped for the 45 KB branded cube-in-brackets logo from `branding/exports/logo/logo-1024.png`.
+  - `assets/videos/sample.mp4` — regenerated with `ffmpeg` — 10 s / 1280×720 / H.264, cube orbiting in Lissajous pattern over the brand hero gradient `#005bc1 → #6446cd`.
+- **Brand palette** `samples/android-demo/src/main/java/io/github/sceneview/demo/SceneViewColors.kt` mirrors the seven tokens from `DESIGN.md` + a `Ramp4` helper. Applied to Physics / Geometry / Shape / CustomMesh / LinesPaths — all `Color.Red / Blue / Green / Yellow / Cyan / Magenta / Gray / DarkGray` references gone.
+- **A11y win** — `LightingDemo` color swatches now carry `contentDescription`. Four new `tapByDesc` tests exercise them.
+- **Icon + text input coverage** — new `tapByDesc(String)` and `typeInto(String, String)` helpers added to `DemoInteractionTest`. Used for:
+  - Animation Play / Pause (was icon-only, untestable)
+  - Video Play / Pause
+  - Text demo Display Text field (real reflow into TextNode via `adb shell input text`)
+- **Result** : 31/31 PASS (9 min), 119 JPEGs @ 8.5 MB, pre-push gate 9/9.
+- **Extra commit on branch :** `7e594364 feat(android-demo): real branded assets + SceneView color palette + extended coverage`
+
+### Session addendum 2 — 2026-04-23 evening (library bug hunt + Physics fix + 32/32 steady state)
+
+Continuation after the 2nd crash rollup. Total branch is now **23 commits ahead of main**.
+
+**Library fixes shipped (sceneview):**
+- **`6de91a47` — CRITIQUE : Node / ModelNode default scale était `(1, 0, 0)`, pas `(1, 1, 1)`.** Cause racine dans `SceneScope.kt` : `scale: Scale = Scale(x = 1f)` — `Scale = Float3` et `Float3(x = 1f)` appelle le constructeur 3-args (y=0, z=0), pas le constructeur uniform-fill `Float3(v: Float)`. Tout `Node { ... }` ou `ModelNode { ... }` composable sans scale explicite rendait des meshes dégénérés à volume zéro. Démonstré par `PhysicsDemo` (sphères invisibles dans les screenshots). Fix = `Scale(1f)` (constructeur 1-arg uniform-fill).
+- **`ec070ec6` — regression guard** dans `sceneview-core` qui vérifie `Scale(1f) == Scale(1f, 1f, 1f)` vs le piège `Scale(x = 1f) == Scale(1f, 0f, 0f)`.
+- **`48d74083` — KDoc warning** sur `Scale` dans `sceneview-core` documentant le gotcha d'API kotlin-math 1.8.
+- **`1e9497e5` — llms.txt** mis à jour pour recommander `Scale(1f)` (pas `Scale(x = 1f)`).
+- **`970ddff1` — MaterialInstance propagation** : `SphereNode` + `CubeNode` réagissent maintenant au changement de `materialInstance` via `SideEffect`. Avant, le Node gardait son ancien instance.
+- **`2e4ef01f` — robust tap handling** sur `ViewNode` + `CollisionDemo` + slider mid-values dans les tests (le nouveau 32e test).
+- **`440b9a3c` — camera gesture + multi-touch** coverage dans `DemoInteractionTest`.
+- **`fdabb07d` — Compose TextField `typeInto`** utilise `UiObject2.setText` (plus robuste que `adb shell input text`).
+
+**Brand pass:**
+- **`b8fcf225` — launcher icons** régénérés depuis le logo branded.
+- **`6b873ad4` — migration `#1A73E8` (Google blue) → `#005BC1`** (SceneView Primary) dans tout le code (16 fichiers, incluant DESIGN.md, assets, widgets, MCP dashboard).
+- **`484d30b8` — SceneViewSwift `AccentColor`** aligné sur la palette brand.
+- **`8a88b053` — Collision + AR demos** migrés sur la brand palette.
+
+**Physics deferred → RÉSOLU.** Les captures committées (`samples/screenshots/android/18_physics.png` et `physics_demo.png`) étaient stale (montraient la plane seule sans sphères, à cause du bug Scale). `30cbce64` remplace avec les frames frais du `DemoInteractionTest` (dropped_3) qui montrent la sphère diagnostic statique + 4 sphères physiques sur la brand ramp.
+
+**Re-run steady-state validation (après tous ces fixes) :**
+- `:samples:android-demo:connectedDebugAndroidTest` — **32/32 PASS** (10 min 21 s).
+- Aucune régression observée. Le `DemoInteractionTest` couvre maintenant camera gestures + multi-touch + slider mid-values.
+
+**Commits session evening:**
+```
+30cbce64 docs(screenshots): refresh Physics demo captures post Scale(1f) fix
+970ddff1 fix(sceneview): propagate MaterialInstance changes to SphereNode + CubeNode
+2e4ef01f feat(demo): robust tap handling on ViewNode + Collision + slider mid-values
+440b9a3c test(android-demo): add camera-gesture + multi-touch coverage
+fdabb07d test(android-demo): typeInto now drives Compose TextField via UiObject2.setText
+1e9497e5 docs(llms): update Node / ModelNode signatures to Scale(1f)
+ec070ec6 test(sceneview-core): regression guard on Scale(1f) uniform-fill semantics
+48d74083 docs(sceneview-core): warn on the Scale(x = 1f) gotcha that broke PhysicsDemo
+6de91a47 fix(sceneview): Node / ModelNode default scale was (1, 0, 0), not (1, 1, 1)
+484d30b8 fix(brand): align SceneViewSwift Examples AccentColor with brand palette
+6b873ad4 fix(brand): migrate legacy #1A73E8 (Google blue) to #005BC1 (SceneView Primary)
+b8fcf225 feat(android-demo): regenerate launcher icons from branded source
+8a88b053 feat(android-demo): brand palette sweep — Collision + AR demos
+```
+
+**Nouveau piège documenté :**
+- Pixel_7a AVD a 6 GB `/data/user/0`, dont ~5 GB pris par les system apps → seulement ~600 MB dispo pour notre APK + test APK (~250 MB). Si `installDebug` échoue avec `INSTALL_FAILED_INSUFFICIENT_STORAGE`, nettoyer `/sdcard/Download/sceneview-qa/*.jpg` (générés par les tests), `pm trim-caches`, puis potentiellement wiper l'AVD. Recréer l'AVD avec `sdcard_size=2048M` + `disk.dataPartition.size=12G` est la solution long terme.
+
+### Session addendum 4 — 2026-04-24 (visual demo audit + reactive LightNode lib fix + 10s wait)
+
+Surface-level visual audit of every Android demo screenshot revealed nine demos with silent
+behavioral bugs that the test harness couldn't catch (it only validates the test process
+doesn't crash). Plus one library bug that broke every interactive lighting demo.
+
+**Library fix** (`3b06f56a`) :
+- `SceneScope.LightNode` composable wired only `position` into a SideEffect; `intensity`,
+  `lightDirection`, `color` were applied solely through the `LightManager.Builder` block at
+  construction time. Added a top-level `color` parameter and pushed every reactive prop
+  through SideEffect so Compose state changes drive the underlying Filament Light.
+
+**Demo fixes** (`d4312940`, `95384202`, `cd908221`, `c8587a14`) — 10 demos :
+- LightingDemo : feeds reactive intensity/color via new lib API, default 200 klx, mainLightNode=null
+- CameraControlsDemo : `key(selectedMode, resetKey)` rebuilds manipulator (Reset button now actually resets)
+- ReflectionProbesDemo : pushes cameraNode.worldPosition into cameraPos state via onFrame
+- ShapeDemo : `key(selectedShape)` rebuilds ShapeNode (lib's primitiveCount is fixed at construction, can't grow for star/hexagon)
+- AnimationDemo : scaleToUnits 1.0→0.6 + centerOrigin so dragon fits viewport ; eliminate conditional `rememberEnvironment` call
+- TextDemo : stack 3 labels vertically (left/right at x=±0.9 were outside frustum)
+- ViewNodeDemo : z=-2/scale 0.15 → z=-1/scale 0.35 so the embedded card is readable
+- SecondaryCameraDemo : rewrote as single SceneView that rotates the helmet (PiP path needed 2 SceneViews sharing one ModelInstance — broken on Pixel_7a Metal)
+- DynamicSkyDemo : neutral env + mainLightNode=null so DynamicSkyNode SUN actually drives illumination
+
+**Test infra fix** (`06976c4a`) :
+- `openDemo` first-frame wait 6 s → 10 s. On cold-boot Pixel_7a Metal AVD, Filament's first
+  PBR pass arrives at 8-9 s ; 6 s captured a black SurfaceView for half the demos. 10 s
+  adds ~96 s to the 24-test suite (~17 min total) but eliminates the false-black flake.
+
+**Discovered emulator gotcha** :
+- Pixel_7a AVD storage saturates after ~6 consecutive QA runs (140 screenshots × 100 KB
+  each into `/sdcard/Download/sceneview-qa/`). Beyond that, `INSTALL_FAILED_INSUFFICIENT_STORAGE`
+  blocks new APK installs AND visual quality degrades (helmet renders close to black due to
+  GPU memory pressure). Mitigation : `adb shell rm -rf /sdcard/Download/sceneview-qa/`
+  between runs. For canonical visuals : cold-boot AVD before final QA capture.
+- Documented in `~/.claude/projects/.../memory/project_emulator_storage_degradation.md`.
+
+**QA runs** : 10 total this session (4-10 each ~15-18 min). Final QA #10 on cold-booted
+Pixel_7a with 10 s wait : 24/24 PASS, all critical demos visually verified (Lighting
+controls reactive, Star/Hexagon visible, Geometry primitives lit, SecondaryCam rotation
+works at all 4 angles).
+
+**120 canonical screenshots refreshed** in `tools/qa-screenshots/interactions/sceneview-qa/`
+from QA #10 (commit c8587a14).
+
+### Session addendum 3 — 2026-04-23 night (polish pass — Gradle 10 ready + MaterialInstance generalized)
+
+Trois fixes propagation + housekeeping suite aux découvertes de la session 2 :
+
+**Eliminated the Scale(x = 1f) virus from public-facing docs** (`4e2bd753`) :
+- `website-static/llms.txt` — served at `sceneview.github.io/llms.txt`
+- `website-static/.well-known/llms.txt` — LLM discovery alt path
+- `gpt/knowledge-api.md` — uploaded as ChatGPT knowledge corpus
+- Regenerated `mcp/dist/generated/llms-txt.js` + `mcp/llms.txt` via `npm run prepare`
+- Kept the Math.kt KDoc + MathTest.kt regression guard intact (those use `Scale(x = 1f)` deliberately to document the gotcha)
+
+**Gradle 10-ready Groovy DSL migration** (`6483c2aa`) :
+- `namespace "..."` → `namespace = "..."` (5 modules)
+- `minifyEnabled true` → `minifyEnabled = true`, `shrinkResources true` → `shrinkResources = true` (android-demo)
+- `compose true` → `compose = true` (sceneview, arsceneview, android-demo, android-tv-demo, common)
+- `buildConfig true` → `buildConfig = true` (android-demo)
+- Flutter / React Native bridge modules intentionally skipped (alpha, lower priority)
+
+**MaterialInstance propagation generalized** (`cbfb8a60`) — 970ddff1 only covered SphereNode + CubeNode. Applied the same `prev*Material` + `setMaterialInstanceAt(0, …)` SideEffect pattern to all 9 remaining geometry composables :
+- CylinderNode, ConeNode, TorusNode, CapsuleNode
+- PlaneNode, LineNode, PathNode, ShapeNode
+- MeshNode (was especially blocked — material was its only state-based surface)
+
+Pre-fix any caller doing `val mat by remember { mutableStateOf(...) }; XxxNode(materialInstance = mat)` + later reassignment saw Compose recomposition happen but the node kept its construction-time material forever. Post-fix every geometry primitive handles reactive material swaps uniformly.
+
+**Re-run validation :**
+- `:samples:android-demo:connectedDebugAndroidTest` — **32/32 PASS** (8 min 57 s). No regression.
+- `:sceneview:compileReleaseKotlin` — OK
+- `pre-push-check.sh` — 9/9 PASS
+
+**Commits session night:**
+```
+cbfb8a60 fix(sceneview): propagate MaterialInstance reassignments to all geometry nodes
+6483c2aa chore(build): migrate Groovy DSL to property = value syntax (Gradle 10 ready)
+4e2bd753 docs: eliminate remaining Scale(x = 1f) occurrences in public docs
+```
+
+**Total branch state: 42 commits ahead of main**, all local pending GitHub ban resolution.
+
+---
+
 ## SESSION intelligent-elbakyan — 2026-04-13 — Quality-gate fix, SPM repo, geometry nodes, scheduled tasks
 
 **Worktree:** `intelligent-elbakyan`
