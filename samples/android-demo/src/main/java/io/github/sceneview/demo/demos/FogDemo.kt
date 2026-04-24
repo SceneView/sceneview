@@ -37,6 +37,7 @@ import io.github.sceneview.node.FogNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberView
 
 /**
@@ -67,7 +68,7 @@ fun FogDemo(onBack: () -> Unit) {
     val view = rememberView(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
     )
 
@@ -131,6 +132,11 @@ fun FogDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 view = view,
+                onGestureListener = rememberOnGestureListener(
+                    onSingleTapUp = { _, _ -> onGesture() },
+                    onDoubleTap = { _, _ -> onGesture() },
+                    onScroll = { _, _, _, _ -> onGesture() },
+                ),
             ) {
                 FogNode(
                     view = view,

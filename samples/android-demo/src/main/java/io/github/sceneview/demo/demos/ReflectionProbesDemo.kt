@@ -33,6 +33,7 @@ import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberScene
 import com.google.android.filament.Scene as FilamentScene
 
@@ -64,7 +65,7 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
     // In a real app you would load a different HDR for the probe zone.
     val probeEnvironment = rememberEnvironment(environmentLoader)
 
-    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
     )
 
@@ -102,6 +103,11 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
                 scene = scene,
                 cameraNode = cameraNode,
                 cameraManipulator = rememberCameraManipulator(),
+                onGestureListener = rememberOnGestureListener(
+                    onSingleTapUp = { _, _ -> onGesture() },
+                    onDoubleTap = { _, _ -> onGesture() },
+                    onScroll = { _, _, _, _ -> onGesture() },
+                ),
                 onFrame = { _ ->
                     // Push the latest camera world position into compose state so the
                     // ReflectionProbeNode below can enable/disable itself based on

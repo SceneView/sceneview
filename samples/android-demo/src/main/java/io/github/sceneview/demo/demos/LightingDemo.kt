@@ -47,6 +47,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberOnGestureListener
 
 /**
  * Demonstrates directional, point, and spot lights with interactive controls.
@@ -88,7 +89,8 @@ fun LightingDemo(onBack: () -> Unit) {
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
     // Hero rotation, deferred until the helmet has loaded (no first-frame snap).
-    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+    // Pauses on first gesture so the user can orbit / pinch without fighting it.
+    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 22_000,
     )
 
@@ -164,6 +166,11 @@ fun LightingDemo(onBack: () -> Unit) {
                 // adds its directional / point / spot contribution on top.
                 mainLightNode = null,
                 cameraManipulator = rememberCameraManipulator(),
+                onGestureListener = rememberOnGestureListener(
+                    onSingleTapUp = { _, _ -> onGesture() },
+                    onDoubleTap = { _, _ -> onGesture() },
+                    onScroll = { _, _, _, _ -> onGesture() },
+                ),
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(

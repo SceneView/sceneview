@@ -36,6 +36,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberView
 
 /**
@@ -67,7 +68,7 @@ fun PostProcessingDemo(onBack: () -> Unit) {
     view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
     view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
 
-    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
     )
 
@@ -91,6 +92,11 @@ fun PostProcessingDemo(onBack: () -> Unit) {
                 environmentLoader = environmentLoader,
                 view = view,
                 cameraManipulator = rememberCameraManipulator(),
+                onGestureListener = rememberOnGestureListener(
+                    onSingleTapUp = { _, _ -> onGesture() },
+                    onDoubleTap = { _, _ -> onGesture() },
+                    onScroll = { _, _, _, _ -> onGesture() },
+                ),
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(

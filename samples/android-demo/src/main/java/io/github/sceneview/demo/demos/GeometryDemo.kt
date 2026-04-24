@@ -19,6 +19,7 @@ import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.LightNode
 import io.github.sceneview.rememberCameraManipulator
@@ -112,9 +113,16 @@ fun GeometryDemo(onBack: () -> Unit) {
                 )
             }
             if (showPlane) {
+                // Plane primitive renders as a flat XY panel facing the camera (+Z).
+                // Previous `Float3(0.32, 0.32, 1f)` made a tilted parallelogram because
+                // Plane.getVertices uses ALL three size components — a non-zero z on what
+                // should be a flat XY quad twists the four corners into a diagonal surface.
+                // Use z=0 for a true flat panel, and set `normal = +Z` so lighting hits
+                // the visible face.
                 PlaneNode(
                     materialInstance = planeMaterial,
-                    size = Float3(0.32f, 0.32f, 1f),
+                    size = Float3(0.32f, 0.32f, 0f),
+                    normal = Direction(z = 1f),
                     position = Position(x = 0.6f, y = 0f, z = -1.5f)
                 )
             }

@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.rememberPausableHeroYaw
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.ViewNode
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -61,11 +63,27 @@ fun ViewNodeDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val windowManager = rememberViewNodeManager()
 
+    // Slow y-axis spin so the front card sweeps through its parallax arc and the
+    // back card (at rotation+180°) reveals itself — makes the "Compose-in-3D" story
+    // unmistakable instead of looking like a flat HUD sticker. `trigger = true`
+    // because the ViewNode itself needs no asset load — the animation can run
+    // immediately. Pauses on first gesture so users can grab and inspect the cards.
+    val (heroYaw, onHeroGesture) = rememberPausableHeroYaw(
+        trigger = true,
+        durationMillis = 14_000,
+        staticYaw = 20f,
+    )
+
     val gestureListener = rememberOnGestureListener(
         // onSingleTapUp fires on the touch-up immediately, no 300 ms double-tap
         // disambiguation delay — lets rapid tap sequences (tests, impatient users)
         // increment the counter every time instead of dropping alternate taps.
-        onSingleTapUp = { _, _ -> tapCount++ },
+        onSingleTapUp = { _, _ ->
+            tapCount++
+            onHeroGesture()
+        },
+        onDoubleTap = { _, _ -> onHeroGesture() },
+        onScroll = { _, _, _, _ -> onHeroGesture() },
     )
 
     DemoScaffold(
@@ -100,19 +118,31 @@ fun ViewNodeDemo(onBack: () -> Unit) {
             cameraManipulator = rememberCameraManipulator(),
             onGestureListener = gestureListener,
         ) {
+            // Front card — rotates with the hero yaw so it sweeps its parallax arc
+            // past the camera.
             ViewNode(
                 windowManager = windowManager,
                 unlit = true,
-                // Bring the embedded card closer and scale it up — at z=-2 / scale 0.15
-                // it rendered as a ~40-dp blob that was unreadable on a phone viewport.
-                // z=-1 + 0.35 gives a card roughly 30 % of the viewport width, large
-                // enough to read the "Hello from 3D!" + "Tapped N times" text.
                 position = Position(x = 0f, y = 0f, z = -1f),
+                rotation = Rotation(y = heroYaw),
                 scale = Float3(0.35f),
                 isVisible = isVisible
             ) {
-                // This Compose content is rendered onto a quad in 3D space.
                 EmbeddedCard(tapCount = tapCount, onTap = { tapCount++ })
+            }
+            // Back card — offset by 180° so when the scene spins the *back* of the
+            // front card is replaced by a second card with different content. This
+            // is the tell-tale sign that ViewNodes live in real 3D space, not in a
+            // HUD overlay — flat stickers can't show a different face on rotation.
+            ViewNode(
+                windowManager = windowManager,
+                unlit = true,
+                position = Position(x = 0f, y = 0f, z = -1f),
+                rotation = Rotation(y = heroYaw + 180f),
+                scale = Float3(0.35f),
+                isVisible = isVisible
+            ) {
+                BackCard(tapCount = tapCount)
             }
         }
     }
@@ -146,6 +176,33 @@ private fun EmbeddedCard(tapCount: Int, onTap: () -> Unit) {
             Button(onClick = onTap) {
                 Text("Tap me")
             }
+        }
+    }
+}
+
+@Composable
+private fun BackCard(tapCount: Int) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
+        modifier = Modifier.padding(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "← the back",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Real 3D Compose.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Front: $tapCount taps",
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }

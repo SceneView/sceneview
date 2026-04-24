@@ -35,6 +35,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberOnGestureListener
 
 /**
  * Demonstrates HDR environment switching.
@@ -75,9 +76,10 @@ fun EnvironmentDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Slow hero rotation that starts only after the helmet finishes loading so the
-    // first-rendered frame matches the animated yaw (no snap-on-load artifact).
-    val yaw = io.github.sceneview.demo.rememberHeroYaw(
+    // Slow hero rotation that starts only after the helmet finishes loading (no
+    // snap-on-load) and pauses on the user's first gesture so manual orbit / pinch
+    // / drag don't fight the animation.
+    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
         trigger = modelInstance != null, durationMillis = 18_000, staticYaw = 30f,
     )
 
@@ -112,6 +114,11 @@ fun EnvironmentDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
                 environment = environment,
+                onGestureListener = rememberOnGestureListener(
+                    onSingleTapUp = { _, _ -> onGesture() },
+                    onDoubleTap = { _, _ -> onGesture() },
+                    onScroll = { _, _, _, _ -> onGesture() },
+                ),
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
