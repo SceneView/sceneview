@@ -1,5 +1,11 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -16,7 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.DemoSettings
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
@@ -55,6 +64,15 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
     // In a real app you would load a different HDR for the probe zone.
     val probeEnvironment = rememberEnvironment(environmentLoader)
 
+    val infiniteTransition = rememberInfiniteTransition(label = "probes-rotation")
+    val animatedYaw by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(20_000, easing = LinearEasing)),
+        label = "probes-yaw",
+    )
+    val yaw = if (DemoSettings.qaMode) 30f else animatedYaw
+
     DemoScaffold(
         title = "Reflection Probes",
         onBack = onBack,
@@ -80,36 +98,40 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
             )
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            scene = scene,
-            cameraNode = cameraNode,
-            cameraManipulator = rememberCameraManipulator(),
-            onFrame = { _ ->
-                // Push the latest camera world position into compose state so the
-                // ReflectionProbeNode below can enable/disable itself based on
-                // actual distance instead of always comparing against the origin.
-                cameraPos = cameraNode.worldPosition
-            }
-        ) {
-            ReflectionProbeNode(
-                filamentScene = scene,
-                environment = probeEnvironment,
-                position = Position(x = 0f, y = probeY, z = 0f),
-                radius = probeRadius,
-                cameraPosition = cameraPos
-            )
-
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f,
-                    position = Position(y = 0f)
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                scene = scene,
+                cameraNode = cameraNode,
+                cameraManipulator = rememberCameraManipulator(),
+                onFrame = { _ ->
+                    // Push the latest camera world position into compose state so the
+                    // ReflectionProbeNode below can enable/disable itself based on
+                    // actual distance instead of always comparing against the origin.
+                    cameraPos = cameraNode.worldPosition
+                },
+            ) {
+                ReflectionProbeNode(
+                    filamentScene = scene,
+                    environment = probeEnvironment,
+                    position = Position(x = 0f, y = probeY, z = 0f),
+                    radius = probeRadius,
+                    cameraPosition = cameraPos,
                 )
+
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                        position = Position(y = 0f),
+                        rotation = Rotation(y = yaw),
+                    )
+                }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }
