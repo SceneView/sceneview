@@ -72,9 +72,10 @@ class DemoSmokeTest {
         }
         context.startActivity(intent)
         val found = device.wait(Until.hasObject(By.text(expectedTitle)), timeout) != null
-        // See rationale in DemoInteractionTest.openDemo — 6 s covers the Apple M3 Metal slow
-        // path for first-frame GLB decode + GPU upload.
-        Thread.sleep(6000)
+        // See rationale in DemoInteractionTest.openDemo — 10 s covers the Apple M3 Metal slow
+        // path including the first PBR-pass on cold-boot (where 6 s left a black SurfaceView
+        // in the captured screenshot).
+        Thread.sleep(10000)
         return found
     }
 

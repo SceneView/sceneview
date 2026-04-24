@@ -140,11 +140,12 @@ class DemoInteractionTest {
         // Wait for the demo's scaffold title to render (confirms Compose + Filament wired up)
         device.wait(Until.hasObject(By.text(expectedTitle)), timeout)
         // First-frame Filament setup on Apple M3 Metal translator: Engine resolve ~200 ms +
-        // material link ~300 ms + async GLB decode ~4-5 s + GPU upload ~1 s = ~6 s end-to-end
-        // for the first demo that loads a model. 2.5 s was flaking, 4 s still showed black
-        // viewports on the first 3D-model demo. 6 s covers the slow path; the cost is ~45 s
-        // of added wait across the 31-test run (~5 min total).
-        Thread.sleep(6000)
+        // material link ~300 ms + async GLB decode ~4-5 s + GPU upload ~1 s + first PBR pass
+        // a few hundred ms. 6 s caught most cases but on cold-boot the first PBR frame can
+        // arrive at 8-9 s, leaving a black SurfaceView in the screenshot. 10 s covers the
+        // worst case and adds ~96 s across the 24-test suite (~25 % overhead, acceptable
+        // for guaranteed visual capture).
+        Thread.sleep(10000)
     }
 
     private fun tap(text: String) {
