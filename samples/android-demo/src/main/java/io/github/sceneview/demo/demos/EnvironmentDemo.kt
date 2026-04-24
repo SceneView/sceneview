@@ -7,11 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -27,15 +22,13 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.environment.Environment
-import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
-import io.github.sceneview.rememberOnGestureListener
 
 /**
  * Demonstrates HDR environment switching.
@@ -76,11 +69,16 @@ fun EnvironmentDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Slow hero rotation that starts only after the helmet finishes loading (no
-    // snap-on-load) and pauses on the user's first gesture so manual orbit / pinch
-    // / drag don't fight the animation.
-    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
-        trigger = modelInstance != null, durationMillis = 18_000, staticYaw = 30f,
+    // Camera orbits the helmet; the helmet itself stays fixed — otherwise an A/B
+    // comparison between HDRs is unreadable because both the reflected highlight and
+    // the helmet's face would rotate simultaneously. Static pose + moving camera lets
+    // the viewer see how each HDR paints the same surface from different angles.
+    val cameraManipulator = rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.0f,
+        yHeight = 0.3f,
+        durationMillis = 18_000,
+        staticYaw = 30f,
     )
 
     DemoScaffold(
@@ -114,17 +112,12 @@ fun EnvironmentDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
                 environment = environment,
-                onGestureListener = rememberOnGestureListener(
-                    onSingleTapUp = { _, _ -> onGesture() },
-                    onDoubleTap = { _, _ -> onGesture() },
-                    onScroll = { _, _, _, _ -> onGesture() },
-                ),
+                cameraManipulator = cameraManipulator,
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
-                        rotation = Rotation(y = yaw),
                     )
                 }
             }

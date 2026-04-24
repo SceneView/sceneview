@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.sceneview.math.Position
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -217,6 +218,144 @@ data class OrbitState(val yaw: Float, val radius: Float, val yHeight: Float) {
             /* x = */ sin(rad) * radius,
             /* y = */ yHeight,
             /* z = */ cos(rad) * radius,
+        )
+    }
+}
+
+/**
+ * A [CameraGestureDetector.CameraManipulator] that orbits the camera around [target]
+ * while idle, then hands control off to a stock [DefaultCameraManipulator] the moment
+ * the user touches the viewport — so the model stays fixed in world space (lights and
+ * reflections hit the same surface every frame) instead of spinning under the camera.
+ *
+ * This is the "camera moves, object stays" counterpart to [rememberPausableHeroYaw]:
+ * use it when a demo is *about* the object itself (hero showcase, PBR lighting,
+ * environment comparison) so the viewer sees the model from different angles without
+ * the model rotating through its own light setup.
+ *
+ * On first gesture the manipulator captures the current orbit pose as the new
+ * [DefaultCameraManipulator.orbitHomePosition], so there's no snap — the user's first
+ * drag continues from exactly where the idle orbit left off.
+ */
+class HeroOrbitCameraManipulator(
+    private val yawProvider: () -> Float,
+    private val radius: Float,
+    private val yHeight: Float,
+    private val target: Position,
+) : io.github.sceneview.gesture.CameraGestureDetector.CameraManipulator {
+    private var fallback: io.github.sceneview.gesture.CameraGestureDetector.DefaultCameraManipulator? =
+        null
+    private var viewportW = 1
+    private var viewportH = 1
+
+    fun isPaused(): Boolean = fallback != null
+
+    private fun currentEye(): Position {
+        val rad = Math.toRadians(yawProvider().toDouble()).toFloat()
+        return Position(
+            x = sin(rad) * radius + target.x,
+            y = target.y + yHeight,
+            z = cos(rad) * radius + target.z,
+        )
+    }
+
+    private fun orbitTransform(): io.github.sceneview.math.Transform {
+        val eye = currentEye()
+        val mat = dev.romainguy.kotlin.math.lookAt(
+            eye = eye,
+            target = target,
+            up = dev.romainguy.kotlin.math.Float3(0f, 1f, 0f),
+        )
+        return io.github.sceneview.math.Transform(mat)
+    }
+
+    private fun ensureFallback() {
+        if (fallback == null) {
+            // Capture the current orbit eye as the manipulator's home so the hand-off is
+            // seamless — the first drag begins exactly where we stopped orbiting.
+            fallback = io.github.sceneview.gesture.CameraGestureDetector.DefaultCameraManipulator(
+                orbitHomePosition = currentEye(),
+                targetPosition = target,
+            ).also { it.setViewport(viewportW, viewportH) }
+        }
+    }
+
+    override fun setViewport(width: Int, height: Int) {
+        viewportW = width.coerceAtLeast(1)
+        viewportH = height.coerceAtLeast(1)
+        fallback?.setViewport(viewportW, viewportH)
+    }
+
+    override fun getTransform(): io.github.sceneview.math.Transform =
+        fallback?.getTransform() ?: orbitTransform()
+
+    override fun grabBegin(x: Int, y: Int, strafe: Boolean) {
+        ensureFallback()
+        fallback?.grabBegin(x, y, strafe)
+    }
+
+    override fun grabUpdate(x: Int, y: Int) {
+        fallback?.grabUpdate(x, y)
+    }
+
+    override fun grabEnd() {
+        fallback?.grabEnd()
+    }
+
+    override fun scrollBegin(x: Int, y: Int, separation: Float) {
+        ensureFallback()
+        fallback?.scrollBegin(x, y, separation)
+    }
+
+    override fun scrollUpdate(x: Int, y: Int, prevSeparation: Float, currSeparation: Float) {
+        fallback?.scrollUpdate(x, y, prevSeparation, currSeparation)
+    }
+
+    override fun scrollEnd() {
+        fallback?.scrollEnd()
+    }
+
+    override fun update(deltaTime: Float) {
+        fallback?.update(deltaTime)
+    }
+}
+
+/**
+ * Factory for [HeroOrbitCameraManipulator] that wires the idle-orbit yaw to a pausable
+ * animator. Returns the manipulator ready to drop into a `SceneView(cameraManipulator = ...)`.
+ *
+ * In [DemoSettings.qaMode] the yaw is frozen at [staticYaw] so screenshot tests stay stable.
+ */
+@Composable
+fun rememberHeroOrbitCameraManipulator(
+    trigger: Boolean,
+    radius: Float = 2.5f,
+    yHeight: Float = 0.5f,
+    durationMillis: Int = 20_000,
+    staticYaw: Float = 45f,
+    target: Position = Position(0f, 0f, 0f),
+): HeroOrbitCameraManipulator {
+    val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(trigger, DemoSettings.qaMode) {
+        if (trigger && !DemoSettings.qaMode) {
+            while (true) {
+                anim.snapTo(0f)
+                anim.animateTo(
+                    targetValue = 360f,
+                    animationSpec = androidx.compose.animation.core.tween(
+                        durationMillis = durationMillis,
+                        easing = androidx.compose.animation.core.LinearEasing,
+                    ),
+                )
+            }
+        }
+    }
+    return androidx.compose.runtime.remember(radius, yHeight, target) {
+        HeroOrbitCameraManipulator(
+            yawProvider = { if (DemoSettings.qaMode) staticYaw else anim.value },
+            radius = radius,
+            yHeight = yHeight,
+            target = target,
         )
     }
 }

@@ -29,25 +29,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
-import io.github.sceneview.math.Rotation
-import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
-import io.github.sceneview.rememberOnGestureListener
 
 /**
  * Demonstrates directional, point, and spot lights with interactive controls.
@@ -88,10 +80,15 @@ fun LightingDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Hero rotation, deferred until the helmet has loaded (no first-frame snap).
-    // Pauses on first gesture so the user can orbit / pinch without fighting it.
-    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
-        trigger = modelInstance != null, durationMillis = 22_000,
+    // Camera orbits the helmet; the model itself stays fixed so the directional /
+    // point / spot light hits the exact same surface every frame — otherwise the
+    // user can't tell the three light types apart because a spinning helmet sweeps
+    // its own surface through the light cone each rotation.
+    val cameraManipulator = rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.0f,
+        yHeight = 0.3f,
+        durationMillis = 22_000,
     )
 
     DemoScaffold(
@@ -165,18 +162,12 @@ fun LightingDemo(onBack: () -> Unit) {
                 // is always somewhat visible (neutral_ibl.ktx), and the user's LightNode
                 // adds its directional / point / spot contribution on top.
                 mainLightNode = null,
-                cameraManipulator = rememberCameraManipulator(),
-                onGestureListener = rememberOnGestureListener(
-                    onSingleTapUp = { _, _ -> onGesture() },
-                    onDoubleTap = { _, _ -> onGesture() },
-                    onScroll = { _, _, _, _ -> onGesture() },
-                ),
+                cameraManipulator = cameraManipulator,
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
-                        rotation = Rotation(y = yaw),
                     )
                 }
             LightNode(

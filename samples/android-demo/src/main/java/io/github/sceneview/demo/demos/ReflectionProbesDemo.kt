@@ -22,14 +22,11 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.math.Position
-import io.github.sceneview.math.Rotation
-import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
-import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberScene
 import com.google.android.filament.Scene as FilamentScene
 
@@ -68,8 +65,16 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
         onDispose { environmentLoader.destroyEnvironment(probeEnvironment) }
     }
 
-    val (yaw, onGesture) = io.github.sceneview.demo.rememberPausableHeroYaw(
-        trigger = modelInstance != null, durationMillis = 20_000, staticYaw = 30f,
+    // Camera orbits the probe volume: this is the whole point of the demo — watching
+    // the reflection flip as the camera crosses the probe sphere boundary. Rotating
+    // the model instead kept the camera static, so the probe's enter/exit check never
+    // fired and the toggle felt broken.
+    val cameraManipulator = io.github.sceneview.demo.rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.2f,
+        yHeight = 0.4f,
+        durationMillis = 20_000,
+        staticYaw = 30f,
     )
 
     DemoScaffold(
@@ -105,12 +110,7 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
                 environmentLoader = environmentLoader,
                 scene = scene,
                 cameraNode = cameraNode,
-                cameraManipulator = rememberCameraManipulator(),
-                onGestureListener = rememberOnGestureListener(
-                    onSingleTapUp = { _, _ -> onGesture() },
-                    onDoubleTap = { _, _ -> onGesture() },
-                    onScroll = { _, _, _, _ -> onGesture() },
-                ),
+                cameraManipulator = cameraManipulator,
                 onFrame = { _ ->
                     // Push the latest camera world position into compose state so the
                     // ReflectionProbeNode below can enable/disable itself based on
@@ -131,7 +131,6 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
                         position = Position(y = 0f),
-                        rotation = Rotation(y = yaw),
                     )
                 }
             }
