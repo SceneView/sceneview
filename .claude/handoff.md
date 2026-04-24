@@ -123,6 +123,50 @@ b8fcf225 feat(android-demo): regenerate launcher icons from branded source
 **Nouveau piège documenté :**
 - Pixel_7a AVD a 6 GB `/data/user/0`, dont ~5 GB pris par les system apps → seulement ~600 MB dispo pour notre APK + test APK (~250 MB). Si `installDebug` échoue avec `INSTALL_FAILED_INSUFFICIENT_STORAGE`, nettoyer `/sdcard/Download/sceneview-qa/*.jpg` (générés par les tests), `pm trim-caches`, puis potentiellement wiper l'AVD. Recréer l'AVD avec `sdcard_size=2048M` + `disk.dataPartition.size=12G` est la solution long terme.
 
+### Session addendum 4 — 2026-04-24 (visual demo audit + reactive LightNode lib fix + 10s wait)
+
+Surface-level visual audit of every Android demo screenshot revealed nine demos with silent
+behavioral bugs that the test harness couldn't catch (it only validates the test process
+doesn't crash). Plus one library bug that broke every interactive lighting demo.
+
+**Library fix** (`3b06f56a`) :
+- `SceneScope.LightNode` composable wired only `position` into a SideEffect; `intensity`,
+  `lightDirection`, `color` were applied solely through the `LightManager.Builder` block at
+  construction time. Added a top-level `color` parameter and pushed every reactive prop
+  through SideEffect so Compose state changes drive the underlying Filament Light.
+
+**Demo fixes** (`d4312940`, `95384202`, `cd908221`, `c8587a14`) — 10 demos :
+- LightingDemo : feeds reactive intensity/color via new lib API, default 200 klx, mainLightNode=null
+- CameraControlsDemo : `key(selectedMode, resetKey)` rebuilds manipulator (Reset button now actually resets)
+- ReflectionProbesDemo : pushes cameraNode.worldPosition into cameraPos state via onFrame
+- ShapeDemo : `key(selectedShape)` rebuilds ShapeNode (lib's primitiveCount is fixed at construction, can't grow for star/hexagon)
+- AnimationDemo : scaleToUnits 1.0→0.6 + centerOrigin so dragon fits viewport ; eliminate conditional `rememberEnvironment` call
+- TextDemo : stack 3 labels vertically (left/right at x=±0.9 were outside frustum)
+- ViewNodeDemo : z=-2/scale 0.15 → z=-1/scale 0.35 so the embedded card is readable
+- SecondaryCameraDemo : rewrote as single SceneView that rotates the helmet (PiP path needed 2 SceneViews sharing one ModelInstance — broken on Pixel_7a Metal)
+- DynamicSkyDemo : neutral env + mainLightNode=null so DynamicSkyNode SUN actually drives illumination
+
+**Test infra fix** (`06976c4a`) :
+- `openDemo` first-frame wait 6 s → 10 s. On cold-boot Pixel_7a Metal AVD, Filament's first
+  PBR pass arrives at 8-9 s ; 6 s captured a black SurfaceView for half the demos. 10 s
+  adds ~96 s to the 24-test suite (~17 min total) but eliminates the false-black flake.
+
+**Discovered emulator gotcha** :
+- Pixel_7a AVD storage saturates after ~6 consecutive QA runs (140 screenshots × 100 KB
+  each into `/sdcard/Download/sceneview-qa/`). Beyond that, `INSTALL_FAILED_INSUFFICIENT_STORAGE`
+  blocks new APK installs AND visual quality degrades (helmet renders close to black due to
+  GPU memory pressure). Mitigation : `adb shell rm -rf /sdcard/Download/sceneview-qa/`
+  between runs. For canonical visuals : cold-boot AVD before final QA capture.
+- Documented in `~/.claude/projects/.../memory/project_emulator_storage_degradation.md`.
+
+**QA runs** : 10 total this session (4-10 each ~15-18 min). Final QA #10 on cold-booted
+Pixel_7a with 10 s wait : 24/24 PASS, all critical demos visually verified (Lighting
+controls reactive, Star/Hexagon visible, Geometry primitives lit, SecondaryCam rotation
+works at all 4 angles).
+
+**120 canonical screenshots refreshed** in `tools/qa-screenshots/interactions/sceneview-qa/`
+from QA #10 (commit c8587a14).
+
 ### Session addendum 3 — 2026-04-23 night (polish pass — Gradle 10 ready + MaterialInstance generalized)
 
 Trois fixes propagation + housekeeping suite aux découvertes de la session 2 :
