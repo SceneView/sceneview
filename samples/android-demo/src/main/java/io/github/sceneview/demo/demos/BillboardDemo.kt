@@ -75,13 +75,15 @@ fun BillboardDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             cameraManipulator = rememberCameraManipulator()
         ) {
-            // BillboardNode: always faces the camera
+            // BillboardNode: always faces the camera. Made larger + closer so the
+            // contrast with the fixed image is obvious (the fixed image rotates / shrinks
+            // as the user orbits, the billboard stays facing them).
             if (showBillboard) {
                 BillboardNode(
                     bitmap = billboardBitmap,
-                    widthMeters = 0.3f,
-                    heightMeters = 0.15f,
-                    position = Position(x = -0.25f, y = 0f, z = -1.5f)
+                    widthMeters = 0.55f,
+                    heightMeters = 0.28f,
+                    position = Position(x = -0.4f, y = 0f, z = -1.2f)
                 )
             }
 
@@ -89,8 +91,8 @@ fun BillboardDemo(onBack: () -> Unit) {
             if (showFixed) {
                 ImageNode(
                     bitmap = fixedBitmap,
-                    position = Position(x = 0.25f, y = 0f, z = -1.5f),
-                    scale = Scale(0.3f)
+                    position = Position(x = 0.4f, y = 0f, z = -1.2f),
+                    scale = Scale(0.55f)
                 )
             }
         }
