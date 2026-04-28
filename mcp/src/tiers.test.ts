@@ -27,6 +27,15 @@ const EXPECTED_FREE_TOOLS = [
   "get_collision_guide",
   "get_platform_roadmap",
   "search_models",
+  // Setup + migration + static guides moved to free in 4.0.5
+  "get_ios_setup",
+  "get_web_setup",
+  "get_ar_setup",
+  "get_platform_setup",
+  "migrate_code",
+  "get_migration_guide",
+  "get_model_optimization_guide",
+  "get_web_rendering_guide",
 ];
 
 // ─── isProTool ──────────────────────────────────────────────────────────────
@@ -39,16 +48,16 @@ describe("isProTool", () => {
     },
   );
 
-  it("returns true for pro tool: get_ios_setup", () => {
-    expect(isProTool("get_ios_setup")).toBe(true);
-  });
-
-  it("returns true for pro tool: migrate_code", () => {
-    expect(isProTool("migrate_code")).toBe(true);
-  });
-
   it("returns true for pro tool: render_3d_preview", () => {
     expect(isProTool("render_3d_preview")).toBe(true);
+  });
+
+  it("returns true for pro tool: create_3d_artifact", () => {
+    expect(isProTool("create_3d_artifact")).toBe(true);
+  });
+
+  it("returns true for pro tool: generate_scene", () => {
+    expect(isProTool("generate_scene")).toBe(true);
   });
 
   it("returns true for pro tool: get_car_configurator (automotive)", () => {
@@ -76,7 +85,7 @@ describe("getToolTier", () => {
   });
 
   it("returns 'pro' for a pro tool", () => {
-    expect(getToolTier("get_ios_setup")).toBe("pro");
+    expect(getToolTier("render_3d_preview")).toBe("pro");
   });
 
   it("defaults to 'pro' for unknown tools", () => {
@@ -100,8 +109,8 @@ describe("getProToolNames", () => {
 
   it("includes known pro tools", () => {
     const proTools = getProToolNames();
-    expect(proTools).toContain("get_ios_setup");
-    expect(proTools).toContain("migrate_code");
+    expect(proTools).toContain("render_3d_preview");
+    expect(proTools).toContain("create_3d_artifact");
     expect(proTools).toContain("get_car_configurator");
   });
 

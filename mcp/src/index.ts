@@ -53,7 +53,7 @@ function logStartupBanner(): void {
     `[sceneview-mcp] v${PACKAGE_VERSION} — ${mode}`,
     proxied
       ? `[sceneview-mcp] Pro tool calls will be forwarded to the hosted gateway.`
-      : `[sceneview-mcp] Set SCENEVIEW_API_KEY to unlock 36+ Pro tools — ${DEFAULT_PRICING_URL}`,
+      : `[sceneview-mcp] All setup, migration & docs tools are free. Pro packages (Automotive/Gaming/Healthcare/Interior) at ${DEFAULT_PRICING_URL}`,
   ];
   for (const line of lines) process.stderr.write(`${line}\n`);
 }

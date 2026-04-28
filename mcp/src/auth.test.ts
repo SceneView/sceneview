@@ -28,7 +28,7 @@ const mockedGetApiKey = vi.mocked(getConfiguredApiKey);
 const mockedValidate = vi.mocked(validateApiKey);
 
 const FREE_TOOL = "list_samples";
-const PRO_TOOL = "get_ios_setup";
+const PRO_TOOL = "render_3d_preview";
 
 function mockFreeUser() {
   mockedGetApiKey.mockReturnValue(undefined);
@@ -144,8 +144,8 @@ describe("filterToolsForTier", () => {
   const sampleTools = [
     { name: "list_samples", description: "List code samples" },
     { name: "validate_code", description: "Validate SceneView code" },
-    { name: "get_ios_setup", description: "iOS setup guide" },
-    { name: "migrate_code", description: "Migrate to SceneView 3.x" },
+    { name: "render_3d_preview", description: "Render a 3D preview" },
+    { name: "create_3d_artifact", description: "Create a 3D artifact" },
   ];
 
   it("marks pro tools with [PRO] prefix for free users", async () => {
@@ -160,11 +160,11 @@ describe("filterToolsForTier", () => {
     expect(validateCode?.description).toBe("Validate SceneView code");
 
     // Pro tools should have [PRO] prefix
-    const iosSetup = result.find((t) => t.name === "get_ios_setup");
-    expect(iosSetup?.description).toBe("[PRO] iOS setup guide");
+    const preview = result.find((t) => t.name === "render_3d_preview");
+    expect(preview?.description).toBe("[PRO] Render a 3D preview");
 
-    const migrateCode = result.find((t) => t.name === "migrate_code");
-    expect(migrateCode?.description).toBe("[PRO] Migrate to SceneView 3.x");
+    const artifact = result.find((t) => t.name === "create_3d_artifact");
+    expect(artifact?.description).toBe("[PRO] Create a 3D artifact");
   });
 
   it("shows all tools normally for pro users", async () => {
@@ -172,11 +172,11 @@ describe("filterToolsForTier", () => {
     const result = await filterToolsForTier(sampleTools);
 
     // No [PRO] prefixes for pro users
-    const iosSetup = result.find((t) => t.name === "get_ios_setup");
-    expect(iosSetup?.description).toBe("iOS setup guide");
+    const preview = result.find((t) => t.name === "render_3d_preview");
+    expect(preview?.description).toBe("Render a 3D preview");
 
-    const migrateCode = result.find((t) => t.name === "migrate_code");
-    expect(migrateCode?.description).toBe("Migrate to SceneView 3.x");
+    const artifact = result.find((t) => t.name === "create_3d_artifact");
+    expect(artifact?.description).toBe("Create a 3D artifact");
   });
 
   it("preserves all tools in the output (no filtering)", async () => {
@@ -188,7 +188,7 @@ describe("filterToolsForTier", () => {
   it("preserves extra properties on tool objects", async () => {
     mockFreeUser();
     const tools = [
-      { name: "get_ios_setup", description: "iOS", inputSchema: { type: "object" } },
+      { name: "render_3d_preview", description: "Preview", inputSchema: { type: "object" } },
     ];
     const result = await filterToolsForTier(tools);
     expect(result[0].inputSchema).toEqual({ type: "object" });
@@ -196,7 +196,7 @@ describe("filterToolsForTier", () => {
 
   it("handles tools with no description gracefully", async () => {
     mockFreeUser();
-    const tools = [{ name: "get_ios_setup" }];
+    const tools = [{ name: "render_3d_preview" }];
     const result = await filterToolsForTier(tools);
     expect(result[0].description).toBe("[PRO] ");
   });

@@ -4,7 +4,14 @@
 
 export type Tier = "free" | "pro";
 
-// ─── Free tools (17) ─────────────────────────────────────────────────────────
+// ─── Free tools ──────────────────────────────────────────────────────────────
+//
+// 4.0.5: setup guides + cross-platform docs moved from Pro to Free. Rationale:
+// these are the entry-point tools any developer hits when integrating
+// SceneView. Gating them behind a paywall was killing adoption (see
+// `.claude/plans/strategic-pivot-april-2026.md`). Pro is now reserved for
+// the 4 vertical packages (Automotive / Gaming / Healthcare / Interior) and
+// the 3 generation tools (preview, artifact, scene generation).
 
 const FREE_TOOLS: readonly string[] = [
   "get_started",
@@ -26,23 +33,29 @@ const FREE_TOOLS: readonly string[] = [
   "get_platform_roadmap",
   "search_models",
   "analyze_project",
+
+  // Setup guides (moved from Pro in 4.0.5)
+  "get_ios_setup",
+  "get_web_setup",
+  "get_ar_setup",
+  "get_platform_setup",
+
+  // Migration tools (moved from Pro in 4.0.5)
+  "migrate_code",
+  "get_migration_guide",
+
+  // Static docs guides (moved from Pro in 4.0.5)
+  "get_model_optimization_guide",
+  "get_web_rendering_guide",
 ] as const;
 
 // ─── Pro tools ────────────────────────────────────────────────────────────────
 
 const PRO_TOOLS: readonly string[] = [
-  // Core pro tools
-  "get_ios_setup",
-  "get_web_setup",
-  "get_ar_setup",
-  "get_platform_setup",
-  "migrate_code",
-  "get_migration_guide",
+  // Generation tools (heavier, may involve external infra)
   "render_3d_preview",
   "create_3d_artifact",
   "generate_scene",
-  "get_model_optimization_guide",
-  "get_web_rendering_guide",
 
   // Automotive package
   "get_car_configurator",
@@ -110,12 +123,13 @@ export function getFreeToolNames(): string[] {
 
 export const PRO_UPGRADE_MESSAGE = `## \u{1F512} Pro Feature
 
-This tool requires a SceneView MCP Pro subscription.
+This tool is part of a specialized package (Automotive / Gaming / Healthcare / Interior) or a heavier generation tool. SceneView MCP Pro unlocks them.
 
 **Upgrade for \u20AC19/month** to unlock:
-- 35+ premium tools (AR, multi-platform, scene generation, artifacts)
-- Specialized packages (Automotive, Gaming, Healthcare, Interior)
-- Email support
+- 4 vertical packages (Automotive, Gaming, Healthcare, Interior — 24 specialized tools)
+- 3D preview, artifact, and scene-generation helpers
+
+All setup, migration, and reference guides remain free.
 
 \u2192 Subscribe at https://sceneview-mcp.mcp-tools-lab.workers.dev/pricing
 \u2192 Then set your API key: \`SCENEVIEW_API_KEY=your_key\``;
