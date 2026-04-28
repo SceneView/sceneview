@@ -44,7 +44,7 @@ const DISCLAIMER = "\n\n---\n*Generated code suggestion. Review before use in pr
 // `SCENEVIEW_SPONSOR_CTA=0`. The counter is module-scoped (per MCP process
 // lifetime), not persisted.
 const SPONSOR_CTA_INTERVAL = 10;
-const SPONSOR_CTA = "\n\n💙 *Building SceneView is a one-dev labor of love. If this tool saved you time, consider [sponsoring on GitHub](https://github.com/sponsors/sceneview) or [upgrading to Pro](https://sceneview-mcp.mcp-tools-lab.workers.dev/pricing) for unlimited access.*";
+const SPONSOR_CTA = "\n\n💙 *Building SceneView is a one-dev labor of love. If it saved you time, consider [supporting on GitHub Sponsors](https://github.com/sponsors/sceneview).*";
 let toolCallCount = 0;
 /** Test-only: reset the module-scoped counter between test cases. */
 export function __resetSponsorCounter() {
