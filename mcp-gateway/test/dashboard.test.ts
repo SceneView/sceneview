@@ -92,9 +92,9 @@ describe("GET public pages", () => {
     const app = makeFullApp();
     const res = await app.request("/pricing", {}, env());
     const body = await res.text();
-    // Free tool count must match mcp/src/tiers.ts::FREE_TOOLS (17).
-    expect(body).toContain("17 free tools");
-    expect(body).not.toContain("15 free tools");
+    // Free tool count must match mcp/src/tiers.ts::FREE_TOOLS (27 since 4.0.5).
+    expect(body).toContain("27 free tools");
+    expect(body).not.toContain("17 free tools");
     // VAT FAQ must reflect the real fiscal state: we are under
     // France's franchise en base de TVA, Stripe Tax is DISABLED,
     // no VAT is collected. The opposite claim is legally risky.
@@ -103,14 +103,14 @@ describe("GET public pages", () => {
     expect(body).toMatch(/no VAT is collected/);
   });
 
-  it("GET /pricing self-host FAQ mentions the @beta tag for Pro access", async () => {
+  it("GET /pricing self-host FAQ no longer mentions the @beta tag (Pro is on @latest since 4.0)", async () => {
     const app = makeFullApp();
     const res = await app.request("/pricing", {}, env());
     const body = await res.text();
-    // Without @beta, users install 3.6.4 @latest which has no proxy
-    // path to the gateway, so their paid key would do nothing. The
-    // FAQ must make that explicit.
-    expect(body).toContain("sceneview-mcp@beta");
+    // Pre-4.0 the npm @latest tag pointed at 3.6.x which had no proxy,
+    // so users had to install @beta to reach the gateway. Since 4.0
+    // the proxy ships in @latest itself — @beta is obsolete.
+    expect(body).not.toContain("sceneview-mcp@beta");
   });
 
   it("GET /docs shows install instructions", async () => {
