@@ -21,13 +21,13 @@ import { recordClientInit, recordToolCall } from "./telemetry.js";
 import { isProTool, getToolTier } from "./tiers.js";
 import { dispatchProxyToolCall, isProxyConfigured, DEFAULT_PRICING_URL, } from "./proxy.js";
 import { API_DOCS, TOOL_DEFINITIONS, dispatchTool, } from "./tools/index.js";
+import { PACKAGE_VERSION } from "./generated/version.js";
 // ─── v4 lite-mode startup banner ─────────────────────────────────────────────
 //
 // MCP servers must keep stdout clean for JSON-RPC, so we log to stderr.
 // Claude Desktop surfaces this in the server's "Logs" panel. The banner
 // tells the user which mode they're in (hosted vs free) and where to
 // upgrade, without blocking the transport handshake.
-const PACKAGE_VERSION = "4.0.0";
 function logStartupBanner() {
     if (process.env.SCENEVIEW_MCP_QUIET === "1")
         return;

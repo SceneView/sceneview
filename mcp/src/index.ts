@@ -36,6 +36,7 @@ import {
   TOOL_DEFINITIONS,
   dispatchTool,
 } from "./tools/index.js";
+import { PACKAGE_VERSION } from "./generated/version.js";
 
 // ─── v4 lite-mode startup banner ─────────────────────────────────────────────
 //
@@ -43,7 +44,6 @@ import {
 // Claude Desktop surfaces this in the server's "Logs" panel. The banner
 // tells the user which mode they're in (hosted vs free) and where to
 // upgrade, without blocking the transport handshake.
-const PACKAGE_VERSION = "4.0.0";
 
 function logStartupBanner(): void {
   if (process.env.SCENEVIEW_MCP_QUIET === "1") return;
