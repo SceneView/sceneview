@@ -4,6 +4,67 @@
 
 ---
 
+## SESSION elegant-wescoff — 2026-05-02 — AR demos visual QA on Pixel 9 (real device)
+
+**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7`
+**Branch:** `claude/tender-haibt-6062c7` — local commits, NOT pushed (GitHub ban still active)
+**Last commit:** `35e5990d` — `fix(ar): Face Mesh invisible + Pose cubes out of view`
+**Device:** Pixel 9, ADB over Wi-Fi `192.168.1.108:41127`. APK with both fixes already installed.
+
+### Inputs
+
+- `/tmp/ar-test/screen.mp4` — 128 s screen recording, user manually walking through 7 AR demos (Tap to Place, Image Detection, Face Mesh, Cloud Anchor, Streetscape, Pose, Rerun). Rerun was not reached.
+- `/tmp/ar-test/frames/f001.png … f064.png` — 64 frames extracted at 0.5 fps. **DO NOT re-read these images in the next session — context already enriched, vision tokens are huge. Trust the verdict table below.**
+
+### What shipped (this session)
+
+**Library — `arsceneview/src/main/java/io/github/sceneview/ar/node/AugmentedFaceNode.kt`:**
+The face mesh `VertexBuffer` declared `TANGENTS` (FLOAT4 quaternion per vertex) but uploaded raw FLOAT3 normals into that slot. Filament read 4 floats from a 3-float-per-vertex buffer → undefined tangent quaternions → broken PBR lighting → with the semi-transparent colored material used by `ARFaceDemo`, the mesh rendered with degenerate alpha and was effectively invisible on-device. Fix: compute proper tangent quaternions every frame from positions + normals + uvs + indices via Filament's `SurfaceOrientation` builder; reusable `ByteBuffer` cached on the node to avoid per-frame allocation.
+
+**Sample — `samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARPoseDemo.kt`:**
+Default sliders `(0, -0.5, -1)` placed cubes 1 m forward of ARCore session-origin. As soon as the user turned the phone, the cubes drifted off-screen. Fix: capture a `basePose` 1 m in front of the camera on first tracked frame, sliders now nudge offsets `(±1 m X, ±0.5 m Y/Z)` from that anchor. Cube grew 0.1 m → 0.2 m, sphere 0.05 m → 0.1 m for legibility at 1 m.
+
+### Frame-by-frame verdict (do not re-validate visually)
+
+| Demo | Status | Notes |
+|---|---|---|
+| Tap to Place | ✅ OK | f008 black init → f011/f015/f019/f025/f030 helmet on plane dots |
+| Image Detection | ✅ OK | User did not point at qrcode → no model attached (expected) |
+| **Face Mesh** | **🟡 NEEDS RE-TEST** | f039/f041 face tracked, **NO mesh overlay** before fix. Re-test after `35e5990d` |
+| Cloud Anchor | ✅ OK | f046 → f047 anchor placed → f050 hosting → f052 `ERROR_NOT_AUTHORIZED` (expected for Free-tier project) |
+| Streetscape | ⚠️ N/A indoor | f055-f060 "Scanning environment" (expected — indoor + no Cloud project) |
+| **Pose Placement** | **🟡 NEEDS RE-TEST** | f063/f064 sliders + camera + **no cubes** before fix. Re-test after `35e5990d` |
+| Rerun Debug | — | Not reached in 128 s recording |
+
+### What the next session should do
+
+1. Reinstall the APK on Pixel 9 if needed (build is already installed at session end, but a re-record may have wiped it):
+   ```bash
+   cd /Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7
+   ./gradlew :samples:android-demo:installDebug
+   ```
+2. Ask Thomas to re-record JUST Face Mesh + Pose Placement (~30 s total), save as `/tmp/ar-test/screen2.mp4`.
+3. Extract 8-10 frames at 0.5 fps with ffmpeg.
+4. Verify: Face Mesh shows blue semi-transparent overlay on the face; Pose shows a purple cube + sphere ~1 m in front of camera at slider zero.
+5. If both PASS → run `bash .claude/scripts/pre-push-check.sh`, then prepare PR text. Push is blocked by GitHub ban — Thomas pushes manually from his account once the ban lifts.
+6. If either still FAILS → diagnose with `adb logcat -s SceneView:V Filament:V` while user repeats the gesture; do NOT just re-read the same frames.
+
+### Files touched this session
+
+- `arsceneview/src/main/java/io/github/sceneview/ar/node/AugmentedFaceNode.kt` (+45 / -7)
+- `samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARPoseDemo.kt` (+45 / -17)
+
+### Prior fixes already validated this session (5)
+
+These were validated by reading f001-f064 and shipping was already in earlier session commits:
+- ARPlacement (helmet placed on plane dots)
+- ARImage (no false alarm — user simply didn't point at qrcode)
+- ARFaceDemo destroy() crash fix held (no abort during back-out)
+- ARCloudAnchor host() actually called (got `ERROR_NOT_AUTHORIZED` from Google)
+- ARStreetscape geospatial init OK (indoor → no overlay, expected)
+
+---
+
 ## SESSION reverent-jang — 2026-04-23 — Android teardown bugs + smoke-test harness + full QA coverage
 
 **Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/hopeful-elgamal-c7433f`
