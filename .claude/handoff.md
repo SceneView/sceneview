@@ -4,6 +4,38 @@
 
 ---
 
+## ⚠️ ACTIVE — 2026-05-04 — Android demo audit interrupted (image-limit crash)
+
+**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7`
+**Branch:** `claude/tender-haibt-6062c7` — **91 commits** on top of main, working tree CLEAN, **NOT pushed** (GitHub ban).
+**Last commit:** `4ee732e3` — handoff doc for this session.
+
+### Why the session stopped
+Image dimension limit (>2000px). I was bulk-reading screen-record grid montages and the Anthropic API rejected the message. **Repeated cause this session — must NOT repeat next session.** Always scale screenshots/grids with `ffmpeg fps=1 scale=400` BEFORE Read; verify with `identify -format "%wx%h"` < 2000 in both dims.
+
+### Read first in next session
+**`.claude/handoff-android-demo-audit.md`** — full rolled-up state (commits table, testing log, 15 demos still to verify, 2 hard rules).
+
+### Where to resume
+Live screen-record audit of these **15 demos**, starting with **LinesPathsDemo** (where the crash hit):
+
+LinesPathsDemo, GeometryDemo, ImageDemo, MultiModelDemo, GestureEditingDemo, CollisionDemo, DebugOverlayDemo, SecondaryCameraDemo, VideoDemo, ARPlacementDemo, ARStreetscapeDemo, ARRerunDemo, ModelViewerDemo, AnimationDemo, MultiModelDemo (re-verify after auto-rotate refactor).
+
+### Hard rules
+1. **No image >2000px** ever sent to Read. Use `ffmpeg -vf "fps=1,scale=400:-1"` then `tile=4x3:padding=4` then `identify` check.
+2. **No `git push`** — `thomasgorisse` GitHub account suspended. Commit local only.
+
+### Pre-handoff close
+Before declaring audit complete:
+```
+./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin
+./gradlew :sceneview:test :arsceneview:testDebugUnitTest
+bash .claude/scripts/pre-push-check.sh
+```
+Then update CLAUDE.md "Current state" + this file's top section.
+
+---
+
 ## SESSION elegant-wescoff — 2026-05-02 — AR demos visual QA on Pixel 9 (real device)
 
 **Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7`
