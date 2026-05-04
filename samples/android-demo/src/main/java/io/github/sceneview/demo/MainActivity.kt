@@ -60,9 +60,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         updateManager = InAppUpdateManager(this)
+        val initialDemo = intent?.getStringExtra("demo")
         setContent {
             SceneViewDemoTheme {
-                SceneViewDemoApp()
+                SceneViewDemoApp(initialDemo = initialDemo)
             }
         }
     }
@@ -79,12 +80,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun SceneViewDemoApp() {
+fun SceneViewDemoApp(initialDemo: String? = null) {
     val navController = rememberNavController()
 
     NavHost(
         navController = navController,
-        startDestination = "list",
+        startDestination = if (initialDemo != null) "demo/$initialDemo" else "list",
         enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
         exitTransition = { slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut() },
         popEnterTransition = { slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn() },
