@@ -327,13 +327,27 @@ fun SceneView(
     }
 
     // Common touch dispatcher — wired to both SurfaceView and TextureView via SceneRenderer.
+    //
+    // Gesture isolation: when the touch lands on an editable node, the camera gesture
+    // detector is skipped so the gesture is fully absorbed by the node. Without this,
+    // dragging/twisting/pinching an editable helmet would also orbit/pan/zoom the camera
+    // simultaneously (because both detectors received every event), making per-node
+    // editing feel "leaky" and unresponsive.
     val touchDispatcher: (MotionEvent) -> Unit = { event ->
         val hitResult = collisionSystem.hitTest(event).firstOrNull { it.node.isTouchable }
         if (onTouchEvent?.invoke(event, hitResult) != true &&
             hitResult?.node?.onTouchEvent(event, hitResult) != true
         ) {
             gestureDetector.onTouchEvent(event, hitResult)
-            cameraGestureDetectorRef.get()?.onTouchEvent(event)
+            // Skip the camera detector when the touch is on an editable node — the node
+            // owns the gesture. We check the hit node's master `isEditable` (and not the
+            // per-axis flags) so a node that's "editable but with all axes locked" still
+            // absorbs the touch — locking an axis should freeze the node, not divert the
+            // gesture to the camera (that would surprise the user).
+            val absorbedByEditableNode = hitResult?.node?.isEditable == true
+            if (!absorbedByEditableNode) {
+                cameraGestureDetectorRef.get()?.onTouchEvent(event)
+            }
         }
     }
 
