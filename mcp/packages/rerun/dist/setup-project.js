@@ -46,11 +46,11 @@ dependencies {
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import io.github.sceneview.ar.ARScene
+import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.rerun.rememberRerunBridge
 
 /**
- * Minimal ARScene that streams camera pose + planes + point clouds to a
+ * Minimal ARSceneView that streams camera pose + planes + point clouds to a
  * Rerun viewer running on localhost:9876.
  *
  * Setup (one-time, on your dev machine):
@@ -66,7 +66,7 @@ fun ARWithRerun() {
         port = 9876,
         enabled = true,
     )
-    ARScene(
+    ARSceneView(
         modifier = Modifier.fillMaxSize(),
         onSessionUpdated = { _, frame ->
             rerun.logFrame(frame)

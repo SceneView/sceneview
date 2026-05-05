@@ -17,10 +17,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
 import java.io.BufferedWriter
+import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Streams ARCore session data to a Rerun viewer over TCP using the
@@ -80,6 +83,24 @@ public constructor(
         public const val DEFAULT_RATE_HZ: Int = 10
     }
 
+    /**
+     * Result of [requestSaveAndShare] — either the sidecar wrote a `.rrd`
+     * file (`success = true` and `path` / `viewerUrl` populated) or it
+     * couldn't (`success = false` with a human-readable [reason]).
+     *
+     * `viewerUrl` is the SceneView Rerun page pre-filled with the recording
+     * location. It is most useful as a copy-paste hint — the underlying URL
+     * usually points at a `file://` path on the dev machine which most
+     * browsers won't fetch from an HTTPS page. Re-host the `.rrd` first.
+     */
+    public data class ShareResult(
+        public val success: Boolean,
+        public val path: String?,
+        public val viewerUrl: String?,
+        public val events: Int,
+        public val reason: String?,
+    )
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Conflated channel: the sender never blocks; a new event replaces any
@@ -89,7 +110,13 @@ public constructor(
     @Volatile private var socket: Socket? = null
     @Volatile private var writer: BufferedWriter? = null
     @Volatile private var writerJob: Job? = null
+    @Volatile private var readerJob: Job? = null
     @Volatile private var lastEmitNanos: Long = 0L
+
+    // Listeners for sidecar control acknowledgments (e.g. save_now -> saved).
+    // CopyOnWriteArrayList lets us iterate from the reader thread while
+    // [requestSaveAndShare] mutates from any caller thread.
+    private val ackListeners = CopyOnWriteArrayList<(ShareResult) -> Unit>()
 
     // Runtime kill-switch. When `false`, every `log*` call is a no-op and we
     // don't even build the JSON string — safe to wire unconditionally in
@@ -100,8 +127,13 @@ public constructor(
         if (rateHz <= 0) 0L else (1_000_000_000L / rateHz)
 
     /**
-     * Open the TCP socket on a background thread and start the writer loop.
+     * Open the TCP socket on a background thread and start the writer + reader loops.
      * Safe to call multiple times: no-op if already connected.
+     *
+     * The reader loop only exists to consume control acknowledgments from the
+     * sidecar (e.g. the `saved` ack returned after [requestSaveAndShare]). It
+     * is NOT a generic event router — non-control lines are silently dropped
+     * because the sidecar has no reason to send them to us today.
      */
     public fun connect() {
         if (writerJob?.isActive == true) return
@@ -112,6 +144,10 @@ public constructor(
                 val w = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
                 socket = s
                 writer = w
+
+                // Start the reader for sidecar acks AFTER the socket is live.
+                readerJob = scope.launch { readSidecarAcks(s) }
+
                 for (line in outbox) {
                     try {
                         w.write(line)
@@ -125,7 +161,43 @@ public constructor(
                 logWarning("connect to $host:$port failed: ${e.message}")
             } finally {
                 closeQuietly()
+                readerJob?.cancel()
+                readerJob = null
             }
+        }
+    }
+
+    /**
+     * Reads JSON-lines acks from the sidecar and dispatches each parsed
+     * [RerunWireFormat.ControlAck] to subscribers. Blocking — runs on its
+     * own coroutine. Exits when the socket closes or the scope is cancelled.
+     */
+    private fun readSidecarAcks(socket: Socket) {
+        try {
+            val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+            while (true) {
+                val line = reader.readLine() ?: break
+                if (line.isBlank()) continue
+                val ack = RerunWireFormat.parseControlAck(line) ?: continue
+                val result = ShareResult(
+                    success = ack.success,
+                    path = ack.path,
+                    viewerUrl = ack.viewerUrl,
+                    events = ack.events,
+                    reason = ack.reason,
+                )
+                // Snapshot listeners; CopyOnWriteArrayList iteration is safe
+                // even if a listener calls remove during dispatch.
+                for (listener in ackListeners) {
+                    try {
+                        listener(result)
+                    } catch (e: Exception) {
+                        logWarning("ack listener threw: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logVerbose("reader exit: ${e.message}")
         }
     }
 
@@ -216,6 +288,64 @@ public constructor(
     public fun logHitResult(hit: HitResult, timestampNanos: Long) {
         if (!enabled) return
         enqueue(RerunWireFormat.hitResult(timestampNanos, hit))
+    }
+
+    // ── Save & share ──────────────────────────────────────────────────────
+
+    /**
+     * Ask the Python sidecar to flush its in-memory recording to a `.rrd`
+     * file on disk and reply with the path + the SceneView Rerun viewer URL.
+     *
+     * Requires the sidecar to be running with `--save` (the demo's
+     * `rerun-bridge.py` defaults to live mode). If the sidecar is in live
+     * mode, `callback` receives a [RerunWireFormat.ControlAck] with
+     * `success = false` and a human-readable `reason`.
+     *
+     * The callback fires on the bridge's I/O thread — marshal to your UI
+     * thread (e.g. via `mainHandler.post` or a Compose `LaunchedEffect`)
+     * before touching UI state.
+     *
+     * Returns immediately. Does nothing if the bridge is not connected
+     * (the control message would be dropped on the conflated outbox).
+     */
+    public fun requestSaveAndShare(callback: (ShareResult) -> Unit) {
+        if (writerJob?.isActive != true) {
+            callback(ShareResult(
+                success = false,
+                path = null,
+                viewerUrl = null,
+                events = 0,
+                reason = "bridge not connected — call connect() first",
+            ))
+            return
+        }
+        // One-shot listener: fires once then unsubscribes itself.
+        lateinit var listener: (ShareResult) -> Unit
+        listener = { ack ->
+            ackListeners.remove(listener)
+            callback(ack)
+        }
+        ackListeners.add(listener)
+        // Use a non-conflated path: `outbox` is conflated which would drop
+        // pending event lines. Write directly to the writer instead.
+        scope.launch {
+            try {
+                writer?.let {
+                    it.write(RerunWireFormat.controlSaveNow())
+                    it.flush()
+                }
+            } catch (e: Exception) {
+                logWarning("control write failed: ${e.message}")
+                ackListeners.remove(listener)
+                callback(ShareResult(
+                    success = false,
+                    path = null,
+                    viewerUrl = null,
+                    events = 0,
+                    reason = "control write failed: ${e.message}",
+                ))
+            }
+        }
     }
 
     // ── Internals ─────────────────────────────────────────────────────────

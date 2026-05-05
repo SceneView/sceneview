@@ -28,13 +28,31 @@ describe("generatePythonSidecar", () => {
 
   it("defaults to spawning the viewer", () => {
     const src = generatePythonSidecar();
-    expect(src).toContain("spawn=True");
+    expect(src).toContain("DEFAULT_SPAWN = True");
   });
 
-  it("disables spawn when spawnViewer=false", () => {
+  it("disables default spawn when spawnViewer=false", () => {
     const src = generatePythonSidecar({ spawnViewer: false });
-    expect(src).toContain("spawn=False");
-    expect(src).not.toContain("spawn=True");
+    expect(src).toContain("DEFAULT_SPAWN = False");
+    expect(src).not.toContain("DEFAULT_SPAWN = True");
+  });
+
+  it("supports save mode + control protocol", () => {
+    const src = generatePythonSidecar();
+    expect(src).toContain("--save");
+    expect(src).toContain('cmd == "save_now"');
+    expect(src).toContain("rr.save(");
+    expect(src).toContain('"ack": "saved"');
+  });
+
+  it("includes share base URL", () => {
+    const src = generatePythonSidecar();
+    expect(src).toContain('SHARE_BASE_URL = "https://sceneview.github.io/rerun/"');
+  });
+
+  it("honours a custom share base URL", () => {
+    const src = generatePythonSidecar({ shareBaseUrl: "https://example.dev/v/" });
+    expect(src).toContain('SHARE_BASE_URL = "https://example.dev/v/"');
   });
 
   it("defaults application id to sceneview-bridge", () => {

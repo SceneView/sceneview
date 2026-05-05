@@ -155,6 +155,68 @@ class RerunWireFormatTest {
         assertTrue(line.contains("\"polygon\":[]"))
     }
 
+    // ── Control protocol ──────────────────────────────────────────────────
+
+    @Test
+    fun `controlSaveNow emits canonical control line`() {
+        val line = RerunWireFormat.controlSaveNow()
+        assertEquals("{\"type\":\"control\",\"cmd\":\"save_now\"}\n", line)
+    }
+
+    @Test
+    fun `parseControlAck recognises a saved ack`() {
+        val ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"saved\"," +
+                "\"path\":\"/home/dev/.sceneview/recordings/2026-05-06.rrd\"," +
+                "\"events\":1234," +
+                "\"viewerUrl\":\"https://sceneview.github.io/rerun/?url=file%3A%2F%2F%2Ftmp%2Fa.rrd\"}",
+        )!!
+        assertTrue(ack.success)
+        assertEquals("/home/dev/.sceneview/recordings/2026-05-06.rrd", ack.path)
+        assertEquals(1234, ack.events)
+        assertEquals(
+            "https://sceneview.github.io/rerun/?url=file%3A%2F%2F%2Ftmp%2Fa.rrd",
+            ack.viewerUrl,
+        )
+        assertEquals(null, ack.reason)
+    }
+
+    @Test
+    fun `parseControlAck recognises a save_unsupported ack`() {
+        val ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"save_unsupported\"," +
+                "\"reason\":\"sidecar started in live mode; relaunch with --save\"}",
+        )!!
+        assertFalse(ack.success)
+        assertEquals(null, ack.path)
+        assertEquals("sidecar started in live mode; relaunch with --save", ack.reason)
+    }
+
+    @Test
+    fun `parseControlAck returns null for non-control lines`() {
+        // Event lines (camera_pose etc.) are not control acks — must be ignored.
+        val line = RerunWireFormat.cameraPoseJson(
+            timestampNanos = 1L,
+            tx = 0f, ty = 0f, tz = 0f, qx = 0f, qy = 0f, qz = 0f, qw = 1f,
+        )
+        assertEquals(null, RerunWireFormat.parseControlAck(line))
+        assertEquals(null, RerunWireFormat.parseControlAck("{\"type\":\"control\"}"))  // no ack field
+        assertEquals(null, RerunWireFormat.parseControlAck("{}"))
+        assertEquals(null, RerunWireFormat.parseControlAck("not json"))
+    }
+
+    @Test
+    fun `parseControlAck handles escaped characters in path`() {
+        val ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"saved\"," +
+                "\"path\":\"C:\\\\Users\\\\d\\u00e9v\\\\rec.rrd\"}",
+        )!!
+        assertTrue(ack.success)
+        assertEquals("C:\\Users\\dév\\rec.rrd", ack.path)
+    }
+
+    // ── Newline invariant ─────────────────────────────────────────────────
+
     @Test
     fun `every serialized line contains exactly one newline, at the end`() {
         val lines = listOf(

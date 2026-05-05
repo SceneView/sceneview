@@ -246,6 +246,119 @@ internal object RerunWireFormat {
         )
     }
 
+    // ── Control protocol ──────────────────────────────────────────────────
+    //
+    // In addition to event lines (camera_pose / plane / point_cloud / …) the
+    // Kotlin bridge can send "control" lines to ask the Python sidecar to
+    // perform an action. The sidecar acknowledges by writing a single JSON
+    // line back on the same socket.
+    //
+    // Wire format:
+    //   client -> sidecar : {"type":"control","cmd":"save_now"}
+    //   sidecar -> client : {"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}
+    //                       {"type":"control","ack":"save_unsupported","reason":"…"}
+    //
+    // The control protocol is intentionally minimal — adding a new command is
+    // a paired change in this file and `samples/.../tools/rerun-bridge.py`.
+
+    /** "Save the current recording and reply with the resulting path + URL." */
+    fun controlSaveNow(): String =
+        """{"type":"control","cmd":"save_now"}""" + "\n"
+
+    /**
+     * Parsed acknowledgment from the sidecar after a `save_now` command.
+     *
+     * @param success  `true` iff the sidecar wrote a file successfully.
+     * @param path     local path of the .rrd on the sidecar host (dev machine), or `null` on failure.
+     * @param viewerUrl URL into the SceneView Rerun viewer that already encodes the
+     *                  recording's location (often a `file://` link the user must
+     *                  re-host before sharing — useful as a copy-paste hint).
+     * @param events   number of events that made it into the file.
+     * @param reason   human-readable error reason on failure (e.g. live-mode sidecar).
+     */
+    data class ControlAck(
+        val success: Boolean,
+        val path: String?,
+        val viewerUrl: String?,
+        val events: Int,
+        val reason: String?,
+    )
+
+    /**
+     * Best-effort parser for one JSON-lines string emitted by the sidecar.
+     *
+     * Returns `null` if the line is not a control acknowledgment we recognise
+     * — callers should ignore it and keep reading. Hand-parsed (no JSON lib)
+     * to keep the runtime dependency-free, matching the rest of this file.
+     */
+    fun parseControlAck(line: String): ControlAck? {
+        // Cheap structural sniff first — avoids regex on every event line.
+        if (!line.contains("\"type\":\"control\"")) return null
+        if (!line.contains("\"ack\"")) return null
+
+        val ack = extractStringField(line, "ack") ?: return null
+        return when (ack) {
+            "saved" -> ControlAck(
+                success = true,
+                path = extractStringField(line, "path"),
+                viewerUrl = extractStringField(line, "viewerUrl"),
+                events = extractIntField(line, "events") ?: 0,
+                reason = null,
+            )
+            else -> ControlAck(
+                success = false,
+                path = null,
+                viewerUrl = null,
+                events = 0,
+                reason = extractStringField(line, "reason") ?: ack,
+            )
+        }
+    }
+
+    private fun extractStringField(line: String, name: String): String? {
+        val key = "\"$name\":\""
+        val start = line.indexOf(key).takeIf { it >= 0 } ?: return null
+        val from = start + key.length
+        val sb = StringBuilder()
+        var i = from
+        while (i < line.length) {
+            val c = line[i]
+            if (c == '\\' && i + 1 < line.length) {
+                when (val next = line[i + 1]) {
+                    '"', '\\', '/' -> sb.append(next)
+                    'n' -> sb.append('\n')
+                    'r' -> sb.append('\r')
+                    't' -> sb.append('\t')
+                    'u' -> {
+                        if (i + 5 >= line.length) return null
+                        sb.append(line.substring(i + 2, i + 6).toInt(16).toChar())
+                        i += 4
+                    }
+                    else -> sb.append(next)
+                }
+                i += 2
+                continue
+            }
+            if (c == '"') return sb.toString()
+            sb.append(c)
+            i++
+        }
+        return null
+    }
+
+    private fun extractIntField(line: String, name: String): Int? {
+        val key = "\"$name\":"
+        val start = line.indexOf(key).takeIf { it >= 0 } ?: return null
+        var i = start + key.length
+        // Skip whitespace
+        while (i < line.length && line[i].isWhitespace()) i++
+        val numStart = i
+        if (i < line.length && (line[i] == '-' || line[i] == '+')) i++
+        while (i < line.length && line[i].isDigit()) i++
+        if (numStart == i) return null
+        return line.substring(numStart, i).toIntOrNull()
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private fun StringBuilder.appendCommonHeader(t: Long, type: String, entity: String) {

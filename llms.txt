@@ -1164,16 +1164,48 @@ Stream an ARCore or ARKit session to the [Rerun](https://rerun.io) viewer for sc
 
 **When to use:** debugging flaky plane detection, tracking drift, anchor instability, or comparing two AR sessions side by side. **Dev-time only** — gate with `BuildConfig.DEBUG` in release builds.
 
+### Two modes
+
+- **Live (default)** — sidecar spawns the Rerun viewer, you debug interactively.
+- **Save & share** — sidecar writes a `.rrd` file you can re-host (R2, GitHub release, gist) and open in any browser via `https://sceneview.github.io/rerun/?url=<encoded>`. Lets you attach a fully-replayable session to a bug report.
+
 ### Architecture
 
 ```
-┌──────────────┐   TCP JSON-lines  ┌──────────────────┐  rerun-sdk   ┌────────────┐
-│  RerunBridge │ ─────────────────▶│ Python sidecar   │ ───────────▶ │ Rerun      │
-│ (Kt or Swift)│   one obj/line \n │ (rerun-bridge.py)│              │ viewer     │
-└──────────────┘                   └──────────────────┘              └────────────┘
+┌──────────────┐   TCP JSON-lines  ┌──────────────────┐  rerun-sdk    ┌──────────────────┐
+│  RerunBridge │ ─────────────────▶│ Python sidecar   │ ─── live ────▶│ Rerun viewer     │
+│ (Kt or Swift)│   one obj/line \n │ (rerun-bridge.py)│ ─── save ────▶│ .rrd file        │
+└──────────────┘   control ack ◀── └──────────────────┘   on demand   └──────────────────┘
+                                                                              │
+                                                                       upload to R2/etc
+                                                                              │
+                                                              https://sceneview.github.io/rerun/
 ```
 
 Same wire format on Android and iOS. A single sidecar handles both platforms.
+
+### Save & share flow
+
+1. Run sidecar in save mode: `python rerun-bridge.py --save`
+2. In the app, tap **Save & Share** while streaming. The bridge sends a `{"type":"control","cmd":"save_now"}` line; the sidecar flushes a `.rrd` and replies with `{"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}`.
+3. Re-host the `.rrd` on a public URL (Cloudflare R2, GitHub release asset, S3, gist).
+4. Open `https://sceneview.github.io/rerun/?url=<encoded-public-url>` in any browser to view + scrub the recording.
+
+The Kotlin API surface for step 2:
+
+```kotlin
+bridge.requestSaveAndShare { result: RerunBridge.ShareResult ->
+    if (result.success) {
+        // result.path = "/home/dev/.sceneview/recordings/2026-05-06_23-30-12.rrd"
+        // result.viewerUrl = "https://sceneview.github.io/rerun/?url=file%3A%2F%2F…"
+        // result.events = 1234
+    } else {
+        // result.reason explains why (e.g. "sidecar started in live mode; relaunch with --save")
+    }
+}
+```
+
+`callback` fires on the bridge's I/O thread — marshal to your UI thread before touching state.
 
 ### Android — `rememberRerunBridge`
 
