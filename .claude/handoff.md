@@ -4,32 +4,32 @@
 
 ---
 
-## SESSION 2026-05-06 — nervous-payne (cont) — v4.0.2 cut
+## SESSION 2026-05-06 — nervous-payne (cont) — v4.0.2 SHIPPED
 
 ### TL;DR
-- ✅ **v4.0.2 tagged + pushed** — `release.yml` workflow triggered, currently in GitHub Actions queue. When it completes, it publishes:
-  - Maven Central: `io.github.sceneview:{sceneview,arsceneview}:4.0.2`
-  - npm: `sceneview-web@4.0.2` (note: `sceneview-mcp` skipped because version 4.0.8 already published — independent track)
-  - Dokka API docs to GitHub Pages
-  - GitHub Release with auto-generated notes
-- ✅ **Version bump propagated** across 29 files (gradle, npm, flutter, docs, samples, README, CLAUDE.md, llms.txt × 4, AboutView.swift, etc.). Only outstanding mismatch is `sceneview.github.io/index.html` which lives in a separate repo and syncs via the website deploy workflow.
-- ✅ **CHANGELOG.md** v4.0.2 entry dated 2026-05-06. Sections: Filament destroy-order crashes, BillboardNode mirror, ViewNode reactive props, Security (hono/postcss), Tooling, Internal.
-- ✅ **2 GitHub Discussions answered**: #843 (MaterialInstance still in use → fixed by #849/#850), #844 (DEAD_OBJECT startMirroring → API removed in v4, see #848).
-- ✅ **#863 issue filed**: regression test for #836 silent close (no-TANGENTS GLB load path).
+- 🚀 **v4.0.2 published end-to-end** (verified):
+  - Maven Central — `<latest>4.0.2</latest>`, `sceneview-4.0.2.aar`/`.pom` HTTP 200 ✅
+  - npm `sceneview-web@4.0.2` ✅
+  - npm `sceneview-mcp@4.0.8` (independent track, skipped per design) ✅
+  - Dokka API docs ✅
+  - GitHub Release v4.0.2 ✅
+  - SPM (git tag `v4.0.2`) ✅ — Swift Package Manager auto-picks up
+  - iOS demo app uploaded to App Store Connect ✅
+  - github.io repo HEAD at 4.0.2 ✅ (live site CDN cache propagating, ~5-10 min)
+- ✅ **All release checks passed**: sync-versions (1 mismatch on `sceneview.github.io/index.html` resolved by deploy), release-checklist (all PASS for tracked artifacts), impact-check (1 SPM blocker → fixed via PR #868).
+- ✅ **2 GitHub Discussions answered with v4.0.2 confirmation**: #843, #844.
+- ✅ **#863 issue filed**: regression test for #836 silent close.
+- ❌ **Play Store deploy failed** — pre-existing issue: Android demo bundle > 200 MB. Not introduced by v4.0.2. Workflow `play-store.yml` keeps failing on every push since this issue surfaced. Library Maven Central / npm / iOS App Store / GitHub Release are unaffected.
 
-### Verification needed in the next session
-1. **Confirm `release.yml` succeeded** — `gh run list --branch v4.0.2 --limit 1`. If failed, inspect `gh run view <id> --log-failed` and re-run the failing job.
-2. **Confirm Maven Central** — `curl -s https://repo.maven.apache.org/maven2/io/github/sceneview/sceneview/maven-metadata.xml | grep latest` should return `<latest>4.0.2</latest>`.
-3. **Confirm npm** — `npm view sceneview-web version` should be `4.0.2`.
-4. **Update CLAUDE.md session block** to mark v4.0.2 as published (it currently says 'on main, awaiting release').
-5. **Reply on #843** with confirmation when fixes are in published v4.0.2 (currently the comment says 'wait for the next published v4.0.x release').
+### What needs fixing (independent of v4.0.2)
+1. **Play Store bundle > 200 MB** — Android demo APK exceeds Play Store limit. Options: (a) trim demo assets / models in `samples/android-demo/src/main/assets/`, (b) convert heavy assets to Play Asset Delivery (asset packs), (c) split into dynamic feature modules. Failure has happened on the last 4 pushes; not new.
+2. **Live website CDN cache** — github.io repo HEAD is at 4.0.2 but the live page still shows 4.0.1 because of GitHub Pages CDN. Resolves itself within ~10 min — no action needed unless still stale tomorrow.
 
 ### What's pending after the release
 - **#852 tangent buffer fix** when the parallel session that owns `claude/fix-augmented-face-followups` returns
 - **#851 tender-haibt rebase** — big work, dedicated session
 - **84 unanswered Q&A Discussions** (Thomas's TODO)
-- **#848** record video/photos enhancement (post-v4.0.2 work)
-- **#856 → #857 fixed** ✅
+- **#848** record video/photos enhancement
 - **#863 GLB no-TANGENTS test** — nice-to-have follow-up
 
 ---
