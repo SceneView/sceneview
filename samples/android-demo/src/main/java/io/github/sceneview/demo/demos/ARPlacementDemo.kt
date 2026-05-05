@@ -4,21 +4,24 @@ import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
@@ -37,33 +40,92 @@ import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberOnGestureListener
 
 /**
- * AR tap-to-place demo.
+ * Interactive AR tap-to-place demo.
  *
- * Displays the camera feed with plane detection. When the user taps on a detected surface,
- * an [AnchorNode][io.github.sceneview.ar.node.AnchorNode] is created at the hit position
- * with a 3D model attached as a child.
+ * Plane detection is rendered as a translucent overlay. Each tap on a detected horizontal or
+ * vertical plane spawns a NEW [ModelNode] instance attached to its own
+ * [AnchorNode][io.github.sceneview.ar.node.AnchorNode]. The model cycles through a small curated
+ * list of bundled GLBs so the user can sample the SDK's variety: helmet, avocado, fox, lantern,
+ * boom-box-style toy car, and shiba.
  *
- * The current [Frame] is captured from [ARSceneView]'s `onSessionUpdated` callback and
- * reused in the gesture listener to perform an ARCore hit test at the tapped screen coordinates.
+ * Each placed model is **editable** — `isEditable = true` on the [ModelNode] enables
+ * pinch-to-scale, two-finger rotate, and one-finger drag. Because the parent [AnchorNode] is
+ * locked to its ARCore [Anchor] pose, the editable child node transforms relative to the anchor:
+ * the anchor stays glued to the plane while the user manipulates the model on top of it.
+ *
+ * Top-center pill shows the live "X models placed" count. The "Clear All" control wipes every
+ * placed model and detaches the underlying ARCore anchors.
  */
+
+private data class PlacedModel(
+    val id: Int,
+    val anchor: Anchor,
+    val assetPath: String,
+    val displayName: String
+)
+
+private data class CycleEntry(val assetPath: String, val displayName: String)
+
+// Curated list of bundled GLBs that look good as small AR objects on a plane.
+// Each has a distinct silhouette and material so the cycle visibly rotates through variety.
+private val MODEL_CYCLE = listOf(
+    CycleEntry("models/khronos_damaged_helmet.glb", "Damaged Helmet"),
+    CycleEntry("models/khronos_avocado.glb", "Avocado"),
+    CycleEntry("models/khronos_fox.glb", "Fox"),
+    CycleEntry("models/khronos_lantern.glb", "Lantern"),
+    CycleEntry("models/khronos_toy_car.glb", "Toy Car"),
+    CycleEntry("models/shiba.glb", "Shiba")
+)
+
 @Composable
 fun ARPlacementDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
 
-    val anchors = remember { mutableStateListOf<Anchor>() }
+    val placedModels = remember { mutableStateListOf<PlacedModel>() }
+    var nextId by remember { mutableStateOf(0) }
+    var cycleIndex by remember { mutableStateOf(0) }
+
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var isTracking by remember { mutableStateOf(false) }
 
     // Keep a reference to the latest Frame for hit testing in the gesture callback.
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
 
-    val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
-
     DemoScaffold(
         title = "Tap to Place",
-        onBack = onBack
+        onBack = onBack,
+        controls = {
+            Text(
+                text = "Tap a detected plane to drop a model. Each model is editable: drag to " +
+                    "translate, pinch to scale, twist to rotate. Models cycle on each tap.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            OutlinedButton(
+                onClick = {
+                    // Detach every ARCore anchor so the session stops tracking them, then drop
+                    // the Compose state — recomposition removes the AnchorNodes from the graph.
+                    placedModels.forEach { runCatching { it.anchor.detach() } }
+                    placedModels.clear()
+                    cycleIndex = 0
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                Text("Clear All")
+            }
+
+            // Up-next preview so the user knows what the next tap will spawn.
+            val nextEntry = MODEL_CYCLE[cycleIndex % MODEL_CYCLE.size]
+            Text(
+                text = "Next tap places: ${nextEntry.displayName}",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             ARSceneView(
@@ -84,7 +146,11 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                     trackingFailureReason = reason
                 },
                 onGestureListener = rememberOnGestureListener(
-                    onSingleTapConfirmed = { event: MotionEvent, _ ->
+                    onSingleTapConfirmed = { event: MotionEvent, node ->
+                        // If the tap landed on an existing editable ModelNode, the gesture
+                        // system handles it (drag/scale/rotate). Don't spawn a new model on top.
+                        if (node != null) return@rememberOnGestureListener
+
                         val frame = latestFrame ?: return@rememberOnGestureListener
                         if (frame.camera.trackingState != TrackingState.TRACKING) {
                             return@rememberOnGestureListener
@@ -99,23 +165,58 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                                 result.distance <= 5.0f // limit placement distance
                         }
                         if (hit != null) {
-                            anchors.add(hit.createAnchor())
+                            val entry = MODEL_CYCLE[cycleIndex % MODEL_CYCLE.size]
+                            placedModels.add(
+                                PlacedModel(
+                                    id = nextId++,
+                                    anchor = hit.createAnchor(),
+                                    assetPath = entry.assetPath,
+                                    displayName = entry.displayName
+                                )
+                            )
+                            cycleIndex = (cycleIndex + 1) % MODEL_CYCLE.size
                         }
                     }
                 )
             ) {
-                // Render an AnchorNode with a model child for each placed anchor.
-                anchors.forEach { anchor ->
-                    AnchorNode(anchor = anchor) {
-                        modelInstance?.let { instance ->
-                            ModelNode(
-                                modelInstance = instance,
-                                scaleToUnits = 0.3f,
-                                centerOrigin = Position(0.0f, 0.0f, 0.0f)
-                            )
+                // One AnchorNode + ModelNode per placement. Wrapping each in `key(id)` gives
+                // every placement its own remember slot, so the rememberModelInstance call
+                // inside loads a fresh, independent ModelInstance per anchor (Filament instances
+                // can only live in one transform at a time, so we cannot share them).
+                placedModels.forEach { placed ->
+                    key(placed.id) {
+                        AnchorNode(anchor = placed.anchor) {
+                            val instance = rememberModelInstance(modelLoader, placed.assetPath)
+                            instance?.let {
+                                ModelNode(
+                                    modelInstance = it,
+                                    scaleToUnits = 0.3f,
+                                    centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    isEditable = true
+                                )
+                            }
                         }
                     }
                 }
+            }
+
+            // Top-center pill: live count of placed models. Mirrors the GestureEditingDemo
+            // "Editing: …" Surface pattern so the two AR/3D demos share an overlay style.
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp),
+                color = Color.Black.copy(alpha = 0.7f),
+                contentColor = Color.White,
+                tonalElevation = 4.dp,
+                shape = MaterialTheme.shapes.small
+            ) {
+                val count = placedModels.size
+                Text(
+                    text = if (count == 1) "1 model placed" else "$count models placed",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
 
             // Scanning indicator overlay
@@ -125,29 +226,30 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                Text(
-                    text = trackingFailureReason?.let { reason ->
-                        when (reason) {
-                            TrackingFailureReason.NONE -> "Point your camera at a surface"
-                            TrackingFailureReason.BAD_STATE -> "AR session error"
-                            TrackingFailureReason.INSUFFICIENT_LIGHT -> "Not enough light"
-                            TrackingFailureReason.EXCESSIVE_MOTION -> "Moving too fast"
-                            TrackingFailureReason.INSUFFICIENT_FEATURES ->
-                                "Not enough detail \u2014 try a textured surface"
-                            TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
-                        }
-                    } ?: "Scanning for surfaces\u2026",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier
-                        .padding(bottom = 32.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            shape = RoundedCornerShape(24.dp)
-                        )
-                        .padding(horizontal = 24.dp, vertical = 12.dp)
-                )
+                Surface(
+                    modifier = Modifier.padding(bottom = 32.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Text(
+                        text = trackingFailureReason?.let { reason ->
+                            when (reason) {
+                                TrackingFailureReason.NONE -> "Point your camera at a surface"
+                                TrackingFailureReason.BAD_STATE -> "AR session error"
+                                TrackingFailureReason.INSUFFICIENT_LIGHT -> "Not enough light"
+                                TrackingFailureReason.EXCESSIVE_MOTION -> "Moving too fast"
+                                TrackingFailureReason.INSUFFICIENT_FEATURES ->
+                                    "Not enough detail — try a textured surface"
+                                TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
+                            }
+                        } ?: "Scanning for surfaces…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                    )
+                }
             }
         }
     }
 }
+
