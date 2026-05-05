@@ -92,9 +92,23 @@ Conditions de re-merge :
 - Vérifier qu'aucune autre session n'a touché aux mêmes fichiers de demo
 
 ### Phase 4 — Optionnel
-- PR GitHub : URL fournie par le push `https://github.com/sceneview/sceneview/pull/new/claude/tender-haibt-6062c7`
-  - ⚠️ **NE PAS créer la PR sans validation explicite de Thomas** (mémoire `feedback_no_pr_burst.md` : max 1 PR externe/semaine, soumission manuelle)
-  - Le repo `sceneview/sceneview` n'est pas externe (c'est le repo perso) mais reste prudent
+- PR GitHub : **DÉJÀ CRÉÉE** → https://github.com/sceneview/sceneview/pull/851
+
+### Phase 5 — Bug Play Store déploiement (CRITIQUE)
+
+**Le store est outdated** — dernier `play-store.yml` run (25397518500, commit `17ef22c8` "session artifacts") a **failed** le 2026-05-05 19:25 avec :
+
+> "Some feature modules of your app bundle exceed the maximum compressed download size (200 MB). Reduce the sizes of these modules: base."
+
+Conséquence : le store reste bloqué à la version pré-`17ef22c8`. Toutes les corrections récentes (vague 1, vague 2, ViewNode position/rotation, MaterialLoader.destroyMaterial fix, etc.) ne sont PAS sur le store.
+
+Options d'action à prioritiser dans une session dédiée :
+1. **Vérifier ce qui a gonflé le bundle dans `17ef22c8`** : si des QA screenshots ou un APK debug ont été committés dans `samples/android-demo/`, les exclure via `.gitignore` + git rm. Probable quick-win.
+2. **Play Asset Delivery** : déplacer les GLB/HDR lourds (assets/) vers asset packs `install-time` ou `on-demand`. Le base module ne dépasserait plus 200 MB.
+3. **Compression assets** : KTX2 pour textures + Draco pour meshes (gain typique 50-80% sur GLB/HDR).
+4. **Streaming runtime CDN** : downloader depuis `sceneview.github.io` au lancement. Mais casse l'offline-first et ajoute latence au démarrage. Moins recommandé sans cache disque local robuste.
+
+⚠️ Approche recommandée : commencer par 1 (cleanup commit `17ef22c8`), vérifier la taille post-cleanup. Si toujours > 200 MB, passer à 2 (Asset Delivery).
 
 ## Règles importantes
 
