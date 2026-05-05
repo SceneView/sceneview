@@ -176,3 +176,63 @@ Sujet futur (mémoire `project_rerun_hosted_idea.md`) :
 - ar-placement (RAS)
 - ar-pose (modulo exposure + axes communs)
 
+---
+
+# Re-review v2 (après fixes vague 1)
+
+APK reflashée à 19:42 (commits `38c2842d` → `36a51c3f`).
+
+## v2.1 animation — partiellement OK
+
+- Header "Model" : ✅ présent
+- Default state à l'entrée : doit être Reveal + Walk (au lieu de Hero + Idle)
+- Manipulator caméra ne marche pas — fix `38c2842d` (onUserGesture callback) n'a pas tenu, à réinvestiguer
+- Certaines caméras trop basses (low angle) — donnent l'impression que le modèle marche dans les airs (Reveal et/ou Tracking probablement)
+
+## v2.2 ar-placement — quelques fixes restants
+
+- Zoom parfois trop abrupt (problème SDK persistant)
+- Le zoom ne fonctionne pas sur le FOV (pinch ne change pas la distance/FOV)
+- Camera tone colors toujours bizarres (exposition AR à appliquer aussi à ar-placement, pas seulement ar-face/ar-pose)
+- Ajouter un indicateur visuel pour le geste actif (move/rotate/scale) — type pill comme dans gesture-editing
+
+## v2.3 gesture-editing — pas fiable
+
+- Beaucoup de choses ne fonctionnent pas
+- Référentiel (axes 3D) basé sur le modèle lui-même — devrait rester fixe à l'origine du monde (0,0,0), pas suivre le node
+- Toggles Position/Rotation/Scale ne désactivent rien réellement (sub-toggles non fonctionnels)
+- Pas fiable : quand on fait un geste sur le node, la caméra bouge aussi (le geste n'est pas absorbé par le node, il fuite vers la caméra)
+
+## v2.4 video — quasi rien ne marche
+
+- Mute toggle : ✅ fonctionne
+- Surface picker (Plane/Cube/Reflective) : ❌ no-op, ne change rien visuellement
+- Cinematic vs Orbit : ❌ no-op, pas de différence visible
+- À refaire intégralement (l'agent 3 a livré du code qui ne s'applique pas en runtime)
+
+## v2.5 debug-overlay — partiel + crash
+
+- Overlay FPS, Tris counter, sparkline, Stress test, suppression "Show Overlay" : ✅
+- Auto-fit caméra ne marche pas — sphère invisible à l'entrée avec count=1
+- Transitions caméra à rendre smooth (animer entre les états, pas de saut brutal)
+- **Stress test fait planter l'app** (crash) — à fixer
+- Question SDK : potentiel souci de perf dans le SDK lui-même pour ramer sur N spheres simples ? À investiguer côté lib (batch rendering, reuse instances, etc.)
+
+## v2.6 ar-face — pas amélioré
+
+- Couleurs délavées caméra : ❌ exposure -1.5f (agent 5) n'a pas eu d'effet visible
+- Mesh toujours invisible sur le visage : ❌ alpha bump (0.4 → 0.85) inefficace
+- Investigation SDK-level requise : le bug est plus profond que les params demo, soit dans `arsceneview/AugmentedFaceNode` (vertex normals/tangents incomplets), soit dans le pipeline Filament (material non upload, buffer pas refresh)
+
+## v2.7 ar-pose — pas classe
+
+- Géométries apparaissent en blanc (pas de matériau / unlit) — pas classe du tout
+- Toujours pas d'axes 3D Blender (utility créée mais pas branchée sur ar-pose)
+- Bug matériau à investiguer : pourquoi les meshes ar-pose ressortent unlit/no-material
+
+## v2.8 ar-streetscape — diag précis ✅
+
+- Écran toujours noir mais nouveau message d'erreur clair affiché en bas (progrès vs v1)
+- Erreur exacte : "AR session error: The Google Fused Location Provider for Android classes must be linked into the app's binary when calling Session.configure() with Geospatial mode enabled (Config.GeospatialMode.ENABLED)."
+- Fix simple : ajouter `com.google.android.gms:play-services-location` dans `samples/android-demo/build.gradle`
+
