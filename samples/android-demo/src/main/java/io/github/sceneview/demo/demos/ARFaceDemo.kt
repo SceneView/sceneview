@@ -49,13 +49,22 @@ fun ARFaceDemo(onBack: () -> Unit) {
     var detectedFaces by remember { mutableStateOf<List<AugmentedFace>>(emptyList()) }
     var faceCount by remember { mutableStateOf(0) }
 
-    // Semi-transparent material for the face mesh overlay — SceneView Primary with 0.4
-    // alpha so the camera feed stays readable under the tint.
+    // Strongly visible material for the face mesh overlay.
+    //
+    // The previous version used `PrimaryOverlay` (alpha 0.4) on the lit `transparent_colored`
+    // material. With the front camera, ARCore disables light estimation
+    // ([ArSession.configure]) so the scene falls back to the default IBL — combined with
+    // a 0.4-alpha PBR pass, the rendered mesh was effectively invisible on Pixel 9
+    // even though tracking reported "Tracking 1 face(s)".
+    //
+    // Bumping alpha to 0.85 + a saturated brand color makes the mesh read clearly under
+    // any lighting / IBL while still letting the camera feed show through enough to
+    // confirm it follows facial features.
     val faceMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(
-            color = SceneViewColors.PrimaryOverlay,
+            color = SceneViewColors.Primary.copy(alpha = 0.85f),
             metallic = 0.0f,
-            roughness = 0.8f,
+            roughness = 0.6f,
             reflectance = 0.1f
         )
     }
@@ -72,6 +81,11 @@ fun ARFaceDemo(onBack: () -> Unit) {
                 materialLoader = materialLoader,
                 planeRenderer = false,
                 sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
+                // Counter the washed-out / over-exposed selfie-camera output reported on
+                // Pixel 9 — the front camera's auto-exposure runs hotter than Camera2's
+                // baseline, producing a pale image when ARCore's defaults are kept.
+                // Negative EV darkens the preview to match natural skin tones again.
+                cameraExposure = -1.5f,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D
                     config.planeFindingMode = Config.PlaneFindingMode.DISABLED
