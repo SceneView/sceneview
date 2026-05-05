@@ -2,12 +2,13 @@
 
 **Date:** 2026-04-17
 **Package:** `sceneview-mcp` (npm)
-**Latest:** v4.0.1
+**Latest:** v4.0.x (see `mcp/package.json` for the exact version)
 **Repo:** github.com/sceneview/sceneview
 
-> **GitHub blocker:** primary account access pending. Marketplaces
-> requiring a GitHub PR (Cursor catalog, mcp.so) need alternative auth
-> — try the `sceneview` org, or Google/email-based signup.
+> **Submission auth:** prefer the `sceneview` GitHub org account when
+> a marketplace requires a PR (Cursor catalog, mcp.so). For
+> marketplaces that accept Google/email signup, use that — no GitHub
+> dependency.
 
 ---
 
@@ -135,7 +136,7 @@ or "deploy from npm" path if available.
 5. Description: paste long description
 6. Submit
 
-### 3. MCPize (monetization layer — GAME CHANGER)
+### 3. MCPize (monetization layer)
 
 **URL:** https://mcpize.com/developers
 **Auth:** Google / email signup likely (verify on the page)
@@ -164,12 +165,12 @@ no commitment. Per the strategy doc, this is the model successful MCPs
 ### 5. PulseMCP (community directory)
 
 **URL:** https://pulsemcp.com/submit
-**Auth:** typically a GitHub PR. **Blocked until GitHub reactivation.**
+**Auth:** typically a GitHub PR — submit via the `sceneview` org account.
 
 ### 6. Cursor MCP catalog
 
 **URL:** https://cursor.directory/mcp (or PR to cursor's community-mcp repo)
-**Auth:** GitHub PR. **Blocked until GitHub reactivation.**
+**Auth:** GitHub PR — submit via the `sceneview` org account.
 
 ### 7. ChatGPT MCP picker
 
@@ -180,15 +181,15 @@ no commitment. Per the strategy doc, this is the model successful MCPs
 ### 8. GitHub Copilot Chat catalog
 
 **URL:** https://docs.github.com/copilot/customizing-copilot/using-model-context-protocol/extending-copilot-chat-with-mcp
-**Auth:** GitHub. **Blocked.**
+**Auth:** GitHub — submit via the `sceneview` org account.
 
 ---
 
 ## Priority order (what to submit FIRST)
 
-1. **MCPize** — unlocks per-call monetization, no GitHub needed
-2. **Apify** — 36k devs, no GitHub needed
-3. **Smithery** — biggest catalog, try with `sceneview` org auth
-4. **mcp.so** — try `sceneview` org auth
+1. **MCPize** — unlocks per-call monetization (Google/email signup)
+2. **Apify** — 36k devs (Google/email signup)
+3. **Smithery** — biggest catalog, use `sceneview` org auth
+4. **mcp.so** — use `sceneview` org auth
 5. **ChatGPT MCP marketplace** — OpenAI auth, not GitHub
-6. (Wait for GitHub reactivation) PulseMCP, Cursor, Copilot
+6. **PulseMCP / Cursor / Copilot catalogs** — `sceneview` org GitHub PRs

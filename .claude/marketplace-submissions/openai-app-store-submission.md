@@ -1,9 +1,9 @@
 # OpenAI App Store — SceneView 3D & AR submission kit
 
 **Submission URL:** https://platform.openai.com/apps-manage
-**App ID:** *(stored in maintainer's private notes — re-fetch from the OpenAI Apps dashboard)*
+**App ID:** *re-fetch from the OpenAI Apps dashboard before submitting*
 **Status:** Section 1 COMPLETE, Section 2 partially filled (URL pasted + 63 tools auto-scanned), blocked on server-side prerequisites.
-**Last touched:** 2026-04-17 (multiple times during the magical-almeida session)
+**Last touched:** 2026-04-17
 
 ## Blockers identified during the live submission attempt
 
@@ -47,9 +47,7 @@ Estimated effort: 30 min if step 1 works, 1-2h if a custom domain is needed.
 Section 1 (App Info) — every field below is persisted in the OpenAI draft (auto-save confirmed by the "Draft saved" indicator in the form header):
 
 This file collects every paste-ready field for the 6-step submission flow.
-Originated from a Chrome MCP session that turned out to be too slow for
-multi-step forms — Thomas finishes the submission manually using these
-snippets.
+The maintainer completes the submission manually using these snippets.
 
 ---
 
@@ -184,7 +182,7 @@ Before clicking Submit:
   ```
   Expect HTTP 200 with `result.serverInfo.name = "sceneview-mcp-gateway"`.
 - [ ] Pricing page renders: <https://sceneview-mcp.mcp-tools-lab.workers.dev/pricing>
-- [ ] Pro upgrade flow tested at least once end-to-end with a Stripe live checkout (already done by Thomas on 2026-04-12, see CLAUDE.md)
+- [ ] Pro upgrade flow tested at least once end-to-end with a Stripe live checkout (verified end-to-end on 2026-04-12)
 
 ---
 

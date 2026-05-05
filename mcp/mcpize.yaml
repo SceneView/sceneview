@@ -22,7 +22,7 @@ description: >-
   Interior packages).
 
 runtime: typescript
-entry: src/index.ts
+entry: dist/index.js
 
 build:
   install: npm ci
