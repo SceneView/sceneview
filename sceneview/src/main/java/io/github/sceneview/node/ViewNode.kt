@@ -321,7 +321,7 @@ class ViewNode(
 }
 
 
-private fun Context.findActivity(): ComponentActivity? {
+internal fun Context.findActivity(): ComponentActivity? {
     return generateSequence(this) { (it as? ContextWrapper)?.baseContext }.filterIsInstance<ComponentActivity>()
         .firstOrNull()
 }

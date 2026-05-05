@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
@@ -63,6 +64,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import dev.romainguy.kotlin.math.Float2
+import io.github.sceneview.node.findActivity
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
+import androidx.core.net.toUri
 
 /**
  * A Filament 3D scene declared as Compose UI.
@@ -1107,10 +1112,31 @@ fun rememberViewNodeManager(
     creator: () -> ViewNode.WindowManager = {
         createViewNodeManager(context)
     }
-) = remember(context, creator).also {
-    DisposableEffect(it) {
-        onDispose {
-            it.destroy()
+): ViewNode.WindowManager {
+    val activity = LocalContext.current.findActivity()
+    val view = LocalView.current
+    return remember(context, creator).also { windowManager ->
+
+        LaunchedEffect(activity, view) {
+            activity
+                ?.lifecycle
+                ?.currentStateFlow
+                ?.onEach { state ->
+                    when (state) {
+                        Lifecycle.State.CREATED -> windowManager.pause()
+                        Lifecycle.State.RESUMED -> windowManager.resume(view)
+                        else -> {
+                            /* no-op */
+                        }
+                    }
+                }
+                ?.collect()
+        }
+
+        DisposableEffect(windowManager) {
+            onDispose {
+                windowManager.destroy()
+            }
         }
     }
 }
