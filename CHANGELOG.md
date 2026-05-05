@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — Crash hardening & reactive ViewNode props
+## v4.0.2 — Crash hardening & reactive ViewNode props (2026-05-06)
 
-**Status:** on `main`, not yet tagged. The next Maven Central / SPM publish will roll all of the items below into a v4.0.x tag.
+**Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.
 
 ### Fixed — Filament destroy-order crashes
 
