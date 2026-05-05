@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
@@ -26,7 +25,7 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
-import io.github.sceneview.math.Position
+import io.github.sceneview.demo.common.Axes3DNode
 import io.github.sceneview.math.Size
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -59,14 +58,31 @@ fun ARPoseDemo(onBack: () -> Unit) {
     // nudge them relative to that anchor, not to the moving camera).
     var basePose by remember { mutableStateOf<Pose?>(null) }
 
-    // Colored material for the pose indicator cube — SceneView Accent purple, with a
-    // touch of metallic for the AR-debug readability that the previous orange provided.
+    // Cube and sphere materials — distinct on-brand colours plus matte PBR settings.
+    //
+    // The previous version used metallic=0.5, roughness=0.3, reflectance=0.5 on the
+    // single cubeMaterial. Under ARCore's `ENVIRONMENTAL_HDR` light estimation the IBL
+    // brightness on a Pixel 9 indoors blew out the specular pass, so the cube + sphere
+    // both came out near-white / unlit-looking despite being purple. Switching to a
+    // matte response (roughness 0.85, low metallic, low reflectance) keeps the base
+    // colour readable in any lighting and makes the AR placement obvious.
+    //
+    // Two materials so cube and sphere read as distinct objects, not a single white
+    // blob — matches the same brand-ramp split used elsewhere in the demos.
     val cubeMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(
             color = SceneViewColors.Accent,
-            metallic = 0.5f,
-            roughness = 0.3f,
-            reflectance = 0.5f
+            metallic = 0.0f,
+            roughness = 0.85f,
+            reflectance = 0.1f
+        )
+    }
+    val sphereMaterial = remember(materialLoader) {
+        materialLoader.createColorInstance(
+            color = SceneViewColors.Primary,
+            metallic = 0.0f,
+            roughness = 0.85f,
+            reflectance = 0.1f
         )
     }
 
@@ -185,6 +201,17 @@ fun ARPoseDemo(onBack: () -> Unit) {
                             floatArrayOf(0f, 0f, 0f, 1f),
                         )
                     }
+                    // Blender-style XYZ axes anchored at the base pose so the user
+                    // always sees where the pose's origin sits in the world. Sliders
+                    // nudge the cube/sphere relative to this anchor — the gizmo
+                    // makes that mapping visible (red = X, green = Y, blue = Z).
+                    PoseNode(pose = base) {
+                        Axes3DNode(
+                            materialLoader = materialLoader,
+                            length = 0.4f,
+                            thickness = 0.005f,
+                        )
+                    }
                     // Cube is 0.2 m / sphere is 0.1 m — big enough to read clearly
                     // at 1 m from the camera on a phone screen. The previous 0.1 m
                     // cube was visible only as a couple of pixels at default FOV.
@@ -197,7 +224,7 @@ fun ARPoseDemo(onBack: () -> Unit) {
                     PoseNode(pose = spherePose) {
                         SphereNode(
                             radius = 0.1f,
-                            materialInstance = cubeMaterial,
+                            materialInstance = sphereMaterial,
                         )
                     }
                 }
