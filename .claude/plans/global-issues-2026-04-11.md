@@ -56,7 +56,7 @@ curl -sL "https://repo1.maven.org/maven2/io/github/sceneview/sceneview/maven-met
 
 **Status:** `README.md`, `llms.txt`, `docs/docs/cheatsheet-ios.md`, and likely other docs all tell iOS/macOS/visionOS users to install via:
 ```swift
-.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.1")
+.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.2")
 ```
 But `gh api repos/sceneview/sceneview-swift` returns **404 — Repository not found**. The repo does not exist on GitHub. Any user following the install instructions gets a clone failure before they can try the SDK.
 
