@@ -364,6 +364,8 @@ ViewNode(
     windowManager: ViewNode.WindowManager,
     unlit: Boolean = false,
     invertFrontFaceWinding: Boolean = false,
+    position: Position = Position(x = 0f),
+    rotation: Rotation = Rotation(x = 0f),
     apply: ViewNodeImpl.() -> Unit = {},
     content: (@Composable NodeScope.() -> Unit)? = null,
     viewContent: @Composable () -> Unit
