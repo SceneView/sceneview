@@ -1135,6 +1135,8 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
      * @param invertFrontFaceWinding Inverts face winding — useful for front-facing AR cameras.
      * @param position              World-space position.
      * @param rotation              World-space rotation (Euler angles in degrees).
+     * @param scale                 Local scale.
+     * @param isVisible             Whether the node should be rendered.
      * @param apply                 Additional configuration on the [ViewNodeImpl] instance.
      * @param content               Optional 3D child nodes in a [NodeScope].
      * @param viewContent           The Compose UI to render inside the 3D node.
@@ -1146,6 +1148,8 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
         invertFrontFaceWinding: Boolean = false,
         position: Position = Position(x = 0f),
         rotation: Rotation = Rotation(x = 0f),
+        scale: Scale = Scale(1f),
+        isVisible: Boolean = true,
         apply: ViewNodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null,
         viewContent: @Composable () -> Unit
@@ -1160,10 +1164,18 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                 content = viewContent
             ).apply(apply)
         }
-        SideEffect {
-            node.position = position
-            node.rotation = rotation
+        // Keyed on scalar components (Float3 uses reference equality so a fresh
+        // Position(x = …) on each recomposition would re-trigger even when unchanged).
+        DisposableEffect(node, position.x, position.y, position.z) {
+            node.position = position; onDispose {}
         }
+        DisposableEffect(node, rotation.x, rotation.y, rotation.z) {
+            node.rotation = rotation; onDispose {}
+        }
+        DisposableEffect(node, scale.x, scale.y, scale.z) {
+            node.scale = scale; onDispose {}
+        }
+        DisposableEffect(node, isVisible) { node.isVisible = isVisible; onDispose {} }
         NodeLifecycle(node, content)
     }
 
