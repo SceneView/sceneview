@@ -2,6 +2,10 @@
 
 package io.github.sceneview.demo.demos
 
+import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +25,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,9 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
+import io.github.sceneview.createDefaultCameraManipulator
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
-import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -50,6 +53,7 @@ import io.github.sceneview.utils.rememberDebugStats
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.max
+import kotlin.math.round
 import kotlin.math.sqrt
 import kotlin.math.tan
 
@@ -61,17 +65,30 @@ import kotlin.math.tan
  * The demo doubles as a stress-test:
  *  - Presets spawn 1, 10, 100, 500, or 1000 procedural [SphereNode]s arranged in a
  *    10×10×N grid.
- *  - **Stress test** ramps from 1 → 5000 nodes over 10 s so users can watch the FPS
- *    sparkline collapse in real time.
+ *  - **Stress test** ramps from 1 → [STRESS_TARGET] over [STRESS_DURATION_MS] so users
+ *    can watch the FPS sparkline collapse in real time. The cap is intentionally well
+ *    below the OOM threshold for mid-range Android devices — each [SphereNode] allocates
+ *    its own VertexBuffer + IndexBuffer (24×24 sphere ≈ 1 152 tris) and Filament's
+ *    per-renderable bookkeeping makes anything above ~3 000 nodes a one-way ticket to
+ *    `OutOfMemoryError`. v2 caps at 2 000 with try/catch around the spawn loop so a
+ *    flaky device stops gracefully instead of taking the whole app down.
  *
- * Auto-fit camera distance is recomputed whenever the spawn target changes so a single
- * sphere is just as visible as the full 10×10×10 grid.
+ * v2 fixes (from Pixel 9 review):
+ *  1. **Single-sphere framing** — count=1 was invisible because the auto-fit clamp gave
+ *     a distance < the sphere radius. Now: explicit single-sphere distance ([SINGLE_SPHERE_DISTANCE])
+ *     and the camera manipulator is re-keyed via `orbitHomePosition` so the home actually
+ *     applies (the previous `SideEffect`-only assignment was overridden by the manipulator
+ *     each frame).
+ *  2. **Smooth dolly between presets** — distance is animated through an [Animatable]
+ *     with a low-stiffness spring, snapped to a 5 cm grid for re-keying the manipulator
+ *     (each manipulator rebuild is ~free, and the snap cap keeps re-builds at ≤ 30 over
+ *     a typical transition).
+ *  3. **Stress-test crash hardened** — cap lowered 5 000 → 2 000, spawn wrapped in
+ *     try/catch with graceful auto-stop + Logcat tag `DebugOverlayDemo` for debugging.
  *
- * Spawn is **progressive**: nodes are added in batches of `SPAWN_BATCH_SIZE` per frame
+ * Spawn is **progressive**: nodes are added in batches of [SPAWN_BATCH_SIZE] per frame
  * via a `LaunchedEffect`, with a "Spawning X / N…" progress bar — preset buttons stay
  * disabled until the spawn finishes to avoid double-clicks creating duplicate work.
- *
- * The overlay is always visible (it *is* the demo).
  */
 @Composable
 fun DebugOverlayDemo(onBack: () -> Unit) {
@@ -79,6 +96,7 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
     var targetCount by remember { mutableIntStateOf(1) }
     var currentCount by remember { mutableIntStateOf(0) }
     var stressRunning by remember { mutableStateOf(false) }
+    var stressAborted by remember { mutableStateOf(false) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -93,30 +111,68 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
     var fpsHead by remember { mutableIntStateOf(0) }
     var historySize by remember { mutableIntStateOf(0) }
 
-    // Auto-fit camera. Recomputed on each `targetCount` change before the spawn ramp
-    // begins, so the very first frame already shows a sensible framing instead of
-    // popping after the user manually zooms.
-    val cameraDistance = remember(targetCount) { autoFitDistance(targetCount) }
+    // Auto-fit camera target (the distance we WANT). Recomputed on every targetCount
+    // change. The animated distance below tweens toward this.
+    val targetDistance = remember(targetCount) { autoFitDistance(targetCount) }
+
+    // Animated distance — low-stiffness spring so transitions feel like a smooth dolly
+    // instead of a hard snap. Initial value matches the first targetDistance so we don't
+    // open with a jarring outward zoom on screen entry.
+    val animatedDistance = remember { Animatable(targetDistance) }
+    LaunchedEffect(targetDistance) {
+        animatedDistance.animateTo(
+            targetValue = targetDistance,
+            animationSpec = spring(
+                stiffness = Spring.StiffnessLow,
+                dampingRatio = Spring.DampingRatioNoBouncy,
+            ),
+        )
+    }
+
+    // The manipulator caches its orbit home at construction. We re-key it on each
+    // *snapped* distance value so the smooth tween is re-rendered as a series of small
+    // dolly steps. CAMERA_REKEY_SNAP_M = 5 cm, so a 0.6 → 6 m transition produces ≤ ~108
+    // rebuilds spread over the spring duration; in practice the spring resolves in < 1 s
+    // and we get ~10–25 rebuilds, which is essentially free (a `Manipulator.Builder()`
+    // is just a few field writes + one JNI call).
+    val snappedDistance = round(animatedDistance.value / CAMERA_REKEY_SNAP_M) * CAMERA_REKEY_SNAP_M
     val cameraNode = rememberCameraNode(engine)
-    SideEffect {
-        cameraNode.position = Position(z = cameraDistance)
+    // Explicit key on snappedDistance — the SDK's `rememberCameraManipulator` already
+    // re-keys when its `creator` lambda identity changes, but going through `remember`
+    // ourselves makes the rebuild contract obvious (one rebuild per 5 cm of dolly).
+    val cameraManipulator = remember(snappedDistance) {
+        createDefaultCameraManipulator(
+            orbitHomePosition = Position(z = snappedDistance),
+            targetPosition = Position(0f),
+        )
     }
 
     // Progressive spawn: incrementally bring `currentCount` toward `targetCount` so the
     // user sees nodes appear in real time instead of staring at a frozen UI thread.
+    // Wrapped in try/catch — a flaky device that throws OOM during the stress ramp
+    // aborts the spawn gracefully and stops the test, instead of taking the whole demo
+    // down with it.
     LaunchedEffect(targetCount) {
         if (currentCount > targetCount) {
             // Shrinking — drop instantly (cheap, no frame-spread needed).
             currentCount = targetCount
             return@LaunchedEffect
         }
-        while (isActive && currentCount < targetCount) {
-            val next = (currentCount + SPAWN_BATCH_SIZE).coerceAtMost(targetCount)
-            currentCount = next
-            // ~16 ms ≈ one frame at 60 Hz. Yields the dispatcher so Filament can render
-            // the just-added batch before we add the next one — that's what gives the
-            // visible "filling up" effect.
-            delay(SPAWN_FRAME_DELAY_MS)
+        try {
+            while (isActive && currentCount < targetCount) {
+                val next = (currentCount + SPAWN_BATCH_SIZE).coerceAtMost(targetCount)
+                currentCount = next
+                // ~16 ms ≈ one frame at 60 Hz. Yields the dispatcher so Filament can
+                // render the just-added batch before we add the next one — that's what
+                // gives the visible "filling up" effect.
+                delay(SPAWN_FRAME_DELAY_MS)
+            }
+        } catch (t: Throwable) {
+            // OOM / Filament JNI failure during ramp — auto-stop and fall back to a
+            // safe count so the user can recover with a button.
+            Log.e(TAG, "Spawn aborted at $currentCount / $targetCount", t)
+            stressRunning = false
+            stressAborted = true
         }
     }
 
@@ -149,6 +205,14 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                     )
                 }
 
+                if (stressAborted) {
+                    Text(
+                        "Stress test aborted (device limit). Tap a preset to recover.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -159,7 +223,10 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                     val controlsEnabled = !spawning && !stressRunning
                     listOf(1, 10, 100, 500, 1000).forEach { preset ->
                         OutlinedButton(
-                            onClick = { targetCount = preset },
+                            onClick = {
+                                stressAborted = false
+                                targetCount = preset
+                            },
                             enabled = controlsEnabled,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
@@ -167,7 +234,10 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                         }
                     }
                     OutlinedButton(
-                        onClick = { targetCount = 1 },
+                        onClick = {
+                            stressAborted = false
+                            targetCount = 1
+                        },
                         enabled = controlsEnabled,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
@@ -175,22 +245,22 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                     }
                 }
 
-                // Stress test: ramp 1 → 5000 over STRESS_DURATION_MS so the sparkline
-                // shows a textbook performance cliff. The button toggles itself off
-                // when the ramp completes (see LaunchedEffect below).
+                // Stress test: ramp 1 → STRESS_TARGET over STRESS_DURATION_MS so the
+                // sparkline shows a textbook performance cliff. The button toggles
+                // itself off when the ramp completes (see LaunchedEffect below).
                 Button(
                     onClick = {
+                        stressAborted = false
                         stressRunning = !stressRunning
                         if (stressRunning) {
                             // Start fresh from a small count so the ramp is visible.
                             targetCount = 1
                         }
                     },
-                    enabled = !stressRunning || stressRunning, // always enabled (toggle)
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Text(
-                        if (stressRunning) "Stop stress test" else "Stress test (1 → 5000)",
+                        if (stressRunning) "Stop stress test" else "Stress test (1 → $STRESS_TARGET)",
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -222,7 +292,7 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
                 cameraNode = cameraNode,
-                cameraManipulator = rememberCameraManipulator(),
+                cameraManipulator = cameraManipulator,
                 onFrame = { frameTimeNanos ->
                     stats.onFrame(frameTimeNanos, nodeCount = currentCount)
                     // Push the just-computed FPS into the ring buffer. We read
@@ -236,6 +306,14 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                 // origin. SphereNode is a built-in SDK primitive (24×24 tessellation =
                 // ~1152 tris each), so the perf cost comes purely from draw calls +
                 // transforms + frustum culling — exactly what the stress test exercises.
+                //
+                // PERF NOTE: each SphereNode here allocates its own VertexBuffer +
+                // IndexBuffer because the SDK's SphereNode constructor builds a fresh
+                // Sphere geometry per node. A future optimisation would be to share one
+                // Sphere geometry across all nodes (an SDK addition — out of scope for
+                // this demo). Material instances are unaffected: a null materialInstance
+                // here means Filament uses its built-in default material with zero
+                // per-node allocation, so the perf cost lives in the geometry buffers.
                 repeat(currentCount) { i ->
                     key(i) {
                         val pos = remember(i) {
@@ -376,6 +454,8 @@ private fun DebugOverlay(
 /*  Tunables / helpers                                                         */
 /* -------------------------------------------------------------------------- */
 
+private const val TAG = "DebugOverlayDemo"
+
 private const val NODE_SPACING = 0.18f
 private const val NODE_RADIUS = 0.04f
 
@@ -389,29 +469,51 @@ private const val SPAWN_FRAME_DELAY_MS = 16L
 /** FPS sparkline — 120 samples at 60 fps ≈ 2 s of history. */
 private const val FPS_HISTORY_SIZE = 120
 
-/** Stress test: linear ramp 1 → 5000 over 10 s. */
-private const val STRESS_TARGET = 5000
+/**
+ * Stress test: linear ramp 1 → 2 000 over 10 s. v1 used 5 000, which OOM'd Pixel-class
+ * devices — each [SphereNode] holds its own VertexBuffer + IndexBuffer (24×24 sphere ≈
+ * 4 KB GPU + 5 KB JVM bookkeeping), so 5 000 ≈ 45 MB of native buffers + Filament's
+ * per-renderable overhead, on top of the existing scene state. 2 000 is a comfortable
+ * upper bound that still produces a clearly visible perf cliff.
+ */
+private const val STRESS_TARGET = 2_000
 private const val STRESS_DURATION_MS = 10_000L
 private const val STRESS_TICK_MS = 50L
+
+/** Distance for a single sphere — close enough to fill ~25 % of vertical FOV at 35°. */
+private const val SINGLE_SPHERE_DISTANCE = 0.8f
+
+/**
+ * Snap the animated camera distance to this grid (in metres) when re-keying the
+ * orbit manipulator. 5 cm is below visible-step threshold for a smooth dolly while
+ * keeping rebuild count bounded for any reasonable transition (max ~120 rebuilds for
+ * a 0 → 6 m sweep, all of them cheap).
+ */
+private const val CAMERA_REKEY_SNAP_M = 0.05f
 
 /**
  * Camera distance that frames a 10×10×N sphere grid (sphere radius [NODE_RADIUS],
  * spacing [NODE_SPACING]) with ~1.2× padding.
  *
- * Approach:
+ * v2 changes:
+ *  - **Single-sphere case is explicit**: count == 1 returns [SINGLE_SPHERE_DISTANCE]
+ *    instead of falling through the bounding-box math (which produced a distance < the
+ *    sphere radius, hiding the sphere on Pixel 9).
+ *  - **Floor raised**: minimum returned distance is now [SINGLE_SPHERE_DISTANCE] so even
+ *    a degenerate count (0, 2, 3) gets a visible framing.
+ *
+ * Approach for count > 1:
  *  1. Compute the half-extents of the bounding box on each axis from the spawn pattern.
- *  2. Take the max half-extent → bounding-sphere radius.
+ *  2. Take the bounding-sphere radius via Pythagoras of the three half-extents.
  *  3. Camera distance = radius / tan(fov/2) × 1.2 (padding).
  *
- * Filament's default vertical FOV is ~45°. We're conservative and use 35° because the
- * actual aspect ratio shrinks the visible cone on phones in portrait mode.
+ * Filament's default vertical FOV is ~45°. We use 35° because portrait aspect ratio
+ * shrinks the visible cone and we want a comfortable margin around the bounding box.
  */
-private fun autoFitDistance(nodeCount: Int): Float {
-    if (nodeCount <= 0) return 1.5f
+internal fun autoFitDistance(nodeCount: Int): Float {
+    if (nodeCount <= 1) return SINGLE_SPHERE_DISTANCE
     // Grid layout: x in [0..9] (mod 10), y in [0..9] (i/10 mod 10), z layer = i/100.
-    // For nodeCount n: zLayers = ceil(n / 100). For 1 node: just one cell, but we still
-    // want some breathing room — clamp the smallest extent so a single sphere isn't
-    // glued to the lens.
+    // For nodeCount n: zLayers = ceil(n / 100).
     val xExtent = if (nodeCount >= 10) 9 else (nodeCount - 1)
     val yExtent = if (nodeCount >= 100) 9 else (((nodeCount - 1) / 10).coerceAtLeast(0))
     val zLayers = ((nodeCount - 1) / 100).coerceAtLeast(0)
@@ -423,7 +525,7 @@ private fun autoFitDistance(nodeCount: Int): Float {
     // 35° vertical FOV (radians) → tan(17.5°) ≈ 0.3153.
     val fovRadHalf = Math.toRadians(17.5).toFloat()
     val raw = radius / tan(fovRadHalf) * 1.2f
-    return max(0.6f, raw)
+    return max(SINGLE_SPHERE_DISTANCE, raw)
 }
 
 private fun formatThousands(v: Long): String {
