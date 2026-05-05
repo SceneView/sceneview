@@ -19,9 +19,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.environment.Environment
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
-import io.github.sceneview.node.Node as NodeImpl
+import io.github.sceneview.node.SphereNode as SphereNodeImpl
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -41,6 +42,9 @@ fun PhysicsDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
+    val environment: Environment = remember(environmentLoader) {
+        environmentLoader.createHDREnvironment(assetFileLocation = "environments/studio_2k.hdr")!!
+    }
 
     DemoScaffold(
         title = "Physics",
@@ -70,9 +74,13 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 engine = engine,
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
-                cameraManipulator = rememberCameraManipulator()
+                environment = environment,
+                cameraManipulator = rememberCameraManipulator(
+                    orbitHomePosition = Position(0f, 0.2f, 1.0f),
+                    targetPosition = Position(0f, 0f, 0f)
+                )
             ) {
-                val groundMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color.DarkGray) }
+                val groundMaterial = remember(materialLoader) { materialLoader.createColorInstance(Color(0.85f, 0.85f, 0.8f)) }
                 val sphereMaterials = remember(materialLoader) {
                     listOf(
                         materialLoader.createColorInstance(Color.Red),
@@ -82,38 +90,35 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     )
                 }
 
-                // Ground plane for visual reference — positioned below center and sized
-                // so the camera can see both the plane and the falling spheres above it.
+                // Ground plane for visual reference — sits just below the origin so
+                // the camera can see both the plane and the falling spheres above it.
                 PlaneNode(
                     materialInstance = groundMaterial,
-                    size = Size(x = 1.5f, y = 1.5f),
-                    position = Position(y = -0.5f)
+                    size = Size(x = 1f, y = 1f),
+                    position = Position(y = -0.15f)
                 )
 
                 for (i in 0 until sphereCount) {
-                    val xOffset = (i % 5 - 2) * 0.3f
-                    val startY = 0.5f + i * 0.4f
+                    val xOffset = (i % 5 - 2) * 0.1f
+                    val startY = 0.15f + i * 0.15f
 
-                    // Capture the Node reference via apply so PhysicsNode can drive it.
-                    var nodeRef by remember(i) { mutableStateOf<NodeImpl?>(null) }
+                    // Capture the SphereNode reference via apply so PhysicsNode can drive it.
+                    var nodeRef by remember(i) { mutableStateOf<SphereNodeImpl?>(null) }
 
-                    Node(
+                    SphereNode(
+                        radius = 0.05f,
+                        materialInstance = sphereMaterials[i % 4],
                         position = Position(x = xOffset, y = startY, z = 0f),
                         apply = { nodeRef = this }
-                    ) {
-                        SphereNode(
-                            radius = 0.15f,
-                            materialInstance = sphereMaterials[i % 4]
-                        )
-                    }
+                    )
 
                     // PhysicsNode attaches an onFrame callback that applies gravity + bounce.
                     nodeRef?.let { node ->
                         PhysicsNode(
                             node = node,
                             restitution = 0.7f,
-                            floorY = -0.5f,
-                            radius = 0.15f
+                            floorY = -0.15f,
+                            radius = 0.05f
                         )
                     }
                 }
