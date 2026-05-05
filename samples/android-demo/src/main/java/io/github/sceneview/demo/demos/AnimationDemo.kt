@@ -322,6 +322,13 @@ fun AnimationDemo(onBack: () -> Unit) {
     // Single manipulator drives all scripted modes via provider lambdas. TRACKING
     // sets `eyeOverride` to take the lambda over the spherical math; the other modes
     // leave it null so the (yaw, radius, yHeight) path runs.
+    //
+    // Gesture hand-off — the cinematic shots are a *starting point*, not a lock. The
+    // moment the user touches the screen the manipulator flips `cameraMode` to FREE
+    // (via `onUserGesture`), which tears down the scripted LaunchedEffect and swaps in
+    // a real `DefaultCameraManipulator` seeded at the current scripted eye. The user
+    // never gets blocked mid-gesture: the swap happens between frames so the in-flight
+    // grab continues uninterrupted on the new manipulator.
     val scriptedManipulator = remember {
         ScriptedCameraManipulator(
             target = target,
@@ -329,6 +336,7 @@ fun AnimationDemo(onBack: () -> Unit) {
             radiusProvider = { radiusAnim.value },
             yHeightProvider = { yHeightAnim.value },
             eyeOverrideProvider = { trackingEye.value },
+            onUserGesture = { if (cameraMode != CameraMode.FREE) cameraMode = CameraMode.FREE },
         )
     }
     // For Free mode: capture the scripted manipulator's last eye and seed a stock
@@ -405,6 +413,8 @@ fun AnimationDemo(onBack: () -> Unit) {
                 }
             }
             if (animationNames.isNotEmpty()) {
+                Text("Model", style = MaterialTheme.typography.labelLarge)
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -508,9 +518,10 @@ fun AnimationDemo(onBack: () -> Unit) {
  * a straight line, so [eyeOverrideProvider] returns a non-null absolute eye when
  * active — when present it bypasses the spherical math entirely.
  *
- * Gestures are intentionally no-ops here: scripted modes run uninterrupted; switching
- * to Free swaps in a stock `DefaultCameraManipulator` that does respond to gestures
- * (see [currentEye] for the seamless hand-off pose).
+ * Gestures don't manipulate the camera directly here — instead they fire
+ * [onUserGesture] so the host can switch to FREE mode, which swaps in a real
+ * `DefaultCameraManipulator` seeded at [currentEye]. From the user's point of view
+ * the cinematic shot was a starting position, not a lock.
  */
 private class ScriptedCameraManipulator(
     private val target: Position,
@@ -518,6 +529,7 @@ private class ScriptedCameraManipulator(
     private val radiusProvider: () -> Float,
     private val yHeightProvider: () -> Float,
     private val eyeOverrideProvider: () -> Position? = { null },
+    private val onUserGesture: () -> Unit = {},
 ) : CameraGestureDetector.CameraManipulator {
 
     // Latest viewport size pushed by the SDK's surface-resize callback. We don't use
@@ -559,10 +571,12 @@ private class ScriptedCameraManipulator(
         return Transform(mat)
     }
 
-    override fun grabBegin(x: Int, y: Int, strafe: Boolean) {}
+    // Any touch on the scene = "I want control". Forward to the host to flip into FREE
+    // mode; the real DefaultCameraManipulator then takes over the in-flight gesture.
+    override fun grabBegin(x: Int, y: Int, strafe: Boolean) { onUserGesture() }
     override fun grabUpdate(x: Int, y: Int) {}
     override fun grabEnd() {}
-    override fun scrollBegin(x: Int, y: Int, separation: Float) {}
+    override fun scrollBegin(x: Int, y: Int, separation: Float) { onUserGesture() }
     override fun scrollUpdate(x: Int, y: Int, prevSeparation: Float, currSeparation: Float) {}
     override fun scrollEnd() {}
     override fun update(deltaTime: Float) {}
