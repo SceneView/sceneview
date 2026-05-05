@@ -1,5 +1,6 @@
 package io.github.sceneview.ar.node
 
+import android.util.Log
 import com.google.android.filament.Engine
 import com.google.android.filament.IndexBuffer
 import com.google.android.filament.MaterialInstance
@@ -20,6 +21,8 @@ import com.google.ar.core.Session
 import com.google.ar.core.Trackable
 import com.google.ar.core.TrackingState
 import io.github.sceneview.node.MeshNode
+
+private const val TAG = "AugmentedFaceNode"
 
 /**
  * AR Augmented Face positioned 3D model node
@@ -153,6 +156,14 @@ open class AugmentedFaceNode(
         val tangents = computeTangents(vertices, normals, uvs, indices, vertexCount)
 
         if (meshNode == null) {
+            // First-frame diagnostic — only logs once per face. Surfaces vertex
+            // count + buffer sanity so on-device debugging of "mesh invisible"
+            // reports can confirm the upload happened with non-zero geometry.
+            Log.d(
+                TAG,
+                "Building face mesh — vertices=$vertexCount, indices=${indices.limit()}, " +
+                    "uvs=${uvs.limit()}, hasMaterial=${faceMaterialInstance != null}"
+            )
             meshNode = MeshNode(
                 engine = engine,
                 primitiveType = PrimitiveType.TRIANGLES,
