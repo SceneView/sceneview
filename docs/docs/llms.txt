@@ -3,8 +3,8 @@
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
 **Android — Maven artifacts (version 3.6.2):**
-- 3D only: `io.github.sceneview:sceneview:4.0.1`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.1`
+- 3D only: `io.github.sceneview:sceneview:4.0.2`
+- AR + 3D: `io.github.sceneview:arsceneview:4.0.2`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.0")
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.1")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.1") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.0.2")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.0.2") // AR (includes sceneview)
 }
 ```
 
@@ -1176,7 +1176,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.1")
+    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.2")
 ]
 ```
 
