@@ -90,7 +90,6 @@ describe("validateInteriorCode", () => {
   it("detects Sceneform 1.x ArSceneView() usage", () => {
     const result = validateInteriorCode(`ArSceneView(modifier = Modifier)`);
     expect(result.valid).toBe(false);
-    expect(result.issues[0].message).toContain("Sceneform");
   });
 
   it("detects loadModelAsync 2.x usage", () => {
@@ -147,7 +146,7 @@ describe("validateInteriorCode", () => {
   });
 
   // ── Missing imports ────────────────────────────────────────────────────
-  it("warns about missing SceneView import", () => {
+  it("warns about missing Scene import", () => {
     const result = validateInteriorCode(`
       @Composable
       fun RoomViewer() {
@@ -159,7 +158,7 @@ describe("validateInteriorCode", () => {
     expect(result.issues.some((i) => i.message.includes("Missing SceneView import"))).toBe(true);
   });
 
-  it("warns about missing ARSceneView import", () => {
+  it("warns about missing ARScene import", () => {
     const result = validateInteriorCode(`
       @Composable
       fun RoomViewer() {

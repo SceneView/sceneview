@@ -86,4 +86,38 @@ describe("generateFurniturePlacement", () => {
         const code = generateFurniturePlacement({ category: "chair", size: "large" });
         expect(code).toContain("1.5f");
     });
+    it("uses medium scale (1f) by default", () => {
+        const code = generateFurniturePlacement({ category: "sofa" });
+        // medium scale = 1.0, JS renders 1.0 as "1" in template literal
+        expect(code).toContain("scaleToUnits = 1f");
+    });
+    it("no rotation slider when rotatable=false", () => {
+        const code = generateFurniturePlacement({
+            category: "rug",
+            rotatable: false,
+        });
+        expect(code).not.toContain("rotationY");
+    });
+    it("no scale slider when scalable=false", () => {
+        const code = generateFurniturePlacement({
+            category: "rug",
+            scalable: false,
+        });
+        expect(code).not.toContain("scaleFactor");
+    });
+    it("uses correct model path for mirror category", () => {
+        const code = generateFurniturePlacement({ category: "mirror" });
+        expect(code).toContain("models/furniture/mirror.glb");
+    });
+    it("generates code for every furniture size", () => {
+        for (const size of FURNITURE_SIZES) {
+            const code = generateFurniturePlacement({ category: "chair", size });
+            expect(code).toContain("@Composable");
+        }
+    });
+    it("3D preview uses SceneView (not ARScene) when ar=false", () => {
+        const code = generateFurniturePlacement({ category: "desk", ar: false });
+        expect(code).toContain("SceneView(");
+        expect(code).not.toContain("ARSceneView(");
+    });
 });

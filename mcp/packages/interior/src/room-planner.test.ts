@@ -77,7 +77,7 @@ describe("generateRoomPlanner", () => {
     const code = generateRoomPlanner({ roomType: "living-room", ar: true });
     expect(code).toContain("import io.github.sceneview.ar.ARSceneView");
     expect(code).toContain("ARSceneView(");
-    expect(code).toContain("arsceneview:3.6.0");
+    expect(code).toContain("arsceneview:3.6.2");
     expect(code).toContain("android.permission.CAMERA");
   });
 
@@ -118,5 +118,52 @@ describe("generateRoomPlanner", () => {
     expect(code).toContain("// Back wall");
     expect(code).toContain("// Left wall");
     expect(code).toContain("// Right wall");
+  });
+
+  it("uses default dimensions when none specified", () => {
+    const code = generateRoomPlanner({ roomType: "studio" });
+    expect(code).toContain("4f");
+    expect(code).toContain("5f");
+    expect(code).toContain("2.7f");
+  });
+
+  it("uses specified wall style in comment", () => {
+    const code = generateRoomPlanner({
+      roomType: "office",
+      wallStyle: "brick",
+    });
+    expect(code).toContain("brick");
+  });
+
+  it("uses specified floor style in comment", () => {
+    const code = generateRoomPlanner({
+      roomType: "kitchen",
+      floorStyle: "tile",
+    });
+    expect(code).toContain("tile");
+  });
+
+  it("ceiling is hidden by default (showCeiling = false)", () => {
+    const code = generateRoomPlanner({ roomType: "bedroom" });
+    expect(code).toContain("showCeiling");
+    expect(code).toContain("mutableStateOf(false)");
+  });
+
+  it("AR version appends AR suffix to composable name", () => {
+    const code = generateRoomPlanner({ roomType: "dining-room", ar: true });
+    expect(code).toContain("fun DiningRoomPlannerAR()");
+  });
+
+  it("WALL_STYLES includes glass and concrete", () => {
+    expect(WALL_STYLES).toContain("glass");
+    expect(WALL_STYLES).toContain("concrete");
+    expect(WALL_STYLES).toContain("wood-panel");
+  });
+
+  it("FLOOR_STYLES includes carpet, marble, laminate, vinyl", () => {
+    expect(FLOOR_STYLES).toContain("carpet");
+    expect(FLOOR_STYLES).toContain("marble");
+    expect(FLOOR_STYLES).toContain("laminate");
+    expect(FLOOR_STYLES).toContain("vinyl");
   });
 });

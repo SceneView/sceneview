@@ -1,12 +1,10 @@
 // ─── Gaming SceneView code validator ──────────────────────────────────────────
 
-import {
-  checkDeprecatedApi,
-  checkMissingSceneViewImports,
-  type ValidationIssue,
-} from "./deprecated-api-check.js";
-
-export type { ValidationIssue };
+export interface ValidationIssue {
+  severity: "error" | "warning" | "info";
+  message: string;
+  line?: number;
+}
 
 export interface ValidationResult {
   valid: boolean;
@@ -59,8 +57,25 @@ export function validateGameCode(code: string): ValidationResult {
     }
   }
 
-  // ── Deprecated APIs (shared check) ───────────────────────────────────────
-  issues.push(...checkDeprecatedApi(code));
+  // ── Deprecated APIs ──────────────────────────────────────────────────────
+  // The `Scene { }` / `ARScene { }` composables were renamed to `SceneView { }` /
+  // `ARSceneView { }` in v3.6 for cross-platform consistency with SceneViewSwift.
+  // The old names are kept as @Deprecated aliases in Scene.kt but should not
+  // appear in new code.
+  const deprecated: [RegExp, string][] = [
+    [/(?<![\w.])Scene\s*\(/, "`Scene { }` is deprecated since v3.6. Use `SceneView { }`."],
+    [/(?<![\w.])ARScene\s*\(/, "`ARScene { }` is deprecated since v3.6. Use `ARSceneView { }`."],
+    [/ArSceneView\s*\(/, "`ArSceneView()` is Sceneform 1.x. Use `ARSceneView { }` from io.github.sceneview."],
+    [/loadModelAsync/, "`loadModelAsync` is Sceneform. Use `rememberModelInstance` in composables."],
+    [/Engine\.create/, "`Engine.create` is imperative. Use `rememberEngine()` in composables."],
+    [/import\s+.*sceneform/, "Sceneform imports are obsolete. SceneView 3.x does not use Sceneform."],
+  ];
+
+  for (const [pattern, msg] of deprecated) {
+    if (pattern.test(code)) {
+      issues.push({ severity: "error", message: msg });
+    }
+  }
 
   // ── Gaming-specific checks ───────────────────────────────────────────────
   if (/onFrame/.test(code) && /Thread\.sleep|delay\(/.test(code)) {
@@ -103,8 +118,26 @@ export function validateGameCode(code: string): ValidationResult {
     });
   }
 
-  // ── Missing imports check (shared check) ─────────────────────────────────
-  issues.push(...checkMissingSceneViewImports(code));
+  // ── Missing imports check ──────────────────────────────────────────────
+  if (
+    /(?<![\w.])SceneView\s*[\(\{]/.test(code) &&
+    !/import\s+io\.github\.sceneview\.SceneView\b/.test(code)
+  ) {
+    issues.push({
+      severity: "warning",
+      message: "Missing SceneView import. Add: import io.github.sceneview.SceneView",
+    });
+  }
+
+  if (
+    /(?<![\w.])ARSceneView\s*[\(\{]/.test(code) &&
+    !/import\s+io\.github\.sceneview\.ar\.ARSceneView\b/.test(code)
+  ) {
+    issues.push({
+      severity: "warning",
+      message: "Missing ARSceneView import. Add: import io.github.sceneview.ar.ARSceneView",
+    });
+  }
 
   const errors = issues.filter((i) => i.severity === "error").length;
   const warnings = issues.filter((i) => i.severity === "warning").length;

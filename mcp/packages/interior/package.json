@@ -1,6 +1,6 @@
 {
   "name": "interior-design-3d-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for Interior Design & Home 3D visualization with SceneView — room planning, AR furniture placement, material switching, lighting design, and room tours.",
   "keywords": [
     "mcp",
@@ -37,10 +37,14 @@
     "interior-design-3d-mcp": "dist/index.js"
   },
   "files": [
-    "dist/**/*.js",
-    "!dist/**/*.test.js",
-    "!dist/**/__fixtures__/**",
-    "README.md"
+    "dist/index.js",
+    "dist/room-planner.js",
+    "dist/furniture-placement.js",
+    "dist/material-switcher.js",
+    "dist/lighting-design.js",
+    "dist/room-tour.js",
+    "dist/furniture-models.js",
+    "dist/validator.js"
   ],
   "engines": {
     "node": ">=18"
@@ -53,13 +57,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.28.0"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.8.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.5"
   },
   "overrides": {
     "picomatch": ">=4.0.4"

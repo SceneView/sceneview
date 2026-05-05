@@ -1,6 +1,6 @@
 {
   "name": "gaming-3d-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for Gaming & Entertainment 3D visualization with SceneView — character viewers, level editors, physics games, particle effects, 3D inventories, and game-ready models.",
   "keywords": [
     "mcp",
@@ -38,10 +38,14 @@
     "gaming-3d-mcp": "dist/index.js"
   },
   "files": [
-    "dist/**/*.js",
-    "!dist/**/*.test.js",
-    "!dist/**/__fixtures__/**",
-    "README.md"
+    "dist/index.js",
+    "dist/character-viewer.js",
+    "dist/level-editor.js",
+    "dist/physics-game.js",
+    "dist/particle-effects.js",
+    "dist/inventory-3d.js",
+    "dist/game-models.js",
+    "dist/validator.js"
   ],
   "engines": {
     "node": ">=18"
@@ -54,13 +58,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.28.0"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.8.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.5"
   },
   "overrides": {
     "picomatch": ">=4.0.4"
