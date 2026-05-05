@@ -1,7 +1,6 @@
 package io.github.sceneview.node
 
 import android.graphics.Bitmap
-import dev.romainguy.kotlin.math.normalize
 import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
@@ -49,14 +48,23 @@ open class BillboardNode(
 
     init {
         // Keep the node facing the camera every frame.
-        // lookTowards(normalize(worldPosition - camPos)) sets local -Z = direction away from
-        // camera, so local +Z (the plane's front face) points toward the camera.
-        // Using lookAt(camPos) would do the opposite: -Z toward camera, +Z away → mirrored UVs.
+        // kotlin-math `lookTowards(direction)` builds Mat4(right, up, -direction, eye), so
+        // local +Z maps to -direction in world space. To make local +Z (the plane's front
+        // face, with correct UVs) point toward the camera, we pass `worldPosition - camPos`
+        // — local +Z then aligns with `camPos - worldPosition`, i.e. faces the camera.
+        // `lookAt(camPos)` would do the opposite: -Z toward camera, +Z away → mirrored UVs.
+        // `lookTowards` normalizes its argument internally, so no explicit normalize() needed.
         onFrame = { _ ->
             cameraPositionProvider?.invoke()?.let { camPos ->
-                val toCamera = camPos - worldPosition
-                if (toCamera.x != 0f || toCamera.y != 0f || toCamera.z != 0f) {
-                    lookTowards(lookDirection = normalize(worldPosition - camPos))
+                val direction = worldPosition - camPos
+                val lengthSq =
+                    direction.x * direction.x +
+                        direction.y * direction.y +
+                        direction.z * direction.z
+                // `lengthSq > epsilon` rejects both the zero vector AND any NaN component
+                // (NaN comparisons always return false), avoiding `normalize(0,0,0) → NaN`.
+                if (lengthSq > 1e-12f) {
+                    lookTowards(lookDirection = direction)
                 }
             }
         }
