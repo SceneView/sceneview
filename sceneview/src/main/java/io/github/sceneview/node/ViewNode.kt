@@ -185,14 +185,15 @@ class ViewNode(
     }
 
     override fun destroy() {
-
         windowManager.removeView(layout)
-
-        materialLoader.destroyMaterialInstance(materialInstance)
+        // Capture MI before super.destroy() removes the renderable component (after which
+        // getMaterialInstanceAt would fail). Destroy in order: renderable (via super) → MI → texture
+        // → stream, so Filament never sees a live texture binding on a dead MI or renderable.
+        val mi = materialInstance
+        super.destroy()
+        materialLoader.destroyMaterialInstance(mi)
         engine.safeDestroyTexture(texture)
         engine.safeDestroyStream(stream)
-
-        super.destroy()
     }
 
     /**

@@ -63,7 +63,12 @@ open class RenderableNode(
     }
 
     override fun destroy() {
-        super.destroy()
+        // Destroy the renderable component BEFORE Node.destroy() frees the entity ID.
+        // If safeDestroyEntity runs first, renderableManager.destroy(entity) silently fails
+        // (entity ID invalid), leaving Filament's internal MI/texture bindings dangling and
+        // causing "Invalid texture still bound to MaterialInstance" on the subsequent texture
+        // destroy.
         engine.safeDestroyRenderable(entity)
+        super.destroy()
     }
 }
