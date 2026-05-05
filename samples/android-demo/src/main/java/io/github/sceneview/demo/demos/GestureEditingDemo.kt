@@ -67,6 +67,12 @@ import kotlin.math.roundToInt
  *    updated every frame by polling the node's [position] and [rotation] from a
  *    [LaunchedEffect] tied to a frame counter. Lets the user see the numerical
  *    effect of their gesture in real time.
+ *
+ * Gesture isolation: when a touch lands on the editable helmet, the camera
+ * orbit/pan/zoom manipulator is skipped for the duration of that touch (handled
+ * by [SceneView]'s touch dispatcher). Without this the same drag would also
+ * orbit the camera, making the helmet appear "pinned to the camera" — which in
+ * turn made the world-fixed axes look like they were following the helmet.
  */
 @Composable
 fun GestureEditingDemo(onBack: () -> Unit) {
@@ -284,8 +290,18 @@ fun GestureEditingDemo(onBack: () -> Unit) {
             )
         ) {
             // Static Blender-style 3D axes at the world origin — never editable,
-            // serves as a visual anchor for the user's gestures.
-            Axes3DNode(materialLoader = materialLoader)
+            // serves as a visual anchor for the user's gestures. Declared at the
+            // SceneScope root (sibling of the ModelNode below, NOT a child) so it
+            // stays world-fixed when the helmet moves/rotates.
+            //
+            // Length 1 m (each side reaches ±0.5 m from the origin) so the axes
+            // visually extend past the helmet's bounding box even at 0.3 m scale —
+            // makes the (0, 0, 0) reference unambiguous when the helmet is dragged.
+            Axes3DNode(
+                materialLoader = materialLoader,
+                length = 1f,
+                thickness = 0.008f,
+            )
 
             // The key(resetKey) block ensures the node is recreated from scratch on reset.
             key(resetKey) {
