@@ -91,8 +91,13 @@ fun AnimationDemo(onBack: () -> Unit) {
     var isPlaying by remember { mutableStateOf(true) }
     var speed by remember { mutableFloatStateOf(1f) }
     var loop by remember { mutableStateOf(true) }
-    var selectedAnim by remember { mutableIntStateOf(0) }
-    var cameraMode by remember { mutableStateOf(CameraMode.HERO) }
+    // Default to "Walk" — animation index 3 is the walk cycle on the threejs Soldier
+    // (0=Idle, 1=Run, 2=TPose, 3=Walk). REVEAL + Walk together is the strongest first
+    // impression (camera pulls back to reveal a walking subject).
+    var selectedAnim by remember { mutableIntStateOf(3) }
+    // Default cinematic shot is REVEAL — close-up to wide pull-back is the most
+    // dramatic intro and pairs naturally with the Walk animation.
+    var cameraMode by remember { mutableStateOf(CameraMode.REVEAL) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -218,15 +223,24 @@ fun AnimationDemo(onBack: () -> Unit) {
                 // Close-up at the chest, then pull back smoothly to a wide high-angle.
                 // No yaw motion — the dolly-out IS the shot. We hold yaw at a slight
                 // off-axis angle (15°) so we never look at the model dead-on.
+                //
+                // Camera Y is `target.y + yHeight` = 0.5 + yHeight. Soldier head is at
+                // y≈1.0, feet at y=0. To keep him visually grounded with the rooftop
+                // floor visible underneath, camera must sit above his head (yHeight ≥
+                // 0.6 → camY ≥ 1.1) for the whole shot. Previous values 0.5 → 0.8 put
+                // the camera at chest-to-shoulder height, which made the soldier look
+                // like he was floating because his feet drifted out of frame on the
+                // close-up. Bumped to 0.9 → 1.2 (camY 1.4 → 1.7) so we look slightly
+                // DOWN at the soldier and the rooftop ground line is always visible.
                 yawAnim.snapTo(15f)
                 while (true) {
                     // Snap to the close-up start
                     radiusAnim.snapTo(1.5f)
-                    yHeightAnim.snapTo(0.5f)
+                    yHeightAnim.snapTo(0.9f)
                     // 6 s pull-back to wide, ease-in-out — matches a real dolly-out
                     val pullBack = tween<Float>(6_000, easing = FastOutSlowInEasing)
                     val sync = launch { radiusAnim.animateTo(5.0f, pullBack) }
-                    yHeightAnim.animateTo(0.8f, pullBack)
+                    yHeightAnim.animateTo(1.2f, pullBack)
                     sync.join()
                     // 2 s hold on the wide shot before looping (delay, not animateTo
                     // — the latter returns immediately when target == current).
@@ -265,10 +279,17 @@ fun AnimationDemo(onBack: () -> Unit) {
             CameraMode.TRACKING -> {
                 // Lateral tracking shot — camera flies past the subject in a straight
                 // line, lookAt re-aims every frame. We sweep along the X axis from
-                // -4 m → +4 m at a fixed Z standoff of 2.5 m and yHeight 0.4 m, so
-                // the soldier is always centered in frame as the camera passes.
+                // -4 m → +4 m at a fixed Z standoff of 2.5 m, so the soldier is always
+                // centered in frame as the camera passes.
+                //
+                // Camera Y is absolute here (eyeOverride bypasses spherical math). The
+                // soldier's feet sit at y=0 and head at y≈1.0; previous yLevel=0.4 was
+                // BELOW his chest (target.y=0.5), so we ended up looking UP at him with
+                // the floor cropped — soldier appeared to float. Bumped to 1.4 (above
+                // his head) so the shot looks slightly DOWN, keeping the rooftop ground
+                // line visible underneath the walking soldier.
                 val zStandoff = 2.5f
-                val yLevel = 0.4f
+                val yLevel = 1.4f
                 val startX = -4.0f
                 val endX = 4.0f
                 // Reuse a single Animatable across loop iterations — animateTo will
@@ -324,11 +345,19 @@ fun AnimationDemo(onBack: () -> Unit) {
     // leave it null so the (yaw, radius, yHeight) path runs.
     //
     // Gesture hand-off — the cinematic shots are a *starting point*, not a lock. The
-    // moment the user touches the screen the manipulator flips `cameraMode` to FREE
-    // (via `onUserGesture`), which tears down the scripted LaunchedEffect and swaps in
-    // a real `DefaultCameraManipulator` seeded at the current scripted eye. The user
-    // never gets blocked mid-gesture: the swap happens between frames so the in-flight
-    // grab continues uninterrupted on the new manipulator.
+    // moment the user touches the screen the scripted manipulator records the begin
+    // event (kind + coords) into [pendingBegin] and flips `cameraMode` to FREE via
+    // [onUserGesture]. Compose recomposes immediately, builds a fresh
+    // `DefaultCameraManipulator`, and we **replay the pending begin call on it** so
+    // subsequent grabUpdate / scrollUpdate events have a valid origin and produce
+    // real deltas. Without this replay the gesture detector keeps routing updates to
+    // the new manipulator, but its internal Filament `Manipulator` never saw the
+    // begin event and returns zero-delta transforms — that's the bug v1 (commit
+    // 38c2842d) shipped: the swap happened, but the new manipulator was missing the
+    // `grabBegin` call so all gestures looked frozen.
+    val pendingBegin = remember {
+        androidx.compose.runtime.mutableStateOf<PendingGestureBegin?>(null)
+    }
     val scriptedManipulator = remember {
         ScriptedCameraManipulator(
             target = target,
@@ -336,7 +365,18 @@ fun AnimationDemo(onBack: () -> Unit) {
             radiusProvider = { radiusAnim.value },
             yHeightProvider = { yHeightAnim.value },
             eyeOverrideProvider = { trackingEye.value },
-            onUserGesture = { if (cameraMode != CameraMode.FREE) cameraMode = CameraMode.FREE },
+            onGrabBegin = { x, y, strafe ->
+                if (cameraMode != CameraMode.FREE) {
+                    pendingBegin.value = PendingGestureBegin.Grab(x, y, strafe)
+                    cameraMode = CameraMode.FREE
+                }
+            },
+            onScrollBegin = { x, y, separation ->
+                if (cameraMode != CameraMode.FREE) {
+                    pendingBegin.value = PendingGestureBegin.Scroll(x, y, separation)
+                    cameraMode = CameraMode.FREE
+                }
+            },
         )
     }
     // For Free mode: capture the scripted manipulator's last eye and seed a stock
@@ -350,6 +390,10 @@ fun AnimationDemo(onBack: () -> Unit) {
     // gesture produces a zero-magnitude transform delta — i.e. taps/drags/pinches do
     // nothing. We capture the viewport as the scripted manipulator sees it and forward
     // it to the free manipulator the moment it appears.
+    //
+    // Once the viewport is forwarded, we replay any [pendingBegin] gesture event so the
+    // user's in-flight drag/pinch gets a valid begin call on the new manipulator and
+    // produces real deltas instead of zeros.
     val freeManipulator = remember(cameraMode) {
         if (cameraMode == CameraMode.FREE) {
             CameraGestureDetector.DefaultCameraManipulator(
@@ -358,6 +402,20 @@ fun AnimationDemo(onBack: () -> Unit) {
             ).also { mgr ->
                 val (w, h) = scriptedManipulator.lastViewport()
                 if (w > 0 && h > 0) mgr.setViewport(w, h)
+                // Replay the in-flight gesture's begin call so the underlying Filament
+                // Manipulator has a valid origin point. Without this, the next
+                // grabUpdate/scrollUpdate the gesture detector forwards lands on a
+                // manipulator that thinks no gesture is in progress and returns a
+                // zero-delta transform.
+                pendingBegin.value?.let { begin ->
+                    when (begin) {
+                        is PendingGestureBegin.Grab ->
+                            mgr.grabBegin(begin.x, begin.y, begin.strafe)
+                        is PendingGestureBegin.Scroll ->
+                            mgr.scrollBegin(begin.x, begin.y, begin.separation)
+                    }
+                    pendingBegin.value = null
+                }
             }
         } else null
     }
@@ -512,6 +570,17 @@ fun AnimationDemo(onBack: () -> Unit) {
 }
 
 /**
+ * Records an in-flight gesture's begin event so the host can replay it on the
+ * fresh `DefaultCameraManipulator` after the FREE-mode swap. See [freeManipulator]
+ * in [AnimationDemo] for the rationale (TL;DR — without replay the new manipulator
+ * has no origin point and every grabUpdate produces zero deltas).
+ */
+private sealed class PendingGestureBegin {
+    data class Grab(val x: Int, val y: Int, val strafe: Boolean) : PendingGestureBegin()
+    data class Scroll(val x: Int, val y: Int, val separation: Float) : PendingGestureBegin()
+}
+
+/**
  * Camera manipulator driven by provider lambdas. By default it computes its eye
  * position from spherical coordinates `(yaw, radius, yHeight)` around [target] and
  * looks at the target. The TRACKING shot needs to leave the orbit circle and follow
@@ -519,9 +588,10 @@ fun AnimationDemo(onBack: () -> Unit) {
  * active — when present it bypasses the spherical math entirely.
  *
  * Gestures don't manipulate the camera directly here — instead they fire
- * [onUserGesture] so the host can switch to FREE mode, which swaps in a real
- * `DefaultCameraManipulator` seeded at [currentEye]. From the user's point of view
- * the cinematic shot was a starting position, not a lock.
+ * [onGrabBegin] / [onScrollBegin] so the host can record the begin event, switch to
+ * FREE mode, and replay the begin call on a real `DefaultCameraManipulator` seeded
+ * at [currentEye]. From the user's point of view the cinematic shot was a starting
+ * position, not a lock.
  */
 private class ScriptedCameraManipulator(
     private val target: Position,
@@ -529,7 +599,8 @@ private class ScriptedCameraManipulator(
     private val radiusProvider: () -> Float,
     private val yHeightProvider: () -> Float,
     private val eyeOverrideProvider: () -> Position? = { null },
-    private val onUserGesture: () -> Unit = {},
+    private val onGrabBegin: (x: Int, y: Int, strafe: Boolean) -> Unit = { _, _, _ -> },
+    private val onScrollBegin: (x: Int, y: Int, separation: Float) -> Unit = { _, _, _ -> },
 ) : CameraGestureDetector.CameraManipulator {
 
     // Latest viewport size pushed by the SDK's surface-resize callback. We don't use
@@ -571,12 +642,15 @@ private class ScriptedCameraManipulator(
         return Transform(mat)
     }
 
-    // Any touch on the scene = "I want control". Forward to the host to flip into FREE
-    // mode; the real DefaultCameraManipulator then takes over the in-flight gesture.
-    override fun grabBegin(x: Int, y: Int, strafe: Boolean) { onUserGesture() }
+    // Any touch on the scene = "I want control". Forward the begin event (with its
+    // coordinates) to the host so it can flip into FREE mode AND replay the begin
+    // call on the freshly-built DefaultCameraManipulator. The replay is what makes
+    // the in-flight gesture actually move the camera — without it the new
+    // manipulator has no origin point recorded.
+    override fun grabBegin(x: Int, y: Int, strafe: Boolean) { onGrabBegin(x, y, strafe) }
     override fun grabUpdate(x: Int, y: Int) {}
     override fun grabEnd() {}
-    override fun scrollBegin(x: Int, y: Int, separation: Float) { onUserGesture() }
+    override fun scrollBegin(x: Int, y: Int, separation: Float) { onScrollBegin(x, y, separation) }
     override fun scrollUpdate(x: Int, y: Int, prevSeparation: Float, currSeparation: Float) {}
     override fun scrollEnd() {}
     override fun update(deltaTime: Float) {}
