@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased — Crash hardening & reactive ViewNode props
+
+**Status:** on `main`, not yet tagged. The next Maven Central / SPM publish will roll all of the items below into a v4.0.x tag.
+
+### Fixed — Filament destroy-order crashes
+
+- `RenderableNode.destroy()` now destroys the renderable component before the entity, fixing the `MaterialInstance "view" still in use by Renderable` SIGABRT seen on screen navigation (#849, closes #837, #847).
+- `PlaneRenderer.destroy()` routes through `MaterialLoader.destroyMaterial()` to prevent double-free on AR scene teardown (#850).
+- `ViewNode.destroy()` and `rememberViewNodeManager` hardened against the post-destroy race that left a leaked `WindowManager` view if `resume()` and `destroy()` interleaved within a single frame (#820, #853).
+
+### Fixed — BillboardNode mirrored texture
+
+- `BillboardNode` (and `TextNode` via inheritance) no longer renders the back face of the plane quad. Switched from `lookAt(camPos)` to `lookTowards(worldPosition - camPos)` so local +Z (front face, correct UVs) faces the viewer. Hardened guard rejects NaN inputs in addition to the zero vector (#838, #854). A 9-test JVM regression suite in `BillboardNodeMathTest` pins the math convention (#858).
+
+### Fixed — ViewNode reactive props
+
+- `ViewNode` composable restores the full reactive prop set (`position`, `rotation`, `scale`, `isVisible`) and switches from `SideEffect` to `DisposableEffect` keyed on scalar components — Compose state changes now propagate without redundant per-recomposition writes (#856, #857). Closes the regression of the original `7d82701c` implementation reintroduced by #842.
+
+### Security
+
+- `hono` bumped to 4.12.17 across `mcp-gateway`, `telemetry-worker`, `hub-gateway` and the bundled MCP packages — resolves the `hono/jsx` SSR XSS via JSX attribute names (9 alerts) (#862).
+- `postcss` bumped to 8.5.14 in the same set — resolves XSS via unescaped `</style>` in CSS Stringify Output (4 alerts).
+- 0 open Dependabot alerts at the time of this entry.
+
+### Improved — Tooling
+
+- `roborazzi` 1.43.0 → 1.60.0 (#830).
+- `dev.romainguy:kotlin-math` reference in `llms.txt` synced to 1.8.0 across all 4 copies (root, website, well-known, bundled MCP) — AI consumers no longer suggest the outdated 1.6.0 dependency (#788 follow-up, #859).
+- Marketplace submission packet (OpenAI App Store + MCPize manifest) committed under `.claude/marketplace-submissions/` for cross-session reuse (#855).
+
+### Internal
+
+- Render tests on SwiftShader CI remain `@Ignore`'d — `Filament.capturePixels()` still crashes the emulator. Coverage by iOS simulator, Web Playwright, and Android demo screenshot jobs. Pure-JVM math regressions can land in `:sceneview:test` (see #858 for the pattern).
+
+---
+
 ## v4.0.1 — Swift Geometry Primitives, Filament 1.71.0, Hub MCP v0.3.0
 
 **Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.
