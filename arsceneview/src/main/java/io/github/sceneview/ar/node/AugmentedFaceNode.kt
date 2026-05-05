@@ -70,8 +70,8 @@ import io.github.sceneview.node.MeshNode
 open class AugmentedFaceNode(
     engine: Engine,
     val augmentedFace: AugmentedFace,
-    meshMaterialInstance: MaterialInstance? = null,
-    builder: RenderableManager.Builder.() -> Unit = {},
+    private val meshMaterialInstance: MaterialInstance? = null,
+    private val builder: RenderableManager.Builder.() -> Unit = {},
     onTrackingStateChanged: ((TrackingState) -> Unit)? = null,
     onUpdated: ((AugmentedFace) -> Unit)? = null
 ) : TrackableNode<AugmentedFace>(
@@ -102,9 +102,6 @@ open class AugmentedFaceNode(
     var meshNode: MeshNode? = null
         private set
 
-    private val faceMaterialInstance = meshMaterialInstance
-    private val meshBuilder = builder
-
     /**
      * The region nodes at the tip of the nose, the detected face's left side of the forehead,
      * the detected face's right side of the forehead.
@@ -130,11 +127,12 @@ open class AugmentedFaceNode(
         val indices = augmentedFace.meshTriangleIndices
         val vertices = augmentedFace.meshVertices
         val normals = augmentedFace.meshNormals
-        val uvs = augmentedFace.meshTextureCoordinates
 
         if (indices.limit() == 0 || vertices.limit() == 0) return
 
         if (meshNode == null) {
+            // UVs are static for the session — read once at mesh creation.
+            val uvs = augmentedFace.meshTextureCoordinates
             meshNode = MeshNode(
                 engine = engine,
                 primitiveType = PrimitiveType.TRIANGLES,
@@ -162,7 +160,7 @@ open class AugmentedFaceNode(
                     .build(engine).apply {
                         setBuffer(engine, indices)       // indices    (static)
                     },
-                materialInstance = faceMaterialInstance,
+                materialInstance = meshMaterialInstance,
                 builder = {
                     // Filament computes AABB asynchronously after vertex buffer upload.
                     // If a render frame starts before AABB is updated, Filament aborts with
@@ -172,7 +170,7 @@ open class AugmentedFaceNode(
                     culling(false)
                     castShadows(false)
                     receiveShadows(false)
-                    meshBuilder()
+                    builder()
                 }
             ).apply { parent = centerNode }
 
