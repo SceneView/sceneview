@@ -205,6 +205,13 @@ open class AugmentedFaceNode(
      * an empty list for [AugmentedFace] on the front camera. Manually sets [PoseNode] state
      * (session, frame, cameraTrackingState) since `super` cannot be called without
      * re-triggering the broken `getUpdatedTrackables` check.
+     *
+     * [update] (trackable) is invoked every frame regardless of tracking state so the
+     * `trackingState` setter in [TrackableNode] fires `onTrackingStateChanged` and
+     * `updateVisibility()` on TRACKING -> STOPPED/PAUSED transitions (e.g. face leaving the
+     * frame). Existing guards in [update] (trackable) skip mesh creation/buffer updates when
+     * not TRACKING. `onUpdated` only fires while TRACKING since the face data is only
+     * meaningful then.
      */
     override fun update(session: Session, frame: Frame) {
         // PoseNode state — set manually since we skip super
@@ -212,8 +219,12 @@ open class AugmentedFaceNode(
         this.frame = frame
         this.cameraTrackingState = frame.camera.trackingState
 
+        // Always propagate trackable state so onTrackingStateChanged fires on every
+        // transition, including TRACKING -> STOPPED/PAUSED. update(trackable) guards mesh
+        // work internally.
+        update(augmentedFace)
+
         if (augmentedFace.trackingState == TrackingState.TRACKING) {
-            update(augmentedFace)
             onUpdated?.invoke(augmentedFace)
         }
     }
