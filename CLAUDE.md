@@ -162,14 +162,17 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-05, session nervous-payne — PR sweep + multi-agent reviews)
+### Current state (last updated: 2026-05-06, session nervous-payne — v4.0.2 cut + multi-agent PR sweep)
 
-- ✅ **Repo cleanup + 7 PRs merged in one session**: #853 ViewNodeManager cleanup, #854 BillboardNode mirror (closes #838), #855 marketplace submission packet, #830 dependabot roborazzi, #857 ViewNode reactive props (closes #856), #858 BillboardNode JVM regression suite, #859 kotlin-math 1.6→1.8 docs sync. Quality-gate ✅, CI ✅, Build APKs ✅ on main.
-- ✅ **Multi-agent review pattern documented** in memory `feedback_pr_review_workflow.md`: 5–7 Opus agents in parallel + 4-bucket triage (merge / fix-merge / hold-comment / follow-up issue). Caught: Engine.kt API breakage in #851 hold, latent Filament UAF in #852 hold, ViewNode reactive-props regression from #842 → filed and fixed via #857.
+- 🚀 **v4.0.2 released** — `release.yml` succeeded end-to-end. Maven Central + npm `sceneview-web@4.0.2` + `sceneview-mcp` (skipped, already at 4.0.8 on independent track) + Dokka API docs + GitHub Release. Tag: `v4.0.2`. Notes: https://github.com/sceneview/sceneview/releases/tag/v4.0.2
+- ✅ **13 PRs merged in this session**: #853 ViewNodeManager cleanup, #854 BillboardNode mirror (closes #838), #855 marketplace submission packet, #830 dependabot roborazzi, #857 ViewNode reactive props (closes #856), #858 BillboardNode JVM regression suite, #859 kotlin-math 1.6→1.8 docs sync, #860 CLAUDE.md session block, #861 handoff.md, #862 hono+postcss security (resolves 13 Dependabot alerts), #864 CHANGELOG Unreleased entry, #865 v4.0.2 version bump, #866 handoff v4.0.2.
+- ✅ **Multi-agent review pattern documented** in memory `feedback_pr_review_workflow.md`: 5–7 Opus agents in parallel + 4-bucket triage. Caught: Engine.kt API breakage in #851 hold, latent Filament UAF in #852 hold, ViewNode reactive-props regression from #842 → fixed via #857.
 - ⚠️ **2 PRs in HOLD with public verdicts**: [#851](https://github.com/sceneview/sceneview/pull/851) tender-haibt (6 blockers, conflicts with already-merged #821/#842/#850, rebase strategy posted), [#852](https://github.com/sceneview/sceneview/pull/852) AugmentedFace follow-ups (1 blocker — tangent buffer dangling Filament ref if vertex count changes).
+- ✅ **0 Dependabot alerts** (was 13 before #862).
+- ✅ **2 GitHub Discussions answered**: #843 (MaterialInstance still in use → fixed in v4.0.2), #844 (DEAD_OBJECT startMirroring → API removed in v4.x).
 - ✅ **Stale memory corrected**: render tests are STILL `@Ignore`'d on SwiftShader CI — PR #814 added Engine-sharing but commit `0a6f4bea` re-ignored them. Pure-JVM math regressions can still land in `:sceneview:test` (cf. PR #858).
 - ✅ **Marketplace packet preserved** in `.claude/marketplace-submissions/` (project-side, not profile-private). Account-tied identifiers (OpenAI App ID, GitHub support ticket) stripped + saved to `~/Projects/profile-private/marketplace-private/`.
-- 1 open issue (#848 enhancement record video/photos), no remaining bug tracking work.
+- 2 open issues (#848 enhancement record video/photos, #863 follow-up GLB no-TANGENTS test).
 
 ### Previous state (last updated: 2026-04-13, session relaxed-faraday — Empire Dashboard + GA4 + Telemetry + Funnel)
 
