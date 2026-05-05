@@ -1700,7 +1700,7 @@ class ActivityARPermissionHandler(activity: ComponentActivity) : ARPermissionHan
 
 ## sceneview-core (KMP)
 
-`sceneview-core` is a Kotlin Multiplatform module containing platform-independent logic shared between Android and iOS. It targets `jvm("android")`, `iosArm64`, `iosSimulatorArm64`, and `iosX64`. It depends on `dev.romainguy:kotlin-math:1.6.0` (exposed as `api`).
+`sceneview-core` is a Kotlin Multiplatform module containing platform-independent logic shared between Android and iOS. It targets `jvm("android")`, `iosArm64`, `iosSimulatorArm64`, and `iosX64`. It depends on `dev.romainguy:kotlin-math:1.8.0` (exposed as `api`).
 
 The `sceneview` Android module depends on `sceneview-core` via `api project(':sceneview-core')`, so all types below are available transitively.
 
