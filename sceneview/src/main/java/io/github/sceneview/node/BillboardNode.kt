@@ -47,10 +47,25 @@ open class BillboardNode(
 ) {
 
     init {
-        // Register a per-frame callback to keep the node facing the camera.
+        // Keep the node facing the camera every frame.
+        // kotlin-math `lookTowards(direction)` builds Mat4(right, up, -direction, eye), so
+        // local +Z maps to -direction in world space. To make local +Z (the plane's front
+        // face, with correct UVs) point toward the camera, we pass `worldPosition - camPos`
+        // — local +Z then aligns with `camPos - worldPosition`, i.e. faces the camera.
+        // `lookAt(camPos)` would do the opposite: -Z toward camera, +Z away → mirrored UVs.
+        // `lookTowards` normalizes its argument internally, so no explicit normalize() needed.
         onFrame = { _ ->
             cameraPositionProvider?.invoke()?.let { camPos ->
-                lookAt(targetWorldPosition = camPos)
+                val direction = worldPosition - camPos
+                val lengthSq =
+                    direction.x * direction.x +
+                        direction.y * direction.y +
+                        direction.z * direction.z
+                // `lengthSq > epsilon` rejects both the zero vector AND any NaN component
+                // (NaN comparisons always return false), avoiding `normalize(0,0,0) → NaN`.
+                if (lengthSq > 1e-12f) {
+                    lookTowards(lookDirection = direction)
+                }
             }
         }
     }
