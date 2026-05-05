@@ -36,6 +36,7 @@ tvMaterial = "1.0.1"
 
 # Play Services
 playAppUpdate = "2.1.0"
+playServicesLocation = "21.3.0"
 
 # Publishing & Docs
 mavenPublish = "0.36.0"
@@ -105,6 +106,7 @@ androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.re
 # Play Services
 play-app-update = { group = "com.google.android.play", name = "app-update", version.ref = "playAppUpdate" }
 play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 # Testing
 androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }

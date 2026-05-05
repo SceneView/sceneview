@@ -93,6 +93,13 @@ dependencies {
     implementation libs.play.app.update
     implementation libs.play.app.update.ktx
 
+    // Google Fused Location Provider — required by ARCore Geospatial mode
+    // (Config.GeospatialMode.ENABLED) used by ARStreetscapeDemo. Without this
+    // dependency on the classpath, Session.configure() throws an
+    // IllegalStateException complaining about missing FLP classes and the
+    // Streetscape demo renders a black screen.
+    implementation libs.play.services.location
+
     // Screenshot testing (Roborazzi — JVM, no emulator needed)
     testImplementation libs.robolectric
     testImplementation libs.roborazzi
