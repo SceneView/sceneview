@@ -4,6 +4,44 @@
 
 ---
 
+## SESSION 2026-05-05 — nervous-payne — PR sweep + multi-agent reviews + 8 merges
+
+### TL;DR
+- ✅ **8 PRs merged on main**:
+  - **#853** rememberViewNodeManager cleanup + post-destroy race guard
+  - **#854** BillboardNode mirror fix (closes #838) — NaN guard via `lengthSq > 1e-12f` + dropped redundant `normalize()` (lookTowards normalizes internally)
+  - **#855** marketplace submission packet (`.claude/marketplace-submissions/` — OpenAI App Store + mcpize submission docs)
+  - **#830** dependabot roborazzi 1.43→1.60
+  - **#857** ViewNode reactive props — restored `scale` + `isVisible`, switched `SideEffect` → `DisposableEffect` keyed on scalars (closes #856)
+  - **#858** BillboardNode JVM regression test suite — 9 pure-math tests pinning `lookTowards` convention + zero/NaN guard
+  - **#859** kotlin-math 1.6→1.8 docs sync (PR #788 follow-up, 4 llms.txt files updated)
+  - **#860** CLAUDE.md session-state update + render-tests memory correction
+- ⚠️ **2 PRs in HOLD with public verdicts** (don't merge without rework):
+  - **#851** tender-haibt — 6 blockers (Engine.kt API breakage, conflicts with already-merged #821/#842/#850, ImageNode/ViewNode resource leaks, allocs hot path). Rebase strategy in PR comment.
+  - **#852** AugmentedFace follow-ups — 1 blocker (tangent buffer dangling Filament ref if vertex count ever changes). Comment on PR.
+- ✅ **Multi-agent review pattern established** (memory `feedback_pr_review_workflow.md`): 5–7 Opus agents in parallel + 4-bucket triage. Caught Engine.kt breakage in #851, latent UAF in #852, regression in #842 (filed #856 + fixed via #857).
+- ✅ **Issue triage**: closed #824 not-a-bug, closing comments on silent #836/#846, filed+resolved #856.
+- ✅ **mcp-gaming/mcp-interior regression** un-staged (50 files, -2768 lines that reverted `files[]` glob fix + multi-file refactor).
+- ✅ **Marketplace packet sanitized**: OpenAI App ID + GitHub support ticket # extracted to `~/Projects/profile-private/marketplace-private/`. Public PR #855 has the project docs only.
+- ✅ **Local cleanup**: 13 branches deleted (8 merged + 5 stale/superseded), 2 idle worktrees removed.
+
+### État repo (snapshot 2026-05-05 21:00 Paris)
+- **Main HEAD**: includes all 8 merges above. Quality-gate ✅, CI ✅, Build APKs ✅.
+- **Open PRs**: 2 (#851 hold, #852 hold) — see verdicts.
+- **Open issues**: 1 (#848 enhancement record video/photos).
+- **Active parallel session worktrees** (locked, do not touch): `agent-a08fb42c…` (claude/fix-augmented-face-normals-encoding), `agent-a9bad0693c…` (claude/fix-augmented-face-tracking-state-callback), `tender-haibt-6062c7`, `viewnode-820-followup`.
+
+### What needs picking up next
+1. **#852 tangent-buffer fix** — when the parallel session that owns `claude/fix-augmented-face-followups` returns, address the agent's blocker: assert ARCore mesh vertex count is stable (it should be — canonical face mesh has fixed topology) OR destroy/rebuild the VertexBuffer if capacity grows. ~30 min.
+2. **#851 tender-haibt rebase** — the PR comment has the exact (a)/(b)/(c)/(d) drop list. Big work, needs a dedicated session.
+3. **GitHub Discussions audit** — Thomas mentioned this is on his TODO. Last sweep was 95 answered (relaxed-faraday session, 2026-04-13). Check what's accumulated since.
+4. **Optional**: file follow-up issue for #836 (silent-closed) requesting a tangent-less GLB load test, per #836 audit comment.
+
+### How to use the agent review workflow
+See memory `feedback_pr_review_workflow.md`. TL;DR: dispatch 5–7 Opus agents in parallel (one per non-trivial PR + 1 audit-merged + 1 audit-issues) with self-contained prompts. Triage outputs into 4 buckets. Don't auto-fix 🔴 — comment with rebase strategy and let the author resolve.
+
+---
+
 ## SESSION 2026-05-05 — stoic-ramanujan — Issues/PRs triage + crash dispose fix mergé
 
 ### TL;DR
