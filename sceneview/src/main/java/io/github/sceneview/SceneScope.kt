@@ -244,7 +244,7 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
         centerOrigin: Position? = null,
         position: Position = Position(x = 0f),
         rotation: Rotation = Rotation(x = 0f),
-        scale: Scale = Scale(x = 1f),
+        scale: Scale = Scale(1f),
         isVisible: Boolean = true,
         isEditable: Boolean = false,
         apply: ModelNodeImpl.() -> Unit = {},
