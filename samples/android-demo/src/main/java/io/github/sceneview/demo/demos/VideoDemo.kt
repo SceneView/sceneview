@@ -4,6 +4,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -25,8 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,12 +40,16 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
+import io.github.sceneview.math.Size
 import io.github.sceneview.math.Transform
 import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
@@ -51,16 +58,15 @@ import kotlin.math.sin
  * Demonstrates [VideoNode] — a flat quad inside a 3D scene that plays a streaming video
  * with audio.
  *
- * This demo offers three creative twists on top of the basic VideoNode:
+ * Three creative twists on top of the basic VideoNode:
  *
  *  - **Surface mode picker** — switch between a flat plane (default), a chrome
- *    sculpture-cube behind the screen for stylised reflections, and a polished
+ *    sculpture-cube next to the screen for stylised reflections, and a polished
  *    reflective floor below the screen so the video bounces off the ground.
- *  - **Cinematic camera** — toggle off the slow orbit and the camera replays a
- *    keyframed sequence (wide → close-up → side angle → wide) with eased Spring
- *    transitions, like a music-video edit.
- *  - **Mute toggle** — start muted by default (auto-play with sound is rude on
- *    mobile); tap the speaker icon to unmute.
+ *  - **Cinematic camera** — a punchy keyframed sequence (very wide → extreme close-up
+ *    → side dolly → top-down) versus a wide steady orbit far back. The two modes look
+ *    visibly different — distance, angle and pacing all change.
+ *  - **Mute toggle** — start muted by default; tap the speaker icon to unmute.
  *
  * Source: Big Buck Bunny — © Blender Foundation, CC-BY 3.0.
  */
@@ -128,9 +134,10 @@ fun VideoDemo(onBack: () -> Unit) {
         }
     }
 
-    // Cinematic camera: animates the camera between named pose keyframes
-    // (wide / close-up / side / top) with eased transitions. When `cinematic`
-    // is off, falls back to the existing slow-orbit behaviour.
+    // Cinematic camera: a single stable manipulator instance whose providers read
+    // the latest cinematic flag from a state ref. The camera animation coroutine
+    // restarts cleanly when `cinematic` flips so the two modes are clearly distinct
+    // (different keyframes, different pacing, different distances).
     val cinematicManipulator = rememberCinematicCameraManipulator(
         trigger = isReady,
         cinematic = cinematic,
@@ -221,55 +228,66 @@ fun VideoDemo(onBack: () -> Unit) {
             // The first frames render black until prepareAsync completes.
             VideoNode(player = player)
 
-            // Decorative geometry that complements the video plane. We don't put the
-            // video on the cube/sphere directly — only one VideoNode can be bound to
-            // a MediaPlayer's SurfaceTexture at a time — instead we surround the
-            // screen with chrome shapes that pick up the IBL reflections and the
-            // warm tones from the studio_warm probe, giving each surface mode a
-            // distinct vibe.
-            when (surfaceMode) {
-                SurfaceMode.PLANE -> {
-                    // No companion geometry — the original "video on a plane" demo.
-                }
+            // Companion geometry — wrapped in `key(surfaceMode)` so switching the
+            // chip forces the whole branch to dispose + recreate, not just SideEffect-
+            // update. Without the key, surface-mode changes that happen to share node
+            // composables (none today, but defensive) would risk reusing stale nodes.
+            //
+            // The video plane is a single VideoNode — only one MediaPlayer can feed
+            // one SurfaceTexture — so we add visible companion nodes around it
+            // instead. Each surface mode positions the companion so it is clearly
+            // visible from the cinematic / orbit camera paths (no occlusion behind
+            // the video plane).
+            key(surfaceMode) {
+                when (surfaceMode) {
+                    SurfaceMode.PLANE -> {
+                        // No companion geometry — the original "video on a plane" demo.
+                    }
 
-                SurfaceMode.CUBE -> {
-                    // Chrome sculpture sitting *behind* the screen. As the
-                    // cinematic camera sweeps around, the cube bounces the
-                    // environment HDR back at the viewer with subtle warm
-                    // highlights that frame the video.
-                    val chromeMaterial = remember(materialLoader) {
-                        materialLoader.createColorInstance(
-                            color = androidx.compose.ui.graphics.Color(0.85f, 0.85f, 0.88f, 1f),
-                            metallic = 1f,
-                            roughness = 0.18f,
-                            reflectance = 0.7f,
+                    SurfaceMode.CUBE -> {
+                        // Chrome sculpture floating to the RIGHT of the video plane
+                        // (not behind, where the plane would occlude it). The cube
+                        // is large enough (1.0 m) to read at any camera distance,
+                        // and slightly tilted so the IBL highlights catch the eye.
+                        val chromeMaterial = remember(materialLoader) {
+                            materialLoader.createColorInstance(
+                                color = androidx.compose.ui.graphics.Color(
+                                    0.92f, 0.92f, 0.95f, 1f
+                                ),
+                                metallic = 1f,
+                                roughness = 0.12f,
+                                reflectance = 0.8f,
+                            )
+                        }
+                        CubeNode(
+                            size = Size(1.0f, 1.0f, 1.0f),
+                            materialInstance = chromeMaterial,
+                            position = Position(x = 1.6f, y = 0.0f, z = -0.2f),
+                            rotation = Rotation(x = 15f, y = 35f, z = 12f),
                         )
                     }
-                    CubeNode(
-                        size = io.github.sceneview.math.Size(0.6f, 0.6f, 0.6f),
-                        materialInstance = chromeMaterial,
-                        position = Position(x = 0f, y = -0.05f, z = -0.6f),
-                        rotation = io.github.sceneview.math.Rotation(x = 0f, y = 35f, z = 15f),
-                    )
-                }
 
-                SurfaceMode.REFLECTIVE_FLOOR -> {
-                    // Polished black floor below the screen — high metallic +
-                    // very low roughness gives a near-mirror reflection of the
-                    // video and the studio_warm IBL.
-                    val floorMaterial = remember(materialLoader) {
-                        materialLoader.createColorInstance(
-                            color = androidx.compose.ui.graphics.Color(0.05f, 0.05f, 0.06f, 1f),
-                            metallic = 1f,
-                            roughness = 0.08f,
-                            reflectance = 0.9f,
+                    SurfaceMode.REFLECTIVE_FLOOR -> {
+                        // Polished black floor right under the screen, large enough
+                        // (5×5 m) to fill the lower half of every camera angle. The
+                        // very low roughness + high metallic gives a near-mirror
+                        // bounce of the video and the IBL.
+                        val floorMaterial = remember(materialLoader) {
+                            materialLoader.createColorInstance(
+                                color = androidx.compose.ui.graphics.Color(
+                                    0.04f, 0.04f, 0.05f, 1f
+                                ),
+                                metallic = 1f,
+                                roughness = 0.06f,
+                                reflectance = 0.95f,
+                            )
+                        }
+                        PlaneNode(
+                            size = Size(5f, 0.001f, 5f),
+                            materialInstance = floorMaterial,
+                            position = Position(x = 0f, y = -0.55f, z = 0f),
                         )
                     }
-                    PlaneNode(
-                        size = io.github.sceneview.math.Size(4f, 0.001f, 4f),
-                        materialInstance = floorMaterial,
-                        position = Position(x = 0f, y = -0.45f, z = 0f),
-                    )
                 }
             }
         }
@@ -291,32 +309,43 @@ private enum class SurfaceMode(val label: String) {
  */
 private data class CameraPose(val eye: Position, val target: Position)
 
+/**
+ * Cinematic keyframes — chosen to be VISIBLY different from the orbit fallback:
+ *  - very-wide hero (back at z=4)
+ *  - extreme close-up (z=0.6, near the plane)
+ *  - dramatic side dolly (x=2.5)
+ *  - top-down 3/4 (y=2)
+ * These cover a large volume of camera positions; the orbit path stays at a
+ * constant z=±3.5, y=0.5 so it reads as a smooth horizontal pan instead.
+ */
 private val CINEMATIC_POSES = listOf(
-    // Wide hero shot — directly in front, slight up-tilt.
-    CameraPose(eye = Position(0f, 0.3f, 2.4f), target = Position(0f, 0f, 0f)),
-    // Push in: close-up that fills the screen with the video.
-    CameraPose(eye = Position(0f, 0.05f, 1.1f), target = Position(0f, 0f, 0f)),
-    // Side angle — sliding camera revealing the scene depth.
-    CameraPose(eye = Position(1.6f, 0.2f, 1.2f), target = Position(0f, 0f, 0f)),
-    // Top-down 3/4 — a brief overhead, then we loop back to wide.
-    CameraPose(eye = Position(-0.6f, 1.2f, 1.6f), target = Position(0f, 0f, 0f)),
+    CameraPose(eye = Position(0f, 0.4f, 4.0f), target = Position(0f, 0f, 0f)),
+    CameraPose(eye = Position(0f, 0.0f, 0.6f), target = Position(0f, 0f, 0f)),
+    CameraPose(eye = Position(2.5f, 0.3f, 0.8f), target = Position(0f, 0f, 0f)),
+    CameraPose(eye = Position(-0.4f, 2.0f, 1.4f), target = Position(0f, 0f, 0f)),
 )
 
-/**
- * Hold each pose for ~3.5 s and crossfade for ~2 s — full loop = ~22 s,
- * same ballpark as a music-video cut. Holds are achieved by using the same
- * pose on both sides of a tween (so `animateTo` has nothing to interpolate
- * for that segment).
- */
-private const val POSE_HOLD_MS = 3_500
-private const val POSE_TRANSITION_MS = 2_000
+/** Hold ~1.6 s and crossfade ~2.4 s — full cinematic loop ≈ 16 s. */
+private const val POSE_HOLD_MS = 1_600
+private const val POSE_TRANSITION_MS = 2_400
+
+/** Orbit pacing — slow, steady, far-back so it reads as "a camera on rails". */
+private const val ORBIT_PERIOD_MS = 22_000
+private const val ORBIT_RADIUS = 3.5f
+private const val ORBIT_HEIGHT = 0.5f
 
 /**
- * A [CameraGestureDetector.CameraManipulator] that plays a keyframed cinematic
- * sequence when [cinematicProvider] returns `true`, and falls back to a slow
- * idle orbit otherwise. The first user gesture hands control off to a stock
- * [CameraGestureDetector.DefaultCameraManipulator] anchored at the current
- * pose — same hand-off semantics as `HeroOrbitCameraManipulator`.
+ * A [CameraGestureDetector.CameraManipulator] driven by composable state. Keeping
+ * a single instance across cinematic/orbit toggles is required because the per-
+ * frame loop in [io.github.sceneview.SceneView] captures the manipulator at
+ * composition and reads `getTransform()` on every frame; swapping the manipulator
+ * reference would not propagate to that loop. Toggling the mode therefore happens
+ * entirely inside the providers, which read the latest [Position] from animatables
+ * driven by [rememberCinematicCameraManipulator].
+ *
+ * On first user gesture we hand off to a stock
+ * [CameraGestureDetector.DefaultCameraManipulator] anchored at the current pose —
+ * same hand-off semantics as `HeroOrbitCameraManipulator`.
  */
 private class CinematicCameraManipulator(
     private val eyeProvider: () -> Position,
@@ -382,61 +411,70 @@ private class CinematicCameraManipulator(
 }
 
 /**
- * Drive cinematic camera animation with three independent [Animatable]s for the
- * eye position (x, y, z) so changes in `cinematic` mid-loop interrupt cleanly
- * without snap. When [cinematic] is false we fall back to a continuous orbit.
+ * Build the cinematic manipulator and drive its providers from a coroutine that
+ * restarts cleanly whenever [cinematic] flips. The two modes use the SAME
+ * underlying animatables (eyeX/Y/Z) so cross-mode transitions interpolate
+ * smoothly from the last cinematic frame to the first orbit frame and back.
+ *
+ * The `update()` callback re-evaluates `eyeProvider` every frame, so the camera
+ * picks up animatable changes immediately even when both modes use one
+ * manipulator instance.
  */
 @Composable
 private fun rememberCinematicCameraManipulator(
     trigger: Boolean,
     cinematic: Boolean,
 ): CinematicCameraManipulator {
+    // Cinematic mode drives eyeX/Y/Z directly via tween animateTo, which gives
+    // smooth crossfades between hand-authored keyframes.
     val eyeX = remember { Animatable(CINEMATIC_POSES[0].eye.x) }
     val eyeY = remember { Animatable(CINEMATIC_POSES[0].eye.y) }
     val eyeZ = remember { Animatable(CINEMATIC_POSES[0].eye.z) }
-    // Orbit yaw is its own Animatable so the orbit mode picks up where the
-    // last cinematic frame left off (or vice-versa) without snap.
-    val orbitYaw = remember { Animatable(0f) }
-    // Capture the latest `cinematic` flag in a state holder so the providers
-    // (created once inside `remember`) read the up-to-date value on every
-    // frame instead of the value at first composition.
-    val cinematicRef = remember { androidx.compose.runtime.mutableStateOf(cinematic) }
-    cinematicRef.value = cinematic
+
+    // Orbit mode drives a single phase animatable [0..1] linearly. The provider
+    // computes (sin, cos) from this phase to keep the orbit on a perfect
+    // circle without three independent tweens fighting each other.
+    val orbitPhase = remember { Animatable(0f) }
+
+    // rememberUpdatedState keeps the provider reading the LATEST cinematic flag
+    // each frame — without this, the lambda baked at first composition would
+    // always see `cinematic = true`.
+    val cinematicState = rememberUpdatedState(cinematic)
 
     LaunchedEffect(trigger, cinematic, DemoSettings.qaMode) {
         if (!trigger || DemoSettings.qaMode) return@LaunchedEffect
         if (cinematic) {
-            // Loop through the keyframe sequence forever, tweening each
-            // segment with FastOutSlowInEasing for that "camera-op" feel.
+            // Cinematic: jump straight into the first transition (no opening hold)
+            // so the user sees the camera move within ~2.4 s of toggling. Then
+            // hold/transition through the loop forever.
             var i = 0
             while (true) {
-                val pose = CINEMATIC_POSES[i % CINEMATIC_POSES.size]
-                // Hold the current pose briefly before transitioning.
-                kotlinx.coroutines.delay(POSE_HOLD_MS.toLong())
                 val next = CINEMATIC_POSES[(i + 1) % CINEMATIC_POSES.size]
                 val spec = tween<Float>(
                     durationMillis = POSE_TRANSITION_MS,
                     easing = FastOutSlowInEasing,
                 )
-                kotlinx.coroutines.coroutineScope {
+                coroutineScope {
                     launch { eyeX.animateTo(next.eye.x, spec) }
                     launch { eyeY.animateTo(next.eye.y, spec) }
                     launch { eyeZ.animateTo(next.eye.z, spec) }
                 }
+                delay(POSE_HOLD_MS.toLong())
                 i++
             }
         } else {
-            // Continuous slow orbit at radius 2.2, height 0.3.
-            // Loop yaw 0..360 in 18 s like the original orbit demo.
+            // Orbit: continuous slow horizontal sweep at a wider radius and
+            // higher elevation than any cinematic keyframe, so the difference
+            // between modes is visually unambiguous (bigger arc, steady speed,
+            // never punches in close). Drive a single phase animatable; the
+            // provider derives the eye position from it.
+            val orbitSpec = tween<Float>(
+                durationMillis = ORBIT_PERIOD_MS,
+                easing = LinearEasing,
+            )
             while (true) {
-                orbitYaw.snapTo(0f)
-                orbitYaw.animateTo(
-                    targetValue = 360f,
-                    animationSpec = tween(
-                        durationMillis = 18_000,
-                        easing = androidx.compose.animation.core.LinearEasing,
-                    ),
-                )
+                orbitPhase.snapTo(0f)
+                orbitPhase.animateTo(1f, orbitSpec)
             }
         }
     }
@@ -444,11 +482,19 @@ private fun rememberCinematicCameraManipulator(
     return remember {
         CinematicCameraManipulator(
             eyeProvider = {
-                if (cinematicRef.value || DemoSettings.qaMode) {
+                // Pick the eye source based on the latest cinematic flag. Both
+                // sources are kept in sync by the LaunchedEffect above (only one
+                // is animated at a time), so when the user toggles the chip the
+                // provider switches feed cleanly without a pose snap.
+                if (cinematicState.value) {
                     Position(eyeX.value, eyeY.value, eyeZ.value)
                 } else {
-                    val rad = Math.toRadians(orbitYaw.value.toDouble()).toFloat()
-                    Position(sin(rad) * 2.2f, 0.3f, cos(rad) * 2.2f)
+                    val rad = (orbitPhase.value * 2.0 * Math.PI).toFloat()
+                    Position(
+                        x = sin(rad) * ORBIT_RADIUS,
+                        y = ORBIT_HEIGHT,
+                        z = cos(rad) * ORBIT_RADIUS,
+                    )
                 }
             },
             targetProvider = { Position(0f, 0f, 0f) },
