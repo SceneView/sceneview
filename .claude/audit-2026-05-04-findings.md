@@ -163,3 +163,66 @@ Si l'un manque, c'est un fix SDK à brancher.
 5. **[SDK?]** Si le bug Loop/Once est confirmé après UI fix (pas un artefact du joue-toutes), c'est un fix SDK dans `playAnimation`.
 
 **Verdict overall:** 🔴 Picker absent + bugs centrage + Loop/Once à vérifier — refactor obligatoire.
+
+---
+
+## AR audit (Pixel 9 physique, 2026-05-05)
+
+État testé sur device réel après wireless debug.
+
+### ar-placement — ✅ PASS de base, manque d'interactivité
+
+État : helmet posé sur parquet, plane detection (dots blancs) OK, ancrage stable.
+
+**À ajouter pour rendre la demo vraiment showcase :**
+1. **[DEMO]** Modèle posé doit être **editable** (zoom pinch, rotation, drag) — wrap avec `EditableNode` ou équivalent comme dans `gesture-editing`
+2. **[DEMO]** Tap sur un autre point d'un plane détecté = **ajout d'un nouveau modèle** (multi-instance) → montre la puissance du hit-test + spawning AR
+3. **[DEMO?]** Cycle des modèles disponibles à chaque tap (helmet → avocado → fox → …) ou un picker de modèle dans la UI
+
+### ar-face — 🔴 BUG CRITIQUE
+
+État : "Tracking 1 face(s)" pill affichée → ARCore détecte le visage. **Mais aucun mesh wireframe / overlay n'est rendu.**
+
+Le fix `35e5990d` (Face Mesh TANGENTS) était compile-only — n'a pas résolu le bug de rendu réel.
+
+**[SDK] CRITIQUE** Le mesh Face est trackée mais le ModelNode/material n'apparaît pas. Investiguer :
+- Le matériau du face mesh est-il rendu transparent ?
+- Le mesh est-il attaché au face anchor avec bonne position ?
+- Y a-t-il un problème de scale (bbox infini ou nul) ?
+
+### ar-pose — 🔴 BUG CRITIQUE
+
+État : sliders Position X/Y/Z fonctionnels (X=-0.06, Y=0.41, Z=0.00). **Mais aucun modèle 3D visible** dans le viewport.
+
+Le fix `a0da14d8` (Pose basePose) idem : compile-only, pas de rendu réel.
+
+**[SDK] CRITIQUE** Pose AR détecte la position mais ne rend pas le modèle. Investiguer si même cause que ar-face (rendu de modèle attaché à anchor cassé) ou problème spécifique au Pose API d'ARCore.
+
+### ar-streetscape — 🔴 BUG (écran noir total)
+
+État : Title "Streetscape Geometry" affiché, mais **viewport noir complet**, pas même de feed caméra. Le pill "Scanning environment..." aperçu en milieu de récording est transitoire et disparaît.
+
+**[SDK ou DEMO]** À investiguer :
+- Est-ce que le feed caméra est rendu ?
+- Permission Geospatial / API key ARCore Geospatial requise ?
+- Bug d'init (le SceneView ne démarre pas du tout) ?
+- Test à refaire dehors avec GPS solide pour distinguer "API ne reçoit pas de coverage" vs "demo cassée localement"
+
+### ar-rerun — ✅ FONCTIONNE techniquement, mais aucun rendu visuel "ailleurs"
+
+État : "Rerun Debug" + camera feed + plane detection + Server IP 127.0.0.1 + Port 9876 + "**Streaming — 329 frames sent**" — le bridge fonctionne, le streaming TCP envoie bien des frames vers le sidecar Python.
+
+**Problème de showcase :** la démo montre que les frames sont envoyées mais **pas le rendu côté Rerun** (le viewer Rerun est ailleurs sur la machine de dev). Pour un user lambda qui ouvre la demo, "329 frames sent vers 127.0.0.1" n'a aucune valeur démontrative.
+
+**Pistes pour rendre la démo réellement showcase :**
+
+1. **[DEMO]** Embed un Rerun Web Viewer dans une WebView Android dans la demo — afficher le rendu Rerun en split-screen (50% caméra AR / 50% Rerun timeline+space view) → l'utilisateur voit en temps réel ce que Rerun reçoit
+2. **[DEMO]** Vidéo embed ou GIF d'un Rerun Web Viewer pré-enregistré, montrant ce que la démo produit côté serveur — placeholder si #1 trop complexe
+3. **[STRATÉGIE BUSINESS]** **SceneView Rerun-hosted server** : héberger un service Rerun en cloud (`rerun.sceneview.app` ou similaire), accessible gratuitement jusqu'à un quota (ex: 100 frames/mois), payant au-delà via le gateway Stripe existant.
+   - **Pricing potentiel** : Free 100 frames/mo, Pro 10k frames/mo @ €9/mo, Team 100k frames/mo @ €29/mo
+   - **Use cases** : QA AR remote, debugging d'apps AR en prod, monitoring de fleets
+   - **Ajout au mcp-gateway** : nouveau tier dans Stripe + endpoint `/rerun/ingest` pour relai des frames vers la viewer hostée
+   - **Effort estimé** : 2-3 semaines (server Rerun + ingestion + viewer + integration gateway)
+   - **À discuter** : ROI vs effort, complémentaire au pivot "free-first toolkit"
+
+**Verdict overall:** mixte — placement+rerun OK techniquement, face+pose+streetscape bugs critiques, rerun manque de visibilité côté user.
