@@ -1,5 +1,6 @@
 package io.github.sceneview.demo.demos
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +33,8 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
 
+private const val TAG = "ARStreetscapeDemo"
+
 /**
  * Geospatial API streetscape geometry demo.
  *
@@ -54,6 +57,13 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     var isTracking by remember { mutableStateOf(false) }
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var geometryCount by remember { mutableStateOf(0) }
+    // Tracks whether Geospatial / Streetscape mode could actually be enabled on the
+    // current device + region. ARCore Geospatial requires a Cloud project key wired
+    // through `arcore-cloud-anchor` config and VPS coverage from Google Street View;
+    // when either is missing, [Session.isGeospatialModeSupported] returns false and
+    // attempting to set the mode would throw on `session.configure()`.
+    var geospatialUnavailable by remember { mutableStateOf<String?>(null) }
+    var sessionError by remember { mutableStateOf<String?>(null) }
 
     // Semi-transparent material for streetscape geometry overlays — SceneView TintLight at
     // low alpha so the real camera feed of buildings/sidewalks stays readable through the
@@ -78,10 +88,47 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = false,
-                sessionConfiguration = { _: Session, config: Config ->
-                    config.geospatialMode = Config.GeospatialMode.ENABLED
-                    config.streetscapeGeometryMode = Config.StreetscapeGeometryMode.ENABLED
-                    config.planeFindingMode = Config.PlaneFindingMode.DISABLED
+                // Slight negative bias to counter the washed-out / over-exposed rear-camera
+                // preview that the Pixel 9 review flagged across the AR demos.
+                cameraExposure = -1.0f,
+                sessionConfiguration = { session: Session, config: Config ->
+                    // Guard the Geospatial + Streetscape opt-in: enabling the mode
+                    // unconditionally throws on devices without the feature, on
+                    // regions without VPS coverage, or when the project lacks a
+                    // configured ARCore Cloud API key. When unsupported, we keep
+                    // a plain AR session running so the camera feed still renders
+                    // and the user sees a clear status rather than a black screen.
+                    val geospatialOk = runCatching {
+                        session.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)
+                    }.getOrElse { error ->
+                        Log.w(TAG, "isGeospatialModeSupported threw", error)
+                        false
+                    }
+                    if (!geospatialOk) {
+                        geospatialUnavailable = "Geospatial API not available on this device"
+                        Log.w(TAG, "Geospatial mode unsupported — running plain AR session")
+                        config.planeFindingMode = Config.PlaneFindingMode.DISABLED
+                        return@ARSceneView
+                    }
+                    runCatching {
+                        config.geospatialMode = Config.GeospatialMode.ENABLED
+                        config.streetscapeGeometryMode = Config.StreetscapeGeometryMode.ENABLED
+                        config.planeFindingMode = Config.PlaneFindingMode.DISABLED
+                    }.onFailure { error ->
+                        // Most common cause: no ARCore Cloud API key configured for
+                        // the app — Geospatial then fails at configure() time with
+                        // an IllegalStateException. Surface a readable message
+                        // instead of a hard crash.
+                        Log.w(TAG, "Geospatial config failed — falling back", error)
+                        geospatialUnavailable = "Geospatial config failed: ${error.message}"
+                        config.geospatialMode = Config.GeospatialMode.DISABLED
+                        config.streetscapeGeometryMode = Config.StreetscapeGeometryMode.DISABLED
+                        config.planeFindingMode = Config.PlaneFindingMode.DISABLED
+                    }
+                },
+                onSessionFailed = { exception ->
+                    Log.e(TAG, "AR session failed", exception)
+                    sessionError = exception.message ?: exception.javaClass.simpleName
                 },
                 onSessionUpdated = { _: Session, frame: Frame ->
                     isTracking = frame.camera.trackingState == TrackingState.TRACKING
@@ -119,6 +166,9 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 val statusText = when {
+                    sessionError != null -> "AR session error: $sessionError"
+                    geospatialUnavailable != null ->
+                        "${geospatialUnavailable!!} \u2014 needs outdoor area with Street View coverage + Cloud API key"
                     geometryCount > 0 -> "Rendering $geometryCount structure(s)"
                     !isTracking -> trackingFailureReason?.let { reason ->
                         when (reason) {
