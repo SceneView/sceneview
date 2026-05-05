@@ -68,7 +68,7 @@ jobs:
         run: cd mcp && npm ci
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Write local.properties
         # quality-gate.sh invokes ./gradlew, which needs sdk.dir on Linux runners.
