@@ -93,13 +93,20 @@ fun ARPlacementDemo(onBack: () -> Unit) {
     // Keep a reference to the latest Frame for hit testing in the gesture callback.
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
 
+    // Active-gesture label (shown while the user is mid-manipulating a placed
+    // model). `null` ⇒ no overlay. Mirrors the GestureEditingDemo pattern so
+    // both demos share the same visual language for "what is my touch doing
+    // right now". Drag → "Moving", twist → "Rotating", pinch → "Scaling".
+    var gestureMode by remember { mutableStateOf<String?>(null) }
+
     DemoScaffold(
         title = "Tap to Place",
         onBack = onBack,
         controls = {
             Text(
                 text = "Tap a detected plane to drop a model. Each model is editable: drag to " +
-                    "translate, pinch to scale, twist to rotate. Models cycle on each tap.",
+                    "translate, pinch to scale, twist to rotate — the active gesture is shown " +
+                    "in the top-center pill. Models cycle on each tap.",
                 style = MaterialTheme.typography.bodyMedium
             )
 
@@ -134,6 +141,11 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = true,
+                // Pixel 9 review feedback: the rear-camera preview was washed out on
+                // this device — ARCore's auto-exposure under ENVIRONMENTAL_HDR
+                // overshoots Camera2's baseline. Apply a -1 EV bias for realistic
+                // tones, matching ar-pose / ar-streetscape.
+                cameraExposure = -1.0f,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
@@ -176,7 +188,24 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                             )
                             cycleIndex = (cycleIndex + 1) % MODEL_CYCLE.size
                         }
-                    }
+                    },
+                    // Pixel 9 review v2: surface which gesture is active so the user
+                    // can tell drag-to-move from twist-to-rotate from pinch-to-scale.
+                    // `node != null` ⇒ gesture is targeting an editable ModelNode
+                    // (placed model). `node == null` ⇒ the touch fell through to the
+                    // background; AR has no orbit camera so we skip the indicator.
+                    onMoveBegin = { _, _, node ->
+                        if (node != null) gestureMode = "Moving"
+                    },
+                    onMoveEnd = { _, _, _ -> gestureMode = null },
+                    onRotateBegin = { _, _, node ->
+                        if (node != null) gestureMode = "Rotating"
+                    },
+                    onRotateEnd = { _, _, _ -> gestureMode = null },
+                    onScaleBegin = { _, _, node ->
+                        if (node != null) gestureMode = "Scaling"
+                    },
+                    onScaleEnd = { _, _, _ -> gestureMode = null }
                 )
             ) {
                 // One AnchorNode + ModelNode per placement. Wrapping each in `key(id)` gives
@@ -217,6 +246,32 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelLarge
                 )
+            }
+
+            // Active-gesture indicator. Sits below the count pill, only visible
+            // while the user is actively manipulating a placed model. Uses the
+            // primary tonal color (vs. the count pill's neutral black) so the
+            // two overlays stay visually distinct even when stacked.
+            AnimatedVisibility(
+                visible = gestureMode != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    tonalElevation = 4.dp,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = gestureMode ?: "",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
 
             // Scanning indicator overlay
