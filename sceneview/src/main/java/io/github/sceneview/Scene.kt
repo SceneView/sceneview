@@ -65,9 +65,6 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import dev.romainguy.kotlin.math.Float2
 import io.github.sceneview.node.findActivity
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.onEach
-import androidx.core.net.toUri
 
 /**
  * A Filament 3D scene declared as Compose UI.
@@ -1113,32 +1110,27 @@ fun rememberViewNodeManager(
         createViewNodeManager(context)
     }
 ): ViewNode.WindowManager {
-    val activity = LocalContext.current.findActivity()
+    val activity = context.findActivity()
     val view = LocalView.current
-    return remember(context, creator).also { windowManager ->
+    val windowManager = remember(context, creator) { creator() }
 
-        LaunchedEffect(activity, view) {
-            activity
-                ?.lifecycle
-                ?.currentStateFlow
-                ?.onEach { state ->
-                    when (state) {
-                        Lifecycle.State.CREATED -> windowManager.pause()
-                        Lifecycle.State.RESUMED -> windowManager.resume(view)
-                        else -> {
-                            /* no-op */
-                        }
-                    }
-                }
-                ?.collect()
-        }
-
-        DisposableEffect(windowManager) {
-            onDispose {
-                windowManager.destroy()
+    LaunchedEffect(windowManager, activity, view) {
+        activity?.lifecycle?.currentStateFlow?.collect { state ->
+            when (state) {
+                Lifecycle.State.RESUMED -> windowManager.resume(view)
+                Lifecycle.State.CREATED -> windowManager.pause()
+                else -> { /* STARTED, INITIALIZED, DESTROYED handled elsewhere */ }
             }
         }
     }
+
+    DisposableEffect(windowManager) {
+        onDispose {
+            windowManager.destroy()
+        }
+    }
+
+    return windowManager
 }
 
 @Composable
