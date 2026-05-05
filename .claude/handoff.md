@@ -4,6 +4,36 @@
 
 ---
 
+## SESSION 2026-05-06 — nervous-payne (cont) — v4.0.2 cut
+
+### TL;DR
+- ✅ **v4.0.2 tagged + pushed** — `release.yml` workflow triggered, currently in GitHub Actions queue. When it completes, it publishes:
+  - Maven Central: `io.github.sceneview:{sceneview,arsceneview}:4.0.2`
+  - npm: `sceneview-web@4.0.2` (note: `sceneview-mcp` skipped because version 4.0.8 already published — independent track)
+  - Dokka API docs to GitHub Pages
+  - GitHub Release with auto-generated notes
+- ✅ **Version bump propagated** across 29 files (gradle, npm, flutter, docs, samples, README, CLAUDE.md, llms.txt × 4, AboutView.swift, etc.). Only outstanding mismatch is `sceneview.github.io/index.html` which lives in a separate repo and syncs via the website deploy workflow.
+- ✅ **CHANGELOG.md** v4.0.2 entry dated 2026-05-06. Sections: Filament destroy-order crashes, BillboardNode mirror, ViewNode reactive props, Security (hono/postcss), Tooling, Internal.
+- ✅ **2 GitHub Discussions answered**: #843 (MaterialInstance still in use → fixed by #849/#850), #844 (DEAD_OBJECT startMirroring → API removed in v4, see #848).
+- ✅ **#863 issue filed**: regression test for #836 silent close (no-TANGENTS GLB load path).
+
+### Verification needed in the next session
+1. **Confirm `release.yml` succeeded** — `gh run list --branch v4.0.2 --limit 1`. If failed, inspect `gh run view <id> --log-failed` and re-run the failing job.
+2. **Confirm Maven Central** — `curl -s https://repo.maven.apache.org/maven2/io/github/sceneview/sceneview/maven-metadata.xml | grep latest` should return `<latest>4.0.2</latest>`.
+3. **Confirm npm** — `npm view sceneview-web version` should be `4.0.2`.
+4. **Update CLAUDE.md session block** to mark v4.0.2 as published (it currently says 'on main, awaiting release').
+5. **Reply on #843** with confirmation when fixes are in published v4.0.2 (currently the comment says 'wait for the next published v4.0.x release').
+
+### What's pending after the release
+- **#852 tangent buffer fix** when the parallel session that owns `claude/fix-augmented-face-followups` returns
+- **#851 tender-haibt rebase** — big work, dedicated session
+- **84 unanswered Q&A Discussions** (Thomas's TODO)
+- **#848** record video/photos enhancement (post-v4.0.2 work)
+- **#856 → #857 fixed** ✅
+- **#863 GLB no-TANGENTS test** — nice-to-have follow-up
+
+---
+
 ## SESSION 2026-05-05 — nervous-payne — PR sweep + multi-agent reviews + 8 merges
 
 ### TL;DR
