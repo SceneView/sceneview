@@ -19,6 +19,15 @@ on:
       - 'samples/ios-demo/**'
       - '.github/workflows/app-store.yml'
   workflow_dispatch:
+    inputs:
+      submit_for_review:
+        description: "Auto-submit the uploaded build for App Store review (TestFlight upload always runs)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: app-store-deploy
@@ -187,6 +196,7 @@ jobs:
             -authenticationKeyIssuerID $APP_STORE_CONNECT_API_ISSUER_ID
 
       - name: Submit build for App Store review
+        if: github.event_name == 'workflow_dispatch' && inputs.submit_for_review == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -244,7 +254,7 @@ jobs:
               payload = {
                   "data": {
                       "type": "appStoreVersions",
-                      "attributes": {"platform": "IOS", "versionString": "3.6.2"},
+                      "attributes": {"platform": "IOS", "versionString": "4.0.3"},
                       "relationships": {"app": {"data": {"type": "apps", "id": app_id}}}
                   }
               }
