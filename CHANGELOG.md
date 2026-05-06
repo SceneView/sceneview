@@ -1,5 +1,37 @@
 # Changelog
 
+## v4.0.3 — Save & Share Rerun + scan-to-open deep-links (2026-05-06)
+
+**Status:** stable. Maven Central, Swift Package Manager, npm, and Play Store artifacts are published from this tag.
+
+### New — Rerun.io self-serve hosted viewer
+
+- `sceneview.github.io/rerun/` page added — drop a `.rrd` recording on it (or paste a URL) and SceneView opens the embedded Rerun Web Viewer with the right defaults. Removes the need to install the Rerun desktop app for quick AR-debug shares (afe1cc94).
+- `RerunBridge.recordToFile(...)` + `share(...)` (`Tier-S` events) ship on Android and iOS with full parity. iOS uses the native share sheet; Android uses `MediaStore`. Wire-format goldens updated (4b8993dd, fa1f8bc1).
+- One-command review guide `.claude/scripts/check-rerun.sh` for the Save & Share MVP (58c74d3f).
+
+### New — scan-to-open deep-links
+
+- `https://sceneview.github.io/open/?demo=<id>` resolves to the published Play Store / App Store apps with the right demo pre-selected. README, website, docs all expose QR codes that route from web → installed app → specific demo (e49d4062, c95ed0d6).
+- Android App Links: `.well-known/assetlinks.json` now ships both Play App Signing and upload-key SHA-256 fingerprints — the production-signed APK is now correctly verified by Android (133df8ff).
+- iOS Universal Links: `SceneViewDemo.entitlements` now declares `applinks:sceneview.github.io` (Associated Domains capability). Pairs with the existing `apple-app-site-association` published on the website (932ac8dc).
+
+### Improved — Play Store CI (canary pattern)
+
+- Push to `main` → AAB uploaded to the Play Store **internal** track only (snapshot for dogfooding) (12f3a5ab).
+- Tag `v[0-9]+.[0-9]+.[0-9]+` (this release) → AAB uploaded to internal + production **in parallel** (canary pattern). The `v4.0.3` tag triggers both jobs concurrently (1e247180).
+- A real release no longer requires a manual Play Console step — once green CI on the tag, the production review is auto-submitted.
+
+### Fixed — android-demo About version
+
+- `AboutTab` was hard-coding `"v4.0.0-rc.1"`; now reads `BuildConfig.VERSION_NAME` so the published build always shows the truthful version (f516387f).
+
+### Internal
+
+- 11 commits in this release, all on `main`. Tag `v4.0.3` is the GA cut.
+
+---
+
 ## v4.0.2 — Crash hardening & reactive ViewNode props (2026-05-06)
 
 **Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.
