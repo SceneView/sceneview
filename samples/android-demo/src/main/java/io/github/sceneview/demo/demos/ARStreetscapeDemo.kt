@@ -57,6 +57,90 @@ private const val TAG = "ARStreetscapeDemo"
 @Composable
 fun ARStreetscapeDemo(onBack: () -> Unit) {
     val context = LocalContext.current
+
+    // Gate the AR scene mount on both CAMERA and ACCESS_FINE_LOCATION being
+    // granted. Streetscape Geometry crashes on either:
+    //   1. CAMERA missing → ARSceneView session creation aborts
+    //   2. FINE_LOCATION missing → Session.configure(GeospatialMode.ENABLED)
+    //      throws FineLocationPermissionNotGrantedException
+    // Mounting ARSceneView before both are granted produces a race where
+    // ARSceneView's own lifecycle observer requests CAMERA in parallel with
+    // our LOCATION request, and Android drops one ("Can request only one
+    // set of permissions at a time"). The fix is to *not* mount ARSceneView
+    // until both permissions are resolved — the gate UI below holds the
+    // composition while the system permission dialogs are processed
+    // sequentially by our single launcher.
+    var cameraGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var fineLocationGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var permissionsResolved by remember {
+        mutableStateOf(cameraGranted && fineLocationGranted)
+    }
+    var permissionDeniedReason by remember { mutableStateOf<String?>(null) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        cameraGranted = result[Manifest.permission.CAMERA] ?: cameraGranted
+        fineLocationGranted =
+            result[Manifest.permission.ACCESS_FINE_LOCATION] ?: fineLocationGranted
+        permissionDeniedReason = when {
+            !cameraGranted ->
+                "Camera permission denied — AR cannot run"
+            !fineLocationGranted ->
+                "Location permission denied — Streetscape Geometry needs ACCESS_FINE_LOCATION"
+            else -> null
+        }
+        permissionsResolved = true
+    }
+
+    LaunchedEffect(Unit) {
+        if (cameraGranted && fineLocationGranted) {
+            permissionsResolved = true
+            return@LaunchedEffect
+        }
+        val toRequest = buildList {
+            if (!cameraGranted) add(Manifest.permission.CAMERA)
+            if (!fineLocationGranted) add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        permissionLauncher.launch(toRequest.toTypedArray())
+    }
+
+    // Permission gate — render a simple status UI until both permissions are
+    // resolved. ARSceneView is *not* composed in this branch, which keeps it
+    // from racing with our own permission request.
+    if (!permissionsResolved || !cameraGranted || !fineLocationGranted) {
+        DemoScaffold(title = "Streetscape Geometry", onBack = onBack) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = permissionDeniedReason ?: "Requesting permissions…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .padding(horizontal = 32.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+            }
+        }
+        return
+    }
+
+    // Both permissions granted — proceed with the AR session.
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
@@ -72,34 +156,6 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     // attempting to set the mode would throw on `session.configure()`.
     var geospatialUnavailable by remember { mutableStateOf<String?>(null) }
     var sessionError by remember { mutableStateOf<String?>(null) }
-
-    // ARCore Geospatial mode REQUIRES ACCESS_FINE_LOCATION at runtime, otherwise
-    // `Session.configure(Config.GeospatialMode.ENABLED)` throws
-    // FineLocationPermissionNotGrantedException — which historically crashed the
-    // demo on first launch (the camera permission alone is not enough). We track
-    // the granted state in compose state so the ARSceneView session config can
-    // decide whether to opt into Geospatial or fall back to plain AR.
-    var fineLocationGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        fineLocationGranted = granted
-        if (!granted) {
-            geospatialUnavailable =
-                "Location permission denied — Streetscape Geometry needs ACCESS_FINE_LOCATION"
-        }
-    }
-    LaunchedEffect(Unit) {
-        if (!fineLocationGranted) {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
 
     // Semi-transparent material for streetscape geometry overlays — SceneView TintLight at
     // low alpha so the real camera feed of buildings/sidewalks stays readable through the
@@ -128,21 +184,10 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
                 // preview that the Pixel 9 review flagged across the AR demos.
                 cameraExposure = -1.0f,
                 sessionConfiguration = { session: Session, config: Config ->
-                    // Guard 1: ACCESS_FINE_LOCATION must be granted before enabling
-                    // Geospatial — `Session.configure(GeospatialMode.ENABLED)` throws
-                    // `FineLocationPermissionNotGrantedException` otherwise (and the
-                    // throw is uncaught by ARCore's lifecycle observer, so the whole
-                    // ARSceneView crashes). Skip the opt-in and run plain AR.
-                    if (!fineLocationGranted) {
-                        if (geospatialUnavailable == null) {
-                            geospatialUnavailable =
-                                "Waiting for location permission — Streetscape needs ACCESS_FINE_LOCATION"
-                        }
-                        Log.w(TAG, "Skipping Geospatial — fine location not granted yet")
-                        config.planeFindingMode = Config.PlaneFindingMode.DISABLED
-                        return@ARSceneView
-                    }
-                    // Guard 2: enabling the mode unconditionally throws on devices
+                    // ACCESS_FINE_LOCATION + CAMERA are guaranteed granted at this
+                    // point — the permission gate above held the composition until
+                    // they resolved, so ARSceneView never mounts otherwise.
+                    // Guard: enabling the mode unconditionally throws on devices
                     // without the feature, on regions without VPS coverage, or when
                     // the project lacks a configured ARCore Cloud API key. When
                     // unsupported, keep a plain AR session running so the camera
