@@ -64,4 +64,5 @@ val ALL_DEMOS = listOf(
     DemoEntry("ar-instant-placement", "Instant Placement", "Place models before plane detection converges", "Augmented Reality"),
     DemoEntry("ar-terrain", "Terrain Anchors", "Geospatial anchor that snaps to outdoor terrain", "Augmented Reality"),
     DemoEntry("ar-rooftop", "Rooftop Anchors", "Geospatial anchor that snaps to building rooftops", "Augmented Reality"),
+    DemoEntry("ar-image-stabilization", "Image Stabilization (EIS)", "Smooth shaky camera with one config flag", "Augmented Reality"),
 )

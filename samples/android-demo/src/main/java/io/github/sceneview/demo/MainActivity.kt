@@ -56,6 +56,7 @@ import io.github.sceneview.demo.demos.ARDepthOcclusionDemo
 import io.github.sceneview.demo.demos.ARInstantPlacementDemo
 import io.github.sceneview.demo.demos.ARTerrainAnchorDemo
 import io.github.sceneview.demo.demos.ARRooftopAnchorDemo
+import io.github.sceneview.demo.demos.ARImageStabilizationDemo
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
 import io.github.sceneview.demo.update.InAppUpdateManager
 import androidx.compose.foundation.layout.Box
@@ -212,6 +213,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "ar-instant-placement" -> ARInstantPlacementDemo(onBack)
         "ar-terrain" -> ARTerrainAnchorDemo(onBack)
         "ar-rooftop" -> ARRooftopAnchorDemo(onBack)
+        "ar-image-stabilization" -> ARImageStabilizationDemo(onBack)
         // Fallback
         else -> PlaceholderDemo(id = id, onBack = onBack)
     }

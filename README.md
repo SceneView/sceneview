@@ -317,6 +317,10 @@ See the [AR Debug — Rerun.io section in `llms.txt`](./llms.txt) for the
 full architecture (live mode + save mode + control protocol) and the
 Kotlin API surface (`RerunBridge.requestSaveAndShare`).
 
+### Record & Replay AR sessions
+
+- **Record & Replay AR sessions** — capture an outdoor ARCore session once with `ARRecorder`, replay it 1:1 at the desk via `ARSceneView(playbackDataset = file)`. Pair with the Rerun bridge for record-replay-inspect debugging. See [`docs/docs/ar-recording.md`](docs/docs/ar-recording.md) and the [`Record & Playback` demo](samples/android-demo/RECORDING_PLAYBACK.md).
+
 ---
 
 ## Architecture

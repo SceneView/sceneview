@@ -67,6 +67,7 @@ nav:
     - Android XR: android-xr.md
     - visionOS Spatial Computing: visionos-spatial.md
     - Integrations: integrations.md
+    - AR Recording & Playback: ar-recording.md
     - Performance: performance.md
     - Testing: testing.md
   - Features:

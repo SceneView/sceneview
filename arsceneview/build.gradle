@@ -84,6 +84,15 @@ android {
         abortOnError = false
         checkDependencies = true
     }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            all {
+                systemProperty 'robolectric.logging.enabled', 'true'
+            }
+        }
+    }
 }
 
 dependencies {
@@ -105,6 +114,7 @@ dependencies {
 
     // Unit tests (JVM — no device required)
     testImplementation 'junit:junit:4.13.2'
+    testImplementation libs.robolectric
 }
 
 apply plugin: "com.vanniktech.maven.publish"

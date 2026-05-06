@@ -1424,6 +1424,27 @@ ARCore replays at the original capture rate. The session looks **identical** to 
 
 ---
 
+## AR Image Stabilization (EIS)
+
+ARCore 1.37+ exposes **Electronic Image Stabilization** as a single `Config` flag. When enabled, ARCore smooths the camera background image so handheld micro-shake doesn't translate into perceived judder. The virtual content stays anchored at the same world pose either way — only the camera image is stabilized. Useful for handheld AR, panoramic captures, and any video-style recording where jitter is distracting.
+
+```kotlin
+ARSceneView(
+    sessionConfiguration = { session, config ->
+        if (session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)) {
+            config.imageStabilizationMode = Config.ImageStabilizationMode.EIS
+        }
+        // ... your other config flags
+    }
+)
+```
+
+- **Not all devices support EIS.** Always gate with `session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)` — calling `setImageStabilizationMode(EIS)` on an unsupported device throws.
+- **Toggling at runtime works** via `session.configure {}`, but the camera background can briefly stutter while the stabilization buffers re-prime. If you expose an in-app toggle, prefer remounting via `key(eisEnabled) { ARSceneView(...) }` for a clean swap.
+- **Interactive demo** at [`samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt).
+
+---
+
 ## Recipes — "I want to..."
 
 ### Show a 3D model with orbit camera
