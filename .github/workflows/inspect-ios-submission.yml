@@ -1,0 +1,189 @@
+name: Inspect iOS App Store submission state
+
+# Read-only diagnostic. Dumps the current state of the iOS App Store
+# submission for io.github.sceneview.demo: reviewSubmissions,
+# appStoreVersions, the latest builds, attached metadata. Helps
+# confirm that v4.0.3 (build 359) is queued for Apple review and
+# there's no missing metadata blocking it.
+#
+# Delete this file after debugging is done.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install --quiet "PyJWT[crypto]" requests
+
+      - name: Dump submission state
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$ASC_API_KEY" > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+          python3 <<'PYEOF'
+          import os, time, jwt, requests, json, sys
+
+          KEY_ID = os.environ["ASC_KEY_ID"]
+          ISSUER_ID = os.environ["ASC_ISSUER_ID"]
+          BUNDLE_ID = "io.github.sceneview.demo"
+
+          with open(os.path.expanduser(f"~/.private_keys/AuthKey_{KEY_ID}.p8")) as f:
+              private_key = f.read()
+
+          def hdr():
+              token = jwt.encode(
+                  {"iss": ISSUER_ID, "iat": int(time.time()), "exp": int(time.time()) + 1200, "aud": "appstoreconnect-v1"},
+                  private_key,
+                  algorithm="ES256",
+                  headers={"kid": KEY_ID},
+              )
+              return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+          BASE = "https://api.appstoreconnect.apple.com/v1"
+
+          def show(title, val):
+              print(f"\n=== {title} ===")
+              print(json.dumps(val, indent=2, default=str))
+
+          # 1. App
+          r = requests.get(f"{BASE}/apps", headers=hdr(), params={"filter[bundleId]": BUNDLE_ID})
+          r.raise_for_status()
+          apps = r.json()["data"]
+          if not apps:
+              print(f"App {BUNDLE_ID} not found"); sys.exit(1)
+          app_id = apps[0]["id"]
+          show("App", {"id": app_id, "name": apps[0]["attributes"].get("name"), "bundleId": apps[0]["attributes"]["bundleId"]})
+
+          # 2. Latest builds (up to 5)
+          r = requests.get(
+              f"{BASE}/builds",
+              headers=hdr(),
+              params={"filter[app]": app_id, "sort": "-uploadedDate", "limit": 5,
+                      "include": "preReleaseVersion"},
+          )
+          r.raise_for_status()
+          builds_data = r.json()["data"]
+          included = {(i["type"], i["id"]): i for i in r.json().get("included", [])}
+          builds = []
+          for b in builds_data:
+              prv_id = b["relationships"]["preReleaseVersion"]["data"]["id"] if b["relationships"]["preReleaseVersion"]["data"] else None
+              prv = included.get(("preReleaseVersions", prv_id), {}).get("attributes", {}) if prv_id else {}
+              builds.append({
+                  "id": b["id"],
+                  "build_number": b["attributes"]["version"],
+                  "version": prv.get("version"),
+                  "platform": prv.get("platform"),
+                  "processingState": b["attributes"]["processingState"],
+                  "expired": b["attributes"].get("expired"),
+                  "uploadedDate": b["attributes"].get("uploadedDate"),
+              })
+          show("Latest 5 builds", builds)
+
+          # 3. App Store Versions (all states, recent first)
+          r = requests.get(
+              f"{BASE}/apps/{app_id}/appStoreVersions",
+              headers=hdr(),
+              params={"limit": 10, "sort": "-createdDate"},
+          )
+          r.raise_for_status()
+          versions = []
+          for v in r.json()["data"]:
+              versions.append({
+                  "id": v["id"],
+                  "versionString": v["attributes"]["versionString"],
+                  "platform": v["attributes"]["platform"],
+                  "appStoreState": v["attributes"]["appStoreState"],
+                  "createdDate": v["attributes"].get("createdDate"),
+              })
+          show("Latest App Store Versions", versions)
+
+          # 4. Localizations of v4.0.3 (if found)
+          target = next((v for v in versions if v["versionString"] == "4.0.3" and v["platform"] == "IOS"), None)
+          if target:
+              r = requests.get(
+                  f"{BASE}/appStoreVersions/{target['id']}/appStoreVersionLocalizations",
+                  headers=hdr(),
+                  params={"limit": 50},
+              )
+              r.raise_for_status()
+              locs = []
+              for l in r.json()["data"]:
+                  a = l["attributes"]
+                  locs.append({
+                      "id": l["id"],
+                      "locale": a.get("locale"),
+                      "whatsNew_present": bool(a.get("whatsNew")),
+                      "description_present": bool(a.get("description")),
+                      "promotionalText_present": bool(a.get("promotionalText")),
+                      "keywords_present": bool(a.get("keywords")),
+                      "supportUrl_present": bool(a.get("supportUrl")),
+                      "marketingUrl_present": bool(a.get("marketingUrl")),
+                  })
+              show("v4.0.3 Localizations (present-flags only — content elided)", locs)
+
+              # 5. Build attached to v4.0.3
+              r = requests.get(f"{BASE}/appStoreVersions/{target['id']}/build", headers=hdr())
+              if r.status_code == 200:
+                  b = r.json()["data"]
+                  show("v4.0.3 attached build", {"id": b["id"], "version": b["attributes"]["version"], "processingState": b["attributes"]["processingState"]} if b else None)
+              else:
+                  show("v4.0.3 attached build", {"status": r.status_code, "body": r.text[:300]})
+
+          # 6. reviewSubmissions for the app
+          r = requests.get(
+              f"{BASE}/reviewSubmissions",
+              headers=hdr(),
+              params={"filter[app]": app_id, "limit": 10, "include": "items"},
+          )
+          r.raise_for_status()
+          subs = []
+          for s in r.json()["data"]:
+              a = s["attributes"]
+              item_ids = [i["id"] for i in s["relationships"]["items"]["data"]]
+              subs.append({
+                  "id": s["id"],
+                  "platform": a.get("platform"),
+                  "state": a.get("state"),
+                  "submittedDate": a.get("submittedDate"),
+                  "items_count": len(item_ids),
+              })
+          show("reviewSubmissions", subs)
+
+          # 7. For the latest reviewSubmission, fetch its items + state
+          if subs:
+              latest_sub = subs[0]
+              r = requests.get(
+                  f"{BASE}/reviewSubmissions/{latest_sub['id']}/items",
+                  headers=hdr(),
+                  params={"limit": 50},
+              )
+              if r.status_code == 200:
+                  items = []
+                  for i in r.json()["data"]:
+                      items.append({
+                          "id": i["id"],
+                          "type": i["type"],
+                          "state": i["attributes"].get("state"),
+                          "removedDate": i["attributes"].get("removedDate"),
+                          "appStoreVersion": i["relationships"].get("appStoreVersion", {}).get("data"),
+                      })
+                  show(f"Items of latest reviewSubmission {latest_sub['id']}", items)
+          PYEOF
+
+          rm -rf ~/.private_keys
