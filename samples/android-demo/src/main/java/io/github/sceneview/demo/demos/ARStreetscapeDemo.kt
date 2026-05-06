@@ -157,6 +157,21 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     var geospatialUnavailable by remember { mutableStateOf<String?>(null) }
     var sessionError by remember { mutableStateOf<String?>(null) }
 
+    // Detect at runtime whether the build wired an ARCore Cloud API key into the
+    // manifest (com.google.android.ar.API_KEY meta-data). When absent — fork
+    // builds without the GitHub secret, dev machines that haven't put the key in
+    // local.properties — Geospatial endpoints silently return no data. We pre-fill
+    // the banner so the user sees "Looking for streetscape geometry…" forever
+    // turned into a clear "API key not configured" diagnostic instead.
+    val hasArcoreApiKey = remember {
+        runCatching {
+            val ai = context.packageManager.getApplicationInfo(
+                context.packageName, PackageManager.GET_META_DATA
+            )
+            !ai.metaData?.getString("com.google.android.ar.API_KEY").isNullOrBlank()
+        }.getOrDefault(false)
+    }
+
     // Semi-transparent material for streetscape geometry overlays — SceneView TintLight at
     // low alpha so the real camera feed of buildings/sidewalks stays readable through the
     // overlay mesh.
@@ -262,6 +277,8 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
             ) {
                 val statusText = when {
                     sessionError != null -> "AR session error: $sessionError"
+                    !hasArcoreApiKey ->
+                        "ARCore Cloud API key not configured \u2014 see samples/android-demo/STREETSCAPE_SETUP.md"
                     geospatialUnavailable != null ->
                         "${geospatialUnavailable!!} \u2014 needs outdoor area with Street View coverage + Cloud API key"
                     geometryCount > 0 -> "Rendering $geometryCount structure(s)"

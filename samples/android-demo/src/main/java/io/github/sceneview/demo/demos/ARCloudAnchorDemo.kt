@@ -1,5 +1,6 @@
 package io.github.sceneview.demo.demos
 
+import android.content.pm.PackageManager
 import android.view.MotionEvent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -59,13 +60,36 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
 
+    // Detect at runtime whether the build wired an ARCore Cloud API key into
+    // the manifest. If absent (e.g. running a fork without the GitHub secret,
+    // or a developer who forgot to set ARCORE_API_KEY in local.properties),
+    // host()/resolve() will silently come back with ERROR_NOT_AUTHORIZED — we
+    // surface that upfront in the status banner so the user knows why.
+    val hasArcoreApiKey = remember {
+        runCatching {
+            val ai = context.packageManager.getApplicationInfo(
+                context.packageName, PackageManager.GET_META_DATA
+            )
+            !ai.metaData?.getString("com.google.android.ar.API_KEY").isNullOrBlank()
+        }.getOrDefault(false)
+    }
+
     var localAnchor by remember { mutableStateOf<Anchor?>(null) }
     var cloudAnchorId by remember { mutableStateOf<String?>(null) }
     var resolveId by remember { mutableStateOf("") }
     var isTracking by remember { mutableStateOf(false) }
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var hostedId by remember { mutableStateOf<String?>(null) }
-    var statusMessage by remember { mutableStateOf("Tap a surface to place an anchor") }
+    var statusMessage by remember {
+        mutableStateOf(
+            if (hasArcoreApiKey) {
+                "Tap a surface to place an anchor"
+            } else {
+                "ARCore Cloud API key not configured — Host/Resolve will return " +
+                    "ERROR_NOT_AUTHORIZED. See samples/android-demo/STREETSCAPE_SETUP.md"
+            }
+        )
+    }
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
     var arSession by remember { mutableStateOf<Session?>(null) }
     // Ref to the CloudAnchorNode created inside the ARSceneView content — needed so the
