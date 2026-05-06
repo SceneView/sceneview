@@ -8,24 +8,25 @@ disambiguation popup.
 ## `assetlinks.json` — Android App-Links
 
 Lists the Android packages allowed to handle `https://sceneview.github.io/`
-URLs. The single `sha256_cert_fingerprints` entry today is the **upload
-key** of `samples/android-demo` (alias `sceneview`, see
-`project_play_store_signing.md`).
+URLs. Two `sha256_cert_fingerprints` are listed:
 
-> ⚠️ **Action required for Play Store builds** — the app published on
-> Google Play is re-signed by **Play App Signing**, so the runtime
-> certificate is different from the upload key. To make App-Links
-> verified for installs from the Play Store, append the
-> **App Signing certificate SHA-256** copied from
-> [Play Console → SceneView Demo → Setup → App signing][playconsole]
-> to the array. Format: `"AB:CD:EF:…"` (uppercase, colon-separated).
->
-> Until that's done, App-Links work only for builds installed from a
-> local APK signed with the upload key (e.g. `assembleDebug` over adb).
-> The custom-scheme path (`sceneview://demo/<id>`) keeps working
-> unconditionally.
->
-> [playconsole]: https://play.google.com/console
+1. **`96:AC:55:C2:1B:74:87:4E:…:9C:2A`** — the **Play App Signing key**
+   used by Google to sign every build distributed via the Play Store.
+   This is the fingerprint that matters for users who installed the app
+   from Google Play, and it was copied from
+   [Play Console → SceneView Demo → Test and release → App integrity →
+   App signing][playconsole] under "App signing key certificate".
+2. **`5E:59:9D:AA:62:74:BC:DF:…:6D:8C`** — the **upload key** of
+   `samples/android-demo` (alias `sceneview`, see
+   `project_play_store_signing.md`). Lets App-Links verify on local
+   debug builds installed via `adb install` / `assembleDebug` so
+   developers don't see different behaviour from real users.
+
+Both are public artifacts of public certificates — the **private** keys
+are not in this file (they live in `~/sceneview-upload.jks` for the
+upload key, and on Google's signing service for the App Signing key).
+
+[playconsole]: https://play.google.com/console
 
 After updating the file, also flip `android:autoVerify="true"` on the
 HTTPS intent-filter in `samples/android-demo/src/main/AndroidManifest.xml`
