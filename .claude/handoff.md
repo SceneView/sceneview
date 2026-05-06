@@ -4,6 +4,98 @@
 
 ---
 
+## SESSION 2026-05-06 — eloquent-panini — Pixel 9 review RESCUE + v4.0.4/5/6 SHIPPED + ARCore Cloud key wired
+
+### TL;DR
+User reported v4.0.3 on the stores was missing "the huge batch of fixes from the Pixel 9 review". Audit found **125 commits unmerged** on `claude/tender-haibt-6062c7` (PR #851) + 3 on PR #852 — v4.0.3 had been cut without rebasing them. Then on Pixel 9 the Streetscape demo crashed with `FineLocationPermissionNotGrantedException`, and even after fixing that, geometries didn't render because the build had no ARCore Cloud API key.
+
+End state: **v4.0.4 → v4.0.5 → v4.0.6 shipped**, ARCore Cloud key created + restricted (3 SHA-1) + wired into manifest via CI secret + documented across 7 surfaces, runtime API key check in CloudAnchor + Streetscape demos, validated live on Pixel 9 (`AR_GEOSPATIAL_MODE_ENABLED`, no crash). All other AR demos (face, image-detection, placement, pose, rerun) tested via adb deep-link on the same device — **0 crash, 0 session error** on all 5.
+
+### What was actually published
+- **Maven Central**: `sceneview:4.0.6` + `arsceneview:4.0.6` + `sceneview-core:4.0.6` ✅ (HTTP 200)
+- **npm**: `sceneview-web@4.0.6` ✅ ; `sceneview-mcp@4.0.8` ⚠️ (4.0.9 NOT yet on npm — see below)
+- **GitHub Releases**: v4.0.4, v4.0.5, v4.0.6 ✅
+- **Play Store**: AAB v4.0.6 uploaded to **production track** ✅ (Google review in progress — typical 1-6h)
+- **App Store**: build 362 (4.0.6) uploaded + auto-submitted ✅ (Apple review in progress — typical 1-3 days)
+
+### Commit log this session (main branch, oldest first)
+```
+033f8074 PR #852 squash — AugmentedFace tracking-state callback + TANGENTS encoding
+425618a4 PR #851 squash — Pixel 9 review (87 sample fixes + 20 lib fixes)
+c0a079a1 chore(release): v4.0.4 — Pixel 9 review fixes + library hardening    ← TAG v4.0.4
+34e7e823 fix(release): v4.0.5 hotfix — android-demo compile + iOS bundle bump  ← TAG v4.0.5
+da3f4902 fix(release): bump remaining sample app versions to 4.0.5
+ebaacbff fix(android-demo): ARStreetscapeDemo — request ACCESS_FINE_LOCATION before Geospatial
+0063efa5 fix(android-demo): permission gate ARSceneView until camera + location both granted
+b280b6d9 feat(android-demo): wire ARCore Cloud API key for Streetscape/Geospatial
+eca1c9b1 chore(release): v4.0.6 — Streetscape / Geospatial enabled in production  ← TAG v4.0.6
+a155966b chore(deps): npm audit fix — clear 8 ip-address moderate vulns
+b6c234b4 docs(arsceneview): document ARCore Cloud API key requirement everywhere
+0b2cb34a feat(android-demo): runtime ARCore API key check in CloudAnchor + Streetscape
+5f659982 chore(mcp): bump sceneview-mcp 4.0.8 → 4.0.9 (ships at next library tag)
+```
+
+### Multi-agent review pattern (worked, document for next time)
+PR #851 had 6 known blockers from a 2026-05-05 review. Spawned 7 Opus agents in parallel (one per blocker + sanity check on PR #852), got back 4-bucket triage:
+- 🟢 MERGE NOW: PR #852
+- 🟡 FIX-THEN-MERGE: blockers #1 (drop ViewNode/PlaneRenderer dups), #2 (revert Engine.kt safeDestroy strip), #3 (extract pinchZoomDelta + nextFov + JVM tests), #5 (LightNode color param after position), #6 (KDoc warning ImageNode.destroy)
+- 🔮 FOLLOW-UP ISSUES: blocker #4 → #873 (perf cache SurfaceOrientation), long-term #6 → #874 (frame-deferred destroy queue)
+
+The 14 pinch-zoom math regression tests (`CameraGestureMathTest`) shipped as part of the rebase rescue.
+
+### ARCore Cloud API key (NEW this session)
+- Project: **Google Play Console Developer** (`pc-api-4638313286439917620-648`)
+- API: ARCore API enabled (`arcore.googleapis.com`). Cloud Anchor (Legacy) intentionally NOT enabled — Google deprecated it, the modern ARCore API covers it.
+- Key name: **"SceneView Demo — ARCore"**
+- Restrictions: Android apps + package `io.github.sceneview.demo` + 3 SHA-1:
+  - debug local: `37:23:AF:25:DF:D4:8C:A0:D4:D7:63:02:2D:AA:D6:73:6F:F9:B7:38`
+  - Play App Signing: `38:39:EE:EF:DE:05:37:F4:00:54:66:12:25:24:E2:04:65:BD:9A:CE`
+  - Upload key: `95:BC:10:D4:53:3B:0C:57:55:A5:61:AA:CE:4F:D2:75:37:32:0E:E6`
+- Backups: `~/Projects/profile-private/credentials/sceneview-arcore.env` (chmod 600), GitHub Actions secret `ARCORE_API_KEY`, `local.properties` (gitignored). **NEVER committed**.
+- CI workflows wired: `play-store.yml`, `build-apks.yml`, `ci.yml`, `pr-check.yml`, `quality-gate.yml`, `render-tests.yml` all inject `ARCORE_API_KEY` via env on the steps that build the sample app. Forks ship without the key — runtime check disables Geospatial gracefully.
+- Doc surfaces:
+  - `samples/android-demo/STREETSCAPE_SETUP.md` (step-by-step Cloud Console setup)
+  - `arsceneview/Module.md` (lib reference — Dokka)
+  - `llms.txt` + `mcp/llms.txt` + `docs/docs/llms.txt` (AI assistants)
+  - `docs/docs/integrations.md` (doc site readers)
+  - `mcp/src/{guides,explain-api,debug-issue,samples}.ts` (MCP server tool outputs)
+  - `samples/android-demo/build.gradle` (manifestPlaceholders) + `AndroidManifest.xml` (meta-data)
+- Budget: existing €10/Monthly alert on the billing account already covers this. Free tier large for personal testing.
+
+### Pixel 9 wireless debug info (for future test sessions)
+- Device: 192.168.1.108:5555 (TLS port also at :46623, usually expires sooner)
+- Connect: `adb connect 192.168.1.108:5555`
+- Streetscape demo deep-link: `adb shell am start -n io.github.sceneview.demo/.MainActivity --es demo ar-streetscape`
+- Caveat: `--es demo` deep-link parsing in `MainActivity.kt` works on cold-start; sometimes the activity is in background and `am start` re-delivers the intent without bringing the app to foreground. Workaround: scroll the demo list manually, tap Streetscape.
+- All 5 AR demos tested via adb deep-link this session — `/tmp/ar-test-*.png` screenshots, 0 crash on each. See `/tmp/test-ar-demos.sh` script for the harness.
+
+### What's still in flight (passive monitoring)
+1. **Apple TestFlight email "ready to test"** for v4.0.6 build 362 — uploaded ~14:30Z, no email yet by 17:30Z. If still nothing in 24h, check App Store Connect → TestFlight directly.
+2. **Google Play "Production release approved"** mail for v4.0.6 — uploaded ~16:00Z, typical 1-6h.
+3. **`Publish to internal` track failed** on v4.0.6 (race Edit conflict with parallel `Publish to production` in canary pattern). Production track WORKED. Pre-existing race, not regressed by this session — fix is to add a retry with backoff or sequence the two jobs in the workflow. NOT urgent.
+
+### What's NOT shipped to npm yet
+- `sceneview-mcp@4.0.9` — bump committed (5f659982) but tag v4.0.6 was cut BEFORE this commit. Need a new library tag (v4.0.7+) for `publish-mcp` job to push 4.0.9 to npm. Consequence: users running `npx sceneview-mcp` see the old `llms.txt` without the "ARCore Cloud API key required" section. Mitigation: doc-site has it; AI assistants reading via the MCP server still get the old text. **Cutting v4.0.7 next** to ship this fix.
+
+### Files that should NEVER be committed (sanity check before push)
+- `local.properties` (already gitignored — verified) — contains `ARCORE_API_KEY=AIza...`
+- `~/Projects/profile-private/credentials/sceneview-arcore.env` (lives outside repo)
+- Anywhere `AIza[A-Za-z0-9_-]{30,}` would match — `git diff --cached | grep -E "AIza..."` should always be empty before push. Verified at every commit this session.
+
+### 5 open issues (none trivial, all enhancements)
+- #871 unlit color material in MaterialLoader (needs `.filamat` binary)
+- #863 regression test GLB without TANGENTS attribute (covers #836 silent close)
+- #848 record video / take photos (Android — `startMirroring` API was removed in 4.x)
+- #873 (filed this session) perf cache SurfaceOrientation in computeTangents
+- #874 (filed this session) frame-deferred destroy queue ImageNode/ViewNode
+
+### Lessons reaffirmed this session
+- The "ZERO TOLERANCE for bugs reaching the user" rule from CLAUDE.md was violated when v4.0.4 shipped without testing the sample-app compile. v4.0.5 hotfix caught it next push. **`:samples:android-demo:assembleDebug` + `:samples:android-demo:bundleRelease` (when store-affecting) MUST be in the pre-push gate**, not just `:sceneview:compileReleaseKotlin`. (`feedback_no_full_test_suite_per_commit` is fine — but `assembleDebug` is fast and catches sample-app regressions.)
+- Multi-agent review pattern (`feedback_pr_review_workflow.md`) works exceptionally well for big PRs. Reuse for any future >50-commit PR.
+- For `RequestMultiplePermissions` + ARSceneView: ARSceneView's lifecycle observer requests CAMERA on its own. If you also request CAMERA via `RequestMultiplePermissions` at the same time, Android drops one with "Can request only one set of permissions at a time". Solution: gate ARSceneView mount until both permissions resolve (don't even compose the AR view during the dialog flow).
+
+---
+
 ## SESSION 2026-05-06 — nervous-payne (cont) — v4.0.2 SHIPPED
 
 ### TL;DR

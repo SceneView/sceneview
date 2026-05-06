@@ -1,5 +1,58 @@
 # Changelog
 
+## v4.0.7 — ARCore Cloud API key documentation everywhere + npm sceneview-mcp@4.0.9 (2026-05-06)
+
+**Status:** stable. Documentation + MCP-server release.
+
+### Documented
+
+The ARCore Cloud API key requirement (for `Config.CloudAnchorMode.ENABLED`,
+`Config.GeospatialMode.ENABLED`, `Config.StreetscapeGeometryMode.ENABLED`) is
+now surfaced everywhere a SceneView consumer might look:
+
+- `arsceneview/Module.md` — dedicated "ARCore Cloud API key" section in the
+  Dokka-published lib reference (with manifest snippet + build.gradle injection
+  + link to the setup guide).
+- `llms.txt` (root) + `mcp/llms.txt` + `docs/docs/llms.txt` — warning block
+  under the ARSceneScope intro so AI assistants generating Cloud-using code
+  emit the manifest/build.gradle wiring automatically.
+- `docs/docs/integrations.md` — full setup section in the doc-site Cloud
+  Anchor + Room example.
+- `mcp/src/guides.ts` (returned by the `get_setup_guide` MCP tool): added the
+  API_KEY meta-data + ACCESS_FINE_LOCATION permission + Cloud setup block.
+- `mcp/src/explain-api.ts` (returned by `explain_api`): added the missing
+  key/permission gotcha to the "common mistakes" list.
+- `mcp/src/debug-issue.ts` (returned by `debug_issue`): added Cloud
+  manifest snippet to the AR troubleshooting flow.
+- `mcp/src/samples.ts`: prepended the setup comment block to the Cloud
+  Anchor sample so generated code includes the prereq inline.
+- `samples/android-demo/STREETSCAPE_SETUP.md` shipped earlier in v4.0.6 stays
+  the canonical step-by-step guide.
+
+### Improved — sample app demos
+
+- `ARStreetscapeDemo` and `ARCloudAnchorDemo` now read
+  `com.google.android.ar.API_KEY` from the manifest at runtime (via
+  `PackageManager.GET_META_DATA`) and surface a precise "ARCore Cloud API
+  key not configured — see STREETSCAPE_SETUP.md" banner instead of letting
+  the user wait on "Looking for streetscape geometry…" forever or seeing
+  a cryptic `ERROR_NOT_AUTHORIZED` after a tap. No-op for production
+  builds (Play Store / App Store ship the key); helpful for forks.
+
+### Internal
+
+- `npm sceneview-mcp` 4.0.8 → **4.0.9** — picks up the regenerated
+  `mcp/src/generated/llms-txt.ts` so `npx sceneview-mcp` users see the new
+  ARCore Cloud key section in `sceneview://api`.
+- 8 Dependabot ip-address moderate alerts cleared via `npm audit fix`
+  across 8 lockfiles (commit `a155966b`).
+- iOS bundle 362 → 363, `MARKETING_VERSION` 4.0.6 → 4.0.7.
+
+### What's still in flight from v4.0.6 (unchanged)
+
+- Apple TestFlight processing v4.0.6 build 362 (auto-submit pending Apple review).
+- Play Store production track for v4.0.6 (Google review pending).
+
 ## v4.0.6 — Streetscape Geometry / Geospatial enabled in production (2026-05-06)
 
 **Status:** stable. Activates the AR Streetscape Geometry, Geospatial, and Cloud Anchors demos for Play Store and App Store builds. The library artefacts on Maven Central are unchanged from v4.0.5 — this release only re-builds the sample apps with the now-wired ARCore Cloud API key.
