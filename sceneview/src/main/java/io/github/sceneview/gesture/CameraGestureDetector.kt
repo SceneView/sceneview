@@ -126,18 +126,13 @@ open class CameraGestureDetector(
         override fun scrollUpdate(x: Int, y: Int, prevSeparation: Float, currSeparation: Float) {
             // Pixel 9 review v2: the legacy linear curve `(prev - curr) * 0.1` was too abrupt —
             // a 200 px pinch produced a 20-unit dolly translation, easily punching the camera
-            // through the target. Apply a soft non-linear damping (`|Δ|^damping` preserving
-            // sign) and a lower default speed for a more progressive feel. Damping is only
-            // applied when |Δ| > 1 px so sub-pixel jitter doesn't get amplified.
-            val delta = prevSeparation - currSeparation
-            val absDelta = kotlin.math.abs(delta)
-            val damped = if (absDelta > 1f) {
-                kotlin.math.sign(delta) *
-                    kotlin.math.exp(kotlin.math.ln(absDelta) * pinchZoomDamping)
-            } else {
-                delta
-            }
-            manipulator.scroll(x, y, damped * pinchZoomSpeed)
+            // through the target. The damping curve lives in [pinchZoomDelta] so it can be
+            // unit-tested on the JVM (no Filament Manipulator instance needed).
+            manipulator.scroll(
+                x,
+                y,
+                pinchZoomDelta(prevSeparation, currSeparation, pinchZoomSpeed, pinchZoomDamping),
+            )
         }
 
         override fun scrollEnd() {}
@@ -357,11 +352,8 @@ class FovZoomCameraManipulator @JvmOverloads constructor(
 
     override fun scrollUpdate(x: Int, y: Int, prevSeparation: Float, currSeparation: Float) {
         // Pinch out (curr > prev) ⇒ user wants to zoom IN ⇒ smaller FOV.
-        val delta = (prevSeparation - currSeparation) * pinchFovSpeed
-        currentFov = (currentFov + delta).coerceIn(
-            fovRangeDegrees.start.toDouble(),
-            fovRangeDegrees.endInclusive.toDouble(),
-        )
+        // Pure math is in [nextFov] for unit testability without a Filament Camera.
+        currentFov = nextFov(currentFov, prevSeparation, currSeparation, fovRangeDegrees, pinchFovSpeed)
         cameraNode.setProjection(fovInDegrees = currentFov, direction = Camera.Fov.VERTICAL)
     }
 
