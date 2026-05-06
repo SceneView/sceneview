@@ -6,5 +6,21 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!--
+		Associated Domains — wires `https://sceneview.github.io/open?demo=<id>`
+		to this app as a verified Universal Link. Pairs with the
+		`apple-app-site-association` file at
+		https://sceneview.github.io/.well-known/apple-app-site-association
+		(see website-static/.well-known/README.md).
+
+		The custom scheme `sceneview://demo/<id>` (declared in Info.plist >
+		CFBundleURLTypes) keeps working without this entitlement, so users on
+		v1.0 of the app still get deep-links from QR codes today. Universal
+		Links activate on the next build that ships this entitlement.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:sceneview.github.io</string>
+	</array>
 </dict>
 </plist>
