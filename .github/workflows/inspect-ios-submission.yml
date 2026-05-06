@@ -95,22 +95,25 @@ jobs:
               })
           show("Latest 5 builds", builds)
 
-          # 3. App Store Versions (all states, recent first)
+          # 3. App Store Versions (all states; ASC's appStoreVersions endpoint
+          #    only allows sort=versionString, so just take the last 10).
           r = requests.get(
               f"{BASE}/apps/{app_id}/appStoreVersions",
               headers=hdr(),
-              params={"limit": 10, "sort": "-createdDate"},
+              params={"limit": 10},
           )
-          r.raise_for_status()
           versions = []
-          for v in r.json()["data"]:
-              versions.append({
-                  "id": v["id"],
-                  "versionString": v["attributes"]["versionString"],
-                  "platform": v["attributes"]["platform"],
-                  "appStoreState": v["attributes"]["appStoreState"],
-                  "createdDate": v["attributes"].get("createdDate"),
-              })
+          if r.status_code != 200:
+              print(f"::warning::appStoreVersions list failed status={r.status_code} body={r.text[:300]}")
+          else:
+              for v in r.json()["data"]:
+                  versions.append({
+                      "id": v["id"],
+                      "versionString": v["attributes"]["versionString"],
+                      "platform": v["attributes"]["platform"],
+                      "appStoreState": v["attributes"]["appStoreState"],
+                      "createdDate": v["attributes"].get("createdDate"),
+                  })
           show("Latest App Store Versions", versions)
 
           # 4. Localizations of v4.0.3 (if found)
