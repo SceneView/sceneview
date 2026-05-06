@@ -204,14 +204,71 @@ jobs:
               fail("Failed to attach build to version", r)
           print(f"Attached build {build_id} to version {version_id}")
 
-          # 6. Submit for review
+          # 6. Submit for review using the modern reviewSubmissions API.
+          #    The legacy /v1/appStoreVersionSubmissions endpoint now only
+          #    supports DELETE (to cancel an in-flight submission); CREATE
+          #    moved to /v1/reviewSubmissions + /v1/reviewSubmissionItems.
+
+          # 6a. Get or create the IN_PROGRESS reviewSubmission for this app
+          r = requests.get(
+              f"{BASE}/reviewSubmissions",
+              headers=hdr(),
+              params={"filter[app]": app_id, "filter[platform]": "IOS", "limit": 10},
+          )
+          if r.status_code != 200:
+              fail("Failed to list review submissions", r)
+          existing = None
+          for s in r.json().get("data", []):
+              state = s["attributes"]["state"]
+              print(f"  reviewSubmission {s['id']} state={state}")
+              if state in ("READY_FOR_REVIEW", "WAITING_FOR_REVIEW", "IN_REVIEW"):
+                  # Already submitted — refuse to double-submit
+                  fail(f"reviewSubmission {s['id']} is already in {state}. Cancel it on App Store Connect first if you want to resubmit.")
+              if state == "COMPLETE":
+                  continue
+              # State must be one we can attach to (UNRESOLVED_ISSUES, etc.)
+              existing = s
+              break
+          if existing:
+              submission_id = existing["id"]
+              print(f"Reusing reviewSubmission id={submission_id} state={existing['attributes']['state']}")
+          else:
+              payload = {"data": {
+                  "type": "reviewSubmissions",
+                  "attributes": {"platform": "IOS"},
+                  "relationships": {"app": {"data": {"type": "apps", "id": app_id}}},
+              }}
+              r = requests.post(f"{BASE}/reviewSubmissions", headers=hdr(), json=payload)
+              if r.status_code not in (200, 201):
+                  fail("Failed to create reviewSubmission", r)
+              submission_id = r.json()["data"]["id"]
+              print(f"Created reviewSubmission id={submission_id}")
+
+          # 6b. Attach the App Store Version as a reviewSubmissionItem
           payload = {"data": {
-              "type": "appStoreVersionSubmissions",
-              "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": version_id}}},
+              "type": "reviewSubmissionItems",
+              "relationships": {
+                  "reviewSubmission": {"data": {"type": "reviewSubmissions", "id": submission_id}},
+                  "appStoreVersion": {"data": {"type": "appStoreVersions", "id": version_id}},
+              },
           }}
-          r = requests.post(f"{BASE}/appStoreVersionSubmissions", headers=hdr(), json=payload)
+          r = requests.post(f"{BASE}/reviewSubmissionItems", headers=hdr(), json=payload)
           if r.status_code in (200, 201):
-              print("::notice::Submitted for App Store review.")
+              print(f"Added appStoreVersion {version_id} as reviewSubmissionItem")
+          elif r.status_code == 409:
+              print(f"::warning::reviewSubmissionItem already exists for this version — continuing")
+          else:
+              fail("Failed to add appStoreVersion to review submission", r)
+
+          # 6c. Set submitted=true to actually start the review
+          payload = {"data": {
+              "type": "reviewSubmissions",
+              "id": submission_id,
+              "attributes": {"submitted": True},
+          }}
+          r = requests.patch(f"{BASE}/reviewSubmissions/{submission_id}", headers=hdr(), json=payload)
+          if r.status_code in (200, 201):
+              print(f"::notice::Submitted reviewSubmission {submission_id} for App Store review.")
           else:
               fail("Submission failed — fix metadata in App Store Connect and re-trigger this workflow", r)
 
