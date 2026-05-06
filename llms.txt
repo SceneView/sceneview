@@ -1388,27 +1388,34 @@ fun ARRecord() {
 
     ARSceneView(
         modifier = Modifier.fillMaxSize(),
-        // attach() must run on every frame: the recorder publishes the latest
-        // Session reference here, and ARCore can swap sessions across resume
-        // cycles. Calling on each onSessionUpdated is cheap (an AtomicReference set).
+        // Wire attach() ONLY through onSessionUpdated. The recorder publishes the
+        // latest Session via an AtomicReference (cheap), and the same Session
+        // instance survives Activity pause/resume — the swap only happens on full
+        // composable disposal (e.g. key() remount or navigating away and back),
+        // and onSessionUpdated re-fires on the new Session naturally. No need to
+        // also wire onSessionCreated.
         onSessionUpdated = { session, _ -> recorder.attach(session) }
     )
 }
 ```
 
-`ARRecorder.state` is `IDLE | RECORDING | ERROR`. The composable auto-stops on dispose.
+`ARRecorder.state`, `recorder.errorMessage`, and `recorder.recordingFile` are all `MutableState`-backed under the hood — read them from a `@Composable` and Compose recomposes / `LaunchedEffect` re-keys when they change. The composable auto-stops on dispose. After `stop()`, `recorder.recordingFile` keeps pointing at the last MP4 so the caller can list / share / replay it.
 
 ### Auto-stop after N seconds
 
 Drive `stop()` from a `LaunchedEffect` keyed on `recorder.state` so you don't block the UI thread:
 
 ```kotlin
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+
 LaunchedEffect(recorder.state) {
     if (recorder.state == ARRecorder.State.RECORDING) {
         delay(30_000L)
         recorder.stop()
     }
 }
+// after the LaunchedEffect fires, the file is at recorder.recordingFile
 ```
 
 ### Replay a session
@@ -1437,7 +1444,7 @@ ARCore replays at the original capture rate. The session looks **identical** to 
 - **MP4 file size.** A few tens of MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
 - **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session. Mutating the param after first composition is silently ignored (the value is snapshotted at session creation).
 - **Recording while in playback mode is rejected.** `ARRecorder.start()` returns `false` and surfaces an error message if the session is currently bound to a playback dataset.
-- **`attach(newSession)` mid-RECORDING is a pointer swap, not a graceful handoff.** If the underlying `Session` instance changes while a recording is in flight (e.g. ARCore tears down + recreates on resume), the old session never receives `stopRecording()` — the in-flight MP4 is left dangling. `stop()` on the new session is a no-op for the orphaned recording. Avoid mid-record session swaps; if your UI needs to switch modes, call `stop()` first, then let the recorder re-attach to the new session.
+- **`attach(newSession)` mid-RECORDING is a pointer swap, not a graceful handoff.** If the underlying `Session` instance changes while a recording is in flight (e.g. the user navigates away and back, or `key(...)` triggers a full ARSceneView teardown), the old session never receives `stopRecording()` — the in-flight MP4 is left dangling. `stop()` on the new session is a no-op for the orphaned recording. Mitigation: call `stop()` BEFORE any UI action that might dispose the ARSceneView; or hook `onSessionCreated` to detect the new-session event and stop+restart deliberately. Note that ARCore keeps the same `Session` instance across plain Activity pause/resume — you only need to worry about swap on composable disposal.
 
 ---
 
