@@ -50,15 +50,20 @@ fun ARRecord() {
 
     ARSceneView(
         modifier = Modifier.fillMaxSize(),
+        // Per-frame attach() is intentional: ARCore can swap the underlying
+        // Session across resume cycles, so the recorder needs the latest reference
+        // each tick. The call is cheap (an AtomicReference set).
         onSessionUpdated = { session, _ -> recorder.attach(session) }
     )
 }
 ```
 
+(Compose imports — `androidx.compose.runtime.*`, `androidx.compose.material3.*`, `androidx.compose.ui.platform.LocalContext` — are elided for brevity.)
+
 `ARRecorder.state` is `IDLE | RECORDING | ERROR`. The composable auto-stops on dispose, so leaving the screen mid-recording flushes the MP4 cleanly.
 
 !!! warning "Emulator: recording does not work"
-    ARCore Recording requires a real camera and IMU. The emulator surfaces a `RECORDING_FAILED` error. Capture on a real device, then replay anywhere — replay works fine on the emulator.
+    ARCore Recording requires a real camera and IMU. The emulator surfaces a `RecordingFailedException` (routed to `recorder.errorMessage` and `state = ERROR`). Capture on a real device, then replay anywhere — replay works fine on the emulator.
 
 !!! note "Where to store recordings"
     `context.getExternalFilesDir("ar-recordings")` is app-private external storage. No runtime permission is required, files are wiped on uninstall, and the directory is reachable via `adb pull` for sharing.
@@ -112,3 +117,6 @@ The same MP4 can be replayed with the Rerun debug bridge attached, giving you a 
 - **MP4 file size.** Tens of MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
 - **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }`.
 - **Recording while in playback mode is rejected.** `ARRecorder.start()` returns `false` and surfaces an error message if the session is currently bound to a playback dataset.
+
+!!! warning "Mid-record session swap leaks the in-flight MP4"
+    `attach(newSession)` while `state == RECORDING` is a pure pointer swap — the previous session never receives `stopRecording()`, so its MP4 is left dangling. ARCore can recreate the `Session` across resume cycles; if your UI lets the user navigate away and back mid-record, call `stop()` first, let the recorder re-attach to the new session, then `start()` again. Tested in `ARRecorderTest.kt`.

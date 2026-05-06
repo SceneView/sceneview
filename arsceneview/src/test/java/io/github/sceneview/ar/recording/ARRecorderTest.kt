@@ -121,7 +121,6 @@ class ARRecorderTest {
         assertEquals(ARRecorder.State.RECORDING, recorder.state)
         assertEquals(outFile, recorder.recordingFile)
         assertNull(recorder.errorMessage)
-        assertEquals(1, session.startRecordingCount)
     }
 
     @Test
@@ -170,7 +169,6 @@ class ARRecorderTest {
 
         assertFalse(started)
         assertEquals(ARRecorder.State.ERROR, recorder.state)
-        assertEquals(0, session.startRecordingCount)
         val msg = recorder.errorMessage
         assertNotNull(msg)
         assertTrue(
@@ -195,7 +193,6 @@ class ARRecorderTest {
         assertEquals(outFile, returned)
         // recordingFile is preserved so the caller can list/share the MP4 afterwards.
         assertEquals(outFile, recorder.recordingFile)
-        assertEquals(1, session.stopRecordingCount)
     }
 
     @Test

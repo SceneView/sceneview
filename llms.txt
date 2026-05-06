@@ -1388,12 +1388,28 @@ fun ARRecord() {
 
     ARSceneView(
         modifier = Modifier.fillMaxSize(),
+        // attach() must run on every frame: the recorder publishes the latest
+        // Session reference here, and ARCore can swap sessions across resume
+        // cycles. Calling on each onSessionUpdated is cheap (an AtomicReference set).
         onSessionUpdated = { session, _ -> recorder.attach(session) }
     )
 }
 ```
 
 `ARRecorder.state` is `IDLE | RECORDING | ERROR`. The composable auto-stops on dispose.
+
+### Auto-stop after N seconds
+
+Drive `stop()` from a `LaunchedEffect` keyed on `recorder.state` so you don't block the UI thread:
+
+```kotlin
+LaunchedEffect(recorder.state) {
+    if (recorder.state == ARRecorder.State.RECORDING) {
+        delay(30_000L)
+        recorder.stop()
+    }
+}
+```
 
 ### Replay a session
 
@@ -1421,6 +1437,7 @@ ARCore replays at the original capture rate. The session looks **identical** to 
 - **MP4 file size.** A few tens of MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
 - **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session. Mutating the param after first composition is silently ignored (the value is snapshotted at session creation).
 - **Recording while in playback mode is rejected.** `ARRecorder.start()` returns `false` and surfaces an error message if the session is currently bound to a playback dataset.
+- **`attach(newSession)` mid-RECORDING is a pointer swap, not a graceful handoff.** If the underlying `Session` instance changes while a recording is in flight (e.g. ARCore tears down + recreates on resume), the old session never receives `stopRecording()` — the in-flight MP4 is left dangling. `stop()` on the new session is a no-op for the orphaned recording. Avoid mid-record session swaps; if your UI needs to switch modes, call `stop()` first, then let the recorder re-attach to the new session.
 
 ---
 
@@ -1440,6 +1457,7 @@ ARSceneView(
 ```
 
 - **Not all devices support EIS.** Always gate with `session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)` — calling `setImageStabilizationMode(EIS)` on an unsupported device throws.
+- **Back-camera only.** EIS is not supported with `Session.Feature.FRONT_CAMERA`. The `isImageStabilizationModeSupported` check returns `false` for front-camera sessions, so the gate above already covers selfie configurations — but be aware that toggling EIS in a front-camera demo will be a no-op.
 - **Toggling at runtime works** via `session.configure {}`, but the camera background can briefly stutter while the stabilization buffers re-prime. If you expose an in-app toggle, prefer remounting via `key(eisEnabled) { ARSceneView(...) }` for a clean swap.
 - **Interactive demo** at [`samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt).
 

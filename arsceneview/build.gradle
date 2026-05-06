@@ -88,9 +88,6 @@ android {
     testOptions {
         unitTests {
             includeAndroidResources = true
-            all {
-                systemProperty 'robolectric.logging.enabled', 'true'
-            }
         }
     }
 }
