@@ -36,6 +36,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+                Deep-link entry: scan a QR code on sceneview.github.io / README /
+                docs and land directly on the matching demo screen.
+                See .claude/plans/rerun-deeplinks-and-qr.md for the full plan.
+
+                Custom scheme `sceneview://demo/<id>` works without store
+                verification — the only path needed for the v1 PR. Verified
+                App-Links over HTTPS will be added in a follow-up once we have
+                a published keystore SHA-256 + a stable assetlinks.json on
+                sceneview.github.io.
+            -->
+            <intent-filter android:label="Open in SceneView Demo">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sceneview" android:host="demo" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

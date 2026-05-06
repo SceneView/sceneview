@@ -19,9 +19,19 @@ extension NSColor {
 /// save favorites, and share screenshots with friends.
 @main
 struct SceneViewDemoApp: App {
+    /// Demo id parsed from a deep-link URL (`sceneview://demo/<id>` or, in the
+    /// future once Universal Links ship, `https://sceneview.github.io/open?demo=<id>`).
+    /// Reset to `nil` after presentation so a config change doesn't replay it.
+    @State private var pendingDeepLinkDemo: String?
+
     var body: some SwiftUI.Scene {
         WindowGroup {
-            ContentView()
+            ContentView(pendingDeepLinkDemo: $pendingDeepLinkDemo)
+                .onOpenURL { url in
+                    if let id = DeepLinkRouter.parse(url, allowedDemos: DemoDeepLinkRegistry.allowedIds) {
+                        pendingDeepLinkDemo = id
+                    }
+                }
         }
         #if os(macOS)
         .defaultSize(width: 1200, height: 800)
@@ -30,7 +40,14 @@ struct SceneViewDemoApp: App {
 }
 
 struct ContentView: View {
+    @Binding var pendingDeepLinkDemo: String?
     @State private var selectedTab = 0
+
+    /// Wraps a demo id so SwiftUI's `.fullScreenCover(item:)` accepts it.
+    private struct DemoLink: Identifiable {
+        let id: String
+    }
+    @State private var presentedDemo: DemoLink?
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -65,5 +82,23 @@ struct ContentView: View {
                 .accessibilityLabel("About This App")
         }
         .tint(SceneViewTheme.primary)
+        .onChange(of: pendingDeepLinkDemo) { newId in
+            guard let id = newId else { return }
+            // Switch to the Scenes tab so the deep-link surface feels
+            // contextual; then present the demo above it as a modal so we
+            // don't have to thread navigation through SamplesTab.
+            selectedTab = 2
+            presentedDemo = DemoLink(id: id)
+            pendingDeepLinkDemo = nil
+        }
+        #if os(iOS)
+        .fullScreenCover(item: $presentedDemo) { link in
+            DemoDeepLinkRegistry.destination(for: link.id)
+        }
+        #else
+        .sheet(item: $presentedDemo) { link in
+            DemoDeepLinkRegistry.destination(for: link.id)
+        }
+        #endif
     }
 }

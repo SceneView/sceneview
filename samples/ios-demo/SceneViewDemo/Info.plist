@@ -49,5 +49,24 @@
 	<string>public.app-category.entertainment</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!--
+		Deep-link entry: scan a QR code on sceneview.github.io / README /
+		docs and land directly on the matching demo screen. Custom scheme
+		mirrors the Android intent-filter (`AndroidManifest.xml`).
+		See .claude/plans/rerun-deeplinks-and-qr.md for the full plan and
+		the verified-Universal-Links follow-up that needs a TEAM_ID +
+		`apple-app-site-association` published on github.io.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.sceneview.demo</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>sceneview</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

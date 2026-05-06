@@ -1,5 +1,6 @@
 package io.github.sceneview.demo
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,9 +10,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import io.github.sceneview.demo.demos.AnimationDemo
 import io.github.sceneview.demo.demos.ARPlacementDemo
 import io.github.sceneview.demo.demos.CameraControlsDemo
@@ -56,15 +64,40 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var updateManager: InAppUpdateManager
 
+    /**
+     * Latest demo id parsed from a deep-link intent (`sceneview://demo/<id>`
+     * today, `https://sceneview.github.io/open?demo=<id>` once App-Links
+     * verification ships). Updated from both `onCreate` (cold start) and
+     * [onNewIntent] (warm start with the activity already in the
+     * background). The Compose UI observes this and navigates when it
+     * sees a non-null value, then resets it via [consumePendingDemo] so
+     * a configuration change doesn't replay the same navigation.
+     */
+    private val pendingDemoId = MutableStateFlow<String?>(null)
+    val pendingDemoIdFlow: StateFlow<String?> get() = pendingDemoId.asStateFlow()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         updateManager = InAppUpdateManager(this)
+        pendingDemoId.value = DeepLinkRouter.parse(intent?.data)
         setContent {
             SceneViewDemoTheme {
-                SceneViewDemoApp()
+                SceneViewDemoApp(activity = this)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Replace the activity intent so subsequent re-creations see the new
+        // deep link, not the original launcher intent.
+        setIntent(intent)
+        pendingDemoId.value = DeepLinkRouter.parse(intent.data)
+    }
+
+    fun consumePendingDemo() {
+        pendingDemoId.value = null
     }
 
     override fun onResume() {
@@ -79,8 +112,20 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun SceneViewDemoApp() {
+fun SceneViewDemoApp(activity: MainActivity? = null) {
     val navController = rememberNavController()
+
+    // Watch for deep-link intents. On a non-null id we either navigate
+    // directly (the demo list is the start destination, so navigate adds
+    // the demo screen on top — back returns to the list) and immediately
+    // consume the pending id so a config change doesn't replay it.
+    val pendingId by (activity?.pendingDemoIdFlow?.collectAsState()
+        ?: remember { MutableStateFlow<String?>(null) }.collectAsState())
+    LaunchedEffect(pendingId) {
+        val id = pendingId ?: return@LaunchedEffect
+        navController.navigate("demo/$id")
+        activity?.consumePendingDemo()
+    }
 
     NavHost(
         navController = navController,

@@ -100,6 +100,32 @@ README screenshot → [tiny QR] → Android app installed?
 - "Discreet" QR placement on the website: under each demo card, in the bottom-right corner with a 32×32 SVG. On the README, under each section heading. On `samples/recipes/*.md` snippets, under the code block. Any preference?
 - Do we ship `sceneview://demo/<id>` only at first (zero-config, works without store verification) and add App-Links verification in a follow-up? That cuts pre-reqs to just the Play Store id (for fallback), and makes the first PR much smaller.
 
+## Status — work shipped 2026-05-06
+
+Already done in this branch (`gifted-kowalevski-1753ec`):
+
+- ✅ `DeepLinkRouter.kt` + 12 Robolectric tests (custom + HTTPS uri shapes, registry guard)
+- ✅ Android `AndroidManifest.xml` — `sceneview://demo/<id>` intent-filter
+- ✅ Android `MainActivity` — `pendingDemoId` StateFlow + `onNewIntent` + `LaunchedEffect`-based navigation
+- ✅ `DeepLinkRouter.swift` — mirror parser
+- ✅ iOS `Info.plist` — `CFBundleURLTypes` for the `sceneview` scheme
+- ✅ iOS `SceneViewDemoApp` / `ContentView` — `.onOpenURL` + `@State pendingDeepLinkDemo` + tab switch + `.fullScreenCover`
+- ✅ `DemoDeepLinkRegistry.swift` — id → `View` mapping (covers ar-rerun + 12 others, fallback placeholder)
+- ✅ `website-static/open/index.html` — UA-aware redirect page (mobile attempts scheme + 1.5s store-fallback / desktop renders QR)
+- ✅ `website-static/js/qrcode-min.js` — ESM wrapper around vendored `qrcode-generator` 1.4.4 (MIT)
+- ✅ Pre-existing `ScreenshotTest.kt` reduced to an `@Ignore`d stub so the test source set compiles (it was already broken on `main`, blocking all JVM tests)
+
+What's gated on the apps being **publicly published on the stores**
+(see `project_demo_apps_publication.md`):
+
+- ❌ QR codes physically embedded on website / README / docs
+  (visible UI placement → would lead to a Play Store / App Store 404
+  every time today)
+- ❌ Verified App-Links (Android `autoVerify="true"` + assetlinks.json)
+- ❌ Universal Links iOS (apple-app-site-association + Associated Domains)
+- ❌ Real `APP_STORE_URL` constant in `/open/index.html` (currently a
+  fallback to `https://sceneview.github.io/#install`)
+
 ## Recommended first PR
 
 A minimal, shippable slice:
