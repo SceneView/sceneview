@@ -88,12 +88,14 @@ fun LinesPathsDemo(onBack: () -> Unit) {
             cameraManipulator = rememberCameraManipulator()
         ) {
             // On-brand line colors — Primary blue for the line segment, Accent purple for the
-            // path polyline. Same hero gradient as the product.
+            // path polyline. Same hero gradient as the product. Unlit because lines have ~0
+            // surface area (lighting contributes nothing useful) and we want crisp readable
+            // strokes regardless of scene illumination.
             val lineMaterial = remember(materialLoader) {
-                materialLoader.createColorInstance(SceneViewColors.Primary)
+                materialLoader.createUnlitColorInstance(SceneViewColors.Primary)
             }
             val pathMaterial = remember(materialLoader) {
-                materialLoader.createColorInstance(SceneViewColors.Accent)
+                materialLoader.createUnlitColorInstance(SceneViewColors.Accent)
             }
 
             // Single line segment — 1 px on most GPUs, so we also draw a pair of spheres at the

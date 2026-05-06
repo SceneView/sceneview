@@ -442,13 +442,52 @@ dependencies {
     <!-- Optional: internet for cloud anchors -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Required ONLY if you use Geospatial / Streetscape / Cloud Anchors.
+         Geospatial mode throws FineLocationPermissionNotGrantedException at
+         configure() time without this — request at runtime BEFORE mounting
+         ARSceneView (see Cloud setup section below). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application>
         <!-- Required: tells Play Store this app needs ARCore -->
         <!-- Use "required" to block installs on non-AR devices -->
         <!-- Use "optional" to allow install but degrade gracefully -->
         <meta-data android:name="com.google.ar.core" android:value="required" />
+
+        <!-- Required ONLY for Cloud Anchors / Geospatial / Streetscape.
+             Inject via manifestPlaceholders in app/build.gradle (read from
+             ARCORE_API_KEY env var or local.properties — never hardcode). -->
+        <meta-data android:name="com.google.android.ar.API_KEY"
+                   android:value="\${arcoreApiKey}" />
     </application>
 </manifest>
+\`\`\`
+
+### ARCore Cloud API key — needed for Cloud Anchors / Geospatial / Streetscape
+
+The three Cloud features above hit Google's ARCore backend. Without a configured key, plain
+plane-finding / hit-testing / face mesh / image detection still work — only Cloud features fail.
+
+Setup once on a Google Cloud project:
+
+1. Enable the ARCore API: <https://console.cloud.google.com/apis/library/arcore.googleapis.com>
+2. Activate billing (Geospatial endpoints are paid; free tier is generous for dev/test).
+3. Create an API key restricted to your Android package + signing SHA-1.
+
+Inject the key at build time via \`app/build.gradle\` (key never committed):
+
+\`\`\`groovy
+android.defaultConfig {
+    def key = System.getenv("ARCORE_API_KEY") ?: ""
+    if (key.isEmpty()) {
+        def f = rootProject.file("local.properties")
+        if (f.exists()) {
+            def p = new Properties(); f.withInputStream { p.load(it) }
+            key = p.getProperty("ARCORE_API_KEY", "")
+        }
+    }
+    manifestPlaceholders["arcoreApiKey"] = key
+}
 \`\`\`
 
 ### AR Required vs Optional

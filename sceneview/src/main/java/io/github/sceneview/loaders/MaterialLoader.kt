@@ -58,6 +58,12 @@ class MaterialLoader(
     private val transparentColoredMaterial by lazy {
         createMaterial("$kMaterialsAssetFolder/transparent_colored.filamat")
     }
+    private val opaqueUnlitColoredMaterial by lazy {
+        createMaterial("$kMaterialsAssetFolder/opaque_unlit_colored.filamat")
+    }
+    private val transparentUnlitColoredMaterial by lazy {
+        createMaterial("$kMaterialsAssetFolder/transparent_unlit_colored.filamat")
+    }
     private val opaqueTexturedMaterial by lazy {
         createMaterial("$kMaterialsAssetFolder/opaque_textured.filamat")
     }
@@ -205,6 +211,9 @@ class MaterialLoader(
      * The metallicness, roughness, and reflectance can be modified using
      * [MaterialInstance.setMetallic], [MaterialInstance.setRoughness],
      * [MaterialInstance.setReflectance].
+     *
+     * For a flat color that ignores scene lighting (no PBR shading), use
+     * [createUnlitColorInstance] instead.
      */
     fun createColorInstance(
         color: androidx.compose.ui.graphics.Color,
@@ -221,6 +230,9 @@ class MaterialLoader(
      * The metallicness, roughness, and reflectance can be modified using
      * [MaterialInstance.setMetallic], [MaterialInstance.setRoughness],
      * [MaterialInstance.setReflectance].
+     *
+     * For a flat color that ignores scene lighting (no PBR shading), use
+     * [createUnlitColorInstance] instead.
      */
     fun createColorInstance(
         color: Int,
@@ -237,6 +249,9 @@ class MaterialLoader(
      * The metallicness, roughness, and reflectance can be modified using
      * [MaterialInstance.setMetallic], [MaterialInstance.setRoughness],
      * [MaterialInstance.setReflectance].
+     *
+     * For a flat color that ignores scene lighting (no PBR shading), use
+     * [createUnlitColorInstance] instead.
      */
     fun createColorInstance(
         color: Color,
@@ -251,6 +266,57 @@ class MaterialLoader(
                 setRoughness(roughness)
                 setReflectance(reflectance)
             }
+
+    /**
+     * Creates an opaque or transparent unlit [Material] depending on the color alpha with the
+     * [Color] passed in.
+     *
+     * The unlit shading model is independent of light: surfaces appear as flat colors and ignore
+     * the scene lighting. Use this for HUD-like overlays, debug visualizations, billboards, or
+     * stylized rendering where physically-based shading is not desired.
+     *
+     * The [Color] can be modified by calling [MaterialInstance.setColor].
+     *
+     * For physically-based shading with metallic/roughness/reflectance, use
+     * [createColorInstance] instead.
+     */
+    fun createUnlitColorInstance(color: androidx.compose.ui.graphics.Color) =
+        createUnlitColorInstance(colorOf(color))
+
+    /**
+     * Creates an opaque or transparent unlit [Material] depending on the color alpha with the
+     * [Color] passed in.
+     *
+     * The unlit shading model is independent of light: surfaces appear as flat colors and ignore
+     * the scene lighting. Use this for HUD-like overlays, debug visualizations, billboards, or
+     * stylized rendering where physically-based shading is not desired.
+     *
+     * The [Color] can be modified by calling [MaterialInstance.setColor].
+     *
+     * For physically-based shading with metallic/roughness/reflectance, use
+     * [createColorInstance] instead.
+     */
+    fun createUnlitColorInstance(color: Int) = createUnlitColorInstance(colorOf(color))
+
+    /**
+     * Creates an opaque or transparent unlit [Material] depending on the color alpha with the
+     * [Color] passed in.
+     *
+     * The unlit shading model is independent of light: surfaces appear as flat colors and ignore
+     * the scene lighting. Use this for HUD-like overlays, debug visualizations, billboards, or
+     * stylized rendering where physically-based shading is not desired.
+     *
+     * The [Color] can be modified by calling [MaterialInstance.setColor].
+     *
+     * For physically-based shading with metallic/roughness/reflectance, use
+     * [createColorInstance] instead.
+     */
+    fun createUnlitColorInstance(color: Color): MaterialInstance =
+        createInstance(
+            if (color.a == 1.0f) opaqueUnlitColoredMaterial else transparentUnlitColoredMaterial
+        ).apply {
+            setColor(color)
+        }
 
     /**
      * Creates an an opaque or transparent [Material] with the [Texture] passed in.

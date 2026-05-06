@@ -136,7 +136,9 @@ SceneView(...) {
 
 ### Primitive geometry nodes
 Geometry nodes accept `materialInstance: MaterialInstance?` for their surface appearance.
-Create materials via `materialLoader.createColorInstance(color, metallic, roughness, reflectance)`.
+Create materials via `materialLoader.createColorInstance(color, metallic, roughness, reflectance)`
+for physically-based shading, or `materialLoader.createUnlitColorInstance(color)` for a flat
+color that ignores the scene lighting (HUD overlays, debug viz, billboards).
 ```kotlin
 SceneView(...) {
     // Create a material — must be called on the main thread (safe inside Scene scope)

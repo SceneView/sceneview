@@ -3,8 +3,8 @@
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
 **Android — Maven artifacts (version 4.0.2):**
-- 3D only: `io.github.sceneview:sceneview:4.0.6`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.6`
+- 3D only: `io.github.sceneview:sceneview:4.0.7`
+- AR + 3D: `io.github.sceneview:arsceneview:4.0.7`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.2")
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.6")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.6") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.0.7")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.0.7") // AR (includes sceneview)
 }
 ```
 
@@ -410,6 +410,11 @@ Geometry nodes accept `materialInstance: MaterialInstance?`. Create materials vi
 SceneView(...) {
     val redMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(Color.Red, metallic = 0f, roughness = 0.6f)
+    }
+    // Unlit (flat colour, ignores scene lighting) — for HUD overlays, debug
+    // gizmos, billboards, stylized rendering. No metallic/roughness/reflectance.
+    val unlitGreen = remember(materialLoader) {
+        materialLoader.createUnlitColorInstance(Color.Green)
     }
     CubeNode(size = Size(0.5f), center = Position(0f, 0.25f, 0f), materialInstance = redMaterial)
     SphereNode(radius = 0.3f, materialInstance = blueMaterial)
@@ -945,7 +950,7 @@ class ModelLoader(engine: Engine, context: Context) {
 ### MaterialLoader
 ```kotlin
 class MaterialLoader(engine: Engine, context: Context) {
-    // Color material — MUST be called on main thread
+    // PBR color material — MUST be called on main thread
     fun createColorInstance(
         color: Color,
         metallic: Float = 0.0f,    // 0 = dielectric, 1 = metal
@@ -953,9 +958,15 @@ class MaterialLoader(engine: Engine, context: Context) {
         reflectance: Float = 0.5f  // Fresnel reflectance
     ): MaterialInstance
 
+    // Unlit (flat) color material — ignores scene lighting (no PBR)
+    // Use for HUD overlays, debug visualizations, billboards, stylized rendering.
+    fun createUnlitColorInstance(color: Color): MaterialInstance
+
     // Also accepts:
     fun createColorInstance(color: androidx.compose.ui.graphics.Color, ...): MaterialInstance
     fun createColorInstance(color: Int, ...): MaterialInstance
+    fun createUnlitColorInstance(color: androidx.compose.ui.graphics.Color): MaterialInstance
+    fun createUnlitColorInstance(color: Int): MaterialInstance
 
     // Texture material
     fun createTextureInstance(texture: Texture, ...): MaterialInstance
@@ -2184,7 +2195,8 @@ let data = SceneSnapshot.pngData(image) // or jpegData(image, quality: 0.9)
 | Image | `ImageNode(bitmap)` / `ImageNode(path)` | `ImageNode.load("img.png")` |
 | Video | `VideoNode(videoPath = "v.mp4")` / `VideoNode(player)` | `VideoNode.load("video.mp4")` |
 | Anchor | `AnchorNode(anchor) { }` | `AnchorNode.world(position:)` |
-| Material | `materialLoader.createColorInstance(Color.Red)` | `.pbr(color:metallic:roughness:)` |
+| Material (PBR) | `materialLoader.createColorInstance(Color.Red)` | `.pbr(color:metallic:roughness:)` |
+| Material (unlit) | `materialLoader.createUnlitColorInstance(Color.Red)` | `CustomMaterial.unlit(color: .red)` |
 | Tap | `onGestureListener(onSingleTapConfirmed = ...)` | `.onEntityTapped { }` / `NodeGesture.onTap(entity)` |
 | Drag | `onGestureListener(onMoveBegin = ...)` | `NodeGesture.onDrag(entity) { translation in }` |
 | Secondary camera | `SecondaryCamera(apply = { })` | `CameraNode()` |

@@ -52,15 +52,17 @@ fun SceneScope.Axes3DNode(
     colorZ: Color = Color.Blue,
 ) {
     // Materials are minted once per (loader, colour) pair — `remember` ensures we don't
-    // leak a fresh MaterialInstance on every recomposition.
+    // leak a fresh MaterialInstance on every recomposition. Unlit so the gizmo keeps the
+    // requested colour regardless of scene lighting (it's a debug reference, not part of
+    // the rendered world).
     val materialX = remember(materialLoader, colorX) {
-        materialLoader.createColorInstance(color = colorX)
+        materialLoader.createUnlitColorInstance(color = colorX)
     }
     val materialY = remember(materialLoader, colorY) {
-        materialLoader.createColorInstance(color = colorY)
+        materialLoader.createUnlitColorInstance(color = colorY)
     }
     val materialZ = remember(materialLoader, colorZ) {
-        materialLoader.createColorInstance(color = colorZ)
+        materialLoader.createUnlitColorInstance(color = colorZ)
     }
 
     // X axis — cylinder lies along native +Y, rotate -90° around Z to point along +X.

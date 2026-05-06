@@ -48,12 +48,13 @@ fun CollisionDemo(onBack: () -> Unit) {
 
     // Pre-create materials for default and highlighted states.
     // On-brand: Primary blue by default, Accent purple when a shape is hit — same hero
-    // gradient as the product identity.
+    // gradient as the product identity. Unlit so the hit/no-hit colour flip stays
+    // legible regardless of scene lighting (the colour itself IS the signal here).
     val defaultMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(color = SceneViewColors.Primary)
+        materialLoader.createUnlitColorInstance(color = SceneViewColors.Primary)
     }
     val highlightedMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(color = SceneViewColors.Accent)
+        materialLoader.createUnlitColorInstance(color = SceneViewColors.Accent)
     }
 
     // Node layout: 3 cubes and 2 spheres in a row.

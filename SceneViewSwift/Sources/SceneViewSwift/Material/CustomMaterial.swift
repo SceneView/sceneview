@@ -170,12 +170,30 @@ public enum CustomMaterial {
         return mat
     }
 
-    // MARK: - Wireframe (Debug)
+    // MARK: - Unlit (Flat color, ignores scene lighting)
 
-    /// Creates a simple flat-color material useful for debugging.
+    /// Creates an unlit (flat-colored) material that ignores the scene lighting.
     ///
-    /// - Parameter color: The wireframe color. Default green.
-    /// - Returns: An unlit material.
+    /// The unlit shading model is independent of light: surfaces appear as flat
+    /// colors and ignore the scene's lights and environment. Use this for
+    /// HUD-like overlays, debug visualizations, billboards, or stylized rendering
+    /// where physically-based shading is not desired.
+    ///
+    /// Mirrors `MaterialLoader.createUnlitColorInstance(color:)` on the Android side.
+    ///
+    /// - Parameter color: The flat color. Default white.
+    /// - Returns: A RealityKit `UnlitMaterial`.
+    public static func unlit(
+        color: SimpleMaterial.Color = .white
+    ) -> any RealityKit.Material {
+        UnlitMaterial(color: color)
+    }
+
+    /// Alias for `unlit(color:)` kept for source compatibility.
+    ///
+    /// Prefer `CustomMaterial.unlit(color:)` — the name aligns with the Filament
+    /// shading model and the Android `createUnlitColorInstance` API.
+    @available(*, deprecated, renamed: "unlit(color:)")
     public static func debug(
         color: SimpleMaterial.Color = .green
     ) -> any RealityKit.Material {

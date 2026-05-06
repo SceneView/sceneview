@@ -412,6 +412,11 @@ SceneView(...) {
     val redMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(Color.Red, metallic = 0f, roughness = 0.6f)
     }
+    // Unlit (flat colour, ignores scene lighting) — for HUD overlays, debug
+    // gizmos, billboards, stylized rendering. No metallic/roughness/reflectance.
+    val unlitGreen = remember(materialLoader) {
+        materialLoader.createUnlitColorInstance(Color.Green)
+    }
     CubeNode(size = Size(0.5f), center = Position(0f, 0.25f, 0f), materialInstance = redMaterial)
     SphereNode(radius = 0.3f, materialInstance = blueMaterial)
     CylinderNode(radius = 0.2f, height = 1.0f, materialInstance = greenMaterial)
@@ -946,7 +951,7 @@ class ModelLoader(engine: Engine, context: Context) {
 ### MaterialLoader
 ```kotlin
 class MaterialLoader(engine: Engine, context: Context) {
-    // Color material — MUST be called on main thread
+    // PBR color material — MUST be called on main thread
     fun createColorInstance(
         color: Color,
         metallic: Float = 0.0f,    // 0 = dielectric, 1 = metal
@@ -954,9 +959,15 @@ class MaterialLoader(engine: Engine, context: Context) {
         reflectance: Float = 0.5f  // Fresnel reflectance
     ): MaterialInstance
 
+    // Unlit (flat) color material — ignores scene lighting (no PBR)
+    // Use for HUD overlays, debug visualizations, billboards, stylized rendering.
+    fun createUnlitColorInstance(color: Color): MaterialInstance
+
     // Also accepts:
     fun createColorInstance(color: androidx.compose.ui.graphics.Color, ...): MaterialInstance
     fun createColorInstance(color: Int, ...): MaterialInstance
+    fun createUnlitColorInstance(color: androidx.compose.ui.graphics.Color): MaterialInstance
+    fun createUnlitColorInstance(color: Int): MaterialInstance
 
     // Texture material
     fun createTextureInstance(texture: Texture, ...): MaterialInstance
@@ -2258,7 +2269,8 @@ let data = SceneSnapshot.pngData(image) // or jpegData(image, quality: 0.9)
 | Image | `ImageNode(bitmap)` / `ImageNode(path)` | `ImageNode.load("img.png")` |
 | Video | `VideoNode(videoPath = "v.mp4")` / `VideoNode(player)` | `VideoNode.load("video.mp4")` |
 | Anchor | `AnchorNode(anchor) { }` | `AnchorNode.world(position:)` |
-| Material | `materialLoader.createColorInstance(Color.Red)` | `.pbr(color:metallic:roughness:)` |
+| Material (PBR) | `materialLoader.createColorInstance(Color.Red)` | `.pbr(color:metallic:roughness:)` |
+| Material (unlit) | `materialLoader.createUnlitColorInstance(Color.Red)` | `CustomMaterial.unlit(color: .red)` |
 | Tap | `onGestureListener(onSingleTapConfirmed = ...)` | `.onEntityTapped { }` / `NodeGesture.onTap(entity)` |
 | Drag | `onGestureListener(onMoveBegin = ...)` | `NodeGesture.onDrag(entity) { translation in }` |
 | Secondary camera | `SecondaryCamera(apply = { })` | `CameraNode()` |

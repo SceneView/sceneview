@@ -78,9 +78,22 @@ final class CustomMaterialTests: XCTestCase {
         XCTAssertNotNil(material)
     }
 
-    // MARK: - Debug
+    // MARK: - Unlit
 
-    func testDebugCreation() {
+    func testUnlitCreation() {
+        let material = CustomMaterial.unlit(color: .green)
+        XCTAssertNotNil(material)
+    }
+
+    func testUnlitDefaultColor() {
+        let material = CustomMaterial.unlit()
+        XCTAssertNotNil(material)
+    }
+
+    // MARK: - Debug (deprecated alias)
+
+    @available(*, deprecated)
+    func testDebugAliasStillWorks() {
         let material = CustomMaterial.debug(color: .green)
         XCTAssertNotNil(material)
     }

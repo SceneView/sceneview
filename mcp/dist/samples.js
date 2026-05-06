@@ -127,7 +127,15 @@ fun AugmentedImageScreen() {
         tags: ["ar", "anchor", "cloud-anchor"],
         dependency: "io.github.sceneview:arsceneview:4.0.0",
         prompt: "Create an AR screen that can host a cloud anchor (saving its ID) and resolve it later on another device. Use SceneView `io.github.sceneview:arsceneview:4.0.0`.",
-        code: `@Composable
+        code: `// ⚠️ Cloud Anchors require an ARCore Cloud API key in AndroidManifest.xml:
+//   <meta-data android:name="com.google.android.ar.API_KEY"
+//              android:value="\${arcoreApiKey}" />
+// …with manifestPlaceholders["arcoreApiKey"] = System.getenv("ARCORE_API_KEY")
+// in app/build.gradle (read from env or local.properties — never hardcoded).
+// Without it, host() / resolve() silently return CloudAnchorState.ERROR_NOT_AUTHORIZED.
+// Setup: enable "ARCore API" on a Google Cloud project, restrict the key to your
+// package + signing SHA-1 (debug + Play App Signing). See arsceneview Module.md.
+@Composable
 fun CloudAnchorScreen() {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
