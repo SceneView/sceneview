@@ -146,6 +146,19 @@ fun DebugModelViewer() {
    </application>
    \`\`\`
 
+   **For Cloud Anchors / Geospatial / Streetscape**, also add:
+   \`\`\`xml
+   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+   <application>
+       <meta-data android:name="com.google.android.ar.API_KEY"
+                  android:value="\${arcoreApiKey}" />
+   </application>
+   \`\`\`
+   …with \`manifestPlaceholders["arcoreApiKey"] = System.getenv("ARCORE_API_KEY") ?: ""\` in
+   \`app/build.gradle\`. Without the API key the backend handshake returns no data; without
+   the location permission \`Session.configure(GeospatialMode.ENABLED)\` throws
+   \`FineLocationPermissionNotGrantedException\`.
+
 4. **Planes not detecting?**
    - Point at a **textured surface** (not plain white walls).
    - Wait 2-3 seconds for ARCore to initialize.

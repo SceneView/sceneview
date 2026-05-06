@@ -97,6 +97,52 @@ All `rememberXxx` helpers from the base `sceneview` module are also available.
 - **Camera permission**: Automatic camera permission request and ARCore install/update flow.
 - **Lifecycle-aware**: Session pause/resume tied to the Compose lifecycle.
 
+## ARCore Cloud API key — required for Cloud Anchors / Geospatial / Streetscape
+
+`Config.CloudAnchorMode.ENABLED`, `Config.GeospatialMode.ENABLED`, and `Config.StreetscapeGeometryMode.ENABLED` all hit Google's ARCore Cloud backend, which requires:
+
+1. **ARCore API enabled** on a Google Cloud project: <https://console.cloud.google.com/apis/library/arcore.googleapis.com>
+2. **Billing activated** on that project (Geospatial endpoints are paid; free tier is generous for dev/test)
+3. **An API key restricted** to your Android package + signing certificate(s) (debug + Play App Signing + upload key)
+4. **`ACCESS_FINE_LOCATION` permission** at runtime — Geospatial throws `FineLocationPermissionNotGrantedException` otherwise
+
+Wire the key into your app's `AndroidManifest.xml`:
+
+```xml
+<application>
+    <meta-data
+        android:name="com.google.android.ar.API_KEY"
+        android:value="${arcoreApiKey}" />
+    <!-- … your activities … -->
+</application>
+```
+
+Inject the value at build time from an env var or `local.properties` (never commit it):
+
+```groovy
+// app/build.gradle
+android {
+    defaultConfig {
+        def arcoreApiKey = System.getenv("ARCORE_API_KEY") ?: ""
+        if (arcoreApiKey.isEmpty()) {
+            def localProps = rootProject.file("local.properties")
+            if (localProps.exists()) {
+                def props = new Properties()
+                localProps.withInputStream { props.load(it) }
+                arcoreApiKey = props.getProperty("ARCORE_API_KEY", "")
+            }
+        }
+        manifestPlaceholders["arcoreApiKey"] = arcoreApiKey
+    }
+}
+```
+
+Add `<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />` to the manifest **and** request it at runtime (e.g. via `RequestMultiplePermissions`) before mounting any `ARSceneView` that uses Geospatial mode.
+
+Step-by-step setup with Cloud Console screenshots: see [`samples/android-demo/STREETSCAPE_SETUP.md`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/STREETSCAPE_SETUP.md) in the repo.
+
+> **Pure plane-finding / hit-testing / AR camera streaming does NOT need an API key** — only the three modes above. The SDK works fully offline for everything else.
+
 ## Session configuration examples
 
 ### Default (world-facing, plane detection)

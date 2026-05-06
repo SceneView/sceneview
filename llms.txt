@@ -697,6 +697,19 @@ SceneView {
 
 **⚠️ Important nesting rule:** AR composables (`AnchorNode`, `CloudAnchorNode`, `AugmentedImageNode`, etc.) can only be declared at the `ARSceneView { }` root level — they are NOT available inside `Node { content }` or other node's `content` blocks. To nest models under an anchor, use `AnchorNode(anchor) { ModelNode(...) }` — the `content` block of `AnchorNode` provides a regular `NodeScope`.
 
+**⚠️ ARCore Cloud API key — required for `CloudAnchorNode`, `StreetscapeGeometryNode`, and any `Config.GeospatialMode.ENABLED` session.** When generating code that uses these features, you MUST include both:
+
+1. The manifest meta-data:
+```xml
+<meta-data
+    android:name="com.google.android.ar.API_KEY"
+    android:value="${arcoreApiKey}" />
+```
+2. The `manifestPlaceholders["arcoreApiKey"] = ...` injection in `app/build.gradle` (read from env var `ARCORE_API_KEY` or `local.properties` — never hardcoded).
+3. `<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />` and a runtime `RequestMultiplePermissions` flow asking for `CAMERA + ACCESS_FINE_LOCATION` BEFORE mounting `ARSceneView`. Geospatial throws `FineLocationPermissionNotGrantedException` otherwise.
+
+Plain plane-finding / hit-testing / face mesh / image detection does NOT require the API key — only Cloud Anchors / Geospatial / Streetscape do. Setup guide with Cloud Console steps: `samples/android-demo/STREETSCAPE_SETUP.md`.
+
 ### AnchorNode — pin to real world
 ```kotlin
 @Composable fun AnchorNode(

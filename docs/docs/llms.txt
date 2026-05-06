@@ -287,6 +287,8 @@ SceneView(...) {
 
 ## ARSceneScope — AR Node DSL
 
+**⚠️ ARCore Cloud API key required for `CloudAnchorNode`, `StreetscapeGeometryNode`, and `Config.GeospatialMode.ENABLED`.** Add `<meta-data android:name="com.google.android.ar.API_KEY" android:value="${arcoreApiKey}"/>` to the manifest and inject the value via `manifestPlaceholders["arcoreApiKey"] = System.getenv("ARCORE_API_KEY") ?: ""` in `app/build.gradle`. Also declare `<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>` and request `CAMERA + ACCESS_FINE_LOCATION` at runtime BEFORE mounting `ARSceneView` (Geospatial throws `FineLocationPermissionNotGrantedException` otherwise). See `samples/android-demo/STREETSCAPE_SETUP.md`. Plain plane / hit-test / face / image detection does NOT need the key.
+
 ### HitResultNode — surface cursor
 ```kotlin
 val view = LocalView.current

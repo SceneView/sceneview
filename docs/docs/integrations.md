@@ -220,6 +220,53 @@ fun ProductScreen(viewModel: ProductViewModel = hiltViewModel()) {
 
 ---
 
+## ARCore Cloud — Cloud Anchors / Geospatial / Streetscape
+
+The `CloudAnchorNode` example below (and any code that enables `Config.CloudAnchorMode.ENABLED`,
+`Config.GeospatialMode.ENABLED`, or `Config.StreetscapeGeometryMode.ENABLED`) hits Google's
+ARCore Cloud backend. You need:
+
+1. **ARCore API enabled** at <https://console.cloud.google.com/apis/library/arcore.googleapis.com>
+2. **Billing on** for the project (Geospatial endpoints are paid; free tier is generous for dev)
+3. **A restricted API key** (Android apps → your package + signing SHA-1)
+4. **`ACCESS_FINE_LOCATION` runtime permission** before `Session.configure(GeospatialMode.ENABLED)`
+   (it throws `FineLocationPermissionNotGrantedException` otherwise)
+
+Wire the key into `AndroidManifest.xml`:
+
+```xml
+<application>
+    <meta-data
+        android:name="com.google.android.ar.API_KEY"
+        android:value="${arcoreApiKey}" />
+</application>
+```
+
+Inject from env or `local.properties` at build time (never commit):
+
+```groovy
+// app/build.gradle
+android.defaultConfig {
+    def key = System.getenv("ARCORE_API_KEY") ?: ""
+    if (key.isEmpty()) {
+        def f = rootProject.file("local.properties")
+        if (f.exists()) {
+            def p = new Properties(); f.withInputStream { p.load(it) }
+            key = p.getProperty("ARCORE_API_KEY", "")
+        }
+    }
+    manifestPlaceholders["arcoreApiKey"] = key
+}
+```
+
+Step-by-step Cloud Console setup (project, billing, API enable, key restrictions):
+[`samples/android-demo/STREETSCAPE_SETUP.md`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/STREETSCAPE_SETUP.md).
+
+> Plain plane-finding, hit-testing, face mesh, image detection, and AR camera streaming do
+> NOT need the API key. Only the three modes above hit the Cloud backend.
+
+---
+
 ## Room / local database
 
 Store anchor data for persistent AR experiences.

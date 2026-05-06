@@ -153,6 +153,7 @@ ARSceneView(
       "Missing AndroidManifest entries — need CAMERA permission and com.google.ar.core meta-data.",
       "Setting worldPosition on nodes instead of using AnchorNode — causes drift.",
       "Testing on emulator — ARCore support on emulators is limited; use a real device.",
+      "Enabling Geospatial / Streetscape / Cloud Anchors without the ARCore Cloud API key wired into the manifest (com.google.android.ar.API_KEY) — backend handshake silently returns no data. Also requires ACCESS_FINE_LOCATION at runtime BEFORE Session.configure(GeospatialMode.ENABLED).",
     ],
     tips: [
       "Always use AnchorNode for placing objects in AR — anchors compensate for tracking drift.",
