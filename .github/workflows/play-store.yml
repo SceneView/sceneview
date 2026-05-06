@@ -1,5 +1,22 @@
 name: Deploy Demo to Play Store
 
+# Canary pattern: every push that touches the demo source triggers a
+# *single* build, then uploads the resulting AAB to **both** the
+# `internal` and `production` tracks in parallel.
+#
+# - `internal` is available to up-to-100 listed testers within ~1 hour
+#   (no Google review). Thomas + the team see the new version
+#   immediately and can catch regressions before real users.
+# - `production` goes through Google's 1–3 day review and rolls out
+#   to everyone once approved.
+#
+# Both tracks ship the same versionCode + versionName, so a tester who
+# happens to also be on production sees the internal build first
+# without any version-number confusion.
+#
+# Override via workflow_dispatch (single track) for emergency
+# patches or A/B test rollouts.
+
 on:
   push:
     branches: [main]
@@ -15,17 +32,18 @@ on:
   workflow_dispatch:
     inputs:
       track:
-        description: 'Play Store track'
+        description: 'Play Store track (single track only on manual dispatch; auto runs do internal + production)'
         required: true
-        default: 'production'
+        default: 'internal+production'
         type: choice
         options:
+          - internal+production
           - production
           - beta
           - alpha
           - internal
 
-# Only one Play Store deploy at a time
+# Only one Play Store deploy at a time.
 concurrency:
   group: play-store-deploy
   cancel-in-progress: false
@@ -34,10 +52,13 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Build & Deploy to Play Store
+  build:
+    name: Build release AAB
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      version_code: ${{ steps.version.outputs.code }}
+      version_name: ${{ steps.version.outputs.name }}
 
     steps:
       - uses: actions/checkout@v6
@@ -113,11 +134,32 @@ jobs:
         if: always()
         run: rm -f samples/android-demo/release.keystore
 
-      - name: Publish to Play Store
+  publish:
+    name: Publish to ${{ matrix.track }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Auto runs publish to both tracks. Manual dispatch lets the user
+    # pick a single track, OR the special `internal+production` value
+    # which fans out via this same matrix.
+    strategy:
+      fail-fast: false
+      matrix:
+        track: ${{ github.event.inputs.track == 'internal+production' || github.event_name != 'workflow_dispatch' && fromJSON('["internal","production"]') || fromJSON(format('["{0}"]', github.event.inputs.track)) }}
+
+    steps:
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: sceneview-demo-${{ needs.build.outputs.version_name }}
+          path: aab
+
+      - name: Publish to Play Store (${{ matrix.track }})
         uses: r0adkll/upload-google-play@v1.1.3
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
           packageName: io.github.sceneview.demo
-          releaseFiles: samples/android-demo/build/outputs/bundle/release/*.aab
-          track: ${{ github.event.inputs.track || 'production' }}
+          releaseFiles: aab/*.aab
+          track: ${{ matrix.track }}
           status: completed
