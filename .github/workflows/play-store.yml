@@ -10,6 +10,8 @@ on:
       - 'samples/android-demo/**'
       - 'samples/android-demo-assets/**'
       - 'samples/common/**'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       track:
@@ -50,17 +52,25 @@ jobs:
 
       - run: chmod +x ./gradlew
 
-      # Auto-versioning: versionCode = run_number (always increasing)
-      # versionName = git tag or YYYY.MM.DD-<short_sha>
+      # Auto-versioning:
+      #   versionCode = run_number (always increasing)
+      #   versionName = - "X.Y.Z" when HEAD is exactly on a release tag (clean public version)
+      #                 - "X.Y.Z-<short_sha>" when on main past the latest tag (snapshot)
+      #                 - "YYYY.MM.DD-<short_sha>" when there is no tag yet
       - name: Calculate version
         id: version
         run: |
           VERSION_CODE=${{ github.run_number }}
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$TAG" ]; then
-            VERSION_NAME="${TAG#v}-$(git rev-parse --short HEAD)"
+          EXACT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+          if [ -n "$EXACT_TAG" ]; then
+            VERSION_NAME="${EXACT_TAG#v}"
           else
-            VERSION_NAME="$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$TAG" ]; then
+              VERSION_NAME="${TAG#v}-$(git rev-parse --short HEAD)"
+            else
+              VERSION_NAME="$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
+            fi
           fi
           echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
