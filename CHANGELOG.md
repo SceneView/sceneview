@@ -1,5 +1,50 @@
 # Changelog
 
+## v4.0.4 — Pixel 9 review fixes + library hardening (2026-05-06)
+
+**Status:** stable. Brings PR #851 (87 sample-app fixes + 20 library fixes from the Pixel 9 live-review session that diverged on 2026-04-22 and never made it into v4.0.3) plus the multi-agent-review hardening of its public API surface.
+
+### Fixed — Android demo app (87 commits)
+
+The store-published v4.0.3 APK shipped without the live-review fixes. v4.0.4 brings them all:
+- AR demos: Face Mesh now visible (proper TANGENTS quaternion encoding via PR #852), Pose has matte materials + Blender-style axes gizmo, Streetscape falls back to plain AR when geospatial unavailable + links Google Fused Location Provider, Placement multi-model spawn + editable + Clear All, Rerun v2 UX (intro screen, live stream stats card, help dialog).
+- 3D demos: Animation default Reveal+Walk + cinematic shots + dragon centred, Geometry plane no longer twisted into a wall, Physics 5×N grid spread + Drop-10 + horizontal floor + diagnostic static sphere, Lighting reactive props, DynamicSky time slider drives illumination, BillboardNode mirror, ViewNode reactive props (closes #856), Custom mesh auto-pause, MultiModel redesign, Lines/Paths 3D helix, Gesture-editing axes gizmo + sliders + live transform readout, Video Big Buck Bunny streaming + cinematic camera + creative surfaces, PostProcessing camera-orbit + SideEffect writes, Debug-overlay interactive node spawner + auto-fit + perf graph + stress test.
+- Branding: launcher icons regenerated, palette sweep across collision/AR demos + Text + Billboard, gradient video, Surface base palette adoption.
+- QA: deep-link `--es demo <id>` ingress for instrumented tests (coexists with the public scan-to-open URL routing).
+
+### Fixed — sceneview / arsceneview library (20 commits)
+
+- `LightNode` (`SceneScope`) now drives intensity / colour / direction reactively on recomposition (was applying only at first creation).
+- `ViewNode`: reactive `position` / `rotation` / `scale` / `isVisible` props on the composable; lifecycle race on post-destroy fixed.
+- `Node` / `ModelNode` default `Scale(1f)` regression — was `(1, 0, 0)` singular transform that cascaded NaN through every downstream matrix op (Physics, animations, children).
+- `MaterialInstance` reassignment now propagates to all geometry nodes (Sphere/Cube/Plane).
+- `onFrame` callback no longer captured stale (was ignoring recomposition).
+- AR camera: editable-node gestures isolated from camera gestures.
+- AR `AugmentedFaceNode`: tracking state callback always fires (PR #789 follow-up via PR #852).
+- New: `FovZoomCameraManipulator` — pinch-to-FOV zoom for orthographic-style framing.
+- New: `DefaultCameraManipulator(pinchZoomSpeed, pinchZoomDamping)` — non-linear damping curve, default tuned for dense screens (was abrupt on Pixel 9).
+
+### New — testability surface
+
+- Pure-Kotlin `pinchZoomDelta` and `nextFov` helpers extracted from the gesture detectors so the math curves can be regression-tested on the JVM (no Filament Engine needed). 14 new tests in `:sceneview:test` cover sub-pixel linearity, sign preservation, speed scaling, damping softening, FOV clamps, and default constants.
+
+### API surface — non-breaking by design
+
+- `LightNode(color = …)` parameter placed AFTER `position` (not in slot 3) to preserve positional source-compat for existing 4.0.x callers passing `direction` positionally. Documented in `SceneScope.kt:354`.
+- `Engine.kt` `safeDestroy*` helpers retain `runCatching` wrapping (the rebase-rescue PR initially stripped it; restored to avoid ABI break for v4.0.x consumers — see commit message `fd1d820e`).
+- `ImageNode.destroy()` deliberate `Texture` retention now documented in a public KDoc with the recommended `bitmap = newBitmap` recycling pattern. Tracked: #874.
+
+### Internal
+
+- 14 new JVM tests (`CameraGestureMathTest`).
+- Roborazzi screenshot tests stay `@Ignore`'d (DemoListScreen renderer change tracked separately).
+- gradle test deps bumped: robolectric 4.14.1 → 4.16.1, roborazzi 1.43.0 → 1.60.0; new androidxTestExtJunit + androidxTestUiAutomator for instrumented coverage.
+
+### Follow-up issues filed during the rebase rescue
+
+- #873: cache `SurfaceOrientation` in `AugmentedFaceNode.computeTangents` (~30 Hz JNI alloc on hot path).
+- #874: frame-deferred destroy queue for `ImageNode` / `ViewNode` GPU textures.
+
 ## v4.0.3 — Save & Share Rerun + scan-to-open deep-links (2026-05-06)
 
 **Status:** stable. Maven Central, Swift Package Manager, npm, and Play Store artifacts are published from this tag.
