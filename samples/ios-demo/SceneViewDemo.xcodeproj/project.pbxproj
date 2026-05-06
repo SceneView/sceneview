@@ -546,7 +546,6 @@
 				MARKETING_VERSION = 4.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -562,9 +561,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = SceneViewDemo/SceneViewDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Automatic;
-				"CODE_SIGN_STYLE[sdk=iphoneos*]" = Manual;
 				CURRENT_PROJECT_VERSION = 359;
 				DEVELOPMENT_TEAM = 5G3DZ3TH45;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -580,7 +577,6 @@
 				MARKETING_VERSION = 4.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "SceneView Demo App Store";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
