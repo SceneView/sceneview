@@ -1,21 +1,24 @@
 name: Deploy Demo to Play Store
 
-# Canary pattern: every push that touches the demo source triggers a
-# *single* build, then uploads the resulting AAB to **both** the
-# `internal` and `production` tracks in parallel.
+# Canary pattern with snapshot/release split.
 #
-# - `internal` is available to up-to-100 listed testers within ~1 hour
-#   (no Google review). Thomas + the team see the new version
-#   immediately and can catch regressions before real users.
-# - `production` goes through Google's 1–3 day review and rolls out
-#   to everyone once approved.
+# Trigger             → tracks
+# ─────────────────────────────────────────────────────────────────────
+# push to main        → internal only (snapshots like 4.0.2-abcdef0)
+# push of v* tag      → internal + production (clean release like 4.0.2)
+# manual dispatch     → user chooses
 #
-# Both tracks ship the same versionCode + versionName, so a tester who
-# happens to also be on production sees the internal build first
-# without any version-number confusion.
+# Why this shape:
 #
-# Override via workflow_dispatch (single track) for emergency
-# patches or A/B test rollouts.
+# - Internal is always the freshest — every push to main lands there
+#   within ~1 hour, no Google review. Thomas + the team eat the
+#   snapshot before real users do.
+# - Production is reserved for **stable releases** (semver tags). No
+#   more "4.0.2-133df8ff" snapshots leaking onto the public store —
+#   only "4.0.2", "4.0.3", … hit production.
+# - A tag push runs through Google review (1-3 days) and replaces the
+#   previous public build. Internal still gets the same AAB so testers
+#   never lag behind production.
 
 on:
   push:
@@ -32,11 +35,12 @@ on:
   workflow_dispatch:
     inputs:
       track:
-        description: 'Play Store track (single track only on manual dispatch; auto runs do internal + production)'
+        description: 'Play Store track. `auto` matches the push behaviour (internal for branches, internal+production for tags).'
         required: true
-        default: 'internal+production'
+        default: 'auto'
         type: choice
         options:
+          - auto
           - internal+production
           - production
           - beta
@@ -59,6 +63,7 @@ jobs:
     outputs:
       version_code: ${{ steps.version.outputs.code }}
       version_name: ${{ steps.version.outputs.name }}
+      tracks: ${{ steps.tracks.outputs.tracks }}
 
     steps:
       - uses: actions/checkout@v6
@@ -96,6 +101,30 @@ jobs:
           echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "Version: $VERSION_NAME ($VERSION_CODE)"
+
+      # Track selection logic for the matrix in the publish job:
+      #   - tag push (v*.*.*)                          → ["internal", "production"]
+      #   - branch push (snapshot)                     → ["internal"]
+      #   - manual dispatch with explicit single track → that track only
+      #   - manual dispatch with `internal+production` → both
+      #   - manual dispatch with `auto`                → falls back to push semantics
+      - name: Compute target tracks
+        id: tracks
+        run: |
+          INPUT_TRACK='${{ github.event.inputs.track }}'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$INPUT_TRACK" ] && [ "$INPUT_TRACK" != "auto" ]; then
+            if [ "$INPUT_TRACK" = "internal+production" ]; then
+              TRACKS='["internal","production"]'
+            else
+              TRACKS="[\"$INPUT_TRACK\"]"
+            fi
+          elif [[ '${{ github.ref }}' == refs/tags/v* ]]; then
+            TRACKS='["internal","production"]'
+          else
+            TRACKS='["internal"]'
+          fi
+          echo "tracks=$TRACKS" >> $GITHUB_OUTPUT
+          echo "Will publish to: $TRACKS"
 
       - name: Validate keystore secret
         env:
@@ -140,13 +169,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    # Auto runs publish to both tracks. Manual dispatch lets the user
-    # pick a single track, OR the special `internal+production` value
-    # which fans out via this same matrix.
+    # Track list comes from the build job — see its `Compute target tracks` step.
     strategy:
       fail-fast: false
       matrix:
-        track: ${{ github.event.inputs.track == 'internal+production' || github.event_name != 'workflow_dispatch' && fromJSON('["internal","production"]') || fromJSON(format('["{0}"]', github.event.inputs.track)) }}
+        track: ${{ fromJSON(needs.build.outputs.tracks) }}
 
     steps:
       - name: Download AAB artifact
