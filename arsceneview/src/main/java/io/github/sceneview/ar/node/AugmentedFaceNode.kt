@@ -5,12 +5,15 @@ import com.google.android.filament.IndexBuffer
 import com.google.android.filament.MaterialInstance
 import com.google.android.filament.RenderableManager
 import com.google.android.filament.RenderableManager.PrimitiveType
+import com.google.android.filament.SurfaceOrientation
 import com.google.android.filament.VertexBuffer
 import com.google.android.filament.VertexBuffer.AttributeType
 import com.google.android.filament.VertexBuffer.VertexAttribute.POSITION
 import com.google.android.filament.VertexBuffer.VertexAttribute.TANGENTS
 import com.google.android.filament.VertexBuffer.VertexAttribute.UV0
 import com.google.ar.core.AugmentedFace
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import com.google.ar.core.AugmentedFace.RegionType
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
@@ -70,8 +73,8 @@ import io.github.sceneview.node.MeshNode
 open class AugmentedFaceNode(
     engine: Engine,
     val augmentedFace: AugmentedFace,
-    meshMaterialInstance: MaterialInstance? = null,
-    builder: RenderableManager.Builder.() -> Unit = {},
+    private val meshMaterialInstance: MaterialInstance? = null,
+    private val builder: RenderableManager.Builder.() -> Unit = {},
     onTrackingStateChanged: ((TrackingState) -> Unit)? = null,
     onUpdated: ((AugmentedFace) -> Unit)? = null
 ) : TrackableNode<AugmentedFace>(
@@ -102,8 +105,11 @@ open class AugmentedFaceNode(
     var meshNode: MeshNode? = null
         private set
 
-    private val faceMaterialInstance = meshMaterialInstance
-    private val meshBuilder = builder
+    // Reusable tangent-quaternion buffer: 4 floats per vertex, 16 bytes/vertex.
+    // Allocated lazily and grown on demand — the face mesh vertex count is stable
+    // across frames (ARCore returns a fixed-topology mesh), so this is typically
+    // allocated once and reused for the life of the node.
+    private var tangentsBuffer: ByteBuffer? = null
 
     /**
      * The region nodes at the tip of the nose, the detected face's left side of the forehead,
@@ -130,30 +136,42 @@ open class AugmentedFaceNode(
         val indices = augmentedFace.meshTriangleIndices
         val vertices = augmentedFace.meshVertices
         val normals = augmentedFace.meshNormals
+        // UVs are static per ARCore docs but `SurfaceOrientation` consumes them every
+        // frame to recompute tangent quaternions, so they have to be in scope here too.
         val uvs = augmentedFace.meshTextureCoordinates
 
         if (indices.limit() == 0 || vertices.limit() == 0) return
+
+        val vertexCount = vertices.limit() / 3
+
+        // Compute tangent quaternions from positions + normals + uvs + indices.
+        // PBR materials require TANGENTS (FLOAT4 quaternions encoding normal + tangent
+        // + bitangent), not raw FLOAT3 normals — uploading normals as if they were
+        // quaternions left the mesh with undefined lighting and rendered it invisible
+        // under the transparent colored material used by the demo.
+        val tangents = computeTangents(vertices, normals, uvs, indices, vertexCount)
 
         if (meshNode == null) {
             meshNode = MeshNode(
                 engine = engine,
                 primitiveType = PrimitiveType.TRIANGLES,
                 vertexBuffer = VertexBuffer.Builder()
-                    // Position + Normals + UV Coordinates
+                    // Position + Tangents (quaternion) + UV Coordinates
                     .bufferCount(3)
                     // Position Attribute (x, y, z)
                     .attribute(POSITION, 0, AttributeType.FLOAT3)
-                    // Tangents Attribute (Quaternion: x, y, z, w)
+                    // Tangents Attribute (Quaternion: x, y, z, w) — encodes normal + tangent
+                    // + bitangent for PBR lighting. Must be FLOAT4.
                     .attribute(TANGENTS, 1, AttributeType.FLOAT4)
                     .normalized(TANGENTS)
                     // Uv Attribute (x, y)
                     .attribute(UV0, 2, AttributeType.FLOAT2)
-                    .vertexCount(vertices.limit() / 3)
+                    .vertexCount(vertexCount)
                     .build(engine).apply {
                         // Fill all slots before the node becomes visible,
                         // so Filament can compute a non-empty AABB (build:552)
                         setBufferAt(engine, 0, vertices) // positions  (dynamic)
-                        setBufferAt(engine, 1, normals)  // normals    (dynamic)
+                        setBufferAt(engine, 1, tangents) // tangents   (dynamic, recomputed)
                         setBufferAt(engine, 2, uvs)      // UVs        (static)
                     },
                 indexBuffer = IndexBuffer.Builder()
@@ -162,7 +180,7 @@ open class AugmentedFaceNode(
                     .build(engine).apply {
                         setBuffer(engine, indices)       // indices    (static)
                     },
-                materialInstance = faceMaterialInstance,
+                materialInstance = meshMaterialInstance,
                 builder = {
                     // Filament computes AABB asynchronously after vertex buffer upload.
                     // If a render frame starts before AABB is updated, Filament aborts with
@@ -172,7 +190,7 @@ open class AugmentedFaceNode(
                     culling(false)
                     castShadows(false)
                     receiveShadows(false)
-                    meshBuilder()
+                    builder()
                 }
             ).apply { parent = centerNode }
 
@@ -185,10 +203,12 @@ open class AugmentedFaceNode(
             return
         }
 
-        // Update dynamic buffers every frame
+        // Update dynamic buffers every frame — positions + recomputed tangents.
+        // Tangent quaternions depend on normals and must be rebuilt whenever the
+        // mesh deforms (i.e. every tracked frame).
         meshNode?.vertexBuffer?.apply {
             setBufferAt(engine, 0, vertices) // positions
-            setBufferAt(engine, 1, normals)  // normals
+            setBufferAt(engine, 1, tangents) // tangent quaternions
         }
 
         centerNode.pose = augmentedFace.centerPose
@@ -205,6 +225,13 @@ open class AugmentedFaceNode(
      * an empty list for [AugmentedFace] on the front camera. Manually sets [PoseNode] state
      * (session, frame, cameraTrackingState) since `super` cannot be called without
      * re-triggering the broken `getUpdatedTrackables` check.
+     *
+     * [update] (trackable) is invoked every frame regardless of tracking state so the
+     * `trackingState` setter in [TrackableNode] fires `onTrackingStateChanged` and
+     * `updateVisibility()` on TRACKING -> STOPPED/PAUSED transitions (e.g. face leaving the
+     * frame). Existing guards in [update] (trackable) skip mesh creation/buffer updates when
+     * not TRACKING. `onUpdated` only fires while TRACKING since the face data is only
+     * meaningful then.
      */
     override fun update(session: Session, frame: Frame) {
         // PoseNode state — set manually since we skip super
@@ -212,9 +239,75 @@ open class AugmentedFaceNode(
         this.frame = frame
         this.cameraTrackingState = frame.camera.trackingState
 
+        // Always propagate trackable state so onTrackingStateChanged fires on every
+        // transition, including TRACKING -> STOPPED/PAUSED. update(trackable) guards mesh
+        // work internally.
+        update(augmentedFace)
+
         if (augmentedFace.trackingState == TrackingState.TRACKING) {
-            update(augmentedFace)
             onUpdated?.invoke(augmentedFace)
         }
+    }
+
+    /**
+     * Builds (or reuses) [tangentsBuffer] and fills it with quaternions computed from
+     * the supplied positions, normals, UVs and indices via Filament's
+     * [SurfaceOrientation]. The returned buffer holds `vertexCount * 16` bytes
+     * (4 floats per vertex) and is rewound to position 0, ready for upload.
+     */
+    private fun computeTangents(
+        positions: java.nio.FloatBuffer,
+        normals: java.nio.FloatBuffer,
+        uvs: java.nio.FloatBuffer,
+        indices: java.nio.ShortBuffer,
+        vertexCount: Int,
+    ): ByteBuffer {
+        val neededBytes = vertexCount * 4 * 4
+        val buf = tangentsBuffer?.takeIf { it.capacity() >= neededBytes }
+            ?: ByteBuffer.allocateDirect(neededBytes).order(ByteOrder.nativeOrder())
+                .also { tangentsBuffer = it }
+
+        buf.clear()
+        buf.limit(neededBytes)
+
+        val orientation = SurfaceOrientation.Builder()
+            .vertexCount(vertexCount)
+            .positions(positions.duplicate().rewind() as java.nio.Buffer)
+            .normals(normals.duplicate().rewind() as java.nio.Buffer)
+            .uvs(uvs.duplicate().rewind() as java.nio.Buffer)
+            .triangleCount(indices.limit() / 3)
+            .triangles_uint16(indices.duplicate().rewind() as java.nio.Buffer)
+            .build()
+        try {
+            orientation.getQuatsAsFloat(buf)
+        } finally {
+            orientation.destroy()
+        }
+        buf.rewind()
+        return buf
+    }
+
+    override fun destroy() {
+        // Destroy the face mesh resources we built in update() before tearing down
+        // the parent chain. Filament does not reclaim VertexBuffer / IndexBuffer when
+        // the owning Renderable is destroyed — they stay in the engine registry until
+        // Engine.destroy() runs, and because they're tied to this composable's
+        // disposable lifecycle, each back-navigation leaks two buffers per tracked face.
+        // More critically: destroying the Engine while a VertexBuffer is still
+        // attached to a not-yet-unregistered Renderable triggers a Filament
+        // PreconditionPanic ("resource still referenced") — that's the native abort
+        // users hit when leaving the Face Mesh demo via the back gesture.
+        val mn = meshNode
+        if (mn != null) {
+            val vb = mn.vertexBuffer
+            val ib = mn.indexBuffer
+            runCatching { mn.destroy() }
+            runCatching { engine.destroyVertexBuffer(vb) }
+            runCatching { engine.destroyIndexBuffer(ib) }
+            meshNode = null
+        }
+        runCatching { centerNode.destroy() }
+        regionNodes.values.forEach { runCatching { it.destroy() } }
+        super.destroy()
     }
 }
