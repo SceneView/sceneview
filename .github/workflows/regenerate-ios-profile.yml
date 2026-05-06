@@ -165,14 +165,18 @@ jobs:
 
           rm -rf ~/.private_keys
 
-      - name: Update IOS_PROVISIONING_PROFILE_BASE64 secret
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+      - name: Verify base64 file
         run: |
           if [ ! -s /tmp/profile.b64 ]; then
             echo "::error::/tmp/profile.b64 missing or empty"
             exit 1
           fi
-          gh secret set IOS_PROVISIONING_PROFILE_BASE64 -R sceneview/sceneview < /tmp/profile.b64
-          rm -f /tmp/profile.b64
-          echo "IOS_PROVISIONING_PROFILE_BASE64 updated"
+          echo "Profile base64 size: $(wc -c < /tmp/profile.b64) chars"
+
+      - name: Upload profile artifact (private to repo)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-provisioning-profile-base64
+          path: /tmp/profile.b64
+          retention-days: 1
+          if-no-files-found: error
