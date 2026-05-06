@@ -132,15 +132,12 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     // Capture the SphereNode reference via apply so PhysicsNode can drive it.
                     var nodeRef by remember(i) { mutableStateOf<SphereNodeImpl?>(null) }
 
-                    Node(
+                    SphereNode(
+                        radius = 0.08f,
+                        materialInstance = sphereMaterials[i % 4],
                         position = Position(x = xOffset, y = startY, z = zOffset),
                         apply = { nodeRef = this }
-                    ) {
-                        SphereNode(
-                            radius = 0.08f,
-                            materialInstance = sphereMaterials[i % 4]
-                        )
-                    }
+                    )
 
                     // PhysicsNode attaches an onFrame callback that applies gravity + bounce.
                     nodeRef?.let { node ->

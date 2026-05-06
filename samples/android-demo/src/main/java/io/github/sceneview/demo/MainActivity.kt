@@ -128,6 +128,10 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
     // consume the pending id so a config change doesn't replay it.
     val pendingId by (activity?.pendingDemoIdFlow?.collectAsState()
         ?: remember { MutableStateFlow<String?>(null) }.collectAsState())
+    // Capture the launch-time deep-link id ONCE, so NavHost picks the right
+    // start destination on first composition. The LaunchedEffect below still
+    // handles subsequent intents (onNewIntent → pendingDemoIdFlow updates).
+    val initialDemo = remember { activity?.pendingDemoIdFlow?.value }
     LaunchedEffect(pendingId) {
         val id = pendingId ?: return@LaunchedEffect
         navController.navigate("demo/$id")

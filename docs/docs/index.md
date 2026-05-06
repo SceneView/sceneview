@@ -61,7 +61,7 @@ No boilerplate. No manual cleanup. Just declare what you want.
 === "Kotlin (Android)"
 
     ```kotlin
-    // build.gradle: implementation("io.github.sceneview:sceneview:4.0.4")
+    // build.gradle: implementation("io.github.sceneview:sceneview:4.0.5")
 
     SceneView(modifier = Modifier.fillMaxSize()) {
         val model = rememberModelInstance(modelLoader, "models/helmet.glb")
@@ -190,7 +190,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
     ```kotlin
     // build.gradle.kts
     dependencies {
-        implementation("io.github.sceneview:sceneview:4.0.4")
+        implementation("io.github.sceneview:sceneview:4.0.5")
     }
     ```
 
@@ -199,7 +199,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
     ```kotlin
     // build.gradle.kts
     dependencies {
-        implementation("io.github.sceneview:arsceneview:4.0.4")
+        implementation("io.github.sceneview:arsceneview:4.0.5")
     }
     ```
 
