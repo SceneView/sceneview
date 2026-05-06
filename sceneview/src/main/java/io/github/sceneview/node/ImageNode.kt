@@ -156,26 +156,24 @@ open class ImageNode private constructor(
         bitmap = ImageTexture.getBitmap(materialLoader.context, drawableResId, type)
     }
 
+    /**
+     * Releases the [MaterialInstance] but intentionally retains the GPU [Texture] —
+     * destroying the texture before Filament has reclaimed the bound MaterialInstance
+     * triggers a native SIGABRT (`Invalid texture still bound to MaterialInstance`),
+     * and MI reclamation is coupled to the render loop, not to this call.
+     *
+     * **GPU-memory implication:** each destroyed [ImageNode] keeps its texture alive
+     * until the parent [com.google.android.filament.Engine] is torn down. For typical
+     * one-Activity, single-Engine usage this is harmless — Engine teardown reclaims
+     * everything. **Do not** create more than ~100 short-lived ImageNodes per Engine
+     * lifetime (feeds, infinite scrollers, particle emitters): for high-churn use
+     * cases recycle a single ImageNode via the `bitmap = newBitmap` setter, which
+     * reuses the same Texture, instead of destroying and recreating.
+     */
     override fun destroy() {
-        // Filament aborts with `Invalid texture still bound to MaterialInstance: 'Transparent
-        // Textured'` whenever a texture is destroyed before its owning MaterialInstance is
-        // reclaimed on the next frame commit. `destroyMaterialInstance` + `flushAndWait` both
-        // tried and neither is strong enough — Filament's MI reclamation is tied to the render
-        // loop, and in an instrumented-test teardown (no `Renderer.render()` call between destroy
-        // and engine shutdown) the MI is technically still considered live.
-        //
-        // Rather than risk a native SIGABRT we intentionally do NOT destroy the texture here —
-        // the parent [MaterialLoader.destroy] path or the [Engine.destroy] path will reclaim it
-        // when the engine is torn down. This matches Filament's own recommended pattern for
-        // short-lived textured MaterialInstances: release the MaterialInstance early, let the
-        // texture live until the Engine dies.
-        //
-        // Regression reference: commit 88a... "samples/ImageNode lifecycle crash" (no issue #),
-        // plus this test suite's BillboardDemo/ImageDemo/TextDemo teardown crashes on Apple M3
-        // Metal emulator, repro at commit 76665230.
         val mi = materialInstance
         super.destroy()
         materialLoader.destroyMaterialInstance(mi)
-        // DELIBERATE: do NOT destroy the texture — Engine teardown reclaims it safely.
+        // DELIBERATE: do NOT destroy the texture — see KDoc above.
     }
 }
