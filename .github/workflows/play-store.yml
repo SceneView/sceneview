@@ -146,6 +146,9 @@ jobs:
           SCENEVIEW_DEMO_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
           SCENEVIEW_DEMO_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           SCENEVIEW_DEMO_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          # Required for Streetscape Geometry / Geospatial / Cloud Anchors demos.
+          # See samples/android-demo/build.gradle manifestPlaceholders.
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: |
           ./gradlew :samples:android-demo:bundleRelease \
             -PversionCode=${{ steps.version.outputs.code }} \

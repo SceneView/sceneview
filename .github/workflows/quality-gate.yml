@@ -79,6 +79,9 @@ jobs:
 
       - name: Run quality gate
         shell: bash
+        env:
+          # Optional. Demo runtime disables Geospatial when unset.
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: bash .claude/scripts/quality-gate.sh
 
       - name: Upload validate-demo-assets log

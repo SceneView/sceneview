@@ -20,6 +20,24 @@ android {
         versionName project.hasProperty('versionName') ? project.property('versionName') : "4.0.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Inject the ARCore Cloud API key into AndroidManifest.xml as a manifest
+        // placeholder. The key MUST NEVER be committed — it's read from one of:
+        //   1. ARCORE_API_KEY environment variable (CI / store-bound builds)
+        //   2. local.properties → ARCORE_API_KEY (developer machines)
+        //   3. fallback empty string (Streetscape / Geospatial / Cloud Anchors
+        //      stay disabled at runtime via the demo's `hasArcoreApiKey` check)
+        // See arsceneview/STREETSCAPE_SETUP.md for how to provision your own key.
+        def arcoreApiKey = System.getenv("ARCORE_API_KEY") ?: ""
+        if (arcoreApiKey.isEmpty()) {
+            def localPropsFile = rootProject.file("local.properties")
+            if (localPropsFile.exists()) {
+                def localProps = new Properties()
+                localPropsFile.withInputStream { localProps.load(it) }
+                arcoreApiKey = localProps.getProperty("ARCORE_API_KEY", "")
+            }
+        }
+        manifestPlaceholders["arcoreApiKey"] = arcoreApiKey
     }
 
     signingConfigs {

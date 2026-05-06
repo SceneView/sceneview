@@ -40,6 +40,9 @@ jobs:
       - uses: gradle/actions/wrapper-validation@v6
 
       - name: Assemble all
+        env:
+          # Forks won't have this secret — demo runtime disables Geospatial gracefully.
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: |
           ./gradlew assembleDebug --stacktrace
 

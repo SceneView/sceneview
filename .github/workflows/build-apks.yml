@@ -43,6 +43,10 @@ jobs:
       - run: chmod +x ./gradlew
 
       - name: Build all sample APKs
+        env:
+          # Optional. When unset (forks, PRs from forks), the demo's runtime
+          # check disables Streetscape / Geospatial / Cloud Anchors gracefully.
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: |
           ./gradlew \
             :samples:android-demo:assembleDebug \

@@ -119,6 +119,8 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Build demo APK
+        env:
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: ./gradlew :samples:android-demo:assembleDebug --stacktrace
 
       - name: Capture demo screenshots

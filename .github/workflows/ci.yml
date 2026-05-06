@@ -49,6 +49,9 @@ jobs:
       - run: chmod +x ./gradlew
 
       - name: Build libraries + samples
+        env:
+          # Optional. Unset on forks → demo gracefully disables Geospatial/Streetscape.
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: |
           ./gradlew \
             assembleDebug \
