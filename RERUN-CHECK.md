@@ -1,6 +1,10 @@
 # 🔍 Rerun MVP — quick check guide
 
-> One commit pushed on this worktree branch: **`32586481`**
+> Three commits on this worktree branch (oldest → newest):
+> - `32586481` feat(rerun): self-serve hosted viewer page + Save & Share flow
+> - `62731f44` chore(rerun): one-command review guide
+> - `dbc055c6` feat(rerun): Swift parity, iOS share sheet, Tier-S events, viewer references
+>
 > Branch: `claude/gifted-kowalevski-1753ec` (worktree, not yet on `main`)
 > Run **one** command at the bottom and you'll see everything in 60 seconds.
 
@@ -104,13 +108,27 @@ backlog** — see `.claude/plans/` once it's drafted.
 
 ## ⏭️ Next session backlog
 
-Tracked in todo + memory `project_rerun_extended_data_types.md`:
+What's still pending after this session:
 
-1. Wire QR-code deep links **website ↔ app** (~1.5 day, see plan to be drafted)
-2. R2 bucket + Worker upload signing → makes `?r=<hash>` work end-to-end (~0.5 day)
-3. Add references to the viewer in `index.html`, root `README.md`, `web-demo` (~1 hour)
-4. `RerunBridge.swift` parity (`requestSaveAndShare`) + iOS demo share sheet (~1 day)
-5. Camera-trail 3D + Quality-timeline archetypes — Tier S "wow" features (~1 day)
+1. **QR-code deep links website ↔ app** — full plan saved at
+   [.claude/plans/rerun-deeplinks-and-qr.md](.claude/plans/rerun-deeplinks-and-qr.md).
+   ~5 h for the custom-scheme MVP, +5 h for verified App-Links. Needs
+   Play Store id, App Store id, keystore SHA-256, TEAM_ID — listed at
+   the top of the plan.
+2. **R2 bucket + Worker upload signing** → makes the `?r=<hash>` URL
+   pattern work end-to-end (sidecar uploads `.rrd` directly, app
+   shows public URL instead of file://). ~0.5 day.
+3. **MCP tool `share_recording`** in `rerun-3d-mcp` to upload an
+   already-saved `.rrd` to the Worker / R2 bucket. ~1 h once #2 is
+   live.
+4. **Push to `main`** — branch is still local. Needs the pusher
+   account (`thomas-gorisse`) since `thomasgorisse` is suspended.
+
+Done in this session (no longer in backlog):
+
+- ✅ `RerunBridge.swift` parity + iOS demo share sheet (commit `dbc055c6`)
+- ✅ Tier-S camera-trail + scalar event types (commit `dbc055c6`)
+- ✅ Viewer references on website / README / cheatsheet (commit `dbc055c6`)
 
 ---
 
