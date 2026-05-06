@@ -106,6 +106,7 @@ fun ARSceneView(
     materialLoader: MaterialLoader = rememberMaterialLoader(engine),
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     sessionFeatures: Set<Session.Feature> = setOf(),
+    playbackDataset: Uri? = null,                  // Replay an MP4 recorded via ARRecorder. See "AR Recording & Playback".
     sessionCameraConfig: ((Session) -> CameraConfig)? = null,
     sessionConfiguration: ((session: Session, Config) -> Unit)? = null,
     planeRenderer: Boolean = true,
@@ -1336,6 +1337,79 @@ The MCP exposes 5 tools: `setup_rerun_project`, `generate_ar_logger`, `generate_
 - **Dev-time only.** Gate with `BuildConfig.DEBUG` / `#if DEBUG`. The bridge is safe to leave wired in release (`setEnabled(false)` short-circuits the hot path), but the socket attempt alone wastes battery.
 - **No Rerun on visionOS yet.** `RerunBridge` is iOS-only because it reads from `ARFrame`, which isn't part of the visionOS API surface.
 - **10 Hz default.** Higher rates are possible but the sidecar becomes a bottleneck beyond ~30 Hz on a typical laptop.
+
+---
+
+## AR Recording & Playback — debug without a phone
+
+ARCore captures the **entire** AR session (camera frames, IMU, planes, depth, anchors, light estimation) into an MP4. SceneView wraps this with [`ARRecorder`](arsceneview/src/main/java/io/github/sceneview/ar/recording/ARRecorder.kt) for recording and a `playbackDataset` parameter on `ARSceneView` for replay. The replayed session re-runs as if you were there: hit-tests return the same results, planes appear at the same moment, anchors track at the same poses.
+
+### Why this matters
+
+- **Iterate at the desk.** Record an outdoor session once; replay it any time without holding a phone in front of the laptop.
+- **Reproduce bugs deterministically.** Share the MP4 with a teammate — they replay your exact session, including the lighting, motion, and surfaces you saw.
+- **CI tests.** Bundle a recording as a test fixture; assert that `onSessionUpdated` reports the expected planes/anchors.
+- **Pair with Rerun.** Record → replay with the [Rerun bridge](#ar-debug--rerunio-integration) attached → inspect every frame in 3D.
+
+### Record a session
+
+```kotlin
+import io.github.sceneview.ar.recording.rememberARRecorder
+import io.github.sceneview.ar.ARSceneView
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+
+@Composable
+fun ARRecord() {
+    val recorder = rememberARRecorder()
+    val context = LocalContext.current
+    val outputDir = remember { context.getExternalFilesDir("ar-recordings")!! }
+
+    Column {
+        Button(onClick = {
+            val name = "ar-${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}.mp4"
+            recorder.start(File(outputDir, name))
+        }) { Text("Record") }
+        Button(onClick = { recorder.stop() }) { Text("Stop") }
+        Text("State: ${recorder.state}")
+    }
+
+    ARSceneView(
+        modifier = Modifier.fillMaxSize(),
+        onSessionUpdated = { session, _ -> recorder.attach(session) }
+    )
+}
+```
+
+`ARRecorder.state` is `IDLE | RECORDING | ERROR`. The composable auto-stops on dispose.
+
+### Replay a session
+
+```kotlin
+import android.net.Uri
+
+@Composable
+fun ARReplay(file: File) {
+    // playbackDataset MUST be set before the session resumes — switching at runtime
+    // requires a full ARSceneView remount, hence the key().
+    key(file) {
+        ARSceneView(
+            modifier = Modifier.fillMaxSize(),
+            playbackDataset = Uri.fromFile(file)
+        )
+    }
+}
+```
+
+ARCore replays at the original capture rate. The session looks **identical** to live: planes appear, anchors lock, depth occlusion works, gestures still hit-test correctly.
+
+### Limits
+
+- **Same device class.** Playback works best on the device that recorded it, or a similar one. Heavily different sensor sets (e.g. phone → tablet) may degrade tracking.
+- **MP4 file size.** ~50–100 MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
+- **Storage permission not needed** for this default location.
+- **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session.
 
 ---
 

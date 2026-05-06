@@ -11,6 +11,7 @@
 package io.github.sceneview.ar
 
 import android.content.Context.WINDOW_SERVICE
+import android.net.Uri
 import android.util.Size
 import android.view.MotionEvent
 import android.view.SurfaceView
@@ -46,6 +47,7 @@ import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
+import com.google.ar.core.exceptions.PlaybackFailedException
 import io.github.sceneview.SceneNodeManager
 import io.github.sceneview.SceneRenderer
 import io.github.sceneview.SurfaceType
@@ -132,6 +134,13 @@ import java.util.concurrent.atomic.AtomicReference
  * @param materialLoader           Loader for Filament material templates. Use [rememberMaterialLoader].
  * @param environmentLoader        Loader for HDR environments. Use [rememberEnvironmentLoader].
  * @param sessionFeatures          ARCore [Session.Feature]s to enable (e.g. front camera).
+ * @param playbackDataset          Optional MP4 dataset previously written via
+ *                                 [Session.startRecording][com.google.ar.core.Session.startRecording].
+ *                                 When non-null, ARCore replays the dataset instead of using the
+ *                                 live camera — the session re-runs as if you were there.
+ *                                 Useful for record-replay debugging, deterministic AR tests, and
+ *                                 sharing reproducers between developers without needing the
+ *                                 original device or location.
  * @param sessionCameraConfig      Override for the ARCore camera configuration.
  * @param sessionConfiguration     Callback to configure the ARCore [Session] and [Config].
  * @param planeRenderer            Whether to render the AR plane grid overlay.
@@ -201,6 +210,25 @@ fun ARSceneView(
      * @see Session.Feature
      */
     sessionFeatures: Set<Session.Feature> = setOf(),
+    /**
+     * Optional MP4 dataset to play back instead of the live camera feed.
+     *
+     * When non-null, ARCore is configured for **playback** mode: the session re-runs the
+     * recorded camera frames, IMU data, planes, anchors and depth from the dataset, exactly
+     * as captured by a previous call to
+     * [Session.startRecording][com.google.ar.core.Session.startRecording] (or via the
+     * [io.github.sceneview.ar.recording.ARRecorder] helper). This is the standard ARCore
+     * record-replay workflow — capture an outdoor session once, iterate at the desk against
+     * the recording, share the MP4 with teammates to reproduce bugs deterministically.
+     *
+     * The URI must be passed before the session resumes; SceneView wires it on session
+     * creation. Switching between live and playback at runtime requires the [ARSceneView]
+     * to be fully recreated (e.g. via Compose `key(playbackDataset) { … }`), because ARCore
+     * binds the playback source to the [Session] for its entire lifetime.
+     *
+     * Default `null` (live camera mode).
+     */
+    playbackDataset: Uri? = null,
     /**
      * Sets the camera config to use.
      * The config must be one returned by [Session.getSupportedCameraConfigs].
@@ -350,10 +378,32 @@ fun ARSceneView(
     val prevTrackingFailureRef = remember { AtomicReference<TrackingFailureReason?>(null) }
     val isFrontFaceWindingInvertedRef = remember { AtomicBoolean(false) }
 
+    // Snapshot the playback URI at session-creation time. ARCore requires
+    // setPlaybackDatasetUri() to be called BEFORE the first resume(), so we read the value
+    // once when the session is built and ignore later recompositions that mutate the param —
+    // toggling between live/playback at runtime requires the caller to recreate the
+    // ARSceneView (typically via `key(playbackDataset) { ARSceneView(...) }`).
+    val playbackDatasetRef = remember { AtomicReference(playbackDataset) }
+    SideEffect { playbackDatasetRef.set(playbackDataset) }
+
     val arCore = remember {
         ARCore(
             onSessionCreated = { session ->
                 cameraStream?.let { session.setCameraTextureNames(it.cameraTextureIds) }
+                // Bind the playback source first — ARCore mandates the URI is set before
+                // resume(), and configure() happens here, then resume() runs immediately
+                // after this callback returns.
+                playbackDatasetRef.get()?.let { uri ->
+                    try {
+                        session.setPlaybackDatasetUri(uri)
+                    } catch (e: PlaybackFailedException) {
+                        onSessionFailedRef.get()?.invoke(e)
+                    } catch (e: Exception) {
+                        // Defensive — ARCore may throw IllegalStateException if the session
+                        // has already been resumed elsewhere. Don't crash; surface to caller.
+                        onSessionFailedRef.get()?.invoke(e)
+                    }
+                }
                 sessionCameraConfigRef.get()?.let { session.cameraConfig = it(session) }
                 session.configure { config ->
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
@@ -781,7 +831,7 @@ private fun ARScenePreview(modifier: Modifier) {
  * @deprecated Use [ARSceneView] instead. This function is a direct alias provided for backward
  * compatibility with code written against earlier SceneView versions.
  */
-@Deprecated("Use ARSceneView instead", ReplaceWith("ARSceneView(modifier, surfaceType, engine, modelLoader, materialLoader, environmentLoader, sessionFeatures, sessionCameraConfig, sessionConfiguration, planeRenderer, cameraStream, view, isOpaque, renderer, scene, environment, mainLightNode, cameraNode, cameraExposure, collisionSystem, viewNodeWindowManager, onSessionCreated, onSessionResumed, onSessionPaused, onSessionFailed, onSessionUpdated, onTrackingFailureChanged, onGestureListener, onTouchEvent, permissionHandler, lifecycle, content)"))
+@Deprecated("Use ARSceneView instead", ReplaceWith("ARSceneView(modifier, surfaceType, engine, modelLoader, materialLoader, environmentLoader, sessionFeatures, playbackDataset, sessionCameraConfig, sessionConfiguration, planeRenderer, cameraStream, view, isOpaque, renderer, scene, environment, mainLightNode, cameraNode, cameraExposure, collisionSystem, viewNodeWindowManager, onSessionCreated, onSessionResumed, onSessionPaused, onSessionFailed, onSessionUpdated, onTrackingFailureChanged, onGestureListener, onTouchEvent, permissionHandler, lifecycle, content)"))
 @Composable
 fun ARScene(
     modifier: Modifier = Modifier,
@@ -791,6 +841,7 @@ fun ARScene(
     materialLoader: MaterialLoader = rememberMaterialLoader(engine),
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     sessionFeatures: Set<Session.Feature> = setOf(),
+    playbackDataset: Uri? = null,
     sessionCameraConfig: ((Session) -> CameraConfig)? = null,
     sessionConfiguration: ((session: Session, Config) -> Unit)? = null,
     planeRenderer: Boolean = true,
@@ -826,6 +877,7 @@ fun ARScene(
     materialLoader = materialLoader,
     environmentLoader = environmentLoader,
     sessionFeatures = sessionFeatures,
+    playbackDataset = playbackDataset,
     sessionCameraConfig = sessionCameraConfig,
     sessionConfiguration = sessionConfiguration,
     planeRenderer = planeRenderer,

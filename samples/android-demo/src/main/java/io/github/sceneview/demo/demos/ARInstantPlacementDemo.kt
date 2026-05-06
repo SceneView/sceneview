@@ -1,0 +1,357 @@
+package io.github.sceneview.demo.demos
+
+import android.view.MotionEvent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.google.ar.core.Anchor
+import com.google.ar.core.Config
+import com.google.ar.core.Frame
+import com.google.ar.core.InstantPlacementPoint
+import com.google.ar.core.Plane
+import com.google.ar.core.Session
+import com.google.ar.core.TrackingFailureReason
+import com.google.ar.core.TrackingState
+import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.math.Position
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.rememberModelInstance
+import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.rememberOnGestureListener
+
+/**
+ * Instant Placement demo.
+ *
+ * Showcases [Config.InstantPlacementMode.LOCAL_Y_UP] — ARCore returns a hit immediately on tap,
+ * even before plane detection has converged. The model snaps in at an approximate distance
+ * (1 m in front of the camera by default) and refines to a "real" pose once ARCore has gathered
+ * enough features. Compare with [ARPlacementDemo], which waits for plane detection.
+ *
+ * Each placed model carries its own [InstantPlacementPoint] when instant placement is on; the
+ * tracking-state badge ("Approximating" → "Tracked") reflects that point's
+ * [InstantPlacementPoint.TrackingMethod] transitioning from `SCREENSPACE_WITH_APPROXIMATE_DISTANCE`
+ * to `FULL_TRACKING`. With instant placement off, the demo behaves like [ARPlacementDemo] — pure
+ * plane-based hit testing.
+ */
+
+private data class InstantPlacedModel(
+    val id: Int,
+    val anchor: Anchor,
+    val trackable: Any?,
+    val assetPath: String,
+    val displayName: String
+)
+
+private data class InstantCycleEntry(val assetPath: String, val displayName: String)
+
+private val INSTANT_MODEL_CYCLE = listOf(
+    InstantCycleEntry("models/khronos_damaged_helmet.glb", "Damaged Helmet"),
+    InstantCycleEntry("models/khronos_avocado.glb", "Avocado"),
+    InstantCycleEntry("models/khronos_fox.glb", "Fox"),
+    InstantCycleEntry("models/khronos_lantern.glb", "Lantern"),
+    InstantCycleEntry("models/khronos_toy_car.glb", "Toy Car"),
+    InstantCycleEntry("models/shiba.glb", "Shiba")
+)
+
+@Composable
+fun ARInstantPlacementDemo(onBack: () -> Unit) {
+    var instantEnabled by remember { mutableStateOf(true) }
+
+    DemoScaffold(
+        title = "Instant Placement",
+        onBack = onBack,
+        controls = {
+            Text(
+                text = "Instant Placement vs plane-based: tap right after launching the app — " +
+                    "the model snaps in immediately. Without instant placement, you'd have to " +
+                    "wait several seconds for ARCore to find a plane first.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (instantEnabled) "Instant Placement ON" else "Instant Placement OFF",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = instantEnabled,
+                    onCheckedChange = { instantEnabled = it }
+                )
+            }
+
+            Text(
+                text = if (instantEnabled) {
+                    "Tap anywhere on screen — ARCore guesses a pose ~1 m in front. The badge " +
+                        "shows \"Approximating\" until the point converges to FULL_TRACKING."
+                } else {
+                    "Plane-based mode: wait for the plane overlay to appear, then tap inside it."
+                },
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    ) {
+        // `key(instantEnabled)` rebuilds the entire ARSceneView (and its ARCore session) when
+        // the user flips the toggle. ARCore configs can be reapplied live, but reusing the same
+        // session across instant-placement on/off blurs which placed models came from which mode
+        // — a fresh session keeps the demo's state clean per toggle.
+        key(instantEnabled) {
+            InstantPlacementScene(instantEnabled = instantEnabled)
+        }
+    }
+}
+
+@Composable
+private fun InstantPlacementScene(instantEnabled: Boolean) {
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+    val materialLoader = rememberMaterialLoader(engine)
+
+    val placedModels = remember { mutableStateListOf<InstantPlacedModel>() }
+    var nextId by remember { mutableStateOf(0) }
+    var cycleIndex by remember { mutableStateOf(0) }
+
+    var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
+    var isTracking by remember { mutableStateOf(false) }
+    var latestFrame by remember { mutableStateOf<Frame?>(null) }
+
+    // Live status of each placed Instant Placement point. Keyed by model id.
+    // Updated each frame from the trackable's TrackingMethod. Recomputed via
+    // `mutableStateMapOf` would require an extra import — using a list of
+    // current-method snapshots keyed by id keeps recomposition simple.
+    val trackingMethods = remember { mutableStateListOf<Pair<Int, InstantPlacementPoint.TrackingMethod>>() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        ARSceneView(
+            modifier = Modifier.fillMaxSize(),
+            engine = engine,
+            modelLoader = modelLoader,
+            materialLoader = materialLoader,
+            planeRenderer = !instantEnabled,
+            cameraExposure = -1.0f,
+            sessionConfiguration = { _: Session, config: Config ->
+                config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+                config.instantPlacementMode = if (instantEnabled) {
+                    Config.InstantPlacementMode.LOCAL_Y_UP
+                } else {
+                    Config.InstantPlacementMode.DISABLED
+                }
+            },
+            onSessionUpdated = { _, frame: Frame ->
+                latestFrame = frame
+                isTracking = frame.camera.trackingState == TrackingState.TRACKING
+                // Refresh tracking-method snapshots so the per-model badge updates as
+                // ARCore promotes points from approximate → full tracking.
+                trackingMethods.clear()
+                placedModels.forEach { placed ->
+                    val point = placed.trackable as? InstantPlacementPoint
+                    if (point != null) {
+                        trackingMethods.add(placed.id to point.trackingMethod)
+                    }
+                }
+            },
+            onTrackingFailureChanged = { reason ->
+                trackingFailureReason = reason
+            },
+            onGestureListener = rememberOnGestureListener(
+                onSingleTapConfirmed = { event: MotionEvent, node ->
+                    if (node != null) return@rememberOnGestureListener
+                    val frame = latestFrame ?: return@rememberOnGestureListener
+                    if (frame.camera.trackingState != TrackingState.TRACKING) {
+                        return@rememberOnGestureListener
+                    }
+
+                    val hit = if (instantEnabled) {
+                        // hitTestInstantPlacement returns immediately even with no detected
+                        // planes — ARCore guesses a pose using the approximate distance.
+                        frame.hitTestInstantPlacement(event.x, event.y, 1.0f).firstOrNull()
+                    } else {
+                        frame.hitTest(event).firstOrNull { result ->
+                            val trackable = result.trackable
+                            trackable is Plane &&
+                                trackable.isPoseInPolygon(result.hitPose) &&
+                                result.distance <= 5.0f
+                        }
+                    } ?: return@rememberOnGestureListener
+
+                    val entry = INSTANT_MODEL_CYCLE[cycleIndex % INSTANT_MODEL_CYCLE.size]
+                    placedModels.add(
+                        InstantPlacedModel(
+                            id = nextId++,
+                            anchor = hit.createAnchor(),
+                            trackable = hit.trackable,
+                            assetPath = entry.assetPath,
+                            displayName = entry.displayName
+                        )
+                    )
+                    cycleIndex = (cycleIndex + 1) % INSTANT_MODEL_CYCLE.size
+                }
+            )
+        ) {
+            placedModels.forEach { placed ->
+                key(placed.id) {
+                    AnchorNode(anchor = placed.anchor) {
+                        val instance = rememberModelInstance(modelLoader, placed.assetPath)
+                        instance?.let {
+                            ModelNode(
+                                modelInstance = it,
+                                scaleToUnits = 0.3f,
+                                centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                isEditable = true
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Top-center pill: model count + per-state tally.
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp),
+            color = Color.Black.copy(alpha = 0.7f),
+            contentColor = Color.White,
+            tonalElevation = 4.dp,
+            shape = MaterialTheme.shapes.small
+        ) {
+            val count = placedModels.size
+            val approximating = trackingMethods.count {
+                it.second == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE
+            }
+            val tracked = trackingMethods.count {
+                it.second == InstantPlacementPoint.TrackingMethod.FULL_TRACKING
+            }
+            val label = if (instantEnabled) {
+                "$count placed • $approximating approximating • $tracked tracked"
+            } else if (count == 1) {
+                "1 model placed"
+            } else {
+                "$count models placed"
+            }
+            Text(
+                text = label,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+
+        // Per-model tracking badges, listed below the count pill. Hidden when instant placement
+        // is off — plane hits don't carry an InstantPlacementPoint trackable.
+        if (instantEnabled && trackingMethods.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                trackingMethods.take(4).forEach { (id, method) ->
+                    val placed = placedModels.firstOrNull { it.id == id } ?: return@forEach
+                    val (label, color) = when (method) {
+                        InstantPlacementPoint.TrackingMethod.FULL_TRACKING ->
+                            "Tracked" to Color(0xFF1B873B)
+                        InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE ->
+                            "Approximating" to Color(0xFFE07B00)
+                        else -> "Lost" to Color(0xFF8A0000)
+                    }
+                    Surface(
+                        color = color.copy(alpha = 0.85f),
+                        contentColor = Color.White,
+                        tonalElevation = 4.dp,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = "${placed.displayName}: $label",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+            }
+        }
+
+        // Clear-all control at the bottom-left.
+        OutlinedButton(
+            onClick = {
+                placedModels.forEach { runCatching { it.anchor.detach() } }
+                placedModels.clear()
+                trackingMethods.clear()
+                cycleIndex = 0
+            },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+        ) {
+            Text("Clear All")
+        }
+
+        // Scanning indicator overlay
+        AnimatedVisibility(
+            visible = !isTracking,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Surface(
+                modifier = Modifier.padding(bottom = 32.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text(
+                    text = trackingFailureReason?.let { reason ->
+                        when (reason) {
+                            TrackingFailureReason.NONE ->
+                                if (instantEnabled) "Tap to place — even before scanning"
+                                else "Point your camera at a surface"
+                            TrackingFailureReason.BAD_STATE -> "AR session error"
+                            TrackingFailureReason.INSUFFICIENT_LIGHT -> "Not enough light"
+                            TrackingFailureReason.EXCESSIVE_MOTION -> "Moving too fast"
+                            TrackingFailureReason.INSUFFICIENT_FEATURES ->
+                                "Not enough detail — try a textured surface"
+                            TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
+                        }
+                    } ?: if (instantEnabled) {
+                        "Initializing camera — you can already tap to place"
+                    } else {
+                        "Scanning for surfaces…"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                )
+            }
+        }
+    }
+}

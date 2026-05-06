@@ -59,4 +59,9 @@ val ALL_DEMOS = listOf(
     DemoEntry("ar-streetscape", "Streetscape", "Urban geometry overlay", "Augmented Reality"),
     DemoEntry("ar-pose", "Pose Tracking", "Free pose positioning", "Augmented Reality"),
     DemoEntry("ar-rerun", "Rerun Debug", "AR debug streaming to Rerun.io", "Augmented Reality"),
+    DemoEntry("ar-record-playback", "Record & Playback", "Record an AR session and replay it without a phone", "Augmented Reality"),
+    DemoEntry("ar-depth-occlusion", "Depth Occlusion", "Real objects hide virtual ones — Depth API", "Augmented Reality"),
+    DemoEntry("ar-instant-placement", "Instant Placement", "Place models before plane detection converges", "Augmented Reality"),
+    DemoEntry("ar-terrain", "Terrain Anchors", "Geospatial anchor that snaps to outdoor terrain", "Augmented Reality"),
+    DemoEntry("ar-rooftop", "Rooftop Anchors", "Geospatial anchor that snaps to building rooftops", "Augmented Reality"),
 )
