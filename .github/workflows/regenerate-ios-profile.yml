@@ -1,0 +1,178 @@
+name: Regenerate iOS Provisioning Profile
+
+# One-shot workflow: enables the Associated Domains capability on the
+# `io.github.sceneview.demo` bundle ID, regenerates the
+# "SceneView Demo App Store" provisioning profile via App Store Connect
+# API, then updates the IOS_PROVISIONING_PROFILE_BASE64 secret used by
+# app-store.yml. Delete this file after the next successful TestFlight
+# upload.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regenerate-ios-profile
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install --quiet "PyJWT[crypto]" requests
+
+      - name: Add ASSOCIATED_DOMAINS capability + regenerate profile
+        id: regen
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$ASC_API_KEY" > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+          python3 <<'PYEOF'
+          import os, time, jwt, requests, sys
+
+          KEY_ID = os.environ["ASC_KEY_ID"]
+          ISSUER_ID = os.environ["ASC_ISSUER_ID"]
+          BUNDLE_ID = "io.github.sceneview.demo"
+          PROFILE_NAME = "SceneView Demo App Store"
+          PROFILE_TYPE = "IOS_APP_STORE"
+
+          with open(os.path.expanduser(f"~/.private_keys/AuthKey_{KEY_ID}.p8")) as f:
+              private_key = f.read()
+
+          token = jwt.encode(
+              {"iss": ISSUER_ID, "iat": int(time.time()), "exp": int(time.time()) + 1200, "aud": "appstoreconnect-v1"},
+              private_key,
+              algorithm="ES256",
+              headers={"kid": KEY_ID},
+          )
+          headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+          BASE = "https://api.appstoreconnect.apple.com/v1"
+
+          def fail(msg, resp=None):
+              print(f"::error::{msg}")
+              if resp is not None:
+                  print(f"  status={resp.status_code} body={resp.text[:1000]}")
+              sys.exit(1)
+
+          # 1. Find the bundle ID + its capabilities
+          r = requests.get(
+              f"{BASE}/bundleIds",
+              headers=headers,
+              params={"filter[identifier]": BUNDLE_ID, "include": "bundleIdCapabilities", "limit": 1},
+          )
+          if r.status_code != 200:
+              fail("Failed to query bundleIds", r)
+          data = r.json()
+          if not data["data"]:
+              fail(f"Bundle ID {BUNDLE_ID} not found")
+          bid = data["data"][0]["id"]
+          print(f"Bundle ID: {bid}")
+
+          existing_caps = {
+              c["attributes"]["capabilityType"]
+              for c in data.get("included", [])
+              if c["type"] == "bundleIdCapabilities"
+          }
+          print(f"Existing capabilities: {sorted(existing_caps)}")
+
+          # 2. Add ASSOCIATED_DOMAINS if missing
+          if "ASSOCIATED_DOMAINS" not in existing_caps:
+              payload = {"data": {
+                  "type": "bundleIdCapabilities",
+                  "attributes": {"capabilityType": "ASSOCIATED_DOMAINS"},
+                  "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid}}},
+              }}
+              r = requests.post(f"{BASE}/bundleIdCapabilities", headers=headers, json=payload)
+              if r.status_code not in (200, 201):
+                  fail("Failed to enable ASSOCIATED_DOMAINS capability", r)
+              print("ASSOCIATED_DOMAINS capability enabled")
+          else:
+              print("ASSOCIATED_DOMAINS already enabled — will still regenerate profile to refresh entitlements")
+
+          # 3. Find the existing profile (to preserve cert relationships and replace it)
+          r = requests.get(
+              f"{BASE}/profiles",
+              headers=headers,
+              params={"filter[name]": PROFILE_NAME, "include": "certificates,bundleId"},
+          )
+          if r.status_code != 200:
+              fail("Failed to list profiles", r)
+          old_profiles = r.json()["data"]
+          certificate_ids = []
+          if old_profiles:
+              old = old_profiles[0]
+              cert_rels = old["relationships"]["certificates"]["data"]
+              certificate_ids = [c["id"] for c in cert_rels]
+              print(f"Old profile id={old['id']} certs={certificate_ids}")
+              r = requests.delete(f"{BASE}/profiles/{old['id']}", headers=headers)
+              if r.status_code not in (200, 204):
+                  fail(f"Failed to delete old profile {old['id']}", r)
+              print(f"Deleted old profile {old['id']}")
+          else:
+              print(f"No existing profile named {PROFILE_NAME!r} — will create from scratch")
+
+          # 4. Fallback: pick the most recent valid IOS_DISTRIBUTION cert
+          if not certificate_ids:
+              r = requests.get(
+                  f"{BASE}/certificates",
+                  headers=headers,
+                  params={"filter[certificateType]": "IOS_DISTRIBUTION,DISTRIBUTION", "sort": "-id", "limit": 5},
+              )
+              if r.status_code != 200:
+                  fail("Failed to list certificates", r)
+              certs = r.json()["data"]
+              if not certs:
+                  fail("No distribution certificates available")
+              certificate_ids = [certs[0]["id"]]
+              print(f"Fallback cert chosen: {certificate_ids}")
+
+          # 5. Recreate the profile (Apple recompiles capabilities at creation time)
+          payload = {"data": {
+              "type": "profiles",
+              "attributes": {"name": PROFILE_NAME, "profileType": PROFILE_TYPE},
+              "relationships": {
+                  "bundleId": {"data": {"type": "bundleIds", "id": bid}},
+                  "certificates": {"data": [{"type": "certificates", "id": cid} for cid in certificate_ids]},
+              },
+          }}
+          r = requests.post(f"{BASE}/profiles", headers=headers, json=payload)
+          if r.status_code not in (200, 201):
+              fail("Failed to create profile", r)
+          new = r.json()["data"]
+          new_id = new["id"]
+          new_b64 = new["attributes"]["profileContent"]
+          print(f"New profile created: id={new_id} name={new['attributes']['name']!r}")
+
+          # 6. Persist base64 to a file the next step will read
+          out_path = "/tmp/profile.b64"
+          with open(out_path, "w") as f:
+              f.write(new_b64)
+          print(f"Profile content written to {out_path} ({len(new_b64)} chars)")
+          PYEOF
+
+          rm -rf ~/.private_keys
+
+      - name: Update IOS_PROVISIONING_PROFILE_BASE64 secret
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        run: |
+          if [ ! -s /tmp/profile.b64 ]; then
+            echo "::error::/tmp/profile.b64 missing or empty"
+            exit 1
+          fi
+          gh secret set IOS_PROVISIONING_PROFILE_BASE64 -R sceneview/sceneview < /tmp/profile.b64
+          rm -f /tmp/profile.b64
+          echo "IOS_PROVISIONING_PROFILE_BASE64 updated"
