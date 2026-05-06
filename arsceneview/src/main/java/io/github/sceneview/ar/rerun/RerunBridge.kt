@@ -290,6 +290,42 @@ public constructor(
         enqueue(RerunWireFormat.hitResult(timestampNanos, hit))
     }
 
+    /**
+     * Log the cumulative camera trail as a single 3D polyline. Pass a
+     * flat `[x0,y0,z0, x1,y1,z1, …]` buffer of accumulated camera
+     * positions — keep it bounded (e.g. last 600 samples) so the JSON
+     * line doesn't grow without bound over long sessions.
+     *
+     * The viewer at [`sceneview.github.io/rerun/`](https://sceneview.github.io/rerun/)
+     * shows the trail under the camera entity, useful for spotting drift
+     * or unusual operator motion patterns.
+     */
+    public fun logCameraTrail(
+        positions: FloatArray,
+        timestampNanos: Long,
+        entity: String = "world/camera/trail",
+    ) {
+        if (!enabled) return
+        if (positions.isEmpty()) return
+        enqueue(RerunWireFormat.cameraTrailJson(timestampNanos, positions, entity))
+    }
+
+    /**
+     * Log a scalar timeseries value (e.g. `tracking_quality`, feature-point
+     * count, frame latency). The Rerun viewer renders it as a graph in the
+     * timeline panel; the [entity] doubles as the legend label.
+     *
+     * Cheap enough to call every frame — let `rateHz` upstream throttle.
+     */
+    public fun logScalar(
+        value: Float,
+        entity: String,
+        timestampNanos: Long,
+    ) {
+        if (!enabled) return
+        enqueue(RerunWireFormat.scalarJson(timestampNanos, value, entity))
+    }
+
     // ── Save & share ──────────────────────────────────────────────────────
 
     /**

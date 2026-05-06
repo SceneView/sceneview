@@ -51,6 +51,22 @@ public final class RerunBridge: ObservableObject {
     public static let defaultPort: UInt16 = 9876
     public static let defaultRateHz: Int = 10
 
+    /// Result of ``requestSaveAndShare(_:)`` — either the sidecar wrote a
+    /// `.rrd` file (`success = true` and `path` / `viewerUrl` populated) or
+    /// it couldn't (`success = false` with a human-readable ``reason``).
+    ///
+    /// `viewerUrl` is the SceneView Rerun page pre-filled with the recording
+    /// location. It is most useful as a copy-paste hint — the underlying
+    /// URL usually points at a `file://` path on the dev machine which most
+    /// browsers won't fetch from an HTTPS page. Re-host the `.rrd` first.
+    public struct ShareResult: Equatable {
+        public let success: Bool
+        public let path: String?
+        public let viewerUrl: String?
+        public let events: Int
+        public let reason: String?
+    }
+
     private let host: String
     private let port: UInt16
     private let rateHz: Int
@@ -63,6 +79,15 @@ public final class RerunBridge: ObservableObject {
     private var lastEmitNanos: Int64 = 0
     private var _enabled: Bool = true
     private let minIntervalNanos: Int64
+
+    /// Buffer holding partial JSON-lines received from the sidecar. The
+    /// bridge does not pretend to be a generic JSON router — it only looks
+    /// for control acknowledgments (e.g. `saved` after `save_now`).
+    private var ackInbox: Data = Data()
+
+    /// One-shot listeners waiting for the next ``RerunWireFormat/ControlAck``.
+    /// Each is removed after firing so a stale callback never re-triggers.
+    private var ackListeners: [(ShareResult) -> Void] = []
 
     /// Total number of events successfully enqueued this session. Published
     /// so a SwiftUI view can bind an overlay to it.
@@ -93,8 +118,10 @@ public final class RerunBridge: ObservableObject {
             guard let nwPort = NWEndpoint.Port(rawValue: self.port) else { return }
             let nwHost = NWEndpoint.Host(self.host)
             let conn = NWConnection(host: nwHost, port: nwPort, using: .tcp)
-            conn.stateUpdateHandler = { state in
+            conn.stateUpdateHandler = { [weak self] state in
                 switch state {
+                case .ready:
+                    self?.startReadLoop()
                 case .failed(let err):
                     NSLog("[RerunBridge] failed: \(err.localizedDescription)")
                 case .cancelled:
@@ -167,6 +194,132 @@ public final class RerunBridge: ObservableObject {
         guard _enabled else { return }
         for anchor in anchors {
             send(RerunWireFormat.anchor(timestampNanos: timestampNanos, arAnchor: anchor))
+        }
+    }
+
+    /// Log the cumulative camera trail as a single 3D polyline. Pass a
+    /// flat `[x0, y0, z0, x1, y1, z1, …]` buffer of accumulated camera
+    /// positions — keep it bounded so the JSON line doesn't grow without
+    /// bound over long sessions.
+    public func logCameraTrail(
+        positions: [Float],
+        timestampNanos: Int64,
+        entity: String = "world/camera/trail"
+    ) {
+        guard _enabled, !positions.isEmpty else { return }
+        send(RerunWireFormat.cameraTrailJson(timestampNanos: timestampNanos,
+                                             positions: positions, entity: entity))
+    }
+
+    /// Log a scalar timeseries value (e.g. `tracking_quality`, feature
+    /// point count). The Rerun viewer renders it as a graph; `entity`
+    /// doubles as the legend label.
+    public func logScalar(
+        _ value: Float,
+        entity: String,
+        timestampNanos: Int64
+    ) {
+        guard _enabled else { return }
+        send(RerunWireFormat.scalarJson(timestampNanos: timestampNanos,
+                                        value: value, entity: entity))
+    }
+
+    // MARK: - Save & share
+
+    /// Ask the Python sidecar to flush its in-memory recording to a `.rrd`
+    /// file on disk and reply with the path + the SceneView Rerun viewer URL.
+    ///
+    /// Requires the sidecar to be running with `--save` (the demo's
+    /// `rerun-bridge.py` defaults to live mode). If the sidecar is in live
+    /// mode, `callback` receives a ``ShareResult`` with `success = false`
+    /// and a human-readable `reason`.
+    ///
+    /// `callback` fires on the bridge's I/O queue — marshal to the main
+    /// queue (e.g. via `DispatchQueue.main.async`) before touching UI state.
+    ///
+    /// Mirrors `RerunBridge.requestSaveAndShare` in the Kotlin bridge.
+    public func requestSaveAndShare(_ callback: @escaping (ShareResult) -> Void) {
+        queue.async { [weak self] in
+            guard let self = self else {
+                callback(ShareResult(success: false, path: nil, viewerUrl: nil, events: 0,
+                                     reason: "bridge has been deallocated"))
+                return
+            }
+            guard let conn = self.connection,
+                  conn.state == .ready || conn.state == .preparing else {
+                callback(ShareResult(success: false, path: nil, viewerUrl: nil, events: 0,
+                                     reason: "bridge not connected — call connect() first"))
+                return
+            }
+            // One-shot listener; the read loop pops it when the next ack arrives.
+            self.ackListeners.append(callback)
+            let line = RerunWireFormat.controlSaveNow()
+            conn.send(content: Data(line.utf8), completion: .contentProcessed { error in
+                if let error = error {
+                    NSLog("[RerunBridge] control write failed: \(error.localizedDescription)")
+                    self.queue.async {
+                        // Pop the listener we just added — a write failure
+                        // means the sidecar will never reply on this socket.
+                        if let i = self.ackListeners.firstIndex(where: { _ in true }) {
+                            let cb = self.ackListeners.remove(at: i)
+                            cb(ShareResult(success: false, path: nil, viewerUrl: nil, events: 0,
+                                           reason: "control write failed: \(error.localizedDescription)"))
+                        }
+                    }
+                }
+            })
+        }
+    }
+
+    // MARK: - Read loop (for control acks)
+    //
+    // The Python sidecar replies to control commands by writing a single
+    // JSON-lines string back on the same socket. We don't try to be a
+    // general-purpose receive router — this loop only fires registered
+    // ``ackListeners`` when it parses a known acknowledgment.
+
+    private func startReadLoop() {
+        guard let conn = connection else { return }
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            guard let self = self else { return }
+            if let data = data, !data.isEmpty {
+                self.ackInbox.append(data)
+                self.drainAckInbox()
+            }
+            if let error = error {
+                NSLog("[RerunBridge] read failed: \(error.localizedDescription)")
+                return
+            }
+            if !isComplete {
+                self.startReadLoop()
+            }
+        }
+    }
+
+    /// Splits ``ackInbox`` on newline, parses each line as a control ack,
+    /// and fires + removes the next-in-line listener. Lines that aren't
+    /// acks are silently dropped (the sidecar shouldn't be sending them
+    /// today, but ignoring them is forward-compatible).
+    private func drainAckInbox() {
+        while let nl = ackInbox.firstIndex(of: 0x0A) {
+            let lineData = ackInbox.subdata(in: ackInbox.startIndex..<nl)
+            ackInbox.removeSubrange(ackInbox.startIndex...nl)
+            guard let line = String(data: lineData, encoding: .utf8),
+                  !line.isEmpty,
+                  let ack = RerunWireFormat.parseControlAck(line) else {
+                continue
+            }
+            let result = ShareResult(
+                success: ack.success,
+                path: ack.path,
+                viewerUrl: ack.viewerUrl,
+                events: ack.events,
+                reason: ack.reason
+            )
+            if !ackListeners.isEmpty {
+                let cb = ackListeners.removeFirst()
+                cb(result)
+            }
         }
     }
 

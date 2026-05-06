@@ -2597,6 +2597,8 @@ ul { list-style: none; }
 .devtools__card-text a { color: var(--accent); text-decoration: underline; }
 .devtools__card-platforms { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .devtools__card-platform { font-size: 0.75rem; font-weight: 600; background: rgba(var(--accent-rgb, 59,130,246), 0.15); color: var(--accent); padding: 4px 12px; border-radius: 999px; }
+.devtools__card-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 18px; font-size: 0.875rem; font-weight: 600; color: var(--color-primary); text-decoration: none; transition: color 0.15s, transform 0.15s; }
+.devtools__card-link:hover { color: var(--color-primary-dim); transform: translateX(2px); }
 
 .metrics__title {
   font-size: clamp(2rem, 4vw, 3rem);

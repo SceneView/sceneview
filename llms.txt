@@ -1232,6 +1232,19 @@ fun ARDebugScreen() {
 
 `logFrame` logs camera pose + planes + point cloud in one call, honours `rateHz`. Finer-grained methods are available if you want to emit events selectively: `logCameraPose(Pose, Long)`, `logPlanes(Collection<Plane>, Long)`, `logPointCloud(PointCloud, Long)`, `logAnchors(Collection<Anchor>, Long)`, `logHitResult(HitResult, Long)`.
 
+**Tier-S "wow" events** (call from your own code, not auto-emitted by `logFrame`):
+
+```kotlin
+// Polyline through every accumulated camera position — flat [x,y,z,…] buffer.
+bridge.logCameraTrail(positions = trailFloats, timestampNanos = frame.timestamp)
+
+// Generic scalar timeseries — graphs in the Rerun timeline panel.
+bridge.logScalar(value = trackingQuality, entity = "world/camera/tracking_quality",
+                 timestampNanos = frame.timestamp)
+```
+
+The Python sidecar maps `camera_trail` to `rr.LineStrips3D` and `scalar` to `rr.Scalars`. Same surface in Swift: `bridge.logCameraTrail(positions:timestampNanos:)` and `bridge.logScalar(_:entity:timestampNanos:)`.
+
 **Threading:** the bridge owns a private `Dispatchers.IO` + `SupervisorJob` scope and a `Channel.CONFLATED` outbox. Every `log*` call is non-blocking — the newest event overwrites any pending one (drop-on-backpressure). Filament's render thread is never blocked.
 
 ### iOS — `RerunBridge` + new `ARSceneView.onFrame`

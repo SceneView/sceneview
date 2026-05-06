@@ -155,6 +155,63 @@ class RerunWireFormatTest {
         assertTrue(line.contains("\"polygon\":[]"))
     }
 
+    // ── Tier-S event types: camera trail + scalar ─────────────────────────
+
+    @Test
+    fun `cameraTrail emits canonical JSON line with default entity`() {
+        val line = RerunWireFormat.cameraTrailJson(
+            timestampNanos = 99L,
+            positions = floatArrayOf(0f, 0f, 0f, 1f, 0f, 0f, 1f, 1f, 0f),
+        )
+        val expected =
+            "{\"t\":99,\"type\":\"camera_trail\",\"entity\":\"world/camera/trail\"," +
+                "\"positions\":[[0.0,0.0,0.0],[1.0,0.0,0.0],[1.0,1.0,0.0]]}\n"
+        assertEquals(expected, line)
+    }
+
+    @Test
+    fun `cameraTrail with empty positions emits empty list`() {
+        val line = RerunWireFormat.cameraTrailJson(
+            timestampNanos = 1L,
+            positions = floatArrayOf(),
+        )
+        assertTrue(line.contains("\"positions\":[]"))
+    }
+
+    @Test
+    fun `cameraTrail truncates trailing partial point (positions length not multiple of 3)`() {
+        // Defensively: a 4-element buffer = 1 full point + leftover.
+        val line = RerunWireFormat.cameraTrailJson(
+            timestampNanos = 1L,
+            positions = floatArrayOf(1f, 2f, 3f, 4f),
+        )
+        assertTrue(line.contains("[1.0,2.0,3.0]"))
+        assertFalse(line.contains("4.0"))
+    }
+
+    @Test
+    fun `scalar emits canonical JSON line`() {
+        val line = RerunWireFormat.scalarJson(
+            timestampNanos = 200L,
+            value = 0.95f,
+            entity = "world/camera/tracking_quality",
+        )
+        val expected =
+            "{\"t\":200,\"type\":\"scalar\",\"entity\":\"world/camera/tracking_quality\"," +
+                "\"value\":0.95}\n"
+        assertEquals(expected, line)
+    }
+
+    @Test
+    fun `scalar handles non-finite values by clamping to 0`() {
+        val line = RerunWireFormat.scalarJson(
+            timestampNanos = 1L,
+            value = Float.NaN,
+            entity = "world/metric",
+        )
+        assertTrue(line.contains("\"value\":0"))
+    }
+
     // ── Control protocol ──────────────────────────────────────────────────
 
     @Test

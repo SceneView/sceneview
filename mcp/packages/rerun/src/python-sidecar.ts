@@ -134,6 +134,15 @@ def handle_event(ev: dict[str, Any]) -> None:
                 colors=[(255, 200, 0)],
             ),
         )
+    elif kind == "camera_trail":
+        poly = np.array(ev["positions"], dtype=np.float32)
+        if len(poly) >= 2:
+            rr.log(entity, rr.LineStrips3D([poly], colors=[(120, 200, 255)]))
+    elif kind == "scalar":
+        value = float(ev.get("value", 0.0))
+        archetype = getattr(rr, "Scalars", None) or getattr(rr, "Scalar", None)
+        if archetype is not None:
+            rr.log(entity, archetype(value))
     else:
         print(f"[rerun-bridge] unknown event type: {kind}", file=sys.stderr)
 

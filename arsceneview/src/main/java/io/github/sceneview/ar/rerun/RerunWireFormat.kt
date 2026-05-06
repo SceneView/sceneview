@@ -246,6 +246,67 @@ internal object RerunWireFormat {
         )
     }
 
+    // ── Tier-S event types: camera trail + tracking-quality scalar ─────────
+
+    /**
+     * Camera trail event — one polyline through every accumulated camera
+     * position so far. The Python sidecar maps this to `rr.LineStrips3D`,
+     * giving Rerun viewers a 3D trace of how the operator moved their phone
+     * during the session.
+     *
+     * `positions` is a flat `[x0, y0, z0, x1, y1, z1, …]` buffer; the
+     * caller is responsible for keeping it bounded (e.g. ring-buffer the
+     * last N samples) so the JSON line doesn't blow up over long sessions.
+     *
+     * Default entity path is `world/camera/trail` so it sits under the
+     * existing camera entity in the Rerun blueprint.
+     */
+    fun cameraTrailJson(
+        timestampNanos: Long,
+        positions: FloatArray,
+        entity: String = "world/camera/trail",
+    ): String {
+        val n = positions.size / 3
+        val sb = StringBuilder(64 + n * 28)
+        sb.append('{')
+        sb.appendCommonHeader(timestampNanos, "camera_trail", entity)
+        sb.append(",\"positions\":[")
+        for (i in 0 until n) {
+            if (i > 0) sb.append(',')
+            sb.append('[')
+            sb.appendFloat(positions[i * 3]); sb.append(',')
+            sb.appendFloat(positions[i * 3 + 1]); sb.append(',')
+            sb.appendFloat(positions[i * 3 + 2])
+            sb.append(']')
+        }
+        sb.append("]}\n")
+        return sb.toString()
+    }
+
+    /**
+     * Generic scalar timeseries event. The Python sidecar maps this to
+     * `rr.Scalars` (Rerun ≥ 0.31) so the value appears as a graph in the
+     * viewer's timeline panel. Use it for things like ARCore tracking
+     * quality (0.0 … 1.0), feature-point count, or any per-frame health
+     * metric you want to scrub against the 3D scene.
+     *
+     * The `entity` is also the legend label in the Rerun viewer — pass a
+     * descriptive path like `world/camera/tracking_quality`.
+     */
+    fun scalarJson(
+        timestampNanos: Long,
+        value: Float,
+        entity: String,
+    ): String {
+        val sb = StringBuilder(96)
+        sb.append('{')
+        sb.appendCommonHeader(timestampNanos, "scalar", entity)
+        sb.append(",\"value\":")
+        sb.appendFloat(value)
+        sb.append("}\n")
+        return sb.toString()
+    }
+
     // ── Control protocol ──────────────────────────────────────────────────
     //
     // In addition to event lines (camera_pose / plane / point_cloud / …) the

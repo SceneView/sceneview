@@ -226,6 +226,42 @@ materialLoader.createColorInstance(Color.Red)
 
 ---
 
+## AR debug — Rerun.io
+
+Stream ARCore frames into the [Rerun](https://rerun.io) viewer for
+scrub-and-replay debugging.
+
+```kotlin
+import io.github.sceneview.ar.rerun.rememberRerunBridge
+
+@Composable
+fun ARDebugScreen() {
+    val bridge = rememberRerunBridge(rateHz = 10, enabled = BuildConfig.DEBUG)
+    ARSceneView(onSessionUpdated = { s, f -> bridge.logFrame(s, f) })
+}
+```
+
+| Mode | Sidecar command | Shareable? |
+|---|---|---|
+| Live | `python rerun-bridge.py` | No — viewer is local-only |
+| Save | `python rerun-bridge.py --save` | Yes — writes a `.rrd` file |
+
+**Save & Share** trigger from the app:
+
+```kotlin
+bridge.requestSaveAndShare { result ->
+    // result.path     -> /Users/dev/.sceneview/recordings/<ts>.rrd
+    // result.viewerUrl -> https://sceneview.github.io/rerun/?url=<…>
+    // result.events   -> 1234
+}
+```
+
+Re-host the `.rrd` and open
+**`https://sceneview.github.io/rerun/?url=<encoded-public-url>`** in any
+browser to scrub the AR session frame-by-frame. No install required.
+
+---
+
 ## Apple platforms
 
 Building for iOS, macOS, or visionOS? See the [Apple API Cheatsheet](cheatsheet-ios.md).

@@ -290,6 +290,26 @@ Listed on the [MCP Registry](https://registry.modelcontextprotocol.io). See the 
 
 ---
 
+## Developer tools
+
+### AR Debug — hosted Rerun viewer
+
+Tap **Save & Share** in the AR Rerun demo to flush a `.rrd` recording on
+your dev machine, then re-host it on any public URL (Cloudflare R2,
+GitHub release, gist) and open:
+
+> **<https://sceneview.github.io/rerun/?url=&lt;encoded-public-url&gt;>**
+
+…in any browser to scrub the AR session frame-by-frame. No install, no
+Rerun viewer needed locally — perfect for attaching a fully-replayable
+session to a bug report. Powered by [`@rerun-io/web-viewer`](https://www.npmjs.com/package/@rerun-io/web-viewer) under SceneView branding.
+
+See the [AR Debug — Rerun.io section in `llms.txt`](./llms.txt) for the
+full architecture (live mode + save mode + control protocol) and the
+Kotlin API surface (`RerunBridge.requestSaveAndShare`).
+
+---
+
 ## Architecture
 
 Each platform uses its **native renderer**. Shared logic lives in KMP.
