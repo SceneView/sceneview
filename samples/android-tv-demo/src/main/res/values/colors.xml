@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- SceneView brand blue -->
-    <color name="sceneview_blue">#1A73E8</color>
+    <!-- SceneView brand palette (source of truth: DESIGN.md) -->
+    <color name="sceneview_blue">#005BC1</color>
+    <color name="sceneview_accent">#6446CD</color>
+    <color name="sceneview_tint_light">#A4C1FF</color>
 </resources>

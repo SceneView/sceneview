@@ -1,28 +1,27 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.math.Rotation
-import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
 /**
- * Full-screen 3D model viewer with orbit camera and slow auto-rotation.
+ * Full-screen 3D model viewer. The CAMERA orbits the helmet for the hero showcase so
+ * lights, reflections and IBL hit the same surface every frame — a model that spins
+ * under the same lighting looks wrong (reflections slide, shadows chase the geometry).
+ *
+ * The moment the user touches the viewport the orbit hands off to the stock
+ * [io.github.sceneview.gesture.CameraGestureDetector.DefaultCameraManipulator] at the
+ * exact same pose, so there's no snap — drag / pinch / zoom continue from where the
+ * automated orbit left off.
  */
 @Composable
 fun ModelViewerDemo(onBack: () -> Unit) {
@@ -31,12 +30,13 @@ fun ModelViewerDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    val infiniteTransition = rememberInfiniteTransition(label = "rotation")
-    val rotationY by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 20_000, easing = LinearEasing)),
-        label = "rotationY"
+    // Camera orbits; model stays fixed. Radius 1.4 m keeps the 0.3 m helmet framed
+    // comfortably at portrait aspect without clipping the near plane.
+    val cameraManipulator = rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 1.4f,
+        yHeight = 0.2f,
+        durationMillis = 20_000,
     )
 
     DemoScaffold(title = "Model Viewer", onBack = onBack) {
@@ -46,20 +46,17 @@ fun ModelViewerDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
-                cameraManipulator = rememberCameraManipulator()
+                cameraManipulator = cameraManipulator,
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.3f,
-                        rotation = Rotation(y = rotationY)
                     )
                 }
             }
 
-            if (modelInstance == null) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
+            LoadingScrim(loading = modelInstance == null, label = "Loading model…")
         }
     }
 }

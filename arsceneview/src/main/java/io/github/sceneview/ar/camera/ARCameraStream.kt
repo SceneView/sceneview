@@ -257,15 +257,24 @@ open class ARCameraStream(
     }
 
     fun destroy() {
-        // Destruction order matters: Filament asserts that a MaterialInstance is not in use
-        // by any Renderable when it is destroyed. We must therefore destroy the renderable
-        // component FIRST, then the materials it referenced.
+        // Destruction order is constrained by two separate Filament preconditions:
+        //
+        //   1. "MaterialInstance still in use by Renderable" — destroy the renderable first.
+        //   2. "Invalid texture still bound to MaterialInstance" — the texture must be
+        //      destroyed AFTER the MaterialInstance that samples it. `Engine.destroyMaterial`
+        //      cascades to the material's defaultInstance, which unbinds all its textures,
+        //      so the correct order is: renderable → material → textures.
+        //
+        // Go through `materialLoader.destroyMaterial` (guarded) rather than
+        // `engine.safeDestroyMaterial` directly so the Material is also removed from
+        // MaterialLoader's tracking list. Otherwise the outer MaterialLoader.destroy()
+        // would walk a stale list and call Engine.destroyMaterial on an already-reclaimed
+        // native object.
+        //
         // See: https://github.com/sceneview/sceneview/issues/773
         renderableManager.safeDestroy(entity)
         engine.safeDestroyVertexBuffer(vertexBuffer)
-        materialLoader.destroyMaterialInstance(standardMaterial.defaultInstance)
         materialLoader.destroyMaterial(standardMaterial)
-        materialLoader.destroyMaterialInstance(depthOcclusionMaterial.defaultInstance)
         materialLoader.destroyMaterial(depthOcclusionMaterial)
         cameraTextures.values.forEach { engine.safeDestroyTexture(it) }
         engine.safeDestroyTexture(depthTexture)

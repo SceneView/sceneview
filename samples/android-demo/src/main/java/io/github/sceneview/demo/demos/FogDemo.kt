@@ -1,11 +1,18 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -23,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.node.FogNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelInstance
@@ -57,18 +65,37 @@ fun FogDemo(onBack: () -> Unit) {
     val view = rememberView(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
+    // Camera orbits the helmet — the volumetric fog is world-space, so moving the
+    // camera through the volume shows the depth falloff (fog thickens with distance)
+    // in a way that a spinning model can't. Spin → model never leaves its cell, so
+    // every frame shows roughly the same "amount" of fog between the eye and the
+    // helmet surface, and the density slider looks less effective.
+    val cameraManipulator = io.github.sceneview.demo.rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.2f,
+        yHeight = 0.3f,
+        durationMillis = 20_000,
+        staticYaw = 30f,
+    )
+
     DemoScaffold(
         title = "Fog",
         onBack = onBack,
         controls = {
-            // Enable / disable toggle
+            // Enable / disable toggle — toggleable on the whole row so tapping the
+            // label flips the state, and UiAutomator finds a clickable ancestor.
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = fogEnabled,
+                        onValueChange = { fogEnabled = it },
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Fog Enabled", style = MaterialTheme.typography.bodyLarge)
-                Switch(checked = fogEnabled, onCheckedChange = { fogEnabled = it })
+                Switch(checked = fogEnabled, onCheckedChange = null)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -105,24 +132,28 @@ fun FogDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            view = view
-        ) {
-            FogNode(
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
                 view = view,
-                enabled = fogEnabled,
-                density = fogDensity,
-                color = selectedPreset.color
-            )
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f
+                cameraManipulator = cameraManipulator,
+            ) {
+                FogNode(
+                    view = view,
+                    enabled = fogEnabled,
+                    density = fogDensity,
+                    color = selectedPreset.color,
                 )
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                    )
+                }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }

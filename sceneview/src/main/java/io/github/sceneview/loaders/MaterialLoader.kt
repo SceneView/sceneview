@@ -302,15 +302,29 @@ class MaterialLoader(
 
     fun destroyMaterial(material: Material) {
         if (material in materials) {
-            engine.safeDestroyMaterialInstance(material.defaultInstance)
-            engine.safeDestroyMaterial(material)
+            // Filament's `Engine.destroyMaterial` implicitly destroys the material's own
+            // `defaultInstance`. Destroying it explicitly here would be a double-destroy; the
+            // previous `safeDestroyMaterialInstance` call was a runCatching-silenced hotfix that
+            // hid the double-free. Rely on Engine.destroyMaterial to do the right thing.
+            //
+            // A `runCatching` wrapper remains around the native call because a Material can
+            // still be reclaimed out of band by the Engine itself (e.g. in the AR teardown
+            // path where `engine.safeDestroy()` runs before the parent MaterialLoader's
+            // DisposableEffect fires). In that case the Kotlin wrapper's `nativeObject` is 0
+            // and `Engine.destroyMaterial` throws `IllegalStateException: Calling method on
+            // destroyed Material`. Swallow — we already lost native ownership, so there is
+            // nothing left for us to reclaim.
+            runCatching { engine.safeDestroyMaterial(material) }
             materials -= material
         }
     }
 
     fun destroyMaterialInstance(materialInstance: MaterialInstance) {
         if (materialInstance in materialInstances) {
-            engine.safeDestroyMaterialInstance(materialInstance)
+            // Same tolerance as destroyMaterial — a MaterialInstance can be orphaned by a
+            // prior Material.destroy (which cascades to its defaultInstance and, during
+            // Engine teardown, effectively to all instances tied to destroyed materials).
+            runCatching { engine.safeDestroyMaterialInstance(materialInstance) }
             materialInstances -= materialInstance
         }
     }
@@ -323,7 +337,7 @@ class MaterialLoader(
         materials.toList().forEach { destroyMaterial(it) }
         materials.clear()
 
-        runCatching { ubershaderProvider.destroyMaterials() }
-        runCatching { ubershaderProvider.destroy() }
+        ubershaderProvider.destroyMaterials()
+        ubershaderProvider.destroy()
     }
 }

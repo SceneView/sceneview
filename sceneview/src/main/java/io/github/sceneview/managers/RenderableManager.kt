@@ -16,4 +16,4 @@ fun RenderableManager.Builder.build(engine: Engine) = EntityManager.get().create
     build(engine, this)
 }
 
-fun RenderableManager.safeDestroy(entity: Entity) = runCatching { destroy(entity) }
+fun RenderableManager.safeDestroy(entity: Entity) = destroy(entity)

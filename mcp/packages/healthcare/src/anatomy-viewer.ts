@@ -68,6 +68,7 @@ export function generateAnatomyViewer(options: AnatomyViewerOptions): string {
   return `package com.example.medical.anatomy
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -198,10 +199,15 @@ ${exploded ? `    explodeFactor: Float,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showLayer, onValueChange = onToggleLayer),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show ${system}", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showLayer, onCheckedChange = onToggleLayer)
+                Switch(checked = showLayer, onCheckedChange = null)
             }
 ${transparent ? `
             Text("Opacity", style = MaterialTheme.typography.bodySmall)
@@ -245,6 +251,7 @@ function generateArAnatomyViewer(
   return `package com.example.medical.anatomy
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

@@ -1,16 +1,12 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -23,16 +19,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import io.github.sceneview.demo.SceneViewColors
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.rememberPausableHeroYaw
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.rememberOnGestureListener
 
 /**
  * Demonstrates custom geometry using built-in geometry nodes composed together.
@@ -44,24 +42,24 @@ import io.github.sceneview.rememberMaterialLoader
 @Composable
 fun CustomMeshDemo(onBack: () -> Unit) {
     var rotating by remember { mutableStateOf(true) }
-    var scale by remember { mutableFloatStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(0.5f) }
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
 
+    // Atom spheres in SceneView primary blue, bonds in the accent purple — the same hero
+    // gradient the brand palette uses.
     val sphereMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(Color.Cyan)
+        materialLoader.createColorInstance(SceneViewColors.Primary)
     }
     val bondMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(Color.Gray)
+        materialLoader.createColorInstance(SceneViewColors.Accent)
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "meshRotation")
-    val rotationY by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 8_000, easing = LinearEasing)),
-        label = "meshRotationY"
+    // Hero yaw auto-pauses on first camera gesture so orbit/pinch don't fight the spin.
+    // Triggered by the user's Auto-Rotate switch.
+    val (rotationY, onHeroGesture) = rememberPausableHeroYaw(
+        trigger = rotating, durationMillis = 8_000, staticYaw = 0f,
     )
 
     DemoScaffold(
@@ -69,12 +67,17 @@ fun CustomMeshDemo(onBack: () -> Unit) {
         onBack = onBack,
         controls = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = rotating,
+                        onValueChange = { rotating = it },
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Auto-Rotate", style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = rotating, onCheckedChange = { rotating = it })
+                Switch(checked = rotating, onCheckedChange = null)
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("Scale: ${"%.1f".format(scale)}x", style = MaterialTheme.typography.labelLarge)
@@ -89,11 +92,24 @@ fun CustomMeshDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator()
+            // Dolly closer — molecule spans ±0.6 m and renders at scale 0.5–2.5x, so at
+            // default camera z = 4 it read as a tiny cluster. z = 2 gives enough room
+            // for the 2.5× slider limit without clipping.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0.1f, 2f),
+                targetPosition = Position(0f, 0f, 0f),
+            ),
+            onGestureListener = rememberOnGestureListener(
+                onSingleTapUp = { _, _ -> onHeroGesture() },
+                onDoubleTap = { _, _ -> onHeroGesture() },
+                onScroll = { _, _, _, _ -> onHeroGesture() },
+            ),
         ) {
-            // Molecule-like structure: center atom + 4 outer atoms connected by bonds
+            // Molecule-like structure: center atom + 4 outer atoms connected by bonds.
+            // Rotation y freezes at the current angle when the user toggles off, which reads
+            // better than snapping back to 0° — you can stop the molecule at any pose.
             Node(
-                rotation = if (rotating) Rotation(y = rotationY) else Rotation(),
+                rotation = Rotation(y = rotationY),
                 scale = Float3(scale)
             ) {
                 // Center atom
@@ -140,18 +156,20 @@ fun CustomMeshDemo(onBack: () -> Unit) {
                     position = Position(-0.3f, 0f, 0f),
                     rotation = Rotation(z = 90f)
                 )
-                // Front atom + bond
+                // Front atom + bond — aligned on +Z so the bond is a clean 90° X
+                // rotation instead of the previous (−Y, +Z) diagonal that left the
+                // cylinder dangling at the wrong angle between the two atoms.
                 SphereNode(
                     materialInstance = sphereMaterial,
                     radius = 0.12f,
-                    position = Position(0f, -0.3f, 0.5f)
+                    position = Position(0f, 0f, 0.6f)
                 )
                 CylinderNode(
                     materialInstance = bondMaterial,
                     radius = 0.03f,
                     height = 0.4f,
-                    position = Position(0f, -0.15f, 0.25f),
-                    rotation = Rotation(x = 45f)
+                    position = Position(0f, 0f, 0.3f),
+                    rotation = Rotation(x = 90f)
                 )
             }
         }

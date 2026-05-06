@@ -62,6 +62,7 @@ export function generateDentalViewer(options: DentalViewerOptions): string {
   return `package com.example.medical.dental
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -288,17 +289,27 @@ ${hasComparison ? `    showComparison: Boolean,
 
 ${showRoots ? `
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showRoots, onValueChange = onToggleRoots),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show roots", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showRoots, onCheckedChange = onToggleRoots)
+                Switch(checked = showRoots, onCheckedChange = null)
             }` : ""}
 
 ${showNerves ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showNerves, onValueChange = onToggleNerves),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Show nerves", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showNerves, onCheckedChange = onToggleNerves)
+                Switch(checked = showNerves, onCheckedChange = null)
             }` : ""}
 
 ${hasTreatmentStages ? `
@@ -312,10 +323,15 @@ ${hasTreatmentStages ? `
             )` : ""}
 
 ${hasComparison ? `
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showComparison, onValueChange = onToggleComparison),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Before / After", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showComparison, onCheckedChange = onToggleComparison)
+                Switch(checked = showComparison, onCheckedChange = null)
             }` : ""}
         }
     }
@@ -331,6 +347,7 @@ function generateArDentalViewer(
   return `package com.example.medical.dental
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

@@ -23,6 +23,34 @@ class MathTest {
         assertEquals(1f, scl.z)
     }
 
+    /**
+     * Regression guard for the PhysicsDemo-invisible-spheres bug:
+     *
+     * `Scale(1f)` MUST produce the uniform scale `(1, 1, 1)`. The named-arg form
+     * `Scale(x = 1f)` produces the singular `(1, 0, 0)` — that's kotlin-math's
+     * three-arg primary constructor with default `y = 0f, z = 0f`.
+     *
+     * If a future refactor ever makes `Scale(1f)` resolve to the primary three-arg
+     * constructor (e.g. by removing `Float3(v: Float)`), this test fails loudly
+     * before the change reaches the node composables.
+     */
+    @Test
+    fun scaleSingleArgIsUniform() {
+        val uniform: Scale = Scale(1f)
+        assertEquals(1f, uniform.x)
+        assertEquals(1f, uniform.y)
+        assertEquals(1f, uniform.z)
+
+        // And the named-arg form stays (intentionally) non-uniform — callers
+        // who want uniform scale must use the positional single-arg form. This
+        // locks in the behaviour so a future kotlin-math upgrade that e.g.
+        // changes the primary constructor to fill y/z from x will surface here.
+        val partial: Scale = Scale(x = 1f)
+        assertEquals(1f, partial.x)
+        assertEquals(0f, partial.y)
+        assertEquals(0f, partial.z)
+    }
+
     @Test
     fun floatArrayToFloat3() {
         val arr = floatArrayOf(1f, 2f, 3f)

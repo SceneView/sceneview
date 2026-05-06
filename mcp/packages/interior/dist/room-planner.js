@@ -21,6 +21,7 @@ export function generateRoomPlanner(options) {
     return `package com.example.interior.planner
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -189,20 +190,37 @@ private fun RoomPlannerControls(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Wrap each row in Modifier.toggleable so tapping anywhere on the row
+            // flips the switch (matches Material 3 guidance for Switch + label rows).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showWalls, onValueChange = onToggleWalls),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Walls", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showWalls, onCheckedChange = onToggleWalls)
+                Switch(checked = showWalls, onCheckedChange = null)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showFloor, onValueChange = onToggleFloor),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Floor", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showFloor, onCheckedChange = onToggleFloor)
+                Switch(checked = showFloor, onCheckedChange = null)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = showCeiling, onValueChange = onToggleCeiling),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Ceiling", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.weight(1f))
-                Switch(checked = showCeiling, onCheckedChange = onToggleCeiling)
+                Switch(checked = showCeiling, onCheckedChange = null)
             }
         }
     }
@@ -213,6 +231,7 @@ function generateArRoomPlanner(composableName, options) {
     return `package com.example.interior.planner
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

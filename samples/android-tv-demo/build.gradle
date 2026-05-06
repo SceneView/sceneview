@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace "io.github.sceneview.sample.tv"
+    namespace = "io.github.sceneview.sample.tv"
 
     compileSdk 36
 
@@ -29,7 +29,7 @@ android {
         jvmTarget = JavaVersion.VERSION_21
     }
     buildFeatures {
-        compose true
+        compose = true
     }
     androidResources {
         noCompress 'filamat', 'ktx'

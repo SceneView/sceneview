@@ -60,6 +60,15 @@ fun ARImageDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
+    // Decode the reference image once per composition — ARCore calls sessionConfiguration on
+    // every session reconfig, so decoding inside that lambda re-opens the asset + allocates a
+    // fresh Bitmap every time (the old bitmap is never recycled either).
+    val referenceBitmap = remember(context) {
+        context.assets.open("augmented_images/qrcode.png").use {
+            BitmapFactory.decodeStream(it)
+        }
+    }
+
     DemoScaffold(
         title = "Augmented Image",
         onBack = onBack
@@ -74,13 +83,10 @@ fun ARImageDemo(onBack: () -> Unit) {
                 sessionConfiguration = { session: Session, config: Config ->
                     config.planeFindingMode = Config.PlaneFindingMode.DISABLED
                     config.focusMode = Config.FocusMode.AUTO
-                    // Build an augmented image database with a reference image.
-                    val bitmap = context.assets.open("augmented_images/qrcode.png").use {
-                        BitmapFactory.decodeStream(it)
-                    }
+                    // Build an augmented image database with the pre-decoded reference bitmap.
                     config.augmentedImageDatabase =
                         AugmentedImageDatabase(session).apply {
-                            addImage("reference", bitmap, 0.15f) // 15 cm physical width
+                            addImage("reference", referenceBitmap, 0.15f) // 15 cm physical width
                         }
                 },
                 onSessionUpdated = { _: Session, frame: Frame ->
@@ -94,6 +100,8 @@ fun ARImageDemo(onBack: () -> Unit) {
                             }
                         }
                     }
+                    // Drop stopped images so stale AugmentedImageNodes don't linger in the scene.
+                    detectedImages.removeAll { it.trackingState == TrackingState.STOPPED }
                     imageCount = detectedImages.size
                 },
                 onTrackingFailureChanged = { reason ->

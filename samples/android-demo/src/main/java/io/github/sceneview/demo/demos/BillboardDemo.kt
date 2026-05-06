@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Scale
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -40,10 +41,10 @@ fun BillboardDemo(onBack: () -> Unit) {
 
     // Create simple colored bitmaps for the billboard and fixed image
     val billboardBitmap = remember {
-        createLabelBitmap("Billboard", 0xFF4CAF50.toInt())
+        createLabelBitmap("Billboard", 0xFF005BC1.toInt())  // SceneView Primary
     }
     val fixedBitmap = remember {
-        createLabelBitmap("Fixed", 0xFF2196F3.toInt())
+        createLabelBitmap("Fixed", 0xFF6446CD.toInt())  // SceneView Accent
     }
 
     DemoScaffold(
@@ -72,15 +73,22 @@ fun BillboardDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
-            cameraManipulator = rememberCameraManipulator()
+            // Dolly closer so both 0.55 m-wide panels read comfortably — at default
+            // camera z = 4 they looked small. z = 1 puts them at 2.2 m.
+            cameraManipulator = rememberCameraManipulator(
+                orbitHomePosition = Position(0f, 0f, 1f),
+                targetPosition = Position(0f, 0f, -1.2f),
+            )
         ) {
-            // BillboardNode: always faces the camera
+            // BillboardNode: always faces the camera. Made larger + closer so the
+            // contrast with the fixed image is obvious (the fixed image rotates / shrinks
+            // as the user orbits, the billboard stays facing them).
             if (showBillboard) {
                 BillboardNode(
                     bitmap = billboardBitmap,
-                    widthMeters = 0.6f,
-                    heightMeters = 0.3f,
-                    position = Position(x = -0.5f, y = 0f, z = 0f)
+                    widthMeters = 0.55f,
+                    heightMeters = 0.28f,
+                    position = Position(x = -0.4f, y = 0f, z = -1.2f)
                 )
             }
 
@@ -88,7 +96,8 @@ fun BillboardDemo(onBack: () -> Unit) {
             if (showFixed) {
                 ImageNode(
                     bitmap = fixedBitmap,
-                    position = Position(x = 0.5f, y = 0f, z = 0f)
+                    position = Position(x = 0.4f, y = 0f, z = -1.2f),
+                    scale = Scale(0.55f)
                 )
             }
         }

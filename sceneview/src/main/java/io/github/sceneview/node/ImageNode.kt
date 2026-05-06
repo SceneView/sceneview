@@ -156,13 +156,24 @@ open class ImageNode private constructor(
         bitmap = ImageTexture.getBitmap(materialLoader.context, drawableResId, type)
     }
 
+    /**
+     * Releases the [MaterialInstance] but intentionally retains the GPU [Texture] —
+     * destroying the texture before Filament has reclaimed the bound MaterialInstance
+     * triggers a native SIGABRT (`Invalid texture still bound to MaterialInstance`),
+     * and MI reclamation is coupled to the render loop, not to this call.
+     *
+     * **GPU-memory implication:** each destroyed [ImageNode] keeps its texture alive
+     * until the parent [com.google.android.filament.Engine] is torn down. For typical
+     * one-Activity, single-Engine usage this is harmless — Engine teardown reclaims
+     * everything. **Do not** create more than ~100 short-lived ImageNodes per Engine
+     * lifetime (feeds, infinite scrollers, particle emitters): for high-churn use
+     * cases recycle a single ImageNode via the `bitmap = newBitmap` setter, which
+     * reuses the same Texture, instead of destroying and recreating.
+     */
     override fun destroy() {
-        // Capture the MaterialInstance reference before super.destroy() removes the renderable
-        // component (after which getMaterialInstanceAt would fail). Destroy the instance before
-        // the texture so Filament's "Invalid texture still bound to MaterialInstance" check passes.
         val mi = materialInstance
         super.destroy()
         materialLoader.destroyMaterialInstance(mi)
-        engine.safeDestroyTexture(texture)
+        // DELIBERATE: do NOT destroy the texture — see KDoc above.
     }
 }

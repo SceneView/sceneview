@@ -17,6 +17,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.withFrameNanos
@@ -328,13 +329,27 @@ fun SceneView(
     }
 
     // Common touch dispatcher — wired to both SurfaceView and TextureView via SceneRenderer.
+    //
+    // Gesture isolation: when the touch lands on an editable node, the camera gesture
+    // detector is skipped so the gesture is fully absorbed by the node. Without this,
+    // dragging/twisting/pinching an editable helmet would also orbit/pan/zoom the camera
+    // simultaneously (because both detectors received every event), making per-node
+    // editing feel "leaky" and unresponsive.
     val touchDispatcher: (MotionEvent) -> Unit = { event ->
         val hitResult = collisionSystem.hitTest(event).firstOrNull { it.node.isTouchable }
         if (onTouchEvent?.invoke(event, hitResult) != true &&
             hitResult?.node?.onTouchEvent(event, hitResult) != true
         ) {
             gestureDetector.onTouchEvent(event, hitResult)
-            cameraGestureDetectorRef.get()?.onTouchEvent(event)
+            // Skip the camera detector when the touch is on an editable node — the node
+            // owns the gesture. We check the hit node's master `isEditable` (and not the
+            // per-axis flags) so a node that's "editable but with all axes locked" still
+            // absorbs the touch — locking an axis should freeze the node, not divert the
+            // gesture to the camera (that would surprise the user).
+            val absorbedByEditableNode = hitResult?.node?.isEditable == true
+            if (!absorbedByEditableNode) {
+                cameraGestureDetectorRef.get()?.onTouchEvent(event)
+            }
         }
     }
 
@@ -376,6 +391,14 @@ fun SceneView(
 
     // ── Render loop ───────────────────────────────────────────────────────────────────────────────
 
+    // Keep the caller's onFrame lambda live across recompositions. LaunchedEffect captures its
+    // body at launch time and never re-runs while (engine, renderer, view, scene) are stable, so
+    // reading `onFrame` directly would pin the lambda from the very first composition — any caller
+    // that reads Compose state inside it (e.g. DebugOverlayDemo's `if (modelInstance != null) 1
+    // else 0`) would see only the initial null state, forever. rememberUpdatedState solves this by
+    // reading the ref inside the loop.
+    val currentOnFrame = rememberUpdatedState(onFrame)
+
     LaunchedEffect(engine, renderer, view, scene) {
         while (true) {
             if (!isResumed.get()) {
@@ -393,7 +416,7 @@ fun SceneView(
                         cameraNode.transform = manipulator.getTransform()
                     }
 
-                    onFrame?.invoke(frameTimeNanos)
+                    currentOnFrame.value?.invoke(frameTimeNanos)
                 }
 
                 lastFrameTimeNanosRef.set(frameTimeNanos)

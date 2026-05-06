@@ -1,15 +1,23 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,7 +29,7 @@ import com.google.android.filament.View.AntiAliasing
 import com.google.android.filament.View.Dithering
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
@@ -47,15 +55,34 @@ fun PostProcessingDemo(onBack: () -> Unit) {
     val view = rememberView(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    // Apply post-processing settings to the Filament View
-    view.ambientOcclusionOptions = view.ambientOcclusionOptions.apply {
-        enabled = ssaoEnabled
+    // Apply post-processing settings to the Filament View after composition lands —
+    // a SideEffect runs on every successful recomposition so toggles actually take
+    // effect on the next rendered frame. Writing to `view` directly inside the body
+    // would work today but is fragile: Filament's options getters currently return
+    // the same mutable struct instance, so any future change that returns a defensive
+    // copy would silently drop SSAO/FXAA/dithering writes.
+    SideEffect {
+        view.ambientOcclusionOptions = view.ambientOcclusionOptions.apply {
+            enabled = ssaoEnabled
+        }
+        view.multiSampleAntiAliasingOptions = view.multiSampleAntiAliasingOptions.apply {
+            enabled = msaaEnabled
+        }
+        view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
+        view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
     }
-    view.multiSampleAntiAliasingOptions = view.multiSampleAntiAliasingOptions.apply {
-        enabled = msaaEnabled
-    }
-    view.antiAliasing = if (fxaaEnabled) AntiAliasing.FXAA else AntiAliasing.NONE
-    view.dithering = if (ditheringEnabled) Dithering.TEMPORAL else Dithering.NONE
+
+    // Camera orbits the helmet; SSAO / FXAA / dithering read best on a static model
+    // where the user can catch aliasing at grazing angles as the camera moves —
+    // a spinning helmet sweeps its surface through the same screen pixels so edge
+    // aliasing is harder to compare between AA modes.
+    val cameraManipulator = io.github.sceneview.demo.rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.0f,
+        yHeight = 0.3f,
+        durationMillis = 20_000,
+        staticYaw = 30f,
+    )
 
     DemoScaffold(
         title = "Post-Processing",
@@ -69,20 +96,23 @@ fun PostProcessingDemo(onBack: () -> Unit) {
             ToggleRow("Temporal Dithering", ditheringEnabled) { ditheringEnabled = it }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            view = view,
-            cameraManipulator = rememberCameraManipulator()
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                view = view,
+                cameraManipulator = cameraManipulator,
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                    )
+                }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }
@@ -90,11 +120,16 @@ fun PostProcessingDemo(onBack: () -> Unit) {
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                onValueChange = onCheckedChange,
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

@@ -80,7 +80,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         updateManager = InAppUpdateManager(this)
-        pendingDemoId.value = DeepLinkRouter.parse(intent?.data)
+        // Two ingress channels: (1) `--es demo <id>` from `adb shell am` for QA / instrumented
+        // tests, (2) URL deep-links via the public sceneview://demo/<id> scheme parsed by
+        // DeepLinkRouter. The QA channel takes precedence so a tester running adb against a
+        // running app can deterministically navigate without competing with a stale URL intent.
+        pendingDemoId.value = intent?.getStringExtra("demo")
+            ?: DeepLinkRouter.parse(intent?.data)
         setContent {
             SceneViewDemoTheme {
                 SceneViewDemoApp(activity = this)
@@ -93,7 +98,9 @@ class MainActivity : ComponentActivity() {
         // Replace the activity intent so subsequent re-creations see the new
         // deep link, not the original launcher intent.
         setIntent(intent)
-        pendingDemoId.value = DeepLinkRouter.parse(intent.data)
+        // Same dual-ingress policy as onCreate — `--es demo` first, URL second.
+        pendingDemoId.value = intent.getStringExtra("demo")
+            ?: DeepLinkRouter.parse(intent.data)
     }
 
     fun consumePendingDemo() {
@@ -129,7 +136,7 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
 
     NavHost(
         navController = navController,
-        startDestination = "list",
+        startDestination = if (initialDemo != null) "demo/$initialDemo" else "list",
         enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
         exitTransition = { slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut() },
         popEnterTransition = { slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn() },

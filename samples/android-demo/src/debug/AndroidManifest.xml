@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+          Debug-only harness for instrumentation tests. Launches a single demo composable
+          directly via an intent extra, bypassing the home list / navigation stack. Not
+          declared in src/main so release builds never ship it. See DemoHostActivity.kt.
+        -->
+        <activity
+            android:name=".DemoHostActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SceneViewDemo" />
+    </application>
+</manifest>

@@ -1,15 +1,9 @@
 package io.github.sceneview.demo.demos
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,45 +12,45 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
-import io.github.sceneview.SurfaceType
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
-import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
 /**
- * Secondary camera (picture-in-picture) demo.
+ * Demonstrates snapping the CAMERA to four named viewing angles around a fixed helmet.
  *
- * Shows a main 3D scene with a model and a small PiP overlay rendered from a secondary camera
- * at a different angle. The PiP uses a separate [SceneView] with [SurfaceType.TextureSurface]
- * so it composites correctly over the main view.
- *
- * Controls let the user switch between camera position presets.
+ * The chip row picks a preset (Top / Side / Front / Corner); each preset parks the
+ * `CameraManipulator` at a different orbit home so lighting, reflections and shadows
+ * stay stable on the model while the viewer's vantage point changes. This is the
+ * correct "camera preset" interpretation — the previous implementation rotated the
+ * helmet itself, which contradicted the demo's name and left IBL reflections static
+ * regardless of the selected "angle".
  */
 @Composable
 fun SecondaryCameraDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    var cameraPreset by remember { mutableStateOf(CameraPreset.TOP) }
+    var cameraPreset by remember { mutableStateOf(CameraPreset.FRONT) }
+    val target = remember { Position(0f, 0f, 0f) }
 
     DemoScaffold(
-        title = "Secondary Camera (PiP)",
+        title = "Camera Presets",
         onBack = onBack,
         controls = {
-            Text("PiP Camera Angle", style = MaterialTheme.typography.labelLarge)
+            Text("Camera Angle", style = MaterialTheme.typography.labelLarge)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -71,52 +65,31 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        // Main 3D scene
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            materialLoader = materialLoader
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f,
-                    centerOrigin = Position(0f, 0f, 0f)
+        // key(cameraPreset) forces a fresh rememberCameraManipulator each time the
+        // user picks a chip — the creator lambda captures the preset's orbit-home
+        // position, so the camera snaps to that vantage point. Without the key the
+        // manipulator would ignore `orbitHomePosition` changes (it's only read on
+        // build) and the preset toggle would have no effect.
+        androidx.compose.runtime.key(cameraPreset) {
+            val manipulator = androidx.compose.runtime.remember {
+                CameraGestureDetector.DefaultCameraManipulator(
+                    orbitHomePosition = cameraPreset.eye,
+                    targetPosition = target,
                 )
             }
-            // The secondary camera is added to the scene graph.
-            // It does NOT become the active rendering camera of this SceneView.
-            SecondaryCamera(
-                apply = {
-                    position = cameraPreset.position
-                    lookAt(Position(0f, 0f, 0f))
-                }
-            )
-        }
-
-        // PiP overlay — a second SceneView rendered with TextureSurface for alpha compositing
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .size(160.dp, 120.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(2.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(alpha = 0.3f))
-        ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
-                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
-                materialLoader = materialLoader
+                materialLoader = materialLoader,
+                environmentLoader = environmentLoader,
+                cameraManipulator = manipulator,
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
-                        centerOrigin = Position(0f, 0f, 0f)
+                        centerOrigin = Position(0f, 0f, 0f),
                     )
                 }
             }
@@ -124,9 +97,9 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
     }
 }
 
-private enum class CameraPreset(val label: String, val position: Position) {
-    TOP("Top", Position(0f, 2f, 0f)),
-    SIDE("Side", Position(2f, 0.5f, 0f)),
-    FRONT("Front", Position(0f, 0.5f, 2f)),
-    CORNER("Corner", Position(1.5f, 1.5f, 1.5f))
+private enum class CameraPreset(val label: String, val eye: Position) {
+    TOP("Top", Position(0f, 1.8f, 0.01f)),
+    SIDE("Side", Position(1.8f, 0.2f, 0f)),
+    FRONT("Front", Position(0f, 0.2f, 1.8f)),
+    CORNER("Corner", Position(1.3f, 0.9f, 1.3f)),
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -66,6 +69,18 @@ fun EnvironmentDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
+    // Camera orbits the helmet; the helmet itself stays fixed — otherwise an A/B
+    // comparison between HDRs is unreadable because both the reflected highlight and
+    // the helmet's face would rotate simultaneously. Static pose + moving camera lets
+    // the viewer see how each HDR paints the same surface from different angles.
+    val cameraManipulator = rememberHeroOrbitCameraManipulator(
+        trigger = modelInstance != null,
+        radius = 2.0f,
+        yHeight = 0.3f,
+        durationMillis = 18_000,
+        staticYaw = 30f,
+    )
+
     DemoScaffold(
         title = "Environment Gallery",
         onBack = onBack,
@@ -90,19 +105,23 @@ fun EnvironmentDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            environment = environment
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 0.5f
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                environment = environment,
+                cameraManipulator = cameraManipulator,
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 0.5f,
+                    )
+                }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }

@@ -52,29 +52,26 @@ object Preconditions {
     }
 
     private fun format(template: String, vararg args: Any?): String {
-        val templateStr = template.toString()
-        val argsArray: Array<out Any?> = args
-
-        val builder = StringBuilder(templateStr.length + 16 * argsArray.size)
+        val builder = StringBuilder(template.length + 16 * args.size)
         var templateStart = 0
         var i = 0
-        while (i < argsArray.size) {
-            val placeholderStart = templateStr.indexOf("%s", templateStart)
+        while (i < args.size) {
+            val placeholderStart = template.indexOf("%s", templateStart)
             if (placeholderStart == -1) {
                 break
             }
-            builder.append(templateStr, templateStart, placeholderStart)
-            builder.append(argsArray[i++])
+            builder.append(template, templateStart, placeholderStart)
+            builder.append(args[i++])
             templateStart = placeholderStart + 2
         }
-        builder.append(templateStr, templateStart, templateStr.length)
+        builder.append(template, templateStart, template.length)
 
-        if (i < argsArray.size) {
+        if (i < args.size) {
             builder.append(" [")
-            builder.append(argsArray[i++])
-            while (i < argsArray.size) {
+            builder.append(args[i++])
+            while (i < args.size) {
                 builder.append(", ")
-                builder.append(argsArray[i++])
+                builder.append(args[i++])
             }
             builder.append(']')
         }
