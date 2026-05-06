@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.sceneview.demo",
+      "sha256_cert_fingerprints": [
+        "5E:59:9D:AA:62:74:BC:DF:28:54:56:70:EC:64:1B:A9:CE:17:3D:BD:DE:5D:AE:C0:CC:06:83:85:0C:48:6D:8C"
+      ]
+    }
+  }
+]

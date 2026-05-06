@@ -40,19 +40,33 @@
             <!--
                 Deep-link entry: scan a QR code on sceneview.github.io / README /
                 docs and land directly on the matching demo screen.
-                See .claude/plans/rerun-deeplinks-and-qr.md for the full plan.
-
-                Custom scheme `sceneview://demo/<id>` works without store
-                verification — the only path needed for the v1 PR. Verified
-                App-Links over HTTPS will be added in a follow-up once we have
-                a published keystore SHA-256 + a stable assetlinks.json on
-                sceneview.github.io.
+                See website-static/.well-known/README.md for the verification
+                state and follow-up steps.
             -->
+
+            <!-- Custom scheme — works on every install, no verification needed. -->
             <intent-filter android:label="Open in SceneView Demo">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="sceneview" android:host="demo" />
+            </intent-filter>
+
+            <!--
+                Verified App-Link over HTTPS — pairs with
+                `website-static/.well-known/assetlinks.json`. autoVerify is
+                kept ON so the system fetches the manifest at install time;
+                until the Play App Signing SHA-256 is added to assetlinks.json
+                (TODO in that file), verification will silently fail for Play
+                Store installs and the URL falls back to the disambiguation
+                picker. Local debug installs (signed with the upload key)
+                already verify successfully.
+            -->
+            <intent-filter android:label="Open in SceneView Demo" android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="sceneview.github.io" android:pathPrefix="/open" />
             </intent-filter>
         </activity>
     </application>

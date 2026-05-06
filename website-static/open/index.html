@@ -247,10 +247,11 @@
     // deferred deep-linking — first-time installers also land on the
     // matching demo. For now, returning users hit the scheme directly.
     const PLAY_PACKAGE_ID = 'io.github.sceneview.demo';
-    // App Store URL — left as a sceneview.github.io fallback until the
-    // iOS demo has a public App Store listing. Replace with
-    // `itms-apps://itunes.apple.com/app/idXXXXX` once published.
-    const APP_STORE_URL = 'https://sceneview.github.io/#install';
+    // App Store track id — "SceneView" by Thomas Gorisse, US App Store,
+    // bundle io.github.sceneview.demo (matches Android applicationId).
+    // First published 2026-04-09. The id is stable for the lifetime of
+    // the app, safe to commit. Cf. project_demo_apps_publication.md.
+    const APP_STORE_URL = 'https://apps.apple.com/us/app/sceneview/id6761329763';
 
     // Allowed demo ids — keep in sync with the Android `DemoRegistry`.
     // We don't try to fetch this list at runtime to avoid an extra

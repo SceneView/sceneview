@@ -23,6 +23,15 @@ Same concepts, same simplicity — Android, iOS, Web, Desktop, TV, Flutter, Reac
 [![Sponsors](https://img.shields.io/github/sponsors/sceneview?label=Sponsors&color=ea4aaa&logo=githubsponsors)](https://github.com/sponsors/sceneview)
 [![Open Collective](https://img.shields.io/opencollective/all/sceneview?label=Backers&color=7FADF2&logo=opencollective)](https://opencollective.com/sceneview)
 
+## Try the demo apps
+
+See SceneView capabilities in action — install the live demos in one tap:
+
+[<img src="website-static/assets/brand/stores/google-play-badge.png" alt="Get it on Google Play" height="54">](https://play.google.com/store/apps/details?id=io.github.sceneview.demo)
+[<img src="website-static/assets/brand/stores/app-store-badge.svg" alt="Download on the App Store" height="48">](https://apps.apple.com/us/app/sceneview/id6761329763)
+
+> **Tip** — every demo opens directly via `https://sceneview.github.io/open?demo=<id>`. For example, `…/open?demo=ar-rerun` lands straight on the AR Rerun debug screen with a single tap from any QR code or link.
+
 ---
 
 ## Quick look
