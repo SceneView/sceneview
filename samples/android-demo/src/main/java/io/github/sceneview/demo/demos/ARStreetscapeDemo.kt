@@ -1,6 +1,10 @@
 package io.github.sceneview.demo.demos
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +24,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
@@ -49,6 +56,7 @@ private const val TAG = "ARStreetscapeDemo"
  */
 @Composable
 fun ARStreetscapeDemo(onBack: () -> Unit) {
+    val context = LocalContext.current
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
@@ -64,6 +72,34 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     // attempting to set the mode would throw on `session.configure()`.
     var geospatialUnavailable by remember { mutableStateOf<String?>(null) }
     var sessionError by remember { mutableStateOf<String?>(null) }
+
+    // ARCore Geospatial mode REQUIRES ACCESS_FINE_LOCATION at runtime, otherwise
+    // `Session.configure(Config.GeospatialMode.ENABLED)` throws
+    // FineLocationPermissionNotGrantedException — which historically crashed the
+    // demo on first launch (the camera permission alone is not enough). We track
+    // the granted state in compose state so the ARSceneView session config can
+    // decide whether to opt into Geospatial or fall back to plain AR.
+    var fineLocationGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        fineLocationGranted = granted
+        if (!granted) {
+            geospatialUnavailable =
+                "Location permission denied — Streetscape Geometry needs ACCESS_FINE_LOCATION"
+        }
+    }
+    LaunchedEffect(Unit) {
+        if (!fineLocationGranted) {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
 
     // Semi-transparent material for streetscape geometry overlays — SceneView TintLight at
     // low alpha so the real camera feed of buildings/sidewalks stays readable through the
@@ -92,12 +128,26 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
                 // preview that the Pixel 9 review flagged across the AR demos.
                 cameraExposure = -1.0f,
                 sessionConfiguration = { session: Session, config: Config ->
-                    // Guard the Geospatial + Streetscape opt-in: enabling the mode
-                    // unconditionally throws on devices without the feature, on
-                    // regions without VPS coverage, or when the project lacks a
-                    // configured ARCore Cloud API key. When unsupported, we keep
-                    // a plain AR session running so the camera feed still renders
-                    // and the user sees a clear status rather than a black screen.
+                    // Guard 1: ACCESS_FINE_LOCATION must be granted before enabling
+                    // Geospatial — `Session.configure(GeospatialMode.ENABLED)` throws
+                    // `FineLocationPermissionNotGrantedException` otherwise (and the
+                    // throw is uncaught by ARCore's lifecycle observer, so the whole
+                    // ARSceneView crashes). Skip the opt-in and run plain AR.
+                    if (!fineLocationGranted) {
+                        if (geospatialUnavailable == null) {
+                            geospatialUnavailable =
+                                "Waiting for location permission — Streetscape needs ACCESS_FINE_LOCATION"
+                        }
+                        Log.w(TAG, "Skipping Geospatial — fine location not granted yet")
+                        config.planeFindingMode = Config.PlaneFindingMode.DISABLED
+                        return@ARSceneView
+                    }
+                    // Guard 2: enabling the mode unconditionally throws on devices
+                    // without the feature, on regions without VPS coverage, or when
+                    // the project lacks a configured ARCore Cloud API key. When
+                    // unsupported, keep a plain AR session running so the camera
+                    // feed still renders and the user sees a clear status rather
+                    // than a black screen.
                     val geospatialOk = runCatching {
                         session.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)
                     }.getOrElse { error ->

@@ -8,6 +8,11 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required by the Streetscape Geometry / Geospatial demos. ARCore throws
+         FineLocationPermissionNotGrantedException if Geospatial mode is enabled
+         without this permission — the demo composable requests it at runtime
+         before configuring the session. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- Required for PermissionImpliesUnsupportedChromeOsHardware lint rule -->
     <uses-feature
