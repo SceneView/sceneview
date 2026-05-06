@@ -11,7 +11,6 @@
 package io.github.sceneview.ar
 
 import android.content.Context.WINDOW_SERVICE
-import android.net.Uri
 import android.util.Size
 import android.view.MotionEvent
 import android.view.SurfaceView
@@ -84,6 +83,7 @@ import io.github.sceneview.rememberARView
 import io.github.sceneview.safeDestroyEnvironment
 import io.github.sceneview.safeDestroyIndirectLight
 import kotlinx.coroutines.delay
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -134,7 +134,7 @@ import java.util.concurrent.atomic.AtomicReference
  * @param materialLoader           Loader for Filament material templates. Use [rememberMaterialLoader].
  * @param environmentLoader        Loader for HDR environments. Use [rememberEnvironmentLoader].
  * @param sessionFeatures          ARCore [Session.Feature]s to enable (e.g. front camera).
- * @param playbackDataset          Optional MP4 dataset previously written via
+ * @param playbackDataset          Optional MP4 dataset [File] previously written via
  *                                 [Session.startRecording][com.google.ar.core.Session.startRecording].
  *                                 When non-null, ARCore replays the dataset instead of using the
  *                                 live camera — the session re-runs as if you were there.
@@ -211,7 +211,7 @@ fun ARSceneView(
      */
     sessionFeatures: Set<Session.Feature> = setOf(),
     /**
-     * Optional MP4 dataset to play back instead of the live camera feed.
+     * Optional MP4 dataset [File] to play back instead of the live camera feed.
      *
      * When non-null, ARCore is configured for **playback** mode: the session re-runs the
      * recorded camera frames, IMU data, planes, anchors and depth from the dataset, exactly
@@ -221,14 +221,14 @@ fun ARSceneView(
      * record-replay workflow — capture an outdoor session once, iterate at the desk against
      * the recording, share the MP4 with teammates to reproduce bugs deterministically.
      *
-     * The URI must be passed before the session resumes; SceneView wires it on session
+     * The file must be passed before the session resumes; SceneView wires it on session
      * creation. Switching between live and playback at runtime requires the [ARSceneView]
      * to be fully recreated (e.g. via Compose `key(playbackDataset) { … }`), because ARCore
      * binds the playback source to the [Session] for its entire lifetime.
      *
      * Default `null` (live camera mode).
      */
-    playbackDataset: Uri? = null,
+    playbackDataset: File? = null,
     /**
      * Sets the camera config to use.
      * The config must be one returned by [Session.getSupportedCameraConfigs].
@@ -378,24 +378,22 @@ fun ARSceneView(
     val prevTrackingFailureRef = remember { AtomicReference<TrackingFailureReason?>(null) }
     val isFrontFaceWindingInvertedRef = remember { AtomicBoolean(false) }
 
-    // Snapshot the playback URI at session-creation time. ARCore requires
-    // setPlaybackDatasetUri() to be called BEFORE the first resume(), so we read the value
-    // once when the session is built and ignore later recompositions that mutate the param —
-    // toggling between live/playback at runtime requires the caller to recreate the
-    // ARSceneView (typically via `key(playbackDataset) { ARSceneView(...) }`).
-    val playbackDatasetRef = remember { AtomicReference(playbackDataset) }
-    SideEffect { playbackDatasetRef.set(playbackDataset) }
-
     val arCore = remember {
+        // Snapshotted at first composition. ARCore requires setPlaybackDataset() to be called
+        // BEFORE the first resume(), so we capture the param value once when the session is
+        // built and ignore later recompositions that mutate it — toggling between live/playback
+        // at runtime requires the caller to recreate the ARSceneView (typically via
+        // `key(playbackDataset) { ARSceneView(...) }`).
+        val initialPlaybackDataset = playbackDataset
         ARCore(
             onSessionCreated = { session ->
                 cameraStream?.let { session.setCameraTextureNames(it.cameraTextureIds) }
-                // Bind the playback source first — ARCore mandates the URI is set before
+                // Bind the playback source first — ARCore mandates the dataset is set before
                 // resume(), and configure() happens here, then resume() runs immediately
                 // after this callback returns.
-                playbackDatasetRef.get()?.let { uri ->
+                initialPlaybackDataset?.let { file ->
                     try {
-                        session.setPlaybackDatasetUri(uri)
+                        session.setPlaybackDataset(file.absolutePath)
                     } catch (e: PlaybackFailedException) {
                         onSessionFailedRef.get()?.invoke(e)
                     } catch (e: Exception) {
@@ -841,7 +839,7 @@ fun ARScene(
     materialLoader: MaterialLoader = rememberMaterialLoader(engine),
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     sessionFeatures: Set<Session.Feature> = setOf(),
-    playbackDataset: Uri? = null,
+    playbackDataset: File? = null,
     sessionCameraConfig: ((Session) -> CameraConfig)? = null,
     sessionConfiguration: ((session: Session, Config) -> Unit)? = null,
     planeRenderer: Boolean = true,

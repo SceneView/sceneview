@@ -1,7 +1,9 @@
 package io.github.sceneview.demo.demos
 
-import android.net.Uri
+import android.content.Context
+import android.os.Build
 import android.view.MotionEvent
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -69,9 +71,9 @@ import java.util.Locale
  *
  * ARCore's `Session.startRecording(RecordingConfig)` captures the **entire** AR session —
  * camera frames, IMU, planes, depth, anchors, light estimation — into an MP4 dataset.
- * `Session.setPlaybackDatasetUri(uri)` then makes the same session replay that MP4 1:1, as if
- * you were physically there. The combination is the most useful debugging primitive ARCore
- * exposes:
+ * `Session.setPlaybackDataset(absolutePath)` then makes the same session replay that MP4 1:1,
+ * as if you were physically there. The combination is the most useful debugging primitive
+ * ARCore exposes:
  *
  * - **Record outside, replay at the desk** — no need to retake a physical test for every
  *   tweak.
@@ -86,7 +88,7 @@ import java.util.Locale
  * - **RECORD** — same as LIVE, plus a record button. While recording, an elapsed-time pill
  *   is shown. Stopping reveals the saved MP4 in the Recordings card.
  * - **PLAYBACK** — lists the MP4s on disk; tapping one re-mounts the [ARSceneView] with
- *   `playbackDataset = Uri.fromFile(file)` so ARCore replays the dataset.
+ *   `playbackDataset = file` so ARCore replays the dataset.
  *
  * Switching mode forces the [ARSceneView] to be rebuilt via `key(currentMode, …)` because
  * ARCore binds the playback source at session-creation time and cannot be toggled after
@@ -222,7 +224,7 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             // The ARSceneView is keyed on (currentMode, currentPlaybackFile) so that any
             // mode switch — and any new playback selection — forces a fresh ARCore Session.
-            // This is required: setPlaybackDatasetUri must run before resume(), which only
+            // This is required: setPlaybackDataset must run before resume(), which only
             // happens when a brand-new session is created.
             key(currentMode, currentPlaybackFile?.absolutePath) {
                 ModeContent(
@@ -264,6 +266,7 @@ private fun ModeContent(
     onRecordingFinished: () -> Unit,
     recordingsDir: File
 ) {
+    val context = LocalContext.current
     val anchors = remember { mutableStateListOf<Anchor>() }
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
     var isTracking by remember { mutableStateOf(false) }
@@ -298,7 +301,7 @@ private fun ModeContent(
 
     val helmet = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    val playbackUri: Uri? = if (mode == Mode.PLAYBACK) playbackFile?.let(Uri::fromFile) else null
+    val playbackDataset: File? = if (mode == Mode.PLAYBACK) playbackFile else null
 
     ARSceneView(
         modifier = Modifier.fillMaxSize(),
@@ -308,7 +311,7 @@ private fun ModeContent(
         planeRenderer = true,
         // Same exposure tweak as ARPlacementDemo — Pixel 9 review feedback.
         cameraExposure = -1.0f,
-        playbackDataset = playbackUri,
+        playbackDataset = playbackDataset,
         sessionConfiguration = { _: Session, config: Config ->
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
             config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
@@ -357,7 +360,10 @@ private fun ModeContent(
             elapsedSeconds = elapsedSeconds,
             onStart = {
                 val name = "ar-session-${TIMESTAMP_FORMAT.format(Date())}.mp4"
-                recorder.start(File(recordingsDir, name))
+                recorder.start(
+                    file = File(recordingsDir, name),
+                    recordingRotation = currentDisplayRotation(context)
+                )
             },
             onStop = {
                 recorder.stop()
@@ -583,6 +589,20 @@ private fun RecordingRow(file: File, isSelected: Boolean, onClick: () -> Unit) {
                 Text(if (isSelected) "Replaying" else "Replay")
             }
         }
+    }
+}
+
+/**
+ * Returns the current display rotation (`Surface.ROTATION_0` … `Surface.ROTATION_270`) so the
+ * MP4 plays back upright when captured in landscape. Uses `Context.getDisplay()` on API 30+
+ * and falls back to the deprecated `WindowManager.defaultDisplay` on older APIs.
+ */
+private fun currentDisplayRotation(context: Context): Int {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        context.display.rotation
+    } else {
+        @Suppress("DEPRECATION")
+        (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.rotation
     }
 }
 

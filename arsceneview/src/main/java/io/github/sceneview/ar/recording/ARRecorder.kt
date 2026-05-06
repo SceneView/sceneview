@@ -1,6 +1,5 @@
 package io.github.sceneview.ar.recording
 
-import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -8,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.google.ar.core.PlaybackStatus
 import com.google.ar.core.RecordingConfig
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.RecordingFailedException
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference
  * `Session.startRecording(RecordingConfig)` captures **everything** the session sees: the
  * camera image stream, IMU data, depth (if enabled), light estimation, plane updates,
  * anchors, augmented images, and the rest. The resulting MP4 is not a normal video — it is a
- * full session dataset that can be replayed 1:1 with [Session.setPlaybackDatasetUri].
+ * full session dataset that can be replayed 1:1 with [Session.setPlaybackDataset].
  *
  * ### Why this exists
  *
@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * @see com.google.ar.core.Session.startRecording
  * @see com.google.ar.core.Session.stopRecording
- * @see com.google.ar.core.Session.setPlaybackDatasetUri
+ * @see com.google.ar.core.Session.setPlaybackDataset
  */
 public class ARRecorder {
 
@@ -119,20 +119,42 @@ public class ARRecorder {
      * Begin recording the attached session into [file]. The parent directory is created if
      * it doesn't already exist.
      *
-     * Returns `true` if recording started, `false` if no session is attached or ARCore
-     * refused the start. On failure, [state] is set to [State.ERROR] and [errorMessage]
-     * holds the reason.
+     * Recording cannot run while the session is in playback mode — if it is, this returns
+     * `false` and transitions to [State.ERROR].
+     *
+     * @param file              Absolute path of the destination MP4. Passed to
+     *                          [RecordingConfig.setMp4DatasetFilePath] (no scoped-storage /
+     *                          [android.net.Uri] wrapping needed).
+     * @param recordingRotation Optional [android.view.Display] rotation (`Surface.ROTATION_0` …
+     *                          `Surface.ROTATION_270`) so the MP4 plays back upright when
+     *                          captured in landscape. Pass the current display rotation from
+     *                          the calling context. Default `null` keeps ARCore's default of 0.
+     *
+     * Returns `true` if recording started, `false` if no session is attached, the session is
+     * in playback mode, or ARCore refused the start. On failure, [state] is set to
+     * [State.ERROR] and [errorMessage] holds the reason.
      */
-    public fun start(file: File): Boolean {
+    public fun start(file: File, recordingRotation: Int? = null): Boolean {
         val session = sessionRef.get()
         if (session == null) {
             _errorMessage = "no AR session attached — call attach(session) first"
             _state = State.ERROR
             return false
         }
+        // Recording is only allowed when the session is NOT in playback mode. PlaybackStatus
+        // values: NONE (no playback dataset bound — recordable), OK / FINISHED / IO_ERROR
+        // (playback active or terminated — never recordable).
+        if (session.playbackStatus != PlaybackStatus.NONE) {
+            _errorMessage = "Cannot record while session is in playback mode"
+            _state = State.ERROR
+            return false
+        }
         return try {
             file.parentFile?.mkdirs()
-            val config = RecordingConfig(session).setMp4DatasetUri(Uri.fromFile(file))
+            val config = RecordingConfig(session)
+                .setMp4DatasetFilePath(file.absolutePath)
+                .setAutoStopOnPause(true)
+            recordingRotation?.let { config.setRecordingRotation(it) }
             session.startRecording(config)
             _recordingFile = file
             _errorMessage = null

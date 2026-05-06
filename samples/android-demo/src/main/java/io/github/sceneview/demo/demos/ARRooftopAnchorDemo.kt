@@ -32,6 +32,7 @@ import androidx.core.content.ContextCompat
 import com.google.ar.core.Anchor
 import com.google.ar.core.Anchor.RooftopAnchorState
 import com.google.ar.core.Config
+import com.google.ar.core.Earth
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -148,6 +149,11 @@ fun ARRooftopAnchorDemo(onBack: () -> Unit) {
     var arSession by remember { mutableStateOf<Session?>(null) }
     var isTracking by remember { mutableStateOf(false) }
     var earthTracking by remember { mutableStateOf(false) }
+    // Tracked alongside `earthTracking` because `Earth.resolveAnchorOnRooftopAsync`
+    // throws IllegalStateException if `earth.earthState != EarthState.ENABLED`. The
+    // `runCatching` below would swallow it silently — gating the button on the
+    // explicit state lets us tell the user *why* the drop is unavailable.
+    var earthState by remember { mutableStateOf<Earth.EarthState?>(null) }
     var cameraLat by remember { mutableStateOf<Double?>(null) }
     var cameraLng by remember { mutableStateOf<Double?>(null) }
     var cameraAlt by remember { mutableStateOf<Double?>(null) }
@@ -236,12 +242,27 @@ fun ARRooftopAnchorDemo(onBack: () -> Unit) {
                         }
                     }
                 },
-                enabled = hasArcoreApiKey && earthTracking && cameraLat != null,
+                enabled = hasArcoreApiKey &&
+                    earthTracking &&
+                    earthState == Earth.EarthState.ENABLED &&
+                    cameraLat != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
             ) {
                 Text("Drop on roof")
+            }
+
+            // Surface the EarthState when it is something other than ENABLED — the
+            // resolve API throws IllegalStateException in that case, but the button
+            // is disabled silently so the user otherwise has no idea what's wrong.
+            if (earthState != null && earthState != Earth.EarthState.ENABLED) {
+                Text(
+                    text = "Earth not ready (state: $earthState)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
             OutlinedButton(
@@ -328,6 +349,7 @@ fun ARRooftopAnchorDemo(onBack: () -> Unit) {
                     isTracking = frame.camera.trackingState == TrackingState.TRACKING
                     val earth = session.earth
                     earthTracking = earth?.trackingState == TrackingState.TRACKING
+                    earthState = earth?.earthState
                     if (earthTracking) {
                         val pose = earth?.cameraGeospatialPose
                         cameraLat = pose?.latitude

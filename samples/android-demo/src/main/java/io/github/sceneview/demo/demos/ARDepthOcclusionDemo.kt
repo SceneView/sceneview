@@ -37,6 +37,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.ar.createARCameraStream
 import io.github.sceneview.ar.rememberARCameraStream
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.math.Position
@@ -81,6 +82,11 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+
+    // Hoisted so the model loads once for the whole demo, not on every re-placement.
+    // The remember slot survives anchor clears + re-drops, so re-tapping is instant
+    // instead of paying the ~200 ms GLB parse hitch each time.
+    val helmetInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
     // User toggle. `null` = "we haven't yet been told whether the device supports depth".
     // Once the first session reports `isDepthModeSupported`, we update [depthSupported].
@@ -206,12 +212,21 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
                             Config.DepthMode.DISABLED
                         }
                     },
-                    cameraStream = rememberARCameraStream(materialLoader).apply {
-                        // Drives material selection in ARCameraStream. Effective only when
-                        // the session's depthMode is AUTOMATIC or RAW_DEPTH_ONLY — the
-                        // session config above guarantees that whenever this is `true`.
-                        isDepthOcclusionEnabled = depthOn
-                    },
+                    // The whole ARSceneView tree is keyed on `depthOn` above, so the
+                    // creator lambda runs once per toggle flip — set the depth flag at
+                    // construction time. This avoids the side-effecting `.apply` on every
+                    // recomposition, and the keyed remount is what guarantees a clean
+                    // material swap (the depth and flat materials live on the same Filament
+                    // renderable; flipping the flag mid-session can leave a queued depth
+                    // frame in an inconsistent state).
+                    cameraStream = rememberARCameraStream(
+                        materialLoader = materialLoader,
+                        creator = {
+                            createARCameraStream(materialLoader).apply {
+                                isDepthOcclusionEnabled = depthOn
+                            }
+                        }
+                    ),
                     onSessionUpdated = { _, frame: Frame ->
                         latestFrame = frame
                         isTracking = frame.camera.trackingState == TrackingState.TRACKING
@@ -243,15 +258,15 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
                         }
                     )
                 ) {
+                    // Wait for both the anchor AND the hoisted model instance — the latter
+                    // can still be null on the very first frame while the GLB loads in the
+                    // background. After that load, the instance is reused across every
+                    // re-placement (anchor clear + re-drop) without reloading.
                     placedAnchor?.let { anchor ->
-                        AnchorNode(anchor = anchor) {
-                            val instance = rememberModelInstance(
-                                modelLoader,
-                                "models/khronos_damaged_helmet.glb"
-                            )
-                            instance?.let {
+                        helmetInstance?.let { instance ->
+                            AnchorNode(anchor = anchor) {
                                 ModelNode(
-                                    modelInstance = it,
+                                    modelInstance = instance,
                                     scaleToUnits = 0.3f,
                                     centerOrigin = Position(0.0f, 0.0f, 0.0f)
                                 )

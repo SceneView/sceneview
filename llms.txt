@@ -106,7 +106,7 @@ fun ARSceneView(
     materialLoader: MaterialLoader = rememberMaterialLoader(engine),
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     sessionFeatures: Set<Session.Feature> = setOf(),
-    playbackDataset: Uri? = null,                  // Replay an MP4 recorded via ARRecorder. See "AR Recording & Playback".
+    playbackDataset: File? = null,                 // Replay an MP4 recorded via ARRecorder. See "AR Recording & Playback".
     sessionCameraConfig: ((Session) -> CameraConfig)? = null,
     sessionConfiguration: ((session: Session, Config) -> Unit)? = null,
     planeRenderer: Boolean = true,
@@ -1387,8 +1387,6 @@ fun ARRecord() {
 ### Replay a session
 
 ```kotlin
-import android.net.Uri
-
 @Composable
 fun ARReplay(file: File) {
     // playbackDataset MUST be set before the session resumes — switching at runtime
@@ -1396,20 +1394,22 @@ fun ARReplay(file: File) {
     key(file) {
         ARSceneView(
             modifier = Modifier.fillMaxSize(),
-            playbackDataset = Uri.fromFile(file)
+            playbackDataset = file
         )
     }
 }
 ```
 
-ARCore replays at the original capture rate. The session looks **identical** to live: planes appear, anchors lock, depth occlusion works, gestures still hit-test correctly.
+ARCore replays at the original capture rate. The session looks **identical** to live: planes appear, anchors lock, depth occlusion works, gestures still hit-test correctly. The playback param is a plain `java.io.File` — no FileProvider, no scoped-storage gymnastics.
 
 ### Limits
 
+- **Camera permission still required for playback.** ARCore opens the camera even when replaying a dataset; users see no live preview but the permission gate fires regardless. Run your normal permission flow.
+- **Emulator: playback works, recording does not.** ARCore Recording requires a real camera + IMU. Use `getExternalFilesDir("ar-recordings")` to store recordings made on a device, then replay them anywhere.
 - **Same device class.** Playback works best on the device that recorded it, or a similar one. Heavily different sensor sets (e.g. phone → tablet) may degrade tracking.
-- **MP4 file size.** ~50–100 MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
-- **Storage permission not needed** for this default location.
-- **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session.
+- **MP4 file size.** A few tens of MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
+- **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session. Mutating the param after first composition is silently ignored (the value is snapshotted at session creation).
+- **Recording while in playback mode is rejected.** `ARRecorder.start()` returns `false` and surfaces an error message if the session is currently bound to a playback dataset.
 
 ---
 

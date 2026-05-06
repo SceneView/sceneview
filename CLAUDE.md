@@ -66,6 +66,8 @@ To set up: `npm install @google/stitch-sdk`, then add the Stitch MCP server in C
 - Load models with `rememberModelInstance(modelLoader, "models/file.glb")` — returns `null`
   while loading, always handle the null case
 - `LightNode`'s `apply` is a **named parameter** (`apply = { intensity(…) }`), not a trailing lambda
+- For AR record-replay debugging, use `rememberARRecorder()` to capture sessions and
+  `ARSceneView(playbackDataset = file)` to replay them — see `llms.txt` "AR Recording & Playback"
 
 ## Critical threading rule
 

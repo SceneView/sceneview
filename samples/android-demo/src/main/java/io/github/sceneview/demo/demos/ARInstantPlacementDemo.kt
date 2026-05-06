@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -146,10 +147,13 @@ private fun InstantPlacementScene(instantEnabled: Boolean) {
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
 
     // Live status of each placed Instant Placement point. Keyed by model id.
-    // Updated each frame from the trackable's TrackingMethod. Recomputed via
-    // `mutableStateMapOf` would require an extra import — using a list of
-    // current-method snapshots keyed by id keeps recomposition simple.
-    val trackingMethods = remember { mutableStateListOf<Pair<Int, InstantPlacementPoint.TrackingMethod>>() }
+    // Using a `mutableStateMapOf` (vs. a list rebuilt every frame) means the per-
+    // frame onSessionUpdated only writes when a value actually changes — Compose
+    // therefore only recomposes the badges when ARCore promotes a point from
+    // approximate → full tracking, not on every one of the 60 ARCore frames/sec.
+    val trackingMethods = remember {
+        mutableStateMapOf<Int, InstantPlacementPoint.TrackingMethod>()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         ARSceneView(
@@ -172,12 +176,16 @@ private fun InstantPlacementScene(instantEnabled: Boolean) {
                 latestFrame = frame
                 isTracking = frame.camera.trackingState == TrackingState.TRACKING
                 // Refresh tracking-method snapshots so the per-model badge updates as
-                // ARCore promotes points from approximate → full tracking.
-                trackingMethods.clear()
+                // ARCore promotes points from approximate → full tracking. Write only
+                // when the value actually changes so we don't churn Compose state at
+                // 60 Hz (each unchanged write would still flag the snapshot dirty and
+                // recompose the badge column).
                 placedModels.forEach { placed ->
-                    val point = placed.trackable as? InstantPlacementPoint
-                    if (point != null) {
-                        trackingMethods.add(placed.id to point.trackingMethod)
+                    val current = (placed.trackable as? InstantPlacementPoint)
+                        ?.trackingMethod
+                        ?: return@forEach
+                    if (trackingMethods[placed.id] != current) {
+                        trackingMethods[placed.id] = current
                     }
                 }
             },
@@ -247,11 +255,11 @@ private fun InstantPlacementScene(instantEnabled: Boolean) {
             shape = MaterialTheme.shapes.small
         ) {
             val count = placedModels.size
-            val approximating = trackingMethods.count {
-                it.second == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE
+            val approximating = trackingMethods.values.count {
+                it == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE
             }
-            val tracked = trackingMethods.count {
-                it.second == InstantPlacementPoint.TrackingMethod.FULL_TRACKING
+            val tracked = trackingMethods.values.count {
+                it == InstantPlacementPoint.TrackingMethod.FULL_TRACKING
             }
             val label = if (instantEnabled) {
                 "$count placed • $approximating approximating • $tracked tracked"
@@ -276,7 +284,7 @@ private fun InstantPlacementScene(instantEnabled: Boolean) {
                     .padding(top = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                trackingMethods.take(4).forEach { (id, method) ->
+                trackingMethods.entries.take(4).forEach { (id, method) ->
                     val placed = placedModels.firstOrNull { it.id == id } ?: return@forEach
                     val (label, color) = when (method) {
                         InstantPlacementPoint.TrackingMethod.FULL_TRACKING ->
