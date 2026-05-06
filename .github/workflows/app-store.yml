@@ -92,19 +92,16 @@ jobs:
           echo "Using Xcode: $(xcode-select -p)"
           xcodebuild -version
 
-      - name: Install the Apple certificate and provisioning profile
+      - name: Install the Apple distribution certificate
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.IOS_BUILD_CERTIFICATE_PASSWORD }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ github.run_id }}_${{ github.run_attempt }}
         run: |
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PROFILE_PATH=$RUNNER_TEMP/build_pp.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
 
           if ! openssl pkcs12 -in "$CERTIFICATE_PATH" -passin "pass:$P12_PASSWORD" -nokeys -noout 2>/dev/null; then
             echo "::error::P12 password verification failed."
@@ -118,10 +115,15 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i $PROFILE_PATH))
-          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
-          echo "PROVISIONING_PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
+      - name: Stage App Store Connect API key for Xcode automatic signing
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$APP_STORE_CONNECT_API_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+          chmod 600 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
 
       - name: Cache Swift Package dependencies
         uses: actions/cache@v5
@@ -138,6 +140,9 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages
 
       - name: Build archive
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           xcodebuild archive \
             -project SceneViewDemo.xcodeproj \
@@ -148,22 +153,19 @@ jobs:
             -skipPackagePluginValidation \
             -skipMacroValidation \
             -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8 \
+            -authenticationKeyID $APP_STORE_CONNECT_API_KEY_ID \
+            -authenticationKeyIssuerID $APP_STORE_CONNECT_API_ISSUER_ID \
             ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=5G3DZ3TH45 \
-            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
             ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
 
       - name: Export IPA and upload to TestFlight
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
-          mkdir -p ~/.private_keys
-          echo "$APP_STORE_CONNECT_API_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
-
           cat > $RUNNER_TEMP/ExportOptions.plist << PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -174,14 +176,9 @@ jobs:
             <key>destination</key>
             <string>upload</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>teamID</key>
             <string>5G3DZ3TH45</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>io.github.sceneview.demo</key>
-              <string>$PROVISIONING_PROFILE_UUID</string>
-            </dict>
           </dict>
           </plist>
           PLIST
