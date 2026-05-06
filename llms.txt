@@ -2,12 +2,12 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.0.1):**
-- 3D only: `io.github.sceneview:sceneview:4.0.1`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.1`
+**Android — Maven artifacts (version 4.0.2):**
+- 3D only: `io.github.sceneview:sceneview:4.0.3`
+- AR + 3D: `io.github.sceneview:arsceneview:4.0.3`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
-- `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.0")
+- `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.2")
 
 **Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.20 | **Compose BOM compatible**
 
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.1")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.1") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.0.3")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.0.3") // AR (includes sceneview)
 }
 ```
 
@@ -548,6 +548,8 @@ SceneView(...) {
     windowManager: ViewNode.WindowManager,
     unlit: Boolean = false,
     invertFrontFaceWinding: Boolean = false,
+    position: Position = Position(x = 0f),
+    rotation: Rotation = Rotation(x = 0f),
     apply: ViewNode.() -> Unit = {},
     content: (@Composable NodeScope.() -> Unit)? = null,
     viewContent: @Composable () -> Unit    // the Compose UI to render
@@ -1162,16 +1164,48 @@ Stream an ARCore or ARKit session to the [Rerun](https://rerun.io) viewer for sc
 
 **When to use:** debugging flaky plane detection, tracking drift, anchor instability, or comparing two AR sessions side by side. **Dev-time only** — gate with `BuildConfig.DEBUG` in release builds.
 
+### Two modes
+
+- **Live (default)** — sidecar spawns the Rerun viewer, you debug interactively.
+- **Save & share** — sidecar writes a `.rrd` file you can re-host (R2, GitHub release, gist) and open in any browser via `https://sceneview.github.io/rerun/?url=<encoded>`. Lets you attach a fully-replayable session to a bug report.
+
 ### Architecture
 
 ```
-┌──────────────┐   TCP JSON-lines  ┌──────────────────┐  rerun-sdk   ┌────────────┐
-│  RerunBridge │ ─────────────────▶│ Python sidecar   │ ───────────▶ │ Rerun      │
-│ (Kt or Swift)│   one obj/line \n │ (rerun-bridge.py)│              │ viewer     │
-└──────────────┘                   └──────────────────┘              └────────────┘
+┌──────────────┐   TCP JSON-lines  ┌──────────────────┐  rerun-sdk    ┌──────────────────┐
+│  RerunBridge │ ─────────────────▶│ Python sidecar   │ ─── live ────▶│ Rerun viewer     │
+│ (Kt or Swift)│   one obj/line \n │ (rerun-bridge.py)│ ─── save ────▶│ .rrd file        │
+└──────────────┘   control ack ◀── └──────────────────┘   on demand   └──────────────────┘
+                                                                              │
+                                                                       upload to R2/etc
+                                                                              │
+                                                              https://sceneview.github.io/rerun/
 ```
 
 Same wire format on Android and iOS. A single sidecar handles both platforms.
+
+### Save & share flow
+
+1. Run sidecar in save mode: `python rerun-bridge.py --save`
+2. In the app, tap **Save & Share** while streaming. The bridge sends a `{"type":"control","cmd":"save_now"}` line; the sidecar flushes a `.rrd` and replies with `{"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}`.
+3. Re-host the `.rrd` on a public URL (Cloudflare R2, GitHub release asset, S3, gist).
+4. Open `https://sceneview.github.io/rerun/?url=<encoded-public-url>` in any browser to view + scrub the recording.
+
+The Kotlin API surface for step 2:
+
+```kotlin
+bridge.requestSaveAndShare { result: RerunBridge.ShareResult ->
+    if (result.success) {
+        // result.path = "/home/dev/.sceneview/recordings/2026-05-06_23-30-12.rrd"
+        // result.viewerUrl = "https://sceneview.github.io/rerun/?url=file%3A%2F%2F…"
+        // result.events = 1234
+    } else {
+        // result.reason explains why (e.g. "sidecar started in live mode; relaunch with --save")
+    }
+}
+```
+
+`callback` fires on the bridge's I/O thread — marshal to your UI thread before touching state.
 
 ### Android — `rememberRerunBridge`
 
@@ -1197,6 +1231,19 @@ fun ARDebugScreen() {
 ```
 
 `logFrame` logs camera pose + planes + point cloud in one call, honours `rateHz`. Finer-grained methods are available if you want to emit events selectively: `logCameraPose(Pose, Long)`, `logPlanes(Collection<Plane>, Long)`, `logPointCloud(PointCloud, Long)`, `logAnchors(Collection<Anchor>, Long)`, `logHitResult(HitResult, Long)`.
+
+**Tier-S "wow" events** (call from your own code, not auto-emitted by `logFrame`):
+
+```kotlin
+// Polyline through every accumulated camera position — flat [x,y,z,…] buffer.
+bridge.logCameraTrail(positions = trailFloats, timestampNanos = frame.timestamp)
+
+// Generic scalar timeseries — graphs in the Rerun timeline panel.
+bridge.logScalar(value = trackingQuality, entity = "world/camera/tracking_quality",
+                 timestampNanos = frame.timestamp)
+```
+
+The Python sidecar maps `camera_trail` to `rr.LineStrips3D` and `scalar` to `rr.Scalars`. Same surface in Swift: `bridge.logCameraTrail(positions:timestampNanos:)` and `bridge.logScalar(_:entity:timestampNanos:)`.
 
 **Threading:** the bridge owns a private `Dispatchers.IO` + `SupervisorJob` scope and a `Channel.CONFLATED` outbox. Every `log*` call is non-blocking — the newest event overwrites any pending one (drop-on-backpressure). Filament's render thread is never blocked.
 
@@ -1698,7 +1745,7 @@ class ActivityARPermissionHandler(activity: ComponentActivity) : ARPermissionHan
 
 ## sceneview-core (KMP)
 
-`sceneview-core` is a Kotlin Multiplatform module containing platform-independent logic shared between Android and iOS. It targets `jvm("android")`, `iosArm64`, `iosSimulatorArm64`, and `iosX64`. It depends on `dev.romainguy:kotlin-math:1.6.0` (exposed as `api`).
+`sceneview-core` is a Kotlin Multiplatform module containing platform-independent logic shared between Android and iOS. It targets `jvm("android")`, `iosArm64`, `iosSimulatorArm64`, and `iosX64`. It depends on `dev.romainguy:kotlin-math:1.8.0` (exposed as `api`).
 
 The `sceneview` Android module depends on `sceneview-core` via `api project(':sceneview-core')`, so all types below are available transitively.
 
@@ -1860,7 +1907,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.1")
+    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.2")
 ]
 ```
 
@@ -2539,7 +2586,7 @@ Renderer: **RealityKit**. Requires iOS 17+ / macOS 14+ / visionOS 1+.
 
 SPM dependency (Package.swift or Xcode):
 ```swift
-.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.1")
+.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.2")
 ```
 
 Import: `import SceneViewSwift`

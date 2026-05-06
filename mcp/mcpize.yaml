@@ -1,0 +1,58 @@
+# MCPize manifest — https://mcpize.com
+#
+# This deploys sceneview-mcp on MCPize cloud, exposing the same stdio package
+# already on npm (`npx sceneview-mcp`) over MCPize's hosted MCP endpoint with
+# their built-in per-call billing, marketplace exposure, and 85% revenue share.
+#
+# IMPORTANT design notes:
+# - Both credentials are OPTIONAL (free tools work without any key). Setting
+#   them `required: true` would block 100% of free-tier users at install time.
+# - The startCommand uses `node dist/index.js` directly so MCPize runs the
+#   package we built in the same sandbox — avoids a second `npx` resolve and
+#   any version drift between source and the npm registry.
+# - Pricing tiers are configured in the MCPize dashboard, not in this file.
+
+version: 1
+name: sceneview-mcp
+description: >-
+  Cross-platform 3D & AR MCP for Android (Compose + Filament), iOS / macOS /
+  visionOS (SwiftUI + RealityKit), and Web (Filament.js + WebXR). 26 free
+  tools (samples, guides, validator, analyze) + 35 Pro tools (scene
+  generation, multi-platform setup, Automotive / Gaming / Healthcare /
+  Interior packages).
+
+runtime: typescript
+entry: dist/index.js
+
+build:
+  install: npm ci
+  command: npm run build
+
+# stdio bridge mode: MCPize auto-wraps the stdio binary with mcp-proxy so it
+# becomes addressable over their HTTP/SSE gateway.
+startCommand:
+  type: stdio
+  command: node dist/index.js
+
+# Per-user credentials surfaced to the subscriber's MCP config. Both optional:
+# free tools never need them; only the Pro / Sketchfab paths consume them.
+credentials:
+  - name: SCENEVIEW_API_KEY
+    required: false
+    description: >-
+      Optional. SceneView Pro subscription key (sv_live_...) — unlocks the 35
+      Pro tools through the hosted gateway. Leave empty to use only the 26
+      free tools.
+    docs_url: https://sceneview-mcp.mcp-tools-lab.workers.dev/pricing
+    mapping:
+      env: SCENEVIEW_API_KEY
+  - name: SKETCHFAB_API_KEY
+    required: false
+    description: >-
+      Optional. Bring-your-own Sketchfab API token to enable `search_models`.
+      Without it, that single tool is disabled; everything else works.
+    docs_url: https://sketchfab.com/settings/password
+    mapping:
+      env: SKETCHFAB_API_KEY
+
+credentials_mode: per_user

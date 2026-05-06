@@ -1,6 +1,5 @@
 package io.github.sceneview.ar.node
 
-import android.util.Log
 import com.google.android.filament.Engine
 import com.google.android.filament.IndexBuffer
 import com.google.android.filament.MaterialInstance
@@ -21,8 +20,6 @@ import com.google.ar.core.Session
 import com.google.ar.core.Trackable
 import com.google.ar.core.TrackingState
 import io.github.sceneview.node.MeshNode
-
-private const val TAG = "AugmentedFaceNode"
 
 /**
  * AR Augmented Face positioned 3D model node
@@ -76,8 +73,8 @@ private const val TAG = "AugmentedFaceNode"
 open class AugmentedFaceNode(
     engine: Engine,
     val augmentedFace: AugmentedFace,
-    meshMaterialInstance: MaterialInstance? = null,
-    builder: RenderableManager.Builder.() -> Unit = {},
+    private val meshMaterialInstance: MaterialInstance? = null,
+    private val builder: RenderableManager.Builder.() -> Unit = {},
     onTrackingStateChanged: ((TrackingState) -> Unit)? = null,
     onUpdated: ((AugmentedFace) -> Unit)? = null
 ) : TrackableNode<AugmentedFace>(
@@ -107,9 +104,6 @@ open class AugmentedFaceNode(
      */
     var meshNode: MeshNode? = null
         private set
-
-    private val faceMaterialInstance = meshMaterialInstance
-    private val meshBuilder = builder
 
     // Reusable tangent-quaternion buffer: 4 floats per vertex, 16 bytes/vertex.
     // Allocated lazily and grown on demand — the face mesh vertex count is stable
@@ -142,6 +136,8 @@ open class AugmentedFaceNode(
         val indices = augmentedFace.meshTriangleIndices
         val vertices = augmentedFace.meshVertices
         val normals = augmentedFace.meshNormals
+        // UVs are static per ARCore docs but `SurfaceOrientation` consumes them every
+        // frame to recompute tangent quaternions, so they have to be in scope here too.
         val uvs = augmentedFace.meshTextureCoordinates
 
         if (indices.limit() == 0 || vertices.limit() == 0) return
@@ -156,14 +152,6 @@ open class AugmentedFaceNode(
         val tangents = computeTangents(vertices, normals, uvs, indices, vertexCount)
 
         if (meshNode == null) {
-            // First-frame diagnostic — only logs once per face. Surfaces vertex
-            // count + buffer sanity so on-device debugging of "mesh invisible"
-            // reports can confirm the upload happened with non-zero geometry.
-            Log.d(
-                TAG,
-                "Building face mesh — vertices=$vertexCount, indices=${indices.limit()}, " +
-                    "uvs=${uvs.limit()}, hasMaterial=${faceMaterialInstance != null}"
-            )
             meshNode = MeshNode(
                 engine = engine,
                 primitiveType = PrimitiveType.TRIANGLES,
@@ -192,7 +180,7 @@ open class AugmentedFaceNode(
                     .build(engine).apply {
                         setBuffer(engine, indices)       // indices    (static)
                     },
-                materialInstance = faceMaterialInstance,
+                materialInstance = meshMaterialInstance,
                 builder = {
                     // Filament computes AABB asynchronously after vertex buffer upload.
                     // If a render frame starts before AABB is updated, Filament aborts with
@@ -202,7 +190,7 @@ open class AugmentedFaceNode(
                     culling(false)
                     castShadows(false)
                     receiveShadows(false)
-                    meshBuilder()
+                    builder()
                 }
             ).apply { parent = centerNode }
 
@@ -237,6 +225,13 @@ open class AugmentedFaceNode(
      * an empty list for [AugmentedFace] on the front camera. Manually sets [PoseNode] state
      * (session, frame, cameraTrackingState) since `super` cannot be called without
      * re-triggering the broken `getUpdatedTrackables` check.
+     *
+     * [update] (trackable) is invoked every frame regardless of tracking state so the
+     * `trackingState` setter in [TrackableNode] fires `onTrackingStateChanged` and
+     * `updateVisibility()` on TRACKING -> STOPPED/PAUSED transitions (e.g. face leaving the
+     * frame). Existing guards in [update] (trackable) skip mesh creation/buffer updates when
+     * not TRACKING. `onUpdated` only fires while TRACKING since the face data is only
+     * meaningful then.
      */
     override fun update(session: Session, frame: Frame) {
         // PoseNode state — set manually since we skip super
@@ -244,8 +239,12 @@ open class AugmentedFaceNode(
         this.frame = frame
         this.cameraTrackingState = frame.camera.trackingState
 
+        // Always propagate trackable state so onTrackingStateChanged fires on every
+        // transition, including TRACKING -> STOPPED/PAUSED. update(trackable) guards mesh
+        // work internally.
+        update(augmentedFace)
+
         if (augmentedFace.trackingState == TrackingState.TRACKING) {
-            update(augmentedFace)
             onUpdated?.invoke(augmentedFace)
         }
     }

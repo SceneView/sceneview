@@ -114,7 +114,7 @@
     "url": "https://sceneview.github.io/",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Android, iOS, macOS, visionOS, Web, Windows, Linux",
-    "softwareVersion": "4.0.1",
+    "softwareVersion": "4.0.3",
     "license": "https://github.com/sceneview/sceneview/blob/main/LICENSE",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "author": { "@type": "Organization", "name": "SceneView", "url": "https://github.com/sceneview" },
@@ -135,7 +135,7 @@
         "name": "How do I add 3D to my Android Jetpack Compose app?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Use SceneView SDK — the only Compose-native 3D library for Android. Add implementation(\"io.github.sceneview:sceneview:4.0.1\") to your build.gradle, then use SceneView { ModelNode(...) } composable. SceneView wraps Google Filament with a declarative API, supports 35+ node types, and adds only ~5MB to your APK."
+          "text": "Use SceneView SDK — the only Compose-native 3D library for Android. Add implementation(\"io.github.sceneview:sceneview:4.0.3\") to your build.gradle, then use SceneView { ModelNode(...) } composable. SceneView wraps Google Filament with a declarative API, supports 35+ node types, and adds only ~5MB to your APK."
         }
       },
       {
@@ -143,7 +143,7 @@
         "name": "What is the best AR SDK for Android with Jetpack Compose?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "SceneView's ARSceneView is the only Compose-native AR SDK for Android. It wraps ARCore with a declarative API: add implementation(\"io.github.sceneview:arsceneview:4.0.1\"), then use ARSceneView { AnchorNode(...) } composable. Supports plane detection, image tracking, cloud anchors, geospatial anchors, and depth."
+          "text": "SceneView's ARSceneView is the only Compose-native AR SDK for Android. It wraps ARCore with a declarative API: add implementation(\"io.github.sceneview:arsceneview:4.0.3\"), then use ARSceneView { AnchorNode(...) } composable. Supports plane detection, image tracking, cloud anchors, geospatial anchors, and depth."
         }
       },
       {
@@ -246,6 +246,31 @@
         <div class="hero__actions">
           <a href="/docs.html" class="hero__btn hero__btn--primary" target="_blank" rel="noopener">Get Started</a>
           <a href="https://github.com/sceneview/sceneview" class="hero__btn hero__btn--outline" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+
+        <!--
+          Store badges — pointing at the published demo apps so visitors
+          can preview SceneView capabilities in a few taps. Cf.
+          project_demo_apps_publication.md for the iOS track id details.
+        -->
+        <div class="hero__store-badges">
+          <span class="hero__store-badges-label">Try it on your phone:</span>
+          <a href="https://play.google.com/store/apps/details?id=io.github.sceneview.demo"
+             class="hero__store-badge"
+             target="_blank" rel="noopener"
+             aria-label="Get SceneView Demo on Google Play">
+            <img src="assets/brand/stores/google-play-badge.png"
+                 alt="Get it on Google Play"
+                 width="140" height="54" loading="lazy">
+          </a>
+          <a href="https://apps.apple.com/us/app/sceneview/id6761329763"
+             class="hero__store-badge"
+             target="_blank" rel="noopener"
+             aria-label="Download SceneView on the App Store">
+            <img src="assets/brand/stores/app-store-badge.svg"
+                 alt="Download on the App Store"
+                 width="140" height="48" loading="lazy">
+          </a>
         </div>
         <div class="hero__platforms">
           <div class="hero__platform">
@@ -435,9 +460,9 @@
             <pre class="code-block"><code><span class="syn-green">// build.gradle.kts</span>
 <span class="syn-purple">dependencies</span> {
     <span class="syn-green">// 3D only</span>
-    <span class="syn-blue">implementation</span>(<span class="syn-green-light">"io.github.sceneview:sceneview:4.0.1"</span>)
+    <span class="syn-blue">implementation</span>(<span class="syn-green-light">"io.github.sceneview:sceneview:4.0.3"</span>)
     <span class="syn-green">// 3D + AR</span>
-    <span class="syn-blue">implementation</span>(<span class="syn-green-light">"io.github.sceneview:arsceneview:4.0.1"</span>)
+    <span class="syn-blue">implementation</span>(<span class="syn-green-light">"io.github.sceneview:arsceneview:4.0.3"</span>)
 }</code></pre>
           </div>
           <div class="tabs__panel" data-panel="ios">
@@ -881,12 +906,14 @@
             <span class="devtools__card-badge">New in v4</span>
           </div>
           <h3 class="devtools__card-title">AR Debug &mdash; Rerun.io</h3>
-          <p class="devtools__card-text">Stream ARCore and ARKit frame data to the <a href="https://rerun.io" target="_blank" rel="noopener">Rerun</a> viewer. Inspect camera poses, tracked planes, point clouds, and anchors &mdash; then scrub the timeline to replay any moment.</p>
+          <p class="devtools__card-text">Stream ARCore and ARKit frame data to the <a href="https://rerun.io" target="_blank" rel="noopener">Rerun</a> viewer. Inspect camera poses, tracked planes, point clouds, and anchors &mdash; then scrub the timeline to replay any moment. Hit <strong>Save &amp; Share</strong> in the demo to attach a fully-replayable session to a bug report.</p>
           <div class="devtools__card-platforms">
             <span class="devtools__card-platform">Android</span>
             <span class="devtools__card-platform">iOS</span>
             <span class="devtools__card-platform">Python sidecar</span>
           </div>
+          <a href="/rerun/" class="devtools__card-link">Open hosted viewer &rarr;</a>
+          <a href="/open/?demo=ar-rerun" class="devtools__card-link" target="_blank" rel="noopener">Open AR Rerun in the demo app &rarr;</a>
         </div>
         <div class="devtools__card reveal">
           <div class="devtools__card-header">
@@ -924,35 +951,35 @@
           <div class="metric-card__icon-wrap metric-card__icon-wrap--forks">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M7 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 9a4 4 0 0 0 3 3.874V13a2 2 0 0 0 2 2 2 2 0 0 0 2-2v-.126A4 4 0 0 0 17 9h-2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2H7z"/></svg>
           </div>
-          <div class="metric-card__value" data-metric="forks">211</div>
+          <div class="metric-card__value" data-metric="forks">215</div>
           <div class="metric-card__label">GitHub forks</div>
         </a>
         <a href="https://www.npmjs.com/package/sceneview-mcp" class="metric-card reveal" target="_blank" rel="noopener" aria-label="sceneview-mcp package on npm">
           <div class="metric-card__icon-wrap metric-card__icon-wrap--npm">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323h13.74v13.354h-3.328V8.665h-3.564v10.012H5.13z"/></svg>
           </div>
-          <div class="metric-card__value" data-metric="mcp-downloads">3.5K</div>
+          <div class="metric-card__value" data-metric="mcp-downloads">2.9K</div>
           <div class="metric-card__label">npm downloads (MCP, 30&nbsp;d)</div>
         </a>
         <a href="https://www.npmjs.com/package/sceneview-web" class="metric-card reveal" target="_blank" rel="noopener" aria-label="sceneview-web package on npm">
           <div class="metric-card__icon-wrap metric-card__icon-wrap--npm2">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323h13.74v13.354h-3.328V8.665h-3.564v10.012H5.13z"/></svg>
           </div>
-          <div class="metric-card__value" data-metric="web-downloads">1.2K</div>
+          <div class="metric-card__value" data-metric="web-downloads">473</div>
           <div class="metric-card__label">npm downloads (Web, 30&nbsp;d)</div>
         </a>
         <a href="https://github.com/sceneview/sceneview/graphs/contributors" class="metric-card reveal" target="_blank" rel="noopener" aria-label="Contributors to sceneview/sceneview">
           <div class="metric-card__icon-wrap metric-card__icon-wrap--contributors">
             <span class="material-symbols-outlined">group</span>
           </div>
-          <div class="metric-card__value" data-metric="contributors">39</div>
+          <div class="metric-card__value" data-metric="contributors">40</div>
           <div class="metric-card__label">Contributors</div>
         </a>
         <a href="https://central.sonatype.com/artifact/io.github.sceneview/sceneview/versions" class="metric-card reveal" target="_blank" rel="noopener" aria-label="Released versions on Maven Central">
           <div class="metric-card__icon-wrap metric-card__icon-wrap--maven">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z"/></svg>
           </div>
-          <div class="metric-card__value" data-metric="releases">70</div>
+          <div class="metric-card__value" data-metric="releases">73</div>
           <div class="metric-card__label">Releases on Maven&nbsp;Central</div>
         </a>
       </div>

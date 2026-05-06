@@ -22,7 +22,7 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
-import io.github.sceneview.node.Node as NodeImpl
+import io.github.sceneview.node.SphereNode as SphereNodeImpl
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
@@ -129,8 +129,8 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     val zOffset = ((i / 5) % 3 - 1) * 0.18f
                     val startY = 0.6f + (i / 5) * 0.18f
 
-                    // Capture the Node reference via apply so PhysicsNode can drive it.
-                    var nodeRef by remember(i) { mutableStateOf<NodeImpl?>(null) }
+                    // Capture the SphereNode reference via apply so PhysicsNode can drive it.
+                    var nodeRef by remember(i) { mutableStateOf<SphereNodeImpl?>(null) }
 
                     Node(
                         position = Position(x = xOffset, y = startY, z = zOffset),

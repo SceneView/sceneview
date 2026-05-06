@@ -19,6 +19,15 @@ on:
       - 'samples/ios-demo/**'
       - '.github/workflows/app-store.yml'
   workflow_dispatch:
+    inputs:
+      submit_for_review:
+        description: "Auto-submit the uploaded build for App Store review (TestFlight upload always runs)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: app-store-deploy
@@ -114,6 +123,15 @@ jobs:
           cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
 
+      - name: Stage App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$APP_STORE_CONNECT_API_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+          chmod 600 ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+
       - name: Cache Swift Package dependencies
         uses: actions/cache@v5
         with:
@@ -150,11 +168,7 @@ jobs:
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
-          mkdir -p ~/.private_keys
-          echo "$APP_STORE_CONNECT_API_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
-
           cat > $RUNNER_TEMP/ExportOptions.plist << PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -187,6 +201,7 @@ jobs:
             -authenticationKeyIssuerID $APP_STORE_CONNECT_API_ISSUER_ID
 
       - name: Submit build for App Store review
+        if: github.event_name == 'workflow_dispatch' && inputs.submit_for_review == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -244,7 +259,7 @@ jobs:
               payload = {
                   "data": {
                       "type": "appStoreVersions",
-                      "attributes": {"platform": "IOS", "versionString": "3.6.2"},
+                      "attributes": {"platform": "IOS", "versionString": "4.0.3"},
                       "relationships": {"app": {"data": {"type": "apps", "id": app_id}}}
                   }
               }

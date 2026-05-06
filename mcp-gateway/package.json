@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "hono": "^4.9.0"
+    "hono": "^4.12.14"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250410.0",

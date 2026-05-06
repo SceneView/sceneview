@@ -59,6 +59,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["style"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_level_editor",
@@ -98,6 +103,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["theme"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_physics_game",
@@ -130,6 +140,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["preset"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "get_particle_effects",
@@ -161,6 +176,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["effect"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -201,6 +221,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["layout"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "list_game_models",
@@ -220,6 +245,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: [],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "validate_game_code",
@@ -233,6 +263,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["code"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
 ];

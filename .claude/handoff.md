@@ -4,300 +4,266 @@
 
 ---
 
-## ⚠️ ACTIVE — 2026-05-04 — Android demo audit interrupted (image-limit crash)
+## SESSION 2026-05-06 — nervous-payne (cont) — v4.0.2 SHIPPED
 
-**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7`
-**Branch:** `claude/tender-haibt-6062c7` — **91 commits** on top of main, working tree CLEAN, **NOT pushed** (GitHub ban).
-**Last commit:** `4ee732e3` — handoff doc for this session.
+### TL;DR
+- 🚀 **v4.0.2 published end-to-end** (verified):
+  - Maven Central — `<latest>4.0.2</latest>`, `sceneview-4.0.2.aar`/`.pom` HTTP 200 ✅
+  - npm `sceneview-web@4.0.2` ✅
+  - npm `sceneview-mcp@4.0.8` (independent track, skipped per design) ✅
+  - Dokka API docs ✅
+  - GitHub Release v4.0.2 ✅
+  - SPM (git tag `v4.0.2`) ✅ — Swift Package Manager auto-picks up
+  - iOS demo app uploaded to App Store Connect ✅
+  - github.io repo HEAD at 4.0.2 ✅ (live site CDN cache propagating, ~5-10 min)
+- ✅ **All release checks passed**: sync-versions (1 mismatch on `sceneview.github.io/index.html` resolved by deploy), release-checklist (all PASS for tracked artifacts), impact-check (1 SPM blocker → fixed via PR #868).
+- ✅ **2 GitHub Discussions answered with v4.0.2 confirmation**: #843, #844.
+- ✅ **#863 issue filed**: regression test for #836 silent close.
+- ❌ **Play Store deploy failed** — pre-existing issue: Android demo bundle > 200 MB. Not introduced by v4.0.2. Workflow `play-store.yml` keeps failing on every push since this issue surfaced. Library Maven Central / npm / iOS App Store / GitHub Release are unaffected.
 
-### Why the session stopped
-Image dimension limit (>2000px). I was bulk-reading screen-record grid montages and the Anthropic API rejected the message. **Repeated cause this session — must NOT repeat next session.** Always scale screenshots/grids with `ffmpeg fps=1 scale=400` BEFORE Read; verify with `identify -format "%wx%h"` < 2000 in both dims.
+### What needs fixing (independent of v4.0.2)
+1. **Play Store bundle > 200 MB** — Android demo APK exceeds Play Store limit. Options: (a) trim demo assets / models in `samples/android-demo/src/main/assets/`, (b) convert heavy assets to Play Asset Delivery (asset packs), (c) split into dynamic feature modules. Failure has happened on the last 4 pushes; not new.
+2. **Live website CDN cache** — github.io repo HEAD is at 4.0.2 but the live page still shows 4.0.1 because of GitHub Pages CDN. Resolves itself within ~10 min — no action needed unless still stale tomorrow.
 
-### Read first in next session
-**`.claude/handoff-android-demo-audit.md`** — full rolled-up state (commits table, testing log, 15 demos still to verify, 2 hard rules).
-
-### Where to resume
-Live screen-record audit of these **15 demos**, starting with **LinesPathsDemo** (where the crash hit):
-
-LinesPathsDemo, GeometryDemo, ImageDemo, MultiModelDemo, GestureEditingDemo, CollisionDemo, DebugOverlayDemo, SecondaryCameraDemo, VideoDemo, ARPlacementDemo, ARStreetscapeDemo, ARRerunDemo, ModelViewerDemo, AnimationDemo, MultiModelDemo (re-verify after auto-rotate refactor).
-
-### Hard rules
-1. **No image >2000px** ever sent to Read. Use `ffmpeg -vf "fps=1,scale=400:-1"` then `tile=4x3:padding=4` then `identify` check.
-2. **No `git push`** — `thomasgorisse` GitHub account suspended. Commit local only.
-
-### Pre-handoff close
-Before declaring audit complete:
-```
-./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin
-./gradlew :sceneview:test :arsceneview:testDebugUnitTest
-bash .claude/scripts/pre-push-check.sh
-```
-Then update CLAUDE.md "Current state" + this file's top section.
+### What's pending after the release
+- **#852 tangent buffer fix** when the parallel session that owns `claude/fix-augmented-face-followups` returns
+- **#851 tender-haibt rebase** — big work, dedicated session
+- **84 unanswered Q&A Discussions** (Thomas's TODO)
+- **#848** record video/photos enhancement
+- **#863 GLB no-TANGENTS test** — nice-to-have follow-up
 
 ---
 
-## SESSION elegant-wescoff — 2026-05-02 — AR demos visual QA on Pixel 9 (real device)
+## SESSION 2026-05-05 — nervous-payne — PR sweep + multi-agent reviews + 8 merges
 
-**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7`
-**Branch:** `claude/tender-haibt-6062c7` — local commits, NOT pushed (GitHub ban still active)
-**Last commit:** `35e5990d` — `fix(ar): Face Mesh invisible + Pose cubes out of view`
-**Device:** Pixel 9, ADB over Wi-Fi `192.168.1.108:41127`. APK with both fixes already installed.
+### TL;DR
+- ✅ **8 PRs merged on main**:
+  - **#853** rememberViewNodeManager cleanup + post-destroy race guard
+  - **#854** BillboardNode mirror fix (closes #838) — NaN guard via `lengthSq > 1e-12f` + dropped redundant `normalize()` (lookTowards normalizes internally)
+  - **#855** marketplace submission packet (`.claude/marketplace-submissions/` — OpenAI App Store + mcpize submission docs)
+  - **#830** dependabot roborazzi 1.43→1.60
+  - **#857** ViewNode reactive props — restored `scale` + `isVisible`, switched `SideEffect` → `DisposableEffect` keyed on scalars (closes #856)
+  - **#858** BillboardNode JVM regression test suite — 9 pure-math tests pinning `lookTowards` convention + zero/NaN guard
+  - **#859** kotlin-math 1.6→1.8 docs sync (PR #788 follow-up, 4 llms.txt files updated)
+  - **#860** CLAUDE.md session-state update + render-tests memory correction
+- ⚠️ **2 PRs in HOLD with public verdicts** (don't merge without rework):
+  - **#851** tender-haibt — 6 blockers (Engine.kt API breakage, conflicts with already-merged #821/#842/#850, ImageNode/ViewNode resource leaks, allocs hot path). Rebase strategy in PR comment.
+  - **#852** AugmentedFace follow-ups — 1 blocker (tangent buffer dangling Filament ref if vertex count ever changes). Comment on PR.
+- ✅ **Multi-agent review pattern established** (memory `feedback_pr_review_workflow.md`): 5–7 Opus agents in parallel + 4-bucket triage. Caught Engine.kt breakage in #851, latent UAF in #852, regression in #842 (filed #856 + fixed via #857).
+- ✅ **Issue triage**: closed #824 not-a-bug, closing comments on silent #836/#846, filed+resolved #856.
+- ✅ **mcp-gaming/mcp-interior regression** un-staged (50 files, -2768 lines that reverted `files[]` glob fix + multi-file refactor).
+- ✅ **Marketplace packet sanitized**: OpenAI App ID + GitHub support ticket # extracted to `~/Projects/profile-private/marketplace-private/`. Public PR #855 has the project docs only.
+- ✅ **Local cleanup**: 13 branches deleted (8 merged + 5 stale/superseded), 2 idle worktrees removed.
 
-### Inputs
+### État repo (snapshot 2026-05-05 21:00 Paris)
+- **Main HEAD**: includes all 8 merges above. Quality-gate ✅, CI ✅, Build APKs ✅.
+- **Open PRs**: 2 (#851 hold, #852 hold) — see verdicts.
+- **Open issues**: 1 (#848 enhancement record video/photos).
+- **Active parallel session worktrees** (locked, do not touch): `agent-a08fb42c…` (claude/fix-augmented-face-normals-encoding), `agent-a9bad0693c…` (claude/fix-augmented-face-tracking-state-callback), `tender-haibt-6062c7`, `viewnode-820-followup`.
 
-- `/tmp/ar-test/screen.mp4` — 128 s screen recording, user manually walking through 7 AR demos (Tap to Place, Image Detection, Face Mesh, Cloud Anchor, Streetscape, Pose, Rerun). Rerun was not reached.
-- `/tmp/ar-test/frames/f001.png … f064.png` — 64 frames extracted at 0.5 fps. **DO NOT re-read these images in the next session — context already enriched, vision tokens are huge. Trust the verdict table below.**
+### What needs picking up next
+1. **#852 tangent-buffer fix** — when the parallel session that owns `claude/fix-augmented-face-followups` returns, address the agent's blocker: assert ARCore mesh vertex count is stable (it should be — canonical face mesh has fixed topology) OR destroy/rebuild the VertexBuffer if capacity grows. ~30 min.
+2. **#851 tender-haibt rebase** — the PR comment has the exact (a)/(b)/(c)/(d) drop list. Big work, needs a dedicated session.
+3. **GitHub Discussions audit** — Thomas mentioned this is on his TODO. Last sweep was 95 answered (relaxed-faraday session, 2026-04-13). Check what's accumulated since.
+4. **Optional**: file follow-up issue for #836 (silent-closed) requesting a tangent-less GLB load test, per #836 audit comment.
 
-### What shipped (this session)
+### How to use the agent review workflow
+See memory `feedback_pr_review_workflow.md`. TL;DR: dispatch 5–7 Opus agents in parallel (one per non-trivial PR + 1 audit-merged + 1 audit-issues) with self-contained prompts. Triage outputs into 4 buckets. Don't auto-fix 🔴 — comment with rebase strategy and let the author resolve.
 
-**Library — `arsceneview/src/main/java/io/github/sceneview/ar/node/AugmentedFaceNode.kt`:**
-The face mesh `VertexBuffer` declared `TANGENTS` (FLOAT4 quaternion per vertex) but uploaded raw FLOAT3 normals into that slot. Filament read 4 floats from a 3-float-per-vertex buffer → undefined tangent quaternions → broken PBR lighting → with the semi-transparent colored material used by `ARFaceDemo`, the mesh rendered with degenerate alpha and was effectively invisible on-device. Fix: compute proper tangent quaternions every frame from positions + normals + uvs + indices via Filament's `SurfaceOrientation` builder; reusable `ByteBuffer` cached on the node to avoid per-frame allocation.
+---
 
-**Sample — `samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARPoseDemo.kt`:**
-Default sliders `(0, -0.5, -1)` placed cubes 1 m forward of ARCore session-origin. As soon as the user turned the phone, the cubes drifted off-screen. Fix: capture a `basePose` 1 m in front of the camera on first tracked frame, sliders now nudge offsets `(±1 m X, ±0.5 m Y/Z)` from that anchor. Cube grew 0.1 m → 0.2 m, sphere 0.05 m → 0.1 m for legibility at 1 m.
+## SESSION 2026-05-05 — stoic-ramanujan — Issues/PRs triage + crash dispose fix mergé
 
-### Frame-by-frame verdict (do not re-validate visually)
+### TL;DR
+- ✅ **Root fix SIGABRT "Invalid texture still bound"** (#849 mergé) — `RenderableNode.destroy()` appelait `safeDestroyEntity` avant `safeDestroyRenderable`, Filament perdait la référence → crash silencieux → texture destroy crash. Fix : inverser l'ordre. Ferme #646 (ouvert déc. 2025), #847, #837.
+- ✅ **PlaneRenderer double-free fix + ViewNodeTest 283 lignes** (#850 mergé)
+- ✅ **4 PRs communautaires mergés** : #842 (ViewNode position/rotation réactifs), #821 (Scale(1f)), #820 (ViewNode s'affiche), #842
+- ✅ **9/10 PRs dependabot mergés** — #830 (roborazzi) en rebase par dependabot
+- ✅ **Toutes issues répondues** — 3 restantes ouvertes (#848 record vidéo, #838 TextNode mirrored, #824 plane detection) avec guidance complète
+- ✅ **PR #822 (InQBarna)** fermée proprement après extraction des parties valides
 
-| Demo | Status | Notes |
+### État repo
+- 0 PRs open (sauf #830 rebase en cours)
+- 3 issues open, toutes avec réponses
+- main à jour, CI verte
+
+## SESSION 2026-05-05 — youthful-cray-655b4d — Bug fixes #847/#837/#838
+
+### TL;DR
+- ✅ **#847/#837 fixés** — `ViewNode.destroy()` détruisait le MI avant le renderable → SIGABRT. Ordre corrigé : renderable → surface → stream → MI → texture → surfaceTexture.release().
+- ✅ **#838 fixé** — `BillboardNode.lookAt(camPos)` exposait la face arrière du quad → texture mirrorée. Fix : `lookTowards(normalize(worldPosition - camPos))` → face avant vers caméra.
+- ✅ **#824 commenté** — pas un bug SDK (debug mode ARCore).
+- Commit `0c767416` sur `claude/youthful-cray-655b4d`. **À merger sur main en prochaine session.**
+
+---
+
+## SESSION 2026-05-05 — romantic-shockley — GitHub push débloqué via thomas-gorisse, main pushé, 5 reviews PR
+
+### TL;DR
+- ✅ **Compte pusher `thomas-gorisse` opérationnel** (renommé depuis `thomasgorisse-dev` avant tout push). Nikita a accordé l'accès à `sceneview` org. `sceneview-tools` reste bloqué (Nikita pas owner).
+- ✅ **Push `main` 24 commits** (`69d8fcf1..c6a89b10`) — débloque npm 4.0.4-4.0.8, mcp-gateway widgets, Swift geometry, llms.txt, etc. côté GitHub.
+- ✅ **5 reviews indépendantes opus** sur branches parked + 4 PRs externes. Verdicts actionnables prêts.
+- ⏸️ **Pas encore push** : `gracious-pare-7f96a2` (1 commit trivial), `tender-haibt-6062c7` (111 commits, hygiene work nécessaire avant push).
+- ⏸️ **Pas encore exécuté** : actions sur PRs (close/merge/request changes).
+
+### État compte GitHub
+- `thomasgorisse` : SUSPENDU J+23 (ticket #4280656, zéro réponse Support)
+- `thomas-gorisse` (nouveau) : ✅ accès `sceneview` org via Nikita. Token gh CLI valide (scopes repo,workflow,read:org,gist). 2FA à activer avant 18 juin 2026.
+- Identité git locale : `Thomas Gorisse <thomas.gorisse@gmail.com>` ✅ (NE PAS toucher — préserver continuité auteur pour migration future à ThomasGorisse à l'unban)
+
+### Verdicts reviews (à exécuter)
+
+| Item | Verdict | Action gh CLI |
 |---|---|---|
-| Tap to Place | ✅ OK | f008 black init → f011/f015/f019/f025/f030 helmet on plane dots |
-| Image Detection | ✅ OK | User did not point at qrcode → no model attached (expected) |
-| **Face Mesh** | **🟡 NEEDS RE-TEST** | f039/f041 face tracked, **NO mesh overlay** before fix. Re-test after `35e5990d` |
-| Cloud Anchor | ✅ OK | f046 → f047 anchor placed → f050 hosting → f052 `ERROR_NOT_AUTHORIZED` (expected for Free-tier project) |
-| Streetscape | ⚠️ N/A indoor | f055-f060 "Scanning environment" (expected — indoor + no Cloud project) |
-| **Pose Placement** | **🟡 NEEDS RE-TEST** | f063/f064 sliders + camera + **no cubes** before fix. Re-test after `35e5990d` |
-| Rerun Debug | — | Not reached in 128 s recording |
+| `gracious-pare-7f96a2` (1 commit) | 🟢 Push direct | `git push origin claude/gracious-pare-7f96a2` |
+| `tender-haibt-6062c7` (111 commits) | 🟡 Hygiene first | Rebase+squash ~12 commits, drop `.claude/*.md` + `tools/qa-screenshots/pixel9/final/` (LFS), KDoc+llms.txt pour `LightNode(color=...)`, CHANGELOG `safeDestroyX` no-runCatching |
+| PR #820 ViewNode displaying | 🔴 Close as dup | Notre `8728340b` Scene.kt déjà mieux. `gh pr close 820 -c "..."` |
+| PR #821 default scale | 🟡 Request changes | Manque ligne 170 (Node composable) + pas de test |
+| PR #822 release crashes | 🟡 Request changes | ✅ ViewNode + PlaneRenderer fixes solides (close #847) ❌ Drop Scene.kt rewrite (`logWarning` package n'existe pas → build cassée) |
+| PR #842 ViewNode position/rotation | 🟢 Approve | `gh pr review 842 --approve` + follow-ups llms.txt:547-554 + `scale` param |
+| PR #845 vitest 4.1.4→4.1.5 | 🔴 Close (déjà fait) | `gh pr close 845` |
+| PR #825-#834, #840 dependabot | 🟢 Merge | Tous encore valides |
 
-### What the next session should do
+### ⚠️ Conflit stratégique à trancher
+**Tender-haibt contient les MÊMES fixes ViewNode/PlaneRenderer/AugmentedFace destroy que PR #822 (côté library)**.
+- Option A community-first : approve/request changes PRs externes d'abord, attendre, merger leur travail → reconnaissance contributeurs. Push tender-haibt avec uniquement les bits non-overlappants.
+- Option B fast : push tender-haibt après hygiene, fermer #822/#821 en pointant les commits qui shippent. Plus rapide mais moins respectueux.
 
-1. Reinstall the APK on Pixel 9 if needed (build is already installed at session end, but a re-record may have wiped it):
-   ```bash
-   cd /Users/thomasgorisse/Projects/sceneview/.claude/worktrees/tender-haibt-6062c7
-   ./gradlew :samples:android-demo:installDebug
-   ```
-2. Ask Thomas to re-record JUST Face Mesh + Pose Placement (~30 s total), save as `/tmp/ar-test/screen2.mp4`.
-3. Extract 8-10 frames at 0.5 fps with ffmpeg.
-4. Verify: Face Mesh shows blue semi-transparent overlay on the face; Pose shows a purple cube + sphere ~1 m in front of camera at slider zero.
-5. If both PASS → run `bash .claude/scripts/pre-push-check.sh`, then prepare PR text. Push is blocked by GitHub ban — Thomas pushes manually from his account once the ban lifts.
-6. If either still FAILS → diagnose with `adb logcat -s SceneView:V Filament:V` while user repeats the gesture; do NOT just re-read the same frames.
+### Issues fermables
+- **#847** Crash AR scene dispose (texture-backed nodes) — fermable par tender-haibt OU PR #822 (combiné avec `a5e75b6e` déjà sur main)
+- **#837** Crash removing textNode — probablement déjà par `a5e75b6e` (à confirmer reporter)
+- **#801** Black rectangle ViewNode — déjà fermé par `8728340b`
 
-### Files touched this session
-
-- `arsceneview/src/main/java/io/github/sceneview/ar/node/AugmentedFaceNode.kt` (+45 / -7)
-- `samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARPoseDemo.kt` (+45 / -17)
-
-### Prior fixes already validated this session (5)
-
-These were validated by reading f001-f064 and shipping was already in earlier session commits:
-- ARPlacement (helmet placed on plane dots)
-- ARImage (no false alarm — user simply didn't point at qrcode)
-- ARFaceDemo destroy() crash fix held (no abort during back-out)
-- ARCloudAnchor host() actually called (got `ERROR_NOT_AUTHORIZED` from Google)
-- ARStreetscape geospatial init OK (indoor → no overlay, expected)
+### À reprendre prochaine session
+1. Trancher Option A vs B (community-first ou fast)
+2. Si A : exécuter les actions PRs (close #820, request changes #821 #822, approve #842) et attendre les contributeurs
+3. Si B : hygiene work tender-haibt → push → fermer PRs en pointant les commits
+4. Push gracious-pare (trivial, peut être fait n'importe quand)
+5. Merge dependabot batch (10 PRs valides)
+6. **`sceneview-tools` toujours bloqué** — option : contacter GitHub Support pour transfert d'ownership ou attendre unban thomasgorisse
 
 ---
 
-## SESSION reverent-jang — 2026-04-23 — Android teardown bugs + smoke-test harness + full QA coverage
+## TRIAGE AUTOMATIQUE — 2026-05-02 — Compte GitHub toujours suspendu (J+19)
 
-**Worktree:** `/Users/thomasgorisse/Projects/sceneview/.claude/worktrees/hopeful-elgamal-c7433f`
-**Branch:** `claude/hopeful-elgamal-c7433f` — 22 commits ahead of main (GitHub ban → no push)
+**Type:** Scheduled task `daily-github-triage`
 
-### What shipped
+### Résultat
 
-**Library fixes (sceneview + arsceneview):**
-- `ViewNode.destroy()` — reordered to call `super.destroy()` BEFORE `destroyMaterialInstance(materialInstance)`. Filament aborts with "destroying MaterialInstance 'view' still in use by Renderable" if the node's Renderable component still references it.
-- `PlaneRenderer.destroy()` — now routes materials through `materialLoader.destroyMaterial(...)` (the guarded path that removes from `materials` list). Previously bypassed the loader → `MaterialLoader.destroy()` crashed on teardown with "Calling method on destroyed Material". Also dropped the manual `destroyMaterialInstance(defaultInstance)` which was a guaranteed double-free (Engine.destroyMaterial cascades).
-- `ARCameraStream.destroy()` — same fix pattern. No more explicit defaultInstance destroy; route materials through `materialLoader.destroyMaterial`. Textures now reliably destroyed AFTER materials (fixes "Invalid texture still bound to MaterialInstance: 'depth'" abort).
-- `MaterialLoader.destroyMaterial` / `destroyMaterialInstance` — wrapped native destroy calls in `runCatching` as defense-in-depth against out-of-order teardown (Engine teardown beating the MaterialLoader DisposableEffect).
+❌ **Compte GitHub TOUJOURS suspendu** — HTTP 403 sur toutes les API GitHub (GraphQL + REST).
 
-**Test infrastructure:**
-- `DemoInteractionTest` baseline: 23 → extended with 10 new sub-function captures (Lighting intensity, Animation speed, PostProc MSAA, CustomMesh scale, LinesPaths path points, Reflection probe Y). 33 screenshots total for these tests.
-- NEW `DemoSmokeTest` class: 8 smoke tests for the 7 AR demos + Camera Controls. Each verifies the demo launches without a JNI crash on Apple M3 Metal translator AVD (where ARCore and Filament Manipulator aren't available).
-- JPEG screenshot pipeline via MediaStore — writes to `/sdcard/Download/sceneview-qa/*.jpg` (survives APK uninstall, no scoped-storage permission dance). Tracked screenshots dropped 52 MB PNG → 6.7 MB JPEG at indistinguishable visual quality.
-- `openDemo` settle bumped 2.5 s → 4 s → 6 s to cover first-frame GLB decode + GPU upload on the slow Metal translator.
-- `ScreenshotTest.kt` rewritten — old 6 tests referenced `AboutScreen`/`SamplesScreen` (retired when the app moved to DemoHostActivity). Replaced with 4 `DemoListScreen` tests (light/dark/large-font/tablet). Fresh Roborazzi goldens generated.
+Aucun triage possible : issues, PRs et CI/CD inaccessibles.
 
-### Stability / quality gates
+**Action URGENTE :** Contacter GitHub Support — ticket #4280656 : https://support.github.com
 
-- **31/31 interaction + smoke tests PASS**, verified on 4 consecutive back-to-back runs (~10 min each).
-- `:sceneview:connectedDebugAndroidTest` — 68 tests (4 skipped due to Filament `readPixels` broken on Metal translator).
-- `:arsceneview:connectedDebugAndroidTest` — BUILD SUCCESSFUL.
-- Library unit tests: `:sceneview:test`, `:arsceneview:testDebugUnitTest`, `:sceneview-core:allTests` — all green.
-- `:samples:android-demo:bundleRelease` — OK (required `-Xmx8g -XX:MaxMetaspaceSize=1g` for R8; may be worth bumping `gradle.properties` default if this recurs).
-- `:sceneview-web:assemble` — BUILD SUCCESSFUL.
-- MCP: `2902 vitest tests pass` across 132 files.
-- `pre-push-check.sh` — 9/9 PASS.
-- `quality-gate.sh --quick` — PASS (1 pre-existing warning on third-party CDN in HTML, unrelated).
-- `impact-check.sh` — PASS (1 pre-existing warning on Swift-only nodes, unrelated).
-- Fresh Roborazzi goldens committed for `DemoListScreen` (light/dark/large-font/tablet).
+---
 
-### Commits
+## HEALTH CHECK — 2026-04-29 — Compte GitHub toujours suspendu (J+16)
 
-```
-2403d20d chore(mcp): regenerate llms-txt bundle and lockfile to 4.0.1
-fcc65c7b test(android-demo): rewrite stale Roborazzi ScreenshotTest for DemoListScreen
-16273dd7 test(android-demo): bump openDemo settle to 6s for reliable first-frame capture
-54fee6fa fix(arsceneview): AR teardown double-free + extend interaction test coverage
-35c78e26 test(android-demo): refresh QA screenshots as JPEG (52 MB -> 6.5 MB)
-dcbf02b1 test(android-demo): persist interaction screenshots via MediaStore
-b14b5942 fix(sceneview): ViewNode teardown order + interaction test JPEG pipeline
-```
+**Type:** Scheduled task `quality-check`
 
-### Pièges qui reviendront
-- R8 OOM (Metaspace) sur `bundleRelease` avec 512m par défaut — passer `-Xmx8g -XX:MaxMetaspaceSize=1g` ou bumper `gradle.properties` définitivement.
-- Apple M3 Metal translator AVD ne résout pas `Manipulator.nCreateBuilder` (`CameraControlsDemo` viewport reste noir, mais l'app ne crashe pas).
-- Filament `readPixels` callback ne firent pas sur Metal translator — les offscreen render-tests restent `@Ignore` dans `sceneview/src/androidTest/`.
-- MediaStore écriture JPEG obligatoire sur API 30+ depuis le test APK UID — `FileOutputStream` direct vers `/sdcard/Download/` échoue EACCES.
-- Premier frame Filament (Engine + GLB decode + GPU upload) prend ~6 s sur cet émulateur → ne pas redescendre sous 6 s dans `openDemo`.
+### Résultat
 
-### Not done (deferred)
-- Physics demo : la sphère diagnostic statique rend OK mais les sphères physiques ne sont pas visibles sur les screenshots (problème de timing simulation / position). Pas dans le scope de cette session.
-- Push GitHub bloqué par le ban — tous les commits restent locaux jusqu'à déblocage.
+⛔ **Compte GitHub TOUJOURS suspendu** (J+16 depuis le 2026-04-13) — HTTP 403 "Sorry. Your account was suspended"
 
-### Session addendum — 2026-04-23 late (branded assets + palette + icon/text test coverage)
+**Action URGENTE :** Contacter GitHub Support — ticket #4280656 : https://support.github.com
 
-Continuation of the same worktree after the user asked for "vraies images/vidéos et couleurs SceneView" :
+### État des services (2026-04-29)
 
-- **Real assets :**
-  - `assets/textures/sceneview_logo.png` — 1.6 KB blue circle placeholder swapped for the 45 KB branded cube-in-brackets logo from `branding/exports/logo/logo-1024.png`.
-  - `assets/videos/sample.mp4` — regenerated with `ffmpeg` — 10 s / 1280×720 / H.264, cube orbiting in Lissajous pattern over the brand hero gradient `#005bc1 → #6446cd`.
-- **Brand palette** `samples/android-demo/src/main/java/io/github/sceneview/demo/SceneViewColors.kt` mirrors the seven tokens from `DESIGN.md` + a `Ramp4` helper. Applied to Physics / Geometry / Shape / CustomMesh / LinesPaths — all `Color.Red / Blue / Green / Yellow / Cyan / Magenta / Gray / DarkGray` references gone.
-- **A11y win** — `LightingDemo` color swatches now carry `contentDescription`. Four new `tapByDesc` tests exercise them.
-- **Icon + text input coverage** — new `tapByDesc(String)` and `typeInto(String, String)` helpers added to `DemoInteractionTest`. Used for:
-  - Animation Play / Pause (was icon-only, untestable)
-  - Video Play / Pause
-  - Text demo Display Text field (real reflow into TextNode via `adb shell input text`)
-- **Result** : 31/31 PASS (9 min), 119 JPEGs @ 8.5 MB, pre-push gate 9/9.
-- **Extra commit on branch :** `7e594364 feat(android-demo): real branded assets + SceneView color palette + extended coverage`
+| Service | État |
+|---|---|
+| sceneview-mcp gateway | ✅ OK |
+| hub-mcp gateway | ✅ OK (11 libs, 52 outils) |
+| telemetry worker | ✅ OK |
+| npm @latest sceneview-mcp | ✅ **4.0.8** (publié 2026-04-28) |
+| Version sync SDK (29 fichiers) | ✅ Tous alignés à 4.0.1 |
+| CI / Issues / PRs | ❌ INACCESSIBLE (compte suspendu) |
 
-### Session addendum 2 — 2026-04-23 evening (library bug hunt + Physics fix + 32/32 steady state)
+### Nouvelles depuis le dernier check (2026-04-22)
 
-Continuation after the 2nd crash rollup. Total branch is now **23 commits ahead of main**.
+- **npm a avancé de 4.0.2 → 4.0.8** : versions 4.0.4–4.0.8 publiées le 2026-04-28 depuis le worktree `gracious-pare-7f96a2` (`claude/gracious-pare-7f96a2`).
+  - v4.0.4 : Soften sponsor CTA, drop Pro upgrade link
+  - v4.0.5+4.0.6 : Rebalance free/pro tiers
+  - v4.0.7 : README rewrite, ship in tarball
+  - v4.0.8 : Fix telemetry version reporting bug + pricing alignment
+- **6 commits non mergés sur main** — worktree `gracious-pare-7f96a2` est propre (aucun fichier non-commité). À merger sur main quand le compte GitHub sera réactivé.
+- **15 worktrees actifs** (versions 4.0.1 à 4.0.8) — nettoyage recommandé après réactivation.
 
-**Library fixes shipped (sceneview):**
-- **`6de91a47` — CRITIQUE : Node / ModelNode default scale était `(1, 0, 0)`, pas `(1, 1, 1)`.** Cause racine dans `SceneScope.kt` : `scale: Scale = Scale(x = 1f)` — `Scale = Float3` et `Float3(x = 1f)` appelle le constructeur 3-args (y=0, z=0), pas le constructeur uniform-fill `Float3(v: Float)`. Tout `Node { ... }` ou `ModelNode { ... }` composable sans scale explicite rendait des meshes dégénérés à volume zéro. Démonstré par `PhysicsDemo` (sphères invisibles dans les screenshots). Fix = `Scale(1f)` (constructeur 1-arg uniform-fill).
-- **`ec070ec6` — regression guard** dans `sceneview-core` qui vérifie `Scale(1f) == Scale(1f, 1f, 1f)` vs le piège `Scale(x = 1f) == Scale(1f, 0f, 0f)`.
-- **`48d74083` — KDoc warning** sur `Scale` dans `sceneview-core` documentant le gotcha d'API kotlin-math 1.8.
-- **`1e9497e5` — llms.txt** mis à jour pour recommander `Scale(1f)` (pas `Scale(x = 1f)`).
-- **`970ddff1` — MaterialInstance propagation** : `SphereNode` + `CubeNode` réagissent maintenant au changement de `materialInstance` via `SideEffect`. Avant, le Node gardait son ancien instance.
-- **`2e4ef01f` — robust tap handling** sur `ViewNode` + `CollisionDemo` + slider mid-values dans les tests (le nouveau 32e test).
-- **`440b9a3c` — camera gesture + multi-touch** coverage dans `DemoInteractionTest`.
-- **`fdabb07d` — Compose TextField `typeInto`** utilise `UiObject2.setText` (plus robuste que `adb shell input text`).
+---
 
-**Brand pass:**
-- **`b8fcf225` — launcher icons** régénérés depuis le logo branded.
-- **`6b873ad4` — migration `#1A73E8` (Google blue) → `#005BC1`** (SceneView Primary) dans tout le code (16 fichiers, incluant DESIGN.md, assets, widgets, MCP dashboard).
-- **`484d30b8` — SceneViewSwift `AccentColor`** aligné sur la palette brand.
-- **`8a88b053` — Collision + AR demos** migrés sur la brand palette.
+## TRIAGE AUTOMATIQUE — 2026-04-22 — Compte GitHub toujours suspendu
 
-**Physics deferred → RÉSOLU.** Les captures committées (`samples/screenshots/android/18_physics.png` et `physics_demo.png`) étaient stale (montraient la plane seule sans sphères, à cause du bug Scale). `30cbce64` remplace avec les frames frais du `DemoInteractionTest` (dropped_3) qui montrent la sphère diagnostic statique + 4 sphères physiques sur la brand ramp.
+**Type:** Scheduled task `daily-github-triage`
 
-**Re-run steady-state validation (après tous ces fixes) :**
-- `:samples:android-demo:connectedDebugAndroidTest` — **32/32 PASS** (10 min 21 s).
-- Aucune régression observée. Le `DemoInteractionTest` couvre maintenant camera gestures + multi-touch + slider mid-values.
+### Résultat
 
-**Commits session evening:**
-```
-30cbce64 docs(screenshots): refresh Physics demo captures post Scale(1f) fix
-970ddff1 fix(sceneview): propagate MaterialInstance changes to SphereNode + CubeNode
-2e4ef01f feat(demo): robust tap handling on ViewNode + Collision + slider mid-values
-440b9a3c test(android-demo): add camera-gesture + multi-touch coverage
-fdabb07d test(android-demo): typeInto now drives Compose TextField via UiObject2.setText
-1e9497e5 docs(llms): update Node / ModelNode signatures to Scale(1f)
-ec070ec6 test(sceneview-core): regression guard on Scale(1f) uniform-fill semantics
-48d74083 docs(sceneview-core): warn on the Scale(x = 1f) gotcha that broke PhysicsDemo
-6de91a47 fix(sceneview): Node / ModelNode default scale was (1, 0, 0), not (1, 1, 1)
-484d30b8 fix(brand): align SceneViewSwift Examples AccentColor with brand palette
-6b873ad4 fix(brand): migrate legacy #1A73E8 (Google blue) to #005BC1 (SceneView Primary)
-b8fcf225 feat(android-demo): regenerate launcher icons from branded source
-8a88b053 feat(android-demo): brand palette sweep — Collision + AR demos
-```
+❌ **Compte GitHub TOUJOURS suspendu** (J+9) — HTTP 403 sur toutes les API GitHub (GraphQL + REST).
 
-**Nouveau piège documenté :**
-- Pixel_7a AVD a 6 GB `/data/user/0`, dont ~5 GB pris par les system apps → seulement ~600 MB dispo pour notre APK + test APK (~250 MB). Si `installDebug` échoue avec `INSTALL_FAILED_INSUFFICIENT_STORAGE`, nettoyer `/sdcard/Download/sceneview-qa/*.jpg` (générés par les tests), `pm trim-caches`, puis potentiellement wiper l'AVD. Recréer l'AVD avec `sdcard_size=2048M` + `disk.dataPartition.size=12G` est la solution long terme.
+Le triage ne peut pas être effectué. Issues, PRs et CI/CD sont inaccessibles.
 
-### Session addendum 4 — 2026-04-24 (visual demo audit + reactive LightNode lib fix + 10s wait)
+**Action URGENTE :** Contacter GitHub Support — ticket #4280656 : https://support.github.com
 
-Surface-level visual audit of every Android demo screenshot revealed nine demos with silent
-behavioral bugs that the test harness couldn't catch (it only validates the test process
-doesn't crash). Plus one library bug that broke every interactive lighting demo.
+---
 
-**Library fix** (`3b06f56a`) :
-- `SceneScope.LightNode` composable wired only `position` into a SideEffect; `intensity`,
-  `lightDirection`, `color` were applied solely through the `LightManager.Builder` block at
-  construction time. Added a top-level `color` parameter and pushed every reactive prop
-  through SideEffect so Compose state changes drive the underlying Filament Light.
+## HEALTH CHECK — 2026-04-22 — Compte GitHub toujours suspendu
 
-**Demo fixes** (`d4312940`, `95384202`, `cd908221`, `c8587a14`) — 10 demos :
-- LightingDemo : feeds reactive intensity/color via new lib API, default 200 klx, mainLightNode=null
-- CameraControlsDemo : `key(selectedMode, resetKey)` rebuilds manipulator (Reset button now actually resets)
-- ReflectionProbesDemo : pushes cameraNode.worldPosition into cameraPos state via onFrame
-- ShapeDemo : `key(selectedShape)` rebuilds ShapeNode (lib's primitiveCount is fixed at construction, can't grow for star/hexagon)
-- AnimationDemo : scaleToUnits 1.0→0.6 + centerOrigin so dragon fits viewport ; eliminate conditional `rememberEnvironment` call
-- TextDemo : stack 3 labels vertically (left/right at x=±0.9 were outside frustum)
-- ViewNodeDemo : z=-2/scale 0.15 → z=-1/scale 0.35 so the embedded card is readable
-- SecondaryCameraDemo : rewrote as single SceneView that rotates the helmet (PiP path needed 2 SceneViews sharing one ModelInstance — broken on Pixel_7a Metal)
-- DynamicSkyDemo : neutral env + mainLightNode=null so DynamicSkyNode SUN actually drives illumination
+**Type:** Scheduled task `quality-check`
 
-**Test infra fix** (`06976c4a`) :
-- `openDemo` first-frame wait 6 s → 10 s. On cold-boot Pixel_7a Metal AVD, Filament's first
-  PBR pass arrives at 8-9 s ; 6 s captured a black SurfaceView for half the demos. 10 s
-  adds ~96 s to the 24-test suite (~17 min total) but eliminates the false-black flake.
+### Résultat
 
-**Discovered emulator gotcha** :
-- Pixel_7a AVD storage saturates after ~6 consecutive QA runs (140 screenshots × 100 KB
-  each into `/sdcard/Download/sceneview-qa/`). Beyond that, `INSTALL_FAILED_INSUFFICIENT_STORAGE`
-  blocks new APK installs AND visual quality degrades (helmet renders close to black due to
-  GPU memory pressure). Mitigation : `adb shell rm -rf /sdcard/Download/sceneview-qa/`
-  between runs. For canonical visuals : cold-boot AVD before final QA capture.
-- Documented in `~/.claude/projects/.../memory/project_emulator_storage_degradation.md`.
+⛔ **Compte GitHub TOUJOURS suspendu** (J+9 depuis le 2026-04-13) — HTTP 403 "Sorry. Your account was suspended"
 
-**QA runs** : 10 total this session (4-10 each ~15-18 min). Final QA #10 on cold-booted
-Pixel_7a with 10 s wait : 24/24 PASS, all critical demos visually verified (Lighting
-controls reactive, Star/Hexagon visible, Geometry primitives lit, SecondaryCam rotation
-works at all 4 angles).
+**Action URGENTE :** Contacter GitHub Support si pas encore fait : https://support.github.com — ticket #4280656
 
-**120 canonical screenshots refreshed** in `tools/qa-screenshots/interactions/sceneview-qa/`
-from QA #10 (commit c8587a14).
+### État des services (2026-04-22)
 
-### Session addendum 3 — 2026-04-23 night (polish pass — Gradle 10 ready + MaterialInstance generalized)
+| Service | État |
+|---|---|
+| sceneview-mcp gateway | ✅ OK |
+| hub-mcp gateway | ✅ OK (11 libs, 52 outils) |
+| telemetry worker | ✅ OK |
+| npm @latest sceneview-mcp | ✅ **4.0.2** (publié 2026-04-17) |
+| Version sync SDK (29 fichiers) | ✅ Tous alignés à 4.0.1 |
+| CI / Issues / PRs | ❌ INACCESSIBLE (compte suspendu) |
 
-Trois fixes propagation + housekeeping suite aux découvertes de la session 2 :
+### Discrepance à corriger
+- `npm @latest` = **4.0.2** (publié 2026-04-17 depuis une autre session)
+- `mcp/package.json` local = **4.0.1** → à mettre à jour en 4.0.2
 
-**Eliminated the Scale(x = 1f) virus from public-facing docs** (`4e2bd753`) :
-- `website-static/llms.txt` — served at `sceneview.github.io/llms.txt`
-- `website-static/.well-known/llms.txt` — LLM discovery alt path
-- `gpt/knowledge-api.md` — uploaded as ChatGPT knowledge corpus
-- Regenerated `mcp/dist/generated/llms-txt.js` + `mcp/llms.txt` via `npm run prepare`
-- Kept the Math.kt KDoc + MathTest.kt regression guard intact (those use `Scale(x = 1f)` deliberately to document the gotcha)
+---
 
-**Gradle 10-ready Groovy DSL migration** (`6483c2aa`) :
-- `namespace "..."` → `namespace = "..."` (5 modules)
-- `minifyEnabled true` → `minifyEnabled = true`, `shrinkResources true` → `shrinkResources = true` (android-demo)
-- `compose true` → `compose = true` (sceneview, arsceneview, android-demo, android-tv-demo, common)
-- `buildConfig true` → `buildConfig = true` (android-demo)
-- Flutter / React Native bridge modules intentionally skipped (alpha, lower priority)
+## TRIAGE AUTOMATIQUE — 2026-04-21 — Compte GitHub suspendu
 
-**MaterialInstance propagation generalized** (`cbfb8a60`) — 970ddff1 only covered SphereNode + CubeNode. Applied the same `prev*Material` + `setMaterialInstanceAt(0, …)` SideEffect pattern to all 9 remaining geometry composables :
-- CylinderNode, ConeNode, TorusNode, CapsuleNode
-- PlaneNode, LineNode, PathNode, ShapeNode
-- MeshNode (was especially blocked — material was its only state-based surface)
+**Type:** Scheduled task `daily-github-triage`
 
-Pre-fix any caller doing `val mat by remember { mutableStateOf(...) }; XxxNode(materialInstance = mat)` + later reassignment saw Compose recomposition happen but the node kept its construction-time material forever. Post-fix every geometry primitive handles reactive material swaps uniformly.
+### Résultat
 
-**Re-run validation :**
-- `:samples:android-demo:connectedDebugAndroidTest` — **32/32 PASS** (8 min 57 s). No regression.
-- `:sceneview:compileReleaseKotlin` — OK
-- `pre-push-check.sh` — 9/9 PASS
+❌ **Compte GitHub suspendu** — HTTP 403 "Sorry. Your account was suspended" sur toutes les API (GraphQL + REST).
 
-**Commits session night:**
-```
-cbfb8a60 fix(sceneview): propagate MaterialInstance reassignments to all geometry nodes
-6483c2aa chore(build): migrate Groovy DSL to property = value syntax (Gradle 10 ready)
-4e2bd753 docs: eliminate remaining Scale(x = 1f) occurrences in public docs
-```
+Le triage n'a pas pu être effectué : impossible d'accéder à l'API GitHub.
 
-**Total branch state: 42 commits ahead of main**, all local pending GitHub ban resolution.
+**Contexte :** Suspension liée au burst de PRs du 2026-04-13 (ticket GitHub #4280656). Le compte est toujours bloqué au 2026-04-21.
+
+**Action requise de Thomas :** Contacter GitHub Support pour lever la suspension, ticket #4280656. URL : https://support.github.com
+
+### État local (sans API GitHub)
+- Derniers commits : feat(mcp-gateway) scene-showcase widget, fix(widget) title sanitisation
+- Fichiers modifiés non commités : mcp-gaming, mcp-gateway/src/index.ts, mcp-interior, mcp/packages/gaming/* et interior/*
+- Aucun diagnostic CI disponible (API bloquée)
+
+---
+
+## TRIAGE AUTOMATIQUE — 2026-04-16 — Échec authentification GitHub
+
+**Type:** Scheduled task `daily-github-triage`
+
+### Résultat
+
+❌ **GitHub token invalide** — `gh auth status` retourne "The token in keyring is invalid."
+
+Le triage n'a pas pu être effectué : impossible d'accéder à l'API GitHub.
+
+**Action requise de Thomas :** Se ré-authentifier avec `gh auth login -h github.com` dans un terminal.
 
 ---
 

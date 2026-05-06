@@ -28,8 +28,8 @@
     {
       "name": "empire-dashboard",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "9191", "--directory", "tools"],
-      "port": 9191
+      "runtimeArgs": ["-m", "http.server", "9393", "--directory", "/Users/thomasgorisse/Projects/profile-private/sync"],
+      "port": 9393
     },
     {
       "name": "hub-gateway",

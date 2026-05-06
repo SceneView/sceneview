@@ -1,3 +1,11 @@
+## 4.0.3
+
+- Version alignment with SceneView v4.0.3 (Rerun Save & Share, scan-to-open deep-links, Play Store canary CI).
+
+## 4.0.2
+
+- Version alignment with SceneView v4.0.2 (Filament destroy-order crash fixes, BillboardNode mirror, ViewNode reactive props, security bumps).
+
 ## 4.0.1
 
 - Version alignment with SceneView v4.0.1

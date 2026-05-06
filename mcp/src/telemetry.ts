@@ -63,11 +63,14 @@ function isEnabled(): boolean {
   return true;
 }
 
-// Read the package version lazily so tests don't need to mock fs.
-// Falls back to "unknown" so payloads stay well-formed even if
-// something goes wrong.
+// Read the package version from the build-time generated module so the
+// telemetry payload reports the real published version. Pre-4.0.8 this
+// fell back to a hardcoded "4.0.0" string that was never bumped, which
+// made it impossible to track adoption of any new release.
+import { PACKAGE_VERSION } from "./generated/version.js";
+
 function getMcpVersion(): string {
-  return process.env.SCENEVIEW_MCP_VERSION ?? "4.0.0";
+  return process.env.SCENEVIEW_MCP_VERSION ?? PACKAGE_VERSION;
 }
 
 // Fire-and-forget POST of a single payload to the individual event endpoint.

@@ -36,7 +36,14 @@
 
 ## Wire format
 
-JSON-lines over TCP with event types: `camera_pose`, `plane`, `point_cloud`, `anchor`, `hit_result`
+JSON-lines over TCP. Two channels on the same socket:
+
+- **Events** — `camera_pose`, `plane`, `point_cloud`, `anchor`, `hit_result` (client → sidecar)
+- **Control** — `{"type":"control","cmd":"save_now"}` (client → sidecar) and `{"type":"control","ack":"saved","path":…,"viewerUrl":…}` (sidecar → client)
+
+## Save & share
+
+Run sidecar with `--save` to write a shareable `.rrd` instead of spawning the live viewer. The Android app's `RerunBridge.requestSaveAndShare(callback)` triggers a flush via the control channel and surfaces the resulting path + viewer URL in a dialog. Re-host the `.rrd` and open `https://sceneview.github.io/rerun/?url=<encoded>` to view in any browser.
 
 ## Built on SceneView SDK
 

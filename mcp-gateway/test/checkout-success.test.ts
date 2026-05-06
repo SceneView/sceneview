@@ -100,7 +100,11 @@ describe("GET /checkout/success", () => {
     // Any future refactor that re-introduces either of these two bugs
     // has to delete a passing test first, which is a big red flag.
     expect(body).toContain("&quot;command&quot;: &quot;npx&quot;");
-    expect(body).toContain("sceneview-mcp@beta");
+    // Pre-4.0 the install instructions had to use @beta because @latest
+    // pointed at 3.6.x which had no proxy. Since 4.0 the proxy ships in
+    // @latest itself, so no tag suffix is needed.
+    expect(body).toContain("sceneview-mcp");
+    expect(body).not.toContain("sceneview-mcp@beta");
     expect(body).toContain("&quot;SCENEVIEW_API_KEY&quot;");
     expect(body).toContain("sceneview-mcp.mcp-tools-lab.workers.dev/mcp");
     expect(body).not.toContain("https://sceneview-mcp.workers.dev/mcp");

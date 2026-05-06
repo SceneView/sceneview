@@ -48,7 +48,7 @@ Ne pas toucher mcp/ (package sceneview-mcp).
 | healthcare-3d-mcp | ? | sceneview monorepo `mcp/packages/healthcare/` | OK |
 
 **Deprecated (7 packages ~1 608 DL/mo décroissant)** :
-ai-invoice, cooking-mcp, travel-mcp, devops-mcp, @thomasgorisse/seo-mcp,
+ai-invoice, cooking-mcp, travel-mcp, devops-mcp, seo-mcp (deprecated),
 gaming-3d-mcp, interior-design-3d-mcp
 **→ NE PAS inclure dans le gateway.** Décision session 2026-04-11 09:57.
 

@@ -150,6 +150,114 @@ final class RerunWireFormatTests: XCTestCase {
         XCTAssertTrue(line.contains("\"polygon\":[]"))
     }
 
+    // MARK: - Tier-S event types: camera trail + scalar
+
+    func testCameraTrailEmitsCanonicalJsonLineWithDefaultEntity() {
+        let line = RerunWireFormat.cameraTrailJson(
+            timestampNanos: 99,
+            positions: [0, 0, 0, 1, 0, 0, 1, 1, 0]
+        )
+        let expected =
+            "{\"t\":99,\"type\":\"camera_trail\",\"entity\":\"world/camera/trail\"," +
+            "\"positions\":[[0.0,0.0,0.0],[1.0,0.0,0.0],[1.0,1.0,0.0]]}\n"
+        XCTAssertEqual(line, expected)
+    }
+
+    func testCameraTrailWithEmptyPositionsEmitsEmptyList() {
+        let line = RerunWireFormat.cameraTrailJson(
+            timestampNanos: 1,
+            positions: []
+        )
+        XCTAssertTrue(line.contains("\"positions\":[]"))
+    }
+
+    func testCameraTrailTruncatesTrailingPartialPoint() {
+        let line = RerunWireFormat.cameraTrailJson(
+            timestampNanos: 1,
+            positions: [1, 2, 3, 4]
+        )
+        XCTAssertTrue(line.contains("[1.0,2.0,3.0]"))
+        XCTAssertFalse(line.contains("4.0"))
+    }
+
+    func testScalarEmitsCanonicalJsonLine() {
+        let line = RerunWireFormat.scalarJson(
+            timestampNanos: 200,
+            value: 0.95,
+            entity: "world/camera/tracking_quality"
+        )
+        let expected =
+            "{\"t\":200,\"type\":\"scalar\",\"entity\":\"world/camera/tracking_quality\"," +
+            "\"value\":0.95}\n"
+        XCTAssertEqual(line, expected)
+    }
+
+    func testScalarHandlesNonFiniteValuesByClampingToZero() {
+        let line = RerunWireFormat.scalarJson(
+            timestampNanos: 1,
+            value: Float.nan,
+            entity: "world/metric"
+        )
+        XCTAssertTrue(line.contains("\"value\":0"))
+    }
+
+    // MARK: - Control protocol
+
+    func testControlSaveNowEmitsCanonicalControlLine() {
+        let line = RerunWireFormat.controlSaveNow()
+        XCTAssertEqual(line, "{\"type\":\"control\",\"cmd\":\"save_now\"}\n")
+    }
+
+    func testParseControlAckRecognisesSavedAck() {
+        let ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"saved\"," +
+                "\"path\":\"/Users/dev/.sceneview/recordings/2026-05-06.rrd\"," +
+                "\"events\":1234," +
+                "\"viewerUrl\":\"https://sceneview.github.io/rerun/?url=file%3A%2F%2F%2Ftmp%2Fa.rrd\"}"
+        )
+        XCTAssertNotNil(ack)
+        XCTAssertTrue(ack!.success)
+        XCTAssertEqual(ack!.path, "/Users/dev/.sceneview/recordings/2026-05-06.rrd")
+        XCTAssertEqual(ack!.events, 1234)
+        XCTAssertEqual(ack!.viewerUrl,
+                       "https://sceneview.github.io/rerun/?url=file%3A%2F%2F%2Ftmp%2Fa.rrd")
+        XCTAssertNil(ack!.reason)
+    }
+
+    func testParseControlAckRecognisesSaveUnsupportedAck() {
+        let ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"save_unsupported\"," +
+                "\"reason\":\"sidecar started in live mode; relaunch with --save\"}"
+        )
+        XCTAssertNotNil(ack)
+        XCTAssertFalse(ack!.success)
+        XCTAssertNil(ack!.path)
+        XCTAssertEqual(ack!.reason, "sidecar started in live mode; relaunch with --save")
+    }
+
+    func testParseControlAckReturnsNilForNonControlLines() {
+        let line = RerunWireFormat.cameraPoseJson(
+            timestampNanos: 1,
+            tx: 0, ty: 0, tz: 0, qx: 0, qy: 0, qz: 0, qw: 1
+        )
+        XCTAssertNil(RerunWireFormat.parseControlAck(line))
+        XCTAssertNil(RerunWireFormat.parseControlAck("{\"type\":\"control\"}"))
+        XCTAssertNil(RerunWireFormat.parseControlAck("{}"))
+        XCTAssertNil(RerunWireFormat.parseControlAck("not json"))
+    }
+
+    func testParseControlAckHandlesEscapedCharactersInPath() {
+        let ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"saved\"," +
+                "\"path\":\"C:\\\\Users\\\\d\\u00e9v\\\\rec.rrd\"}"
+        )
+        XCTAssertNotNil(ack)
+        XCTAssertTrue(ack!.success)
+        XCTAssertEqual(ack!.path, "C:\\Users\\dév\\rec.rrd")
+    }
+
+    // MARK: - Newline invariant
+
     func testEverySerializedLineContainsExactlyOneNewlineAtTheEnd() {
         let lines = [
             RerunWireFormat.cameraPoseJson(timestampNanos: 1, tx: 0, ty: 0, tz: 0, qx: 0, qy: 0, qz: 0, qw: 1),

@@ -279,6 +279,181 @@ public enum RerunWireFormat {
 
     #endif
 
+    // MARK: - Tier-S event types: camera trail + tracking-quality scalar
+
+    /// Camera trail event — one polyline through every accumulated camera
+    /// position so far. The Python sidecar maps this to `rr.LineStrips3D`,
+    /// giving Rerun viewers a 3D trace of how the operator moved their
+    /// phone during the session.
+    ///
+    /// `positions` is a flat `[x0, y0, z0, x1, y1, z1, …]` buffer; the
+    /// caller is responsible for keeping it bounded (e.g. ring-buffer the
+    /// last N samples) so the JSON line doesn't blow up over long sessions.
+    public static func cameraTrailJson(
+        timestampNanos: Int64,
+        positions: [Float],
+        entity: String = "world/camera/trail"
+    ) -> String {
+        let n = positions.count / 3
+        var s = ""
+        s.reserveCapacity(64 + n * 28)
+        s.append("{")
+        appendCommonHeader(&s, timestampNanos: timestampNanos, type: "camera_trail", entity: entity)
+        s.append(",\"positions\":[")
+        for i in 0..<n {
+            if i > 0 { s.append(",") }
+            s.append("[")
+            appendFloat(&s, positions[i * 3]); s.append(",")
+            appendFloat(&s, positions[i * 3 + 1]); s.append(",")
+            appendFloat(&s, positions[i * 3 + 2])
+            s.append("]")
+        }
+        s.append("]}\n")
+        return s
+    }
+
+    /// Generic scalar timeseries event. The Python sidecar maps this to
+    /// `rr.Scalars` so the value appears as a graph in the viewer's
+    /// timeline panel. Use it for ARKit `trackingState` quality, feature
+    /// point count, or any per-frame health metric.
+    public static func scalarJson(
+        timestampNanos: Int64,
+        value: Float,
+        entity: String
+    ) -> String {
+        var s = ""
+        s.reserveCapacity(96)
+        s.append("{")
+        appendCommonHeader(&s, timestampNanos: timestampNanos, type: "scalar", entity: entity)
+        s.append(",\"value\":")
+        appendFloat(&s, value)
+        s.append("}\n")
+        return s
+    }
+
+    // MARK: - Control protocol
+    //
+    // In addition to event lines (camera_pose / plane / point_cloud / …) the
+    // bridge can send "control" lines to ask the Python sidecar to perform
+    // an action. The sidecar acknowledges by writing a single JSON line back
+    // on the same socket.
+    //
+    // Wire format:
+    //   client -> sidecar : {"type":"control","cmd":"save_now"}
+    //   sidecar -> client : {"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}
+    //                       {"type":"control","ack":"save_unsupported","reason":"…"}
+    //
+    // Mirrors `RerunWireFormat.controlSaveNow()` and `parseControlAck` on the
+    // Kotlin side — adding a new command requires touching both files plus
+    // the Python sidecar generator (`mcp/packages/rerun/src/python-sidecar.ts`).
+
+    /// "Save the current recording and reply with the resulting path + URL."
+    public static func controlSaveNow() -> String {
+        return "{\"type\":\"control\",\"cmd\":\"save_now\"}\n"
+    }
+
+    /// Parsed acknowledgment from the sidecar after a `save_now` command.
+    public struct ControlAck: Equatable {
+        /// `true` iff the sidecar wrote a file successfully.
+        public let success: Bool
+        /// Local path of the .rrd on the sidecar host (dev machine).
+        public let path: String?
+        /// URL into the SceneView Rerun viewer that already encodes the
+        /// recording's location. Useful as a copy-paste hint — file:// URLs
+        /// won't be fetched from an HTTPS page, so re-host first.
+        public let viewerUrl: String?
+        /// Number of events that made it into the file.
+        public let events: Int
+        /// Human-readable error reason on failure (e.g. live-mode sidecar).
+        public let reason: String?
+    }
+
+    /// Best-effort parser for one JSON-lines string emitted by the sidecar.
+    ///
+    /// Returns `nil` if the line is not a control acknowledgment we
+    /// recognise — callers should ignore it and keep reading. Hand-parsed
+    /// (no `JSONDecoder`) to mirror the Kotlin parser byte-for-byte.
+    public static func parseControlAck(_ line: String) -> ControlAck? {
+        if !line.contains("\"type\":\"control\"") { return nil }
+        if !line.contains("\"ack\"") { return nil }
+
+        guard let ack = extractStringField(line, name: "ack") else { return nil }
+        switch ack {
+        case "saved":
+            return ControlAck(
+                success: true,
+                path: extractStringField(line, name: "path"),
+                viewerUrl: extractStringField(line, name: "viewerUrl"),
+                events: extractIntField(line, name: "events") ?? 0,
+                reason: nil
+            )
+        default:
+            return ControlAck(
+                success: false,
+                path: nil,
+                viewerUrl: nil,
+                events: 0,
+                reason: extractStringField(line, name: "reason") ?? ack
+            )
+        }
+    }
+
+    private static func extractStringField(_ line: String, name: String) -> String? {
+        let key = "\"\(name)\":\""
+        guard let keyRange = line.range(of: key) else { return nil }
+        var i = keyRange.upperBound
+        var out = ""
+        while i < line.endIndex {
+            let c = line[i]
+            if c == "\\" {
+                let next = line.index(after: i)
+                guard next < line.endIndex else { return nil }
+                let esc = line[next]
+                switch esc {
+                case "\"", "\\", "/": out.append(esc)
+                case "n": out.append("\n")
+                case "r": out.append("\r")
+                case "t": out.append("\t")
+                case "u":
+                    let hexStart = line.index(after: next)
+                    guard let hexEnd = line.index(hexStart, offsetBy: 4, limitedBy: line.endIndex) else { return nil }
+                    if let code = UInt32(line[hexStart..<hexEnd], radix: 16),
+                       let scalar = Unicode.Scalar(code) {
+                        out.append(Character(scalar))
+                    }
+                    i = hexEnd
+                    continue
+                default: out.append(esc)
+                }
+                i = line.index(after: next)
+                continue
+            }
+            if c == "\"" { return out }
+            out.append(c)
+            i = line.index(after: i)
+        }
+        return nil
+    }
+
+    private static func extractIntField(_ line: String, name: String) -> Int? {
+        let key = "\"\(name)\":"
+        guard let keyRange = line.range(of: key) else { return nil }
+        var i = keyRange.upperBound
+        // Skip whitespace.
+        while i < line.endIndex, line[i].isWhitespace { i = line.index(after: i) }
+        let numStart = i
+        if i < line.endIndex, line[i] == "-" || line[i] == "+" {
+            i = line.index(after: i)
+        }
+        while i < line.endIndex,
+              let av = line[i].asciiValue,
+              av >= 0x30, av <= 0x39 {
+            i = line.index(after: i)
+        }
+        if numStart == i { return nil }
+        return Int(line[numStart..<i])
+    }
+
     // MARK: - Helpers
 
     private static func appendCommonHeader(

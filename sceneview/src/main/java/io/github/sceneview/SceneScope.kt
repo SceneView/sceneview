@@ -347,8 +347,9 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
      * @param intensity  Luminous intensity in candela (point/spot) or lux (directional/sun).
      * @param direction  Direction vector for directional/spot/sun lights.
      * @param position   World-space position of the light node.
+     * @param color      Linear RGB light colour (defaults to white when null).
      * @param apply      Builder configuration for [LightManager.Builder] — for advanced properties
-     *                   (color, falloff, spotLightCone, sunAngularRadius, etc.).
+     *                   (falloff, spotLightCone, sunAngularRadius, etc.).
      * @param nodeApply  Additional imperative configuration on the [LightNodeImpl] after creation.
      * @param content    Optional child nodes declared in a [NodeScope].
      */
@@ -356,9 +357,9 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
     fun LightNode(
         type: LightManager.Type,
         intensity: Float? = null,
-        color: io.github.sceneview.math.Color? = null,
         direction: Direction? = null,
         position: Position = Position(x = 0f),
+        color: io.github.sceneview.math.Color? = null,
         apply: LightManager.Builder.() -> Unit = {},
         nodeApply: LightNodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null

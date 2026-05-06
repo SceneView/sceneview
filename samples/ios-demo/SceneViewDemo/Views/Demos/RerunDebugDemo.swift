@@ -36,6 +36,10 @@ struct RerunDebugDemo: View {
         rateHz: 10
     )
 
+    @State private var sharing: Bool = false
+    @State private var shareResult: RerunBridge.ShareResult? = nil
+    @State private var shareSheetItem: ShareSheetItem? = nil
+
     var body: some View {
         ZStack {
             #if !targetEnvironment(simulator)
@@ -55,11 +59,73 @@ struct RerunDebugDemo: View {
                 statusPill
                 Spacer()
                 infoPanel
+                shareButton
             }
             .padding()
         }
         .onAppear { bridge.connect() }
         .onDisappear { bridge.disconnect() }
+        .alert(
+            shareResult?.success == true ? "Recording saved" : "Couldn't save",
+            isPresented: Binding(
+                get: { shareResult != nil },
+                set: { if !$0 { shareResult = nil } }
+            ),
+            presenting: shareResult
+        ) { result in
+            if result.success, let url = result.viewerUrl {
+                Button("Share link") {
+                    shareSheetItem = ShareSheetItem(text: url)
+                }
+                Button("Copy viewer URL") {
+                    UIPasteboard.general.string = url
+                }
+                if let path = result.path {
+                    Button("Copy path") {
+                        UIPasteboard.general.string = path
+                    }
+                }
+                Button("Done", role: .cancel) {}
+            } else {
+                Button("Close", role: .cancel) {}
+            }
+        } message: { result in
+            if result.success {
+                Text("\(result.events) events recorded. Re-host the .rrd on a public URL and share the link to view in any browser.")
+            } else {
+                Text(result.reason ?? "The sidecar didn't acknowledge the save command.")
+            }
+        }
+        .sheet(item: $shareSheetItem) { item in
+            ActivityView(activityItems: [item.text])
+        }
+    }
+
+    private var shareButton: some View {
+        Button {
+            guard !sharing else { return }
+            sharing = true
+            bridge.requestSaveAndShare { result in
+                DispatchQueue.main.async {
+                    sharing = false
+                    shareResult = result
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "square.and.arrow.up")
+                Text(sharing ? "Saving on dev machine…" : "Save & Share recording")
+                    .fontWeight(.semibold)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(Color.purple.opacity(0.85))
+            .clipShape(Capsule())
+        }
+        .disabled(sharing)
+        .padding(.top, 8)
     }
 
     private var statusPill: some View {
@@ -90,6 +156,23 @@ struct RerunDebugDemo: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.black.opacity(0.72))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// Wraps a String so SwiftUI's `.sheet(item:)` accepts it (the closure
+    /// requires `Identifiable`).
+    private struct ShareSheetItem: Identifiable {
+        let id = UUID()
+        let text: String
+    }
+
+    /// Tiny `UIActivityViewController` bridge so we can present the system
+    /// share sheet from SwiftUI without depending on iOS 16's `ShareLink`.
+    private struct ActivityView: UIViewControllerRepresentable {
+        let activityItems: [Any]
+        func makeUIViewController(context: Context) -> UIActivityViewController {
+            UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        }
+        func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
     }
 
     private var simulatorPlaceholder: some View {

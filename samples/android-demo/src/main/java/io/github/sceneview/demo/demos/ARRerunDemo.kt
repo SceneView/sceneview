@@ -1,6 +1,12 @@
 package io.github.sceneview.demo.demos
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.view.MotionEvent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,12 +36,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
@@ -76,6 +87,9 @@ fun ARRerunDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var host by remember { mutableStateOf(RerunBridge.DEFAULT_HOST) }
     var port by remember { mutableStateOf(RerunBridge.DEFAULT_PORT.toString()) }
     var isConnected by remember { mutableStateOf(false) }
@@ -88,6 +102,9 @@ fun ARRerunDemo(onBack: () -> Unit) {
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
     var showHelp by remember { mutableStateOf(false) }
     val anchors = remember { mutableStateListOf<Anchor>() }
+
+    var sharing by remember { mutableStateOf(false) }
+    var shareResult by remember { mutableStateOf<RerunBridge.ShareResult?>(null) }
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
@@ -226,6 +243,33 @@ fun ARRerunDemo(onBack: () -> Unit) {
                     frameCount = frameCount,
                     lastPose = lastCameraPose
                 )
+                Spacer(Modifier.height(4.dp))
+                Button(
+                    onClick = {
+                        if (sharing) return@Button
+                        sharing = true
+                        bridge.requestSaveAndShare { result ->
+                            scope.launch {
+                                withContext(Dispatchers.Main) {
+                                    sharing = false
+                                    shareResult = result
+                                }
+                            }
+                        }
+                    },
+                    enabled = !sharing,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (sharing) "Saving on dev machine\u2026"
+                        else "Save & Share recording"
+                    )
+                }
+                Text(
+                    text = "Requires the Python sidecar to be running with --save",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     ) {
@@ -290,6 +334,33 @@ fun ARRerunDemo(onBack: () -> Unit) {
                         }
                     }
                 }
+            }
+
+            // Share result dialog
+            shareResult?.let { result ->
+                ShareResultDialog(
+                    result = result,
+                    onDismiss = { shareResult = null },
+                    onCopyPath = { path ->
+                        copyToClipboard(context, "Path", path)
+                        Toast.makeText(context, "Path copied", Toast.LENGTH_SHORT).show()
+                    },
+                    onCopyUrl = { url ->
+                        copyToClipboard(context, "Viewer URL", url)
+                        Toast.makeText(context, "Viewer URL copied", Toast.LENGTH_SHORT).show()
+                    },
+                    onShare = onShare@{ url ->
+                        if (url.isNullOrBlank()) return@onShare
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, url)
+                            putExtra(Intent.EXTRA_SUBJECT, "AR session — SceneView")
+                        }
+                        context.startActivity(
+                            Intent.createChooser(intent, "Share AR session")
+                        )
+                    },
+                )
             }
 
             // Status overlay
@@ -498,4 +569,91 @@ private fun HelpDialog(onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text("Got it") }
         }
     )
+}
+
+@Composable
+private fun ShareResultDialog(
+    result: RerunBridge.ShareResult,
+    onDismiss: () -> Unit,
+    onCopyPath: (String) -> Unit,
+    onCopyUrl: (String) -> Unit,
+    onShare: (String?) -> Unit,
+) {
+    val viewerUrl = result.viewerUrl
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(if (result.success) "Recording saved" else "Couldn't save")
+        },
+        text = {
+            if (result.success) {
+                ShareResultBody(result, onCopyPath, onCopyUrl)
+            } else {
+                Text(
+                    text = result.reason
+                        ?: "The sidecar didn't acknowledge the save command.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        },
+        confirmButton = {
+            if (result.success && viewerUrl != null) {
+                TextButton(onClick = { onShare(viewerUrl) }) { Text("Share link") }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Close") }
+            }
+        },
+        dismissButton = if (result.success) {
+            { TextButton(onClick = onDismiss) { Text("Done") } }
+        } else null,
+    )
+}
+
+@Composable
+private fun ShareResultBody(
+    result: RerunBridge.ShareResult,
+    onCopyPath: (String) -> Unit,
+    onCopyUrl: (String) -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "${result.events} events recorded.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        result.path?.let { path ->
+            Text("Saved on the dev machine:", style = MaterialTheme.typography.labelMedium)
+            Text(
+                path,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = { onCopyPath(path) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Copy path") }
+        }
+        result.viewerUrl?.let { url ->
+            Text(
+                "Re-host this .rrd on a public URL (R2, GitHub release, gist) and " +
+                    "open the viewer at:",
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Text(
+                url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            OutlinedButton(
+                onClick = { onCopyUrl(url) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Copy viewer URL") }
+        }
+    }
+}
+
+private fun copyToClipboard(context: Context, label: String, text: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText(label, text))
 }

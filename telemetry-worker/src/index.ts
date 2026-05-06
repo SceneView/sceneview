@@ -234,8 +234,14 @@ app.get("/v1/stats", async (c) => {
     }
   }
 
+  // Period selector: ?days=1|7|30|90 (default: 1 → preserves prior 24h behavior)
+  const rawDays = c.req.query("days") ?? "1";
+  const days = Math.min(Math.max(parseInt(rawDays, 10) || 1, 1), 90);
+  const window = `-${days} days`;
+  const period = days === 1 ? "24h" : `${days}d`;
+
   try {
-    const [totals, topTools, versions] = await Promise.all([
+    const [totals, topTools, versions, tiers, clientVers] = await Promise.all([
       c.env.DB.prepare(
         `SELECT
            COUNT(*) as total,
@@ -243,30 +249,62 @@ app.get("/v1/stats", async (c) => {
            COUNT(CASE WHEN event = 'tool' THEN 1 END) as tools,
            COUNT(DISTINCT client) as unique_clients
          FROM events
-         WHERE ingested > datetime('now', '-24 hours')`,
-      ).first(),
+         WHERE ingested > datetime('now', ?)`,
+      )
+        .bind(window)
+        .first(),
       c.env.DB.prepare(
         `SELECT tool, COUNT(*) as count
          FROM events
-         WHERE event = 'tool' AND ingested > datetime('now', '-24 hours')
+         WHERE event = 'tool' AND ingested > datetime('now', ?)
          GROUP BY tool
          ORDER BY count DESC
          LIMIT 20`,
-      ).all(),
+      )
+        .bind(window)
+        .all(),
       c.env.DB.prepare(
         `SELECT mcp_ver, COUNT(*) as count
          FROM events
-         WHERE ingested > datetime('now', '-24 hours')
+         WHERE ingested > datetime('now', ?)
          GROUP BY mcp_ver
          ORDER BY count DESC`,
-      ).all(),
+      )
+        .bind(window)
+        .all(),
+      // Tier breakdown — free vs pro distribution (events + unique users)
+      c.env.DB.prepare(
+        `SELECT tier,
+                COUNT(*) as count,
+                COUNT(DISTINCT client) as unique_clients
+         FROM events
+         WHERE ingested > datetime('now', ?)
+         GROUP BY tier
+         ORDER BY count DESC`,
+      )
+        .bind(window)
+        .all(),
+      // Claude Code / client version distribution (top 10)
+      c.env.DB.prepare(
+        `SELECT client_ver, COUNT(*) as count, COUNT(DISTINCT client) as unique_clients
+         FROM events
+         WHERE ingested > datetime('now', ?) AND client_ver != ''
+         GROUP BY client_ver
+         ORDER BY count DESC
+         LIMIT 10`,
+      )
+        .bind(window)
+        .all(),
     ]);
 
     return c.json({
-      period: "24h",
+      period,
+      days,
       totals,
       topTools: topTools.results,
       versions: versions.results,
+      tiers: tiers.results,
+      clientVersions: clientVers.results,
     });
   } catch {
     return c.json({ error: "query_failed" }, 500);
@@ -397,6 +435,121 @@ app.get("/v1/timeseries", async (c) => {
     }
 
     return c.json({ metric, days, data: rows });
+  } catch {
+    return c.json({ error: "query_failed" }, 500);
+  }
+});
+
+// ── Top clients endpoint (most active users) ─────────────────────────────────
+app.get("/v1/top-clients", async (c) => {
+  const token = c.env.STATS_TOKEN;
+  if (token) {
+    const auth = c.req.header("Authorization") ?? "";
+    if (auth !== `Bearer ${token}`) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+  }
+
+  const days = Math.min(
+    Math.max(parseInt(c.req.query("days") ?? "7", 10) || 7, 1),
+    90,
+  );
+  const limit = Math.min(
+    Math.max(parseInt(c.req.query("limit") ?? "20", 10) || 20, 1),
+    100,
+  );
+  const window = `-${days} days`;
+
+  try {
+    const result = await c.env.DB.prepare(
+      `SELECT
+         client,
+         COUNT(*) as events,
+         COUNT(CASE WHEN event = 'tool' THEN 1 END) as tool_calls,
+         MAX(ingested) as last_seen,
+         MIN(ingested) as first_seen,
+         (SELECT tier FROM events e2 WHERE e2.client = events.client ORDER BY ingested DESC LIMIT 1) as tier,
+         (SELECT mcp_ver FROM events e2 WHERE e2.client = events.client ORDER BY ingested DESC LIMIT 1) as mcp_ver,
+         (SELECT client_ver FROM events e2 WHERE e2.client = events.client ORDER BY ingested DESC LIMIT 1) as client_ver
+       FROM events
+       WHERE ingested > datetime('now', ?)
+       GROUP BY client
+       ORDER BY events DESC
+       LIMIT ?`,
+    )
+      .bind(window, limit)
+      .all();
+
+    return c.json({ days, limit, clients: result.results });
+  } catch {
+    return c.json({ error: "query_failed" }, 500);
+  }
+});
+
+// ── Funnel endpoint (conversion: install → first call → 10th call → pro) ─────
+app.get("/v1/funnel", async (c) => {
+  const token = c.env.STATS_TOKEN;
+  if (token) {
+    const auth = c.req.header("Authorization") ?? "";
+    if (auth !== `Bearer ${token}`) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+  }
+
+  const days = Math.min(
+    Math.max(parseInt(c.req.query("days") ?? "30", 10) || 30, 1),
+    90,
+  );
+  const window = `-${days} days`;
+
+  try {
+    // Single query computing per-client aggregates, then summarizing into funnel buckets
+    const stages = await c.env.DB.prepare(
+      `WITH per_client AS (
+         SELECT
+           client,
+           COUNT(CASE WHEN event = 'init' THEN 1 END) as inits,
+           COUNT(CASE WHEN event = 'tool' THEN 1 END) as tools,
+           MAX(CASE WHEN tier = 'pro' THEN 1 ELSE 0 END) as is_pro
+         FROM events
+         WHERE ingested > datetime('now', ?)
+         GROUP BY client
+       )
+       SELECT
+         COUNT(*) as installed,
+         COUNT(CASE WHEN tools >= 1 THEN 1 END) as activated,
+         COUNT(CASE WHEN tools >= 10 THEN 1 END) as engaged,
+         COUNT(CASE WHEN tools >= 50 THEN 1 END) as power_users,
+         COUNT(CASE WHEN is_pro = 1 THEN 1 END) as pro_users
+       FROM per_client`,
+    )
+      .bind(window)
+      .first<{
+        installed: number;
+        activated: number;
+        engaged: number;
+        power_users: number;
+        pro_users: number;
+      }>();
+
+    const installed = stages?.installed ?? 0;
+    const activated = stages?.activated ?? 0;
+    const engaged = stages?.engaged ?? 0;
+    const power = stages?.power_users ?? 0;
+    const pro = stages?.pro_users ?? 0;
+    const pct = (n: number) =>
+      installed > 0 ? +((n / installed) * 100).toFixed(1) : 0;
+
+    return c.json({
+      days,
+      stages: [
+        { stage: "installed", label: "Installed (any event)", count: installed, pct: 100 },
+        { stage: "activated", label: "≥1 tool call", count: activated, pct: pct(activated) },
+        { stage: "engaged", label: "≥10 tool calls", count: engaged, pct: pct(engaged) },
+        { stage: "power_users", label: "≥50 tool calls", count: power, pct: pct(power) },
+        { stage: "pro_users", label: "Pro tier", count: pro, pct: pct(pro) },
+      ],
+    });
   } catch {
     return c.json({ error: "query_failed" }, 500);
   }

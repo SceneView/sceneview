@@ -105,7 +105,12 @@ fun DemoListScreen(onDemoClick: (String) -> Unit) {
                 ) {
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "SceneView v4.0.0-rc.1",
+                        // BuildConfig.VERSION_NAME comes straight from the
+                        // versionName passed to the build (gradle.properties for
+                        // local builds, the Play Store CI for release builds —
+                        // see .github/workflows/play-store.yml). Hard-coding
+                        // it here drifts every release.
+                        text = "SceneView v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

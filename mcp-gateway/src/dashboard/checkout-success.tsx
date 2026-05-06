@@ -30,7 +30,7 @@ export const CheckoutSuccess: FC<CheckoutSuccessProps> = (props) => {
   const tierLabel =
     props.tier === "team" ? "Team" : props.tier === "pro" ? "Pro" : "Free";
   // Claude Desktop does NOT yet support HTTP MCP servers — only stdio.
-  // So we ship the npm lite package (`sceneview-mcp@beta`) which runs
+  // So we ship the npm lite package (`sceneview-mcp`) which runs
   // locally and forwards Pro tool calls to the gateway. Any buyer who
   // copy-pastes this lands in a working state after restarting Claude
   // Desktop. See .claude/NOTICE-2026-04-11-mcp-gateway-live.md §7.
@@ -38,7 +38,7 @@ export const CheckoutSuccess: FC<CheckoutSuccessProps> = (props) => {
   "mcpServers": {
     "sceneview": {
       "command": "npx",
-      "args": ["-y", "sceneview-mcp@beta"],
+      "args": ["-y", "sceneview-mcp"],
       "env": {
         "SCENEVIEW_API_KEY": "${props.apiKey}"
       }

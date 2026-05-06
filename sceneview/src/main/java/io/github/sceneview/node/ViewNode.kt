@@ -185,16 +185,15 @@ class ViewNode(
     }
 
     override fun destroy() {
-        // Order matters — super.destroy() (Node/RenderableNode) removes the Renderable
-        // component that references our MaterialInstance. Destroying the MI before that
-        // trips Filament's commit check:
-        //   "destroying MaterialInstance 'view' which is still in use by Renderable"
-        // Same lifecycle pattern as ImageNode. Texture + Stream are deliberately not
-        // destroyed here — the Engine teardown reclaims them safely, and destroying a
-        // SurfaceTexture-backed external texture early races with Android's surface pool.
         windowManager.removeView(layout)
+        // Capture MI before super.destroy() removes the renderable component (after which
+        // getMaterialInstanceAt would fail). Destroy in order: renderable (via super) → MI → texture
+        // → stream, so Filament never sees a live texture binding on a dead MI or renderable.
+        val mi = materialInstance
         super.destroy()
-        materialLoader.destroyMaterialInstance(materialInstance)
+        materialLoader.destroyMaterialInstance(mi)
+        engine.safeDestroyTexture(texture)
+        engine.safeDestroyStream(stream)
     }
 
     /**
@@ -251,6 +250,8 @@ class ViewNode(
         private val windowManager =
             context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
 
+        private var destroyed = false
+
         val layout by lazy {
             FrameLayout(context).also {
                 context.findActivity()?.let { activity ->
@@ -274,10 +275,14 @@ class ViewNode(
          * Therefore, we must use post to ensure that the window is only added after resume is finished.
          */
         fun resume(ownerView: View) {
+            if (destroyed) return
             // A ownerView can only be added to the WindowManager after the activity has finished resuming.
             // Therefore, we must use post to ensure that the window is only added after resume is finished.
             ownerView.post {
-                if (ownerView.isAttachedToWindow) {
+                // Recheck after the post: destroy() may have run while we were queued — without this
+                // guard the layout would be re-attached to the system WindowManager *after* it was
+                // explicitly torn down, leaking the window for the lifetime of the process.
+                if (!destroyed && ownerView.isAttachedToWindow) {
                     tryAttachingView()
                 }
             }
@@ -292,6 +297,7 @@ class ViewNode(
         }
 
         fun destroy() {
+            destroyed = true
             tryDetachingView()
         }
 
@@ -322,7 +328,7 @@ class ViewNode(
 }
 
 
-private fun Context.findActivity(): ComponentActivity? {
+internal fun Context.findActivity(): ComponentActivity? {
     return generateSequence(this) { (it as? ContextWrapper)?.baseContext }.filterIsInstance<ComponentActivity>()
         .firstOrNull()
 }

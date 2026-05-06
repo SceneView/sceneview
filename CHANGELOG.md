@@ -1,5 +1,73 @@
 # Changelog
 
+## v4.0.3 — Save & Share Rerun + scan-to-open deep-links (2026-05-06)
+
+**Status:** stable. Maven Central, Swift Package Manager, npm, and Play Store artifacts are published from this tag.
+
+### New — Rerun.io self-serve hosted viewer
+
+- `sceneview.github.io/rerun/` page added — drop a `.rrd` recording on it (or paste a URL) and SceneView opens the embedded Rerun Web Viewer with the right defaults. Removes the need to install the Rerun desktop app for quick AR-debug shares (afe1cc94).
+- `RerunBridge.recordToFile(...)` + `share(...)` (`Tier-S` events) ship on Android and iOS with full parity. iOS uses the native share sheet; Android uses `MediaStore`. Wire-format goldens updated (4b8993dd, fa1f8bc1).
+- One-command review guide `.claude/scripts/check-rerun.sh` for the Save & Share MVP (58c74d3f).
+
+### New — scan-to-open deep-links
+
+- `https://sceneview.github.io/open/?demo=<id>` resolves to the published Play Store / App Store apps with the right demo pre-selected. README, website, docs all expose QR codes that route from web → installed app → specific demo (e49d4062, c95ed0d6).
+- Android App Links: `.well-known/assetlinks.json` now ships both Play App Signing and upload-key SHA-256 fingerprints — the production-signed APK is now correctly verified by Android (133df8ff).
+- iOS Universal Links: `SceneViewDemo.entitlements` now declares `applinks:sceneview.github.io` (Associated Domains capability). Pairs with the existing `apple-app-site-association` published on the website (932ac8dc).
+
+### Improved — Play Store CI (canary pattern)
+
+- Push to `main` → AAB uploaded to the Play Store **internal** track only (snapshot for dogfooding) (12f3a5ab).
+- Tag `v[0-9]+.[0-9]+.[0-9]+` (this release) → AAB uploaded to internal + production **in parallel** (canary pattern). The `v4.0.3` tag triggers both jobs concurrently (1e247180).
+- A real release no longer requires a manual Play Console step — once green CI on the tag, the production review is auto-submitted.
+
+### Fixed — android-demo About version
+
+- `AboutTab` was hard-coding `"v4.0.0-rc.1"`; now reads `BuildConfig.VERSION_NAME` so the published build always shows the truthful version (f516387f).
+
+### Internal
+
+- 11 commits in this release, all on `main`. Tag `v4.0.3` is the GA cut.
+
+---
+
+## v4.0.2 — Crash hardening & reactive ViewNode props (2026-05-06)
+
+**Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.
+
+### Fixed — Filament destroy-order crashes
+
+- `RenderableNode.destroy()` now destroys the renderable component before the entity, fixing the `MaterialInstance "view" still in use by Renderable` SIGABRT seen on screen navigation (#849, closes #837, #847).
+- `PlaneRenderer.destroy()` routes through `MaterialLoader.destroyMaterial()` to prevent double-free on AR scene teardown (#850).
+- `ViewNode.destroy()` and `rememberViewNodeManager` hardened against the post-destroy race that left a leaked `WindowManager` view if `resume()` and `destroy()` interleaved within a single frame (#820, #853).
+
+### Fixed — BillboardNode mirrored texture
+
+- `BillboardNode` (and `TextNode` via inheritance) no longer renders the back face of the plane quad. Switched from `lookAt(camPos)` to `lookTowards(worldPosition - camPos)` so local +Z (front face, correct UVs) faces the viewer. Hardened guard rejects NaN inputs in addition to the zero vector (#838, #854). A 9-test JVM regression suite in `BillboardNodeMathTest` pins the math convention (#858).
+
+### Fixed — ViewNode reactive props
+
+- `ViewNode` composable restores the full reactive prop set (`position`, `rotation`, `scale`, `isVisible`) and switches from `SideEffect` to `DisposableEffect` keyed on scalar components — Compose state changes now propagate without redundant per-recomposition writes (#856, #857). Closes the regression of the original `7d82701c` implementation reintroduced by #842.
+
+### Security
+
+- `hono` bumped to 4.12.17 across `mcp-gateway`, `telemetry-worker`, `hub-gateway` and the bundled MCP packages — resolves the `hono/jsx` SSR XSS via JSX attribute names (9 alerts) (#862).
+- `postcss` bumped to 8.5.14 in the same set — resolves XSS via unescaped `</style>` in CSS Stringify Output (4 alerts).
+- 0 open Dependabot alerts at the time of this entry.
+
+### Improved — Tooling
+
+- `roborazzi` 1.43.0 → 1.60.0 (#830).
+- `dev.romainguy:kotlin-math` reference in `llms.txt` synced to 1.8.0 across all 4 copies (root, website, well-known, bundled MCP) — AI consumers no longer suggest the outdated 1.6.0 dependency (#788 follow-up, #859).
+- Marketplace submission packet (OpenAI App Store + MCPize manifest) committed under `.claude/marketplace-submissions/` for cross-session reuse (#855).
+
+### Internal
+
+- Render tests on SwiftShader CI remain `@Ignore`'d — `Filament.capturePixels()` still crashes the emulator. Coverage by iOS simulator, Web Playwright, and Android demo screenshot jobs. Pure-JVM math regressions can land in `:sceneview:test` (see #858 for the pattern).
+
+---
+
 ## v4.0.1 — Swift Geometry Primitives, Filament 1.71.0, Hub MCP v0.3.0
 
 **Status:** stable. Maven Central and Swift Package Manager artifacts are published from this tag.

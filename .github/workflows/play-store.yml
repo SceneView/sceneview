@@ -1,5 +1,25 @@
 name: Deploy Demo to Play Store
 
+# Canary pattern with snapshot/release split.
+#
+# Trigger             → tracks
+# ─────────────────────────────────────────────────────────────────────
+# push to main        → internal only (snapshots like 4.0.2-abcdef0)
+# push of v* tag      → internal + production (clean release like 4.0.2)
+# manual dispatch     → user chooses
+#
+# Why this shape:
+#
+# - Internal is always the freshest — every push to main lands there
+#   within ~1 hour, no Google review. Thomas + the team eat the
+#   snapshot before real users do.
+# - Production is reserved for **stable releases** (semver tags). No
+#   more "4.0.2-133df8ff" snapshots leaking onto the public store —
+#   only "4.0.2", "4.0.3", … hit production.
+# - A tag push runs through Google review (1-3 days) and replaces the
+#   previous public build. Internal still gets the same AAB so testers
+#   never lag behind production.
+
 on:
   push:
     branches: [main]
@@ -10,20 +30,24 @@ on:
       - 'samples/android-demo/**'
       - 'samples/android-demo-assets/**'
       - 'samples/common/**'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       track:
-        description: 'Play Store track'
+        description: 'Play Store track. `auto` matches the push behaviour (internal for branches, internal+production for tags).'
         required: true
-        default: 'production'
+        default: 'auto'
         type: choice
         options:
+          - auto
+          - internal+production
           - production
           - beta
           - alpha
           - internal
 
-# Only one Play Store deploy at a time
+# Only one Play Store deploy at a time.
 concurrency:
   group: play-store-deploy
   cancel-in-progress: false
@@ -32,10 +56,14 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Build & Deploy to Play Store
+  build:
+    name: Build release AAB
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      version_code: ${{ steps.version.outputs.code }}
+      version_name: ${{ steps.version.outputs.name }}
+      tracks: ${{ steps.tracks.outputs.tracks }}
 
     steps:
       - uses: actions/checkout@v6
@@ -50,21 +78,53 @@ jobs:
 
       - run: chmod +x ./gradlew
 
-      # Auto-versioning: versionCode = run_number (always increasing)
-      # versionName = git tag or YYYY.MM.DD-<short_sha>
+      # Auto-versioning:
+      #   versionCode = run_number (always increasing)
+      #   versionName = - "X.Y.Z" when HEAD is exactly on a release tag (clean public version)
+      #                 - "X.Y.Z-<short_sha>" when on main past the latest tag (snapshot)
+      #                 - "YYYY.MM.DD-<short_sha>" when there is no tag yet
       - name: Calculate version
         id: version
         run: |
           VERSION_CODE=${{ github.run_number }}
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$TAG" ]; then
-            VERSION_NAME="${TAG#v}-$(git rev-parse --short HEAD)"
+          EXACT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+          if [ -n "$EXACT_TAG" ]; then
+            VERSION_NAME="${EXACT_TAG#v}"
           else
-            VERSION_NAME="$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$TAG" ]; then
+              VERSION_NAME="${TAG#v}-$(git rev-parse --short HEAD)"
+            else
+              VERSION_NAME="$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
+            fi
           fi
           echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "Version: $VERSION_NAME ($VERSION_CODE)"
+
+      # Track selection logic for the matrix in the publish job:
+      #   - tag push (v*.*.*)                          → ["internal", "production"]
+      #   - branch push (snapshot)                     → ["internal"]
+      #   - manual dispatch with explicit single track → that track only
+      #   - manual dispatch with `internal+production` → both
+      #   - manual dispatch with `auto`                → falls back to push semantics
+      - name: Compute target tracks
+        id: tracks
+        run: |
+          INPUT_TRACK='${{ github.event.inputs.track }}'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$INPUT_TRACK" ] && [ "$INPUT_TRACK" != "auto" ]; then
+            if [ "$INPUT_TRACK" = "internal+production" ]; then
+              TRACKS='["internal","production"]'
+            else
+              TRACKS="[\"$INPUT_TRACK\"]"
+            fi
+          elif [[ '${{ github.ref }}' == refs/tags/v* ]]; then
+            TRACKS='["internal","production"]'
+          else
+            TRACKS='["internal"]'
+          fi
+          echo "tracks=$TRACKS" >> $GITHUB_OUTPUT
+          echo "Will publish to: $TRACKS"
 
       - name: Validate keystore secret
         env:
@@ -103,11 +163,30 @@ jobs:
         if: always()
         run: rm -f samples/android-demo/release.keystore
 
-      - name: Publish to Play Store
+  publish:
+    name: Publish to ${{ matrix.track }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Track list comes from the build job — see its `Compute target tracks` step.
+    strategy:
+      fail-fast: false
+      matrix:
+        track: ${{ fromJSON(needs.build.outputs.tracks) }}
+
+    steps:
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: sceneview-demo-${{ needs.build.outputs.version_name }}
+          path: aab
+
+      - name: Publish to Play Store (${{ matrix.track }})
         uses: r0adkll/upload-google-play@v1.1.3
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
           packageName: io.github.sceneview.demo
-          releaseFiles: samples/android-demo/build/outputs/bundle/release/*.aab
-          track: ${{ github.event.inputs.track || 'production' }}
+          releaseFiles: aab/*.aab
+          track: ${{ matrix.track }}
           status: completed

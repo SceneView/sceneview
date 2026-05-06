@@ -1,0 +1,74 @@
+package io.github.sceneview.demo
+
+import android.net.Uri
+
+/**
+ * Parses an incoming intent's data URI and returns the demo id to open,
+ * or `null` if the URI is not a valid SceneView deep link.
+ *
+ * Supported URI shapes:
+ *
+ * 1. **Custom scheme** — `sceneview://demo/<id>` (intent-filter in
+ *    AndroidManifest, no store verification needed). The id is the
+ *    last path segment.
+ *
+ * 2. **Verified App-Links** (future) — `https://sceneview.github.io/open?demo=<id>`.
+ *    Pulled from the `demo` query parameter. Will become live once
+ *    `/.well-known/assetlinks.json` ships on github.io with the
+ *    published Play Store keystore SHA-256.
+ *
+ * The id must match an entry in [registry] (defaults to [ALL_DEMOS]) —
+ * we don't blindly navigate to user-provided strings, both because the
+ * demo registry is closed and because that prevents trivial fuzzing of
+ * the navigation graph from a hostile QR code. Unknown ids return `null`
+ * and the activity falls back to its normal start destination.
+ *
+ * Pure function: no side effects, no Android framework calls beyond
+ * [Uri] accessors. Unit-testable on a plain JVM via Robolectric's
+ * `Uri` shadow or by passing already-parsed primitives — see
+ * `DeepLinkRouterTest`.
+ */
+internal object DeepLinkRouter {
+
+    /** Custom URL scheme registered in `AndroidManifest.xml`. */
+    const val SCHEME_CUSTOM: String = "sceneview"
+
+    /** Custom URL host. Only `demo` is supported today. */
+    const val HOST_CUSTOM: String = "demo"
+
+    /** Hostname for verified App-Links (future). */
+    const val HOST_HTTPS: String = "sceneview.github.io"
+
+    /** Path prefix on the App-Links host. */
+    const val PATH_HTTPS: String = "/open"
+
+    /** Query parameter name carrying the demo id on the App-Links host. */
+    const val QUERY_PARAM: String = "demo"
+
+    fun parse(data: Uri?, registry: List<DemoEntry> = ALL_DEMOS): String? {
+        if (data == null) return null
+        val candidate = extractCandidate(data) ?: return null
+        return if (registry.any { it.id == candidate }) candidate else null
+    }
+
+    /**
+     * Extracts the raw id token from a URI without validating it against
+     * a registry. Exposed so tests can verify the URI parser separately
+     * from the registry lookup.
+     */
+    internal fun extractCandidate(data: Uri): String? {
+        val scheme = data.scheme?.lowercase() ?: return null
+        return when (scheme) {
+            SCHEME_CUSTOM -> {
+                if (!data.host.equals(HOST_CUSTOM, ignoreCase = true)) return null
+                data.lastPathSegment?.takeIf { it.isNotBlank() }
+            }
+            "https", "http" -> {
+                if (!data.host.equals(HOST_HTTPS, ignoreCase = true)) return null
+                if (data.path?.startsWith(PATH_HTTPS) != true) return null
+                data.getQueryParameter(QUERY_PARAM)?.takeIf { it.isNotBlank() }
+            }
+            else -> null
+        }
+    }
+}

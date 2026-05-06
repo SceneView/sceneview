@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["5G3DZ3TH45.io.github.sceneview.demo"],
+        "components": [
+          {
+            "/": "/open*",
+            "?": { "demo": "*" },
+            "comment": "Open a specific demo from a QR/link in the SceneView Demo app."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2597,6 +2597,21 @@ ul { list-style: none; }
 .devtools__card-text a { color: var(--accent); text-decoration: underline; }
 .devtools__card-platforms { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .devtools__card-platform { font-size: 0.75rem; font-weight: 600; background: rgba(var(--accent-rgb, 59,130,246), 0.15); color: var(--accent); padding: 4px 12px; border-radius: 999px; }
+.devtools__card-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 18px; font-size: 0.875rem; font-weight: 600; color: var(--color-primary); text-decoration: none; transition: color 0.15s, transform 0.15s; }
+.devtools__card-link:hover { color: var(--color-primary-dim); transform: translateX(2px); }
+
+/* Hero store badges — published demo apps on Play Store + App Store. */
+.hero__store-badges { display: flex; align-items: center; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.hero__store-badges-label { font-size: 0.875rem; color: var(--color-on-surface-variant); font-weight: 500; }
+.hero__store-badge { display: inline-flex; transition: transform 0.15s, opacity 0.15s; }
+.hero__store-badge:hover { transform: translateY(-2px); opacity: 0.92; }
+.hero__store-badge img { display: block; height: 48px; width: auto; }
+.hero__store-badge img[src$=".png"] { /* Google Play badge tends to render slightly taller */ height: 54px; }
+@media (max-width: 600px) {
+  .hero__store-badges { gap: 8px; }
+  .hero__store-badge img { height: 40px; }
+  .hero__store-badge img[src$=".png"] { height: 46px; }
+}
 
 .metrics__title {
   font-size: clamp(2rem, 4vw, 3rem);

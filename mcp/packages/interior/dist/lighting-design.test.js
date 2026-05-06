@@ -110,4 +110,35 @@ describe("generateLightingDesign", () => {
             expect(code).toContain("LightNode");
         }
     });
+    it("uses neutral-white color temperature (4000K)", () => {
+        const code = generateLightingDesign({
+            lights: ["ambient"],
+            colorTemperature: "neutral-white",
+        });
+        expect(code).toContain("neutral-white");
+        expect(code).toContain("4000K");
+    });
+    it("uses cool-white color temperature (5000K)", () => {
+        const code = generateLightingDesign({
+            lights: ["track"],
+            colorTemperature: "cool-white",
+        });
+        expect(code).toContain("cool-white");
+        expect(code).toContain("5000K");
+    });
+    it("uses default room model when none specified", () => {
+        const code = generateLightingDesign({ lights: ["sconce"] });
+        expect(code).toContain("models/room/interior_scene.glb");
+    });
+    it("COLOR_TEMPERATURES has 5 options", () => {
+        expect(COLOR_TEMPERATURES.length).toBe(5);
+        expect(COLOR_TEMPERATURES).toContain("neutral-white");
+        expect(COLOR_TEMPERATURES).toContain("cool-white");
+    });
+    it("LIGHT_TYPES includes track, sconce, chandelier, strip-led", () => {
+        expect(LIGHT_TYPES).toContain("track");
+        expect(LIGHT_TYPES).toContain("sconce");
+        expect(LIGHT_TYPES).toContain("chandelier");
+        expect(LIGHT_TYPES).toContain("strip-led");
+    });
 });

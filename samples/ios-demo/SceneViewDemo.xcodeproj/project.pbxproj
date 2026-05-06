@@ -67,6 +67,8 @@
 		C10000000000000000000020 /* SceneGalleryDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000020 /* SceneGalleryDemo.swift */; };
 		C10000000000000000000021 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000021 /* Theme.swift */; };
 		C10000000000000000000022 /* RerunDebugDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000022 /* RerunDebugDemo.swift */; };
+		C10000000000000000000023 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000023 /* DeepLinkRouter.swift */; };
+		C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000024 /* DemoDeepLinkRegistry.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -97,6 +99,8 @@
 		C20000000000000000000020 /* SceneGalleryDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneGalleryDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000021 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		C20000000000000000000022 /* RerunDebugDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RerunDebugDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000023 /* DeepLinkRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkRouter.swift; sourceTree = "<group>"; };
+		C20000000000000000000024 /* DemoDeepLinkRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDeepLinkRegistry.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* game_boy_classic.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = game_boy_classic.usdz; sourceTree = "<group>"; };
 		D20000000000000000000002 /* tree_scene.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = tree_scene.usdz; sourceTree = "<group>"; };
 		D20000000000000000000003 /* red_car.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = red_car.usdz; sourceTree = "<group>"; };
@@ -158,6 +162,8 @@
 			children = (
 				A20000010000000000000001 /* SceneViewDemoApp.swift */,
 				C20000000000000000000021 /* Theme.swift */,
+				C20000000000000000000023 /* DeepLinkRouter.swift */,
+				C20000000000000000000024 /* DemoDeepLinkRegistry.swift */,
 				C40000000000000000000001 /* Views */,
 				C40000000000000000000004 /* Utilities */,
 				D40000000000000000000001 /* Models */,
@@ -409,6 +415,8 @@
 				C10000000000000000000020 /* SceneGalleryDemo.swift in Sources */,
 				C10000000000000000000021 /* Theme.swift in Sources */,
 				C10000000000000000000022 /* RerunDebugDemo.swift in Sources */,
+				C10000000000000000000023 /* DeepLinkRouter.swift in Sources */,
+				C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -531,7 +539,7 @@
 				CODE_SIGN_ENTITLEMENTS = SceneViewDemo/SceneViewDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 358;
+				CURRENT_PROJECT_VERSION = 359;
 				DEVELOPMENT_TEAM = 5G3DZ3TH45;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SceneViewDemo/Info.plist;
@@ -543,10 +551,9 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 3.6.2;
+				MARKETING_VERSION = 4.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -562,10 +569,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = SceneViewDemo/SceneViewDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Automatic;
 				"CODE_SIGN_STYLE[sdk=iphoneos*]" = Manual;
-				CURRENT_PROJECT_VERSION = 358;
+				CURRENT_PROJECT_VERSION = 359;
 				DEVELOPMENT_TEAM = 5G3DZ3TH45;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SceneViewDemo/Info.plist;
@@ -577,7 +584,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 3.6.2;
+				MARKETING_VERSION = 4.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "SceneView Demo App Store";

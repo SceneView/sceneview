@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('sceneview-theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch(e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AR Session Viewer — SceneView</title>
+  <meta name="description" content="View and share AR debug sessions captured with SceneView. Powered by Rerun.io.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#005bc1">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+  <!-- Open Graph (will be overwritten by JS once metadata loaded) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AR Session — SceneView">
+  <meta property="og:description" content="Interactive AR debug session viewer.">
+  <meta property="og:image" content="https://sceneview.github.io/og-image.png">
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+
+  <style>
+    :root {
+      --color-primary: #005bc1;
+      --color-primary-dim: #0050aa;
+      --color-tertiary: #6446cd;
+      --color-on-surface: #1e3256;
+      --color-on-surface-variant: #4c5f85;
+      --color-on-primary: #f9f8ff;
+      --color-surface: #f9f9ff;
+      --color-surface-container: #e9edff;
+      --color-surface-container-high: #e0e8ff;
+      --color-outline: #687ba3;
+      --color-outline-variant: #9fb2dd;
+      --color-status-stable: #16a34a;
+      --color-status-warning: #f59e0b;
+      --color-status-error: #dc2626;
+      --gradient-hero: linear-gradient(135deg, #005bc1 0%, #6446cd 100%);
+      --shadow-card: 0 12px 32px rgba(30, 50, 86, 0.06);
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', monospace;
+      --header-height: 56px;
+    }
+    [data-theme="dark"] {
+      --color-primary: #79c0ff;
+      --color-primary-dim: #58a6ff;
+      --color-tertiary: #d2a8ff;
+      --color-on-surface: #f0f6fc;
+      --color-on-surface-variant: #c9d1d9;
+      --color-on-primary: #001d3d;
+      --color-surface: #0d1117;
+      --color-surface-container: #21262d;
+      --color-surface-container-high: #282e36;
+      --color-outline: #30363d;
+      --color-outline-variant: #484f58;
+      --color-status-warning: #fbbf24;
+      --color-status-error: #f87171;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; width: 100%;
+      font-family: var(--font-body);
+      background: var(--color-surface);
+      color: var(--color-on-surface);
+      overflow: hidden;
+    }
+    body { display: block; padding-top: var(--header-height); }
+
+    /* ── Header ────────────────────────────────────────────────────── */
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--header-height);
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 16px;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-outline-variant);
+      z-index: 10;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none;
+      color: var(--color-on-surface);
+      font-weight: 600;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .brand-mark {
+      width: 28px; height: 28px;
+      background: var(--gradient-hero);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.5px;
+    }
+    .session-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex; flex-direction: column;
+      line-height: 1.2;
+    }
+    .session-title {
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-sub {
+      font-size: 12px;
+      color: var(--color-on-surface-variant);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-sub .sep { opacity: 0.5; margin: 0 6px; }
+    .session-sub .quality-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 4px;
+      background: var(--color-status-stable);
+    }
+    .session-sub .quality-dot.warning { background: var(--color-status-warning); }
+    .session-sub .quality-dot.error { background: var(--color-status-error); }
+
+    .toolbar {
+      display: flex; gap: 6px; align-items: center;
+      flex-shrink: 0;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--color-outline-variant);
+      background: var(--color-surface-container);
+      color: var(--color-on-surface);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 150ms, border-color 150ms, transform 100ms;
+    }
+    .btn:hover {
+      background: var(--color-surface-container-high);
+      border-color: var(--color-outline);
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      border-color: var(--color-primary);
+    }
+    .btn-primary:hover {
+      background: var(--color-primary-dim);
+      border-color: var(--color-primary-dim);
+    }
+    .btn-icon {
+      width: 34px;
+      padding: 0;
+      justify-content: center;
+    }
+    .btn svg { width: 14px; height: 14px; }
+    .btn-icon svg { width: 16px; height: 16px; }
+
+    /* ── Viewer container ─────────────────────────────────────────── */
+    #viewer {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - var(--header-height));
+      background: #0f0f14;
+      overflow: hidden;
+    }
+    #viewer > canvas {
+      display: block;
+    }
+
+    /* ── Loading state ────────────────────────────────────────────── */
+    .splash {
+      position: fixed;
+      top: var(--header-height); left: 0; right: 0; bottom: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--color-surface);
+      color: var(--color-on-surface);
+      gap: 16px;
+      z-index: 5;
+    }
+    .splash.hidden { display: none; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--color-outline-variant);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 800ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .splash-text { font-size: 14px; color: var(--color-on-surface-variant); }
+    .splash.error .spinner { display: none; }
+    .error-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+    .error-title { font-weight: 600; font-size: 18px; }
+    .error-detail {
+      max-width: 480px;
+      text-align: center;
+      color: var(--color-on-surface-variant);
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 0 24px;
+    }
+
+    /* ── Empty state (no session loaded) ─────────────────────────── */
+    .empty {
+      max-width: 540px;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .empty h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: var(--gradient-hero);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .empty p {
+      margin: 0 0 20px;
+      color: var(--color-on-surface-variant);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .empty code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--color-surface-container);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .empty .cta {
+      display: flex; gap: 8px; justify-content: center;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Toast (copy feedback) ────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--color-on-surface);
+      color: var(--color-surface);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow-card);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms, transform 200ms;
+      z-index: 100;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Mobile ───────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      header { padding: 0 10px; gap: 10px; }
+      .brand-text { display: none; }
+      .toolbar .btn-label { display: none; }
+      .toolbar .btn { padding: 0 10px; }
+    }
+
+    /* ── Responsive: hide non-essential text on small viewports ──── */
+    @media (max-width: 480px) {
+      .session-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a class="brand" href="https://sceneview.github.io/" title="SceneView home">
+      <span class="brand-mark" aria-hidden="true">SV</span>
+      <span class="brand-text">SceneView</span>
+    </a>
+
+    <div class="session-meta" id="session-meta">
+      <div class="session-title" id="session-title">AR Session Viewer</div>
+      <div class="session-sub" id="session-sub">Powered by Rerun.io</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" id="btn-download" title="Download .rrd recording" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span class="btn-label">Download</span>
+      </button>
+
+      <button class="btn" id="btn-embed" title="Copy embed snippet" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+        <span class="btn-label">Embed</span>
+      </button>
+
+      <button class="btn btn-primary" id="btn-share" title="Copy share link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/>
+          <polyline points="16 6 12 2 8 6"/>
+          <line x1="12" y1="2" x2="12" y2="15"/>
+        </svg>
+        <span class="btn-label">Share</span>
+      </button>
+
+      <a class="btn" id="btn-open-in-app" href="/open/?demo=ar-rerun" target="_blank" rel="noopener" title="Open the AR Rerun demo on your phone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+          <line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+        <span class="btn-label">Open in app</span>
+      </a>
+
+      <button class="btn btn-icon" id="btn-theme" title="Toggle dark / light mode" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="viewer"></div>
+
+  <div class="splash" id="splash">
+    <div class="spinner"></div>
+    <div class="splash-text" id="splash-text">Loading session…</div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module">
+    // ─── Config ────────────────────────────────────────────────────────────
+    const VIEWER_VERSION = '0.31.4';
+    const VIEWER_MODULE = `https://cdn.jsdelivr.net/npm/@rerun-io/web-viewer@${VIEWER_VERSION}/+esm`;
+    // R2 bucket base URL — set once R2 is provisioned.
+    // Until then `?r=<hash>` is unsupported; only `?url=` works.
+    const R2_BASE = ''; // e.g. 'https://pub-XXXX.r2.dev'
+
+    // ─── Helpers ───────────────────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+    const showSplash = (msg, isError = false) => {
+      const splash = $('splash');
+      splash.classList.remove('hidden', 'error');
+      if (isError) splash.classList.add('error');
+      $('splash-text').innerHTML = isError
+        ? `<div class="error-icon">⚠️</div><div class="error-title">${escapeHtml(msg.title || 'Error')}</div><div class="error-detail">${escapeHtml(msg.detail || '')}</div>`
+        : msg;
+    };
+    const hideSplash = () => $('splash').classList.add('hidden');
+    const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+    const toast = (msg) => {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 2200);
+    };
+
+    // ─── Theme toggle ──────────────────────────────────────────────────────
+    $('btn-theme').addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('sceneview-theme', next); } catch (e) { /* ignore */ }
+    });
+
+    // ─── Resolve session URL ───────────────────────────────────────────────
+    const params = new URLSearchParams(location.search);
+    const directUrl = params.get('url');
+    const sessionHash = params.get('r');
+
+    let rrdUrl = null;
+    let metadataUrl = null;
+
+    if (directUrl) {
+      rrdUrl = directUrl;
+      // Allow caller to pass metadata URL alongside via &m=
+      metadataUrl = params.get('m') || null;
+    } else if (sessionHash && R2_BASE) {
+      rrdUrl = `${R2_BASE}/sessions/${encodeURIComponent(sessionHash)}.rrd`;
+      metadataUrl = `${R2_BASE}/sessions/${encodeURIComponent(sessionHash)}.json`;
+    }
+
+    // ─── Empty state ───────────────────────────────────────────────────────
+    if (!rrdUrl) {
+      $('splash').innerHTML = `
+        <div class="empty">
+          <h1>AR Session Viewer</h1>
+          <p>
+            Drop your <code>.rrd</code> recording here, or share a session URL.<br>
+            This page renders AR debug sessions captured with
+            <a href="https://sceneview.github.io/" style="color: var(--color-primary); text-decoration: none;">SceneView</a>
+            via the Rerun web viewer.
+          </p>
+          <p style="font-size: 12px;">
+            Open with <code>?url=https://example.com/session.rrd</code>
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="https://sceneview.github.io/playground/">Get SceneView</a>
+            <a class="btn" href="https://www.npmjs.com/package/rerun-3d-mcp">rerun-3d-mcp</a>
+          </div>
+        </div>
+      `;
+      // Wire share to copy current URL anyway
+      $('btn-share').addEventListener('click', () => copyToClipboard(location.href, 'Page URL copied'));
+    } else {
+      bootViewer(rrdUrl, metadataUrl).catch((err) => {
+        console.error(err);
+        showSplash({ title: 'Failed to load session', detail: err.message || String(err) }, true);
+      });
+    }
+
+    // ─── Boot ──────────────────────────────────────────────────────────────
+    async function bootViewer(rrdUrl, metadataUrl) {
+      // 1. Fetch metadata in parallel with viewer module load
+      const [{ WebViewer }, metadata] = await Promise.all([
+        import(VIEWER_MODULE),
+        metadataUrl ? fetchJson(metadataUrl).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      // 2. Apply metadata to header
+      if (metadata) applyMetadata(metadata);
+
+      // 3. Wire toolbar
+      wireToolbar(rrdUrl, metadata);
+
+      // 4. Boot viewer
+      const viewer = new WebViewer();
+      try {
+        await viewer.start(rrdUrl, $('viewer'), { hide_welcome_screen: true });
+      } catch (err) {
+        throw new Error(
+          `The Rerun viewer could not load the recording. ` +
+          `Check the URL is reachable and CORS-enabled. (${err.message || err})`
+        );
+      }
+      hideSplash();
+
+      // Rerun's WebViewer reads its initial canvas size from inline styles
+      // and only re-reads them on `window` resize events. We need to (a) push
+      // the canvas to fill its container by overriding the inline width/height,
+      // and (b) fire a synthetic resize so Rerun re-projects its WebGL viewport.
+      const fitCanvas = () => {
+        const container = $('viewer');
+        const canvas = container.querySelector('canvas');
+        if (!canvas) return;
+        canvas.style.width = container.clientWidth + 'px';
+        canvas.style.height = container.clientHeight + 'px';
+        window.dispatchEvent(new Event('resize'));
+      };
+      fitCanvas();
+      requestAnimationFrame(fitCanvas);
+      const ro = new ResizeObserver(fitCanvas);
+      ro.observe($('viewer'));
+
+      // Track view in GA if present
+      if (typeof gtag === 'function') {
+        gtag('event', 'rerun_session_view', {
+          session_id: metadata?.id || sessionHash || 'direct-url',
+        });
+      }
+    }
+
+    async function fetchJson(url) {
+      const r = await fetch(url, { mode: 'cors' });
+      if (!r.ok) throw new Error(`metadata fetch ${r.status}`);
+      return r.json();
+    }
+
+    // ─── Metadata → header ─────────────────────────────────────────────────
+    function applyMetadata(m) {
+      const title = m.title || m.name || 'AR Session';
+      $('session-title').textContent = title;
+      document.title = `${title} — SceneView`;
+
+      // Update OG tags
+      const setMeta = (prop, val) => {
+        const el = document.querySelector(`meta[property="${prop}"]`);
+        if (el) el.setAttribute('content', val);
+      };
+      setMeta('og:title', `${title} — SceneView AR Session`);
+      if (m.description) setMeta('og:description', m.description);
+
+      // Subtitle: device · duration · frames · quality
+      const parts = [];
+      if (m.device) parts.push(escapeHtml(m.device));
+      if (m.os) parts.push(escapeHtml(m.os));
+      if (typeof m.durationSeconds === 'number') parts.push(formatDuration(m.durationSeconds));
+      if (typeof m.frameCount === 'number') parts.push(`${m.frameCount.toLocaleString()} frames`);
+      if (typeof m.trackingQuality === 'number') {
+        const q = m.trackingQuality;
+        const cls = q >= 0.85 ? '' : q >= 0.5 ? 'warning' : 'error';
+        parts.push(`<span class="quality-dot ${cls}"></span>${Math.round(q * 100)}% tracking`);
+      }
+      $('session-sub').innerHTML = parts.join('<span class="sep">·</span>') || 'Powered by Rerun.io';
+    }
+
+    function formatDuration(sec) {
+      if (sec < 60) return `${sec.toFixed(1)}s`;
+      const m = Math.floor(sec / 60);
+      const s = Math.round(sec % 60);
+      return `${m}m ${s}s`;
+    }
+
+    // ─── Toolbar wiring ────────────────────────────────────────────────────
+    function wireToolbar(rrdUrl, metadata) {
+      const dl = $('btn-download');
+      dl.hidden = false;
+      dl.addEventListener('click', () => {
+        const a = document.createElement('a');
+        a.href = rrdUrl;
+        a.download = (metadata?.title || 'sceneview-session') + '.rrd';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+
+      const embed = $('btn-embed');
+      embed.hidden = false;
+      embed.addEventListener('click', () => {
+        const snippet = `<iframe src="${location.href}" style="width:100%;height:480px;border:0;border-radius:8px" allow="fullscreen"></iframe>`;
+        copyToClipboard(snippet, 'Embed snippet copied');
+      });
+
+      $('btn-share').addEventListener('click', () => {
+        if (navigator.share) {
+          navigator.share({
+            title: metadata?.title || 'AR Session',
+            text: 'AR debug session captured with SceneView',
+            url: location.href,
+          }).catch(() => copyToClipboard(location.href, 'Link copied'));
+        } else {
+          copyToClipboard(location.href, 'Link copied');
+        }
+      });
+    }
+
+    function copyToClipboard(text, msg) {
+      const done = () => toast(msg);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+      } else {
+        fallbackCopy(text, done);
+      }
+    }
+
+    function fallbackCopy(text, done) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+      ta.remove();
+    }
+  </script>
+</body>
+</html>

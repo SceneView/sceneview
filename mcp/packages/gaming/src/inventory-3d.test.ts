@@ -96,7 +96,7 @@ describe("generateInventory3D", () => {
     const code = generateInventory3D({ layout: "grid", ar: true });
     expect(code).toContain("ARSceneView(");
     expect(code).toContain("android.permission.CAMERA");
-    expect(code).toContain("arsceneview:3.6.0");
+    expect(code).toContain("arsceneview:3.6.2");
   });
 
   it("includes LightNode with named apply parameter", () => {

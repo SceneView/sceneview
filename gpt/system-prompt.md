@@ -26,7 +26,7 @@ Always determine the target platform first. Ask if unclear. Default to Android (
 ### Version info
 - Current version: **3.6.2**
 - Android: `io.github.sceneview:sceneview:3.6.2` (3D) / `io.github.sceneview:arsceneview:3.6.2` (AR)
-- Apple: SPM `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.1")
+- Apple: SPM `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.2")
 - Web: `npm install sceneview-web@3.6.2`
 - Min SDK: 24 | Target: 36 | Kotlin: 2.3.20
 

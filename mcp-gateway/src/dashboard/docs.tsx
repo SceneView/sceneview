@@ -13,10 +13,10 @@ export const Docs: FC = () => (
   >
     <h1>Docs</h1>
     <p>
-      Point any MCP-capable agent at the hosted gateway. The 17 free
-      tools work without authentication; the 36+ Pro tools require an
-      API key you receive on the <a href="/pricing">pricing</a>{" "}
-      checkout success page.
+      Point any MCP-capable agent at the hosted gateway. The 27 free
+      tools work without authentication; the 27 Pro tools (vertical
+      packages + generation helpers) require an API key you receive
+      on the <a href="/pricing">pricing</a> checkout success page.
     </p>
 
     <h2>Quickstart</h2>
@@ -53,7 +53,7 @@ export const Docs: FC = () => (
   "mcpServers": {
     "sceneview": {
       "command": "npx",
-      "args": ["-y", "sceneview-mcp@beta"],
+      "args": ["-y", "sceneview-mcp"],
       "env": {
         "SCENEVIEW_API_KEY": "sv_live_YOUR_KEY_HERE"
       }
@@ -62,7 +62,7 @@ export const Docs: FC = () => (
 }`}</code></pre>
     <p>
       Leave <code>env</code> empty (<code>{`{}`}</code>) if you only
-      want the 17 free tools — no signup needed. Restart Claude Desktop
+      want the 27 free tools — no signup needed. Restart Claude Desktop
       after editing.
     </p>
 
@@ -85,7 +85,7 @@ export const Docs: FC = () => (
     <h2>Zed</h2>
     <p>
       Zed's context servers support stdio too; use the same{" "}
-      <code>sceneview-mcp@beta</code> command as Claude Desktop above.
+      <code>sceneview-mcp</code> command as Claude Desktop above.
       Add it to <code>~/.config/zed/settings.json</code> under the{" "}
       <code>context_servers</code> section with the{" "}
       <code>SCENEVIEW_API_KEY</code> env var set.
@@ -107,15 +107,16 @@ export const Docs: FC = () => (
 
     <h2>Local stdio (free mode, zero signup)</h2>
     <p>
-      If you only want the 17 free tools and no network round-trip at
-      all, install the latest stable package (3.6.x):
+      If you only want the 27 free tools and no network round-trip at
+      all, install the latest stable package (4.0.x):
     </p>
     <pre><code>{`npx -y sceneview-mcp`}</code></pre>
     <p>
-      This runs every tool locally. To unlock the 36+ Pro tools later
-      after subscribing, switch to <code>sceneview-mcp@beta</code> and
-      set <code>SCENEVIEW_API_KEY</code> — see the Claude Desktop
-      snippet above.
+      This runs every developer tool locally — setup, samples, validator,
+      migration, full API reference. To unlock the 27 Pro tools later
+      (vertical packages + generation helpers), set{" "}
+      <code>SCENEVIEW_API_KEY</code> — see the Claude Desktop snippet
+      above.
     </p>
 
     <h2>Usage and rate limits</h2>

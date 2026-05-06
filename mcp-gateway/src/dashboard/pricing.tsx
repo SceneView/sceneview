@@ -92,12 +92,12 @@ export const Pricing: FC = () => (
         name="Free"
         price="0 EUR"
         period="forever"
-        description="Everything you need to learn SceneView."
+        description="Every developer tool — setup, samples, validator, migration, docs."
         features={[
-          "17 free tools",
-          "SceneView API reference",
-          "Known issues resource",
-          "Community support",
+          "27 free tools",
+          "Setup guides for every platform (Android, iOS, Web, Flutter, RN, Desktop, TV)",
+          "Code samples + validator + migration tooling",
+          "Full SceneView API reference + known issues",
           "Self-hosted stdio npm package",
         ]}
         contact={{
@@ -109,12 +109,11 @@ export const Pricing: FC = () => (
         name="Pro"
         price="19 EUR"
         period="month"
-        description="For developers shipping real 3D and AR apps."
+        description="For developers building specialised vertical apps."
         features={[
           "Everything in Free",
-          "36+ Pro tools",
-          "Scene generation and 3D artifacts",
-          "AR and multi-platform guides",
+          "4 vertical packages (Automotive, Gaming, Healthcare, Interior — 24 specialised tools)",
+          "3 generation helpers (3D preview, artifact, scene generation)",
           "Hosted HTTP endpoint, 50k calls / month",
           "Email support",
         ]}
@@ -128,8 +127,7 @@ export const Pricing: FC = () => (
         description="For organisations with multiple developers."
         features={[
           "Everything in Pro",
-          "Automotive, Gaming, Healthcare, Interior packages",
-          "250k calls / month",
+          "250k calls / month (5× the Pro quota)",
           "Per-seat API keys",
           "Priority support",
           "Custom invoicing",
@@ -163,12 +161,11 @@ export const Pricing: FC = () => (
       <h3>Can I self-host?</h3>
       <p>
         Yes. The free tier runs fully local with{" "}
-        <code>npx -y sceneview-mcp</code> (17 tools, no signup, no
-        network round-trip). To unlock the 36+ Pro tools after paying,
-        switch to the hosted-proxy build with{" "}
-        <code>npx -y sceneview-mcp@beta</code> and set{" "}
-        <code>SCENEVIEW_API_KEY</code> in your MCP client config —
-        Pro calls then route transparently through the gateway.
+        <code>npx -y sceneview-mcp</code> (27 tools, no signup, no
+        network round-trip). After subscribing, set{" "}
+        <code>SCENEVIEW_API_KEY</code> in your MCP client config — Pro
+        tool calls (vertical packages, generation helpers) then route
+        transparently through the hosted gateway.
       </p>
       <h3>Do you store my prompts?</h3>
       <p>

@@ -110,4 +110,38 @@ describe("generateMaterialSwitcher", () => {
     const code = generateMaterialSwitcher({ surface: "countertop" });
     expect(code).toContain("#2F4F4F");
   });
+
+  it("generates correct model path for floor surface", () => {
+    const code = generateMaterialSwitcher({ surface: "floor" });
+    expect(code).toContain("models/room/floor_scene.glb");
+  });
+
+  it("generates correct model path for ceiling surface", () => {
+    const code = generateMaterialSwitcher({ surface: "ceiling" });
+    expect(code).toContain("models/room/ceiling_scene.glb");
+  });
+
+  it("generates correct model path for wallpaper surface", () => {
+    const code = generateMaterialSwitcher({ surface: "wallpaper" });
+    expect(code).toContain("models/room/wallpaper_scene.glb");
+  });
+
+  it("generates code for every finish type", () => {
+    for (const finish of PAINT_FINISHES) {
+      const code = generateMaterialSwitcher({ surface: "wall-paint", finish });
+      expect(code).toContain("@Composable");
+      expect(code).toContain(finish);
+    }
+  });
+
+  it("uses default fabric colors", () => {
+    const code = generateMaterialSwitcher({ surface: "fabric" });
+    expect(code).toContain("#4169E1");
+    expect(code).toContain("#DC143C");
+  });
+
+  it("PAINT_FINISHES includes eggshell and semi-gloss", () => {
+    expect(PAINT_FINISHES).toContain("eggshell");
+    expect(PAINT_FINISHES).toContain("semi-gloss");
+  });
 });

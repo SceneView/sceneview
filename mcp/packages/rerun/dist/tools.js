@@ -45,6 +45,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["platform"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "generate_ar_logger",
@@ -77,6 +82,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["language", "dataTypes"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "generate_python_sidecar",
@@ -97,6 +107,11 @@ export const TOOL_DEFINITIONS = [
                     description: "Automatically spawn the Rerun viewer process. Default: true.",
                 },
             },
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
     {
@@ -129,6 +144,11 @@ export const TOOL_DEFINITIONS = [
             },
             required: ["rrdUrl"],
         },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
+        },
     },
     {
         name: "explain_concept",
@@ -143,6 +163,11 @@ export const TOOL_DEFINITIONS = [
                 },
             },
             required: ["concept"],
+        },
+        annotations: {
+            readOnlyHint: true,
+            openWorldHint: false,
+            destructiveHint: false,
         },
     },
 ];

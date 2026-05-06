@@ -23,6 +23,15 @@ Same concepts, same simplicity — Android, iOS, Web, Desktop, TV, Flutter, Reac
 [![Sponsors](https://img.shields.io/github/sponsors/sceneview?label=Sponsors&color=ea4aaa&logo=githubsponsors)](https://github.com/sponsors/sceneview)
 [![Open Collective](https://img.shields.io/opencollective/all/sceneview?label=Backers&color=7FADF2&logo=opencollective)](https://opencollective.com/sceneview)
 
+## Try the demo apps
+
+See SceneView capabilities in action — install the live demos in one tap:
+
+[<img src="website-static/assets/brand/stores/google-play-badge.png" alt="Get it on Google Play" height="54">](https://play.google.com/store/apps/details?id=io.github.sceneview.demo)
+[<img src="website-static/assets/brand/stores/app-store-badge.svg" alt="Download on the App Store" height="48">](https://apps.apple.com/us/app/sceneview/id6761329763)
+
+> **Tip** — every demo opens directly via `https://sceneview.github.io/open?demo=<id>`. For example, `…/open?demo=ar-rerun` lands straight on the AR Rerun debug screen with a single tap from any QR code or link.
+
 ---
 
 ## Quick look
@@ -80,8 +89,8 @@ No engine boilerplate. No lifecycle callbacks. The runtime handles everything.
 **Android** (3D + AR):
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.1")     // 3D
-    implementation("io.github.sceneview:arsceneview:4.0.1")   // AR (includes 3D)
+    implementation("io.github.sceneview:sceneview:4.0.3")     // 3D
+    implementation("io.github.sceneview:arsceneview:4.0.3")   // AR (includes 3D)
 }
 ```
 
@@ -287,6 +296,26 @@ claude mcp add sceneview -- npx sceneview-mcp
 - **MCP server** with 28+ tools — no other 3D SDK has this
 
 Listed on the [MCP Registry](https://registry.modelcontextprotocol.io). See the [MCP README](./mcp/README.md) for full setup and tool reference.
+
+---
+
+## Developer tools
+
+### AR Debug — hosted Rerun viewer
+
+Tap **Save & Share** in the AR Rerun demo to flush a `.rrd` recording on
+your dev machine, then re-host it on any public URL (Cloudflare R2,
+GitHub release, gist) and open:
+
+> **<https://sceneview.github.io/rerun/?url=&lt;encoded-public-url&gt;>**
+
+…in any browser to scrub the AR session frame-by-frame. No install, no
+Rerun viewer needed locally — perfect for attaching a fully-replayable
+session to a bug report. Powered by [`@rerun-io/web-viewer`](https://www.npmjs.com/package/@rerun-io/web-viewer) under SceneView branding.
+
+See the [AR Debug — Rerun.io section in `llms.txt`](./llms.txt) for the
+full architecture (live mode + save mode + control protocol) and the
+Kotlin API surface (`RerunBridge.requestSaveAndShare`).
 
 ---
 

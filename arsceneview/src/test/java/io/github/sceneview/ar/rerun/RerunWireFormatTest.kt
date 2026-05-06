@@ -155,6 +155,125 @@ class RerunWireFormatTest {
         assertTrue(line.contains("\"polygon\":[]"))
     }
 
+    // ── Tier-S event types: camera trail + scalar ─────────────────────────
+
+    @Test
+    fun `cameraTrail emits canonical JSON line with default entity`() {
+        val line = RerunWireFormat.cameraTrailJson(
+            timestampNanos = 99L,
+            positions = floatArrayOf(0f, 0f, 0f, 1f, 0f, 0f, 1f, 1f, 0f),
+        )
+        val expected =
+            "{\"t\":99,\"type\":\"camera_trail\",\"entity\":\"world/camera/trail\"," +
+                "\"positions\":[[0.0,0.0,0.0],[1.0,0.0,0.0],[1.0,1.0,0.0]]}\n"
+        assertEquals(expected, line)
+    }
+
+    @Test
+    fun `cameraTrail with empty positions emits empty list`() {
+        val line = RerunWireFormat.cameraTrailJson(
+            timestampNanos = 1L,
+            positions = floatArrayOf(),
+        )
+        assertTrue(line.contains("\"positions\":[]"))
+    }
+
+    @Test
+    fun `cameraTrail truncates trailing partial point (positions length not multiple of 3)`() {
+        // Defensively: a 4-element buffer = 1 full point + leftover.
+        val line = RerunWireFormat.cameraTrailJson(
+            timestampNanos = 1L,
+            positions = floatArrayOf(1f, 2f, 3f, 4f),
+        )
+        assertTrue(line.contains("[1.0,2.0,3.0]"))
+        assertFalse(line.contains("4.0"))
+    }
+
+    @Test
+    fun `scalar emits canonical JSON line`() {
+        val line = RerunWireFormat.scalarJson(
+            timestampNanos = 200L,
+            value = 0.95f,
+            entity = "world/camera/tracking_quality",
+        )
+        val expected =
+            "{\"t\":200,\"type\":\"scalar\",\"entity\":\"world/camera/tracking_quality\"," +
+                "\"value\":0.95}\n"
+        assertEquals(expected, line)
+    }
+
+    @Test
+    fun `scalar handles non-finite values by clamping to 0`() {
+        val line = RerunWireFormat.scalarJson(
+            timestampNanos = 1L,
+            value = Float.NaN,
+            entity = "world/metric",
+        )
+        assertTrue(line.contains("\"value\":0"))
+    }
+
+    // ── Control protocol ──────────────────────────────────────────────────
+
+    @Test
+    fun `controlSaveNow emits canonical control line`() {
+        val line = RerunWireFormat.controlSaveNow()
+        assertEquals("{\"type\":\"control\",\"cmd\":\"save_now\"}\n", line)
+    }
+
+    @Test
+    fun `parseControlAck recognises a saved ack`() {
+        val ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"saved\"," +
+                "\"path\":\"/home/dev/.sceneview/recordings/2026-05-06.rrd\"," +
+                "\"events\":1234," +
+                "\"viewerUrl\":\"https://sceneview.github.io/rerun/?url=file%3A%2F%2F%2Ftmp%2Fa.rrd\"}",
+        )!!
+        assertTrue(ack.success)
+        assertEquals("/home/dev/.sceneview/recordings/2026-05-06.rrd", ack.path)
+        assertEquals(1234, ack.events)
+        assertEquals(
+            "https://sceneview.github.io/rerun/?url=file%3A%2F%2F%2Ftmp%2Fa.rrd",
+            ack.viewerUrl,
+        )
+        assertEquals(null, ack.reason)
+    }
+
+    @Test
+    fun `parseControlAck recognises a save_unsupported ack`() {
+        val ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"save_unsupported\"," +
+                "\"reason\":\"sidecar started in live mode; relaunch with --save\"}",
+        )!!
+        assertFalse(ack.success)
+        assertEquals(null, ack.path)
+        assertEquals("sidecar started in live mode; relaunch with --save", ack.reason)
+    }
+
+    @Test
+    fun `parseControlAck returns null for non-control lines`() {
+        // Event lines (camera_pose etc.) are not control acks — must be ignored.
+        val line = RerunWireFormat.cameraPoseJson(
+            timestampNanos = 1L,
+            tx = 0f, ty = 0f, tz = 0f, qx = 0f, qy = 0f, qz = 0f, qw = 1f,
+        )
+        assertEquals(null, RerunWireFormat.parseControlAck(line))
+        assertEquals(null, RerunWireFormat.parseControlAck("{\"type\":\"control\"}"))  // no ack field
+        assertEquals(null, RerunWireFormat.parseControlAck("{}"))
+        assertEquals(null, RerunWireFormat.parseControlAck("not json"))
+    }
+
+    @Test
+    fun `parseControlAck handles escaped characters in path`() {
+        val ack = RerunWireFormat.parseControlAck(
+            "{\"type\":\"control\",\"ack\":\"saved\"," +
+                "\"path\":\"C:\\\\Users\\\\d\\u00e9v\\\\rec.rrd\"}",
+        )!!
+        assertTrue(ack.success)
+        assertEquals("C:\\Users\\dév\\rec.rrd", ack.path)
+    }
+
+    // ── Newline invariant ─────────────────────────────────────────────────
+
     @Test
     fun `every serialized line contains exactly one newline, at the end`() {
         val lines = listOf(

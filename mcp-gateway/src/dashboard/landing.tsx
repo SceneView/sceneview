@@ -32,16 +32,16 @@ export const Landing: FC = () => (
     <section class="dash-grid">
       <div class="stat-card">
         <div class="label">Free tools</div>
-        <div class="value">17</div>
+        <div class="value">27</div>
         <p style="margin:.5rem 0 0;font-size:.875rem;">
-          Samples, guides, validation. No key required.
+          Setup, samples, validator, migration, docs. No key required.
         </p>
       </div>
       <div class="stat-card">
         <div class="label">Pro tools</div>
-        <div class="value">36+</div>
+        <div class="value">27</div>
         <p style="margin:.5rem 0 0;font-size:.875rem;">
-          AR, multi-platform, scene generation, 3D artifacts.
+          Vertical packages + 3D preview / artifact / scene generation.
         </p>
       </div>
       <div class="stat-card">
@@ -93,7 +93,7 @@ export const Landing: FC = () => (
         Claude Desktop, Claude Code, Cursor, Zed, Continue, and any
         MCP-capable AI client. HTTP-native clients (Cursor, Continue,
         raw curl) point straight at the gateway; stdio-only clients
-        (Claude Desktop, Zed) run the thin <code>sceneview-mcp@beta</code>
+        (Claude Desktop, Zed) run the thin <code>sceneview-mcp</code>
         npm package which forwards Pro tool calls to the gateway for
         you.
       </p>
