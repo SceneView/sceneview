@@ -1,9 +1,11 @@
 package io.github.sceneview.demo.demos
 
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.view.MotionEvent
 import android.view.WindowManager
+import androidx.core.content.FileProvider
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -107,8 +109,15 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
      // having to UiAutomator-click through Mode.PLAYBACK and the recording list.
     val pendingFile = io.github.sceneview.demo.DemoSettings.arPendingPlaybackFile
         ?.let(::File)?.takeIf { it.exists() }
-    var currentMode by remember { mutableStateOf(if (pendingFile != null) Mode.PLAYBACK else Mode.LIVE) }
+    // Default mode is RECORD: it's the action 90% of users came here to take, and the
+    // RECORD overlay's "How this helps" + big record button doubles as a clear hint that
+    // a Playback tab exists for replaying. LIVE is still reachable from the chips for
+    // sanity-checking session quality before a take.
+    var currentMode by remember { mutableStateOf(if (pendingFile != null) Mode.PLAYBACK else Mode.RECORD) }
     var currentPlaybackFile by remember { mutableStateOf<File?>(pendingFile) }
+    // Last file saved by the recorder this session — drives the green "Recording saved"
+    // callout in RECORD mode + its Replay / Share buttons. Null until the first stop.
+    var lastSavedFile by remember { mutableStateOf<File?>(null) }
     LaunchedEffect(Unit) {
         // Consume so a config change / process recreation doesn't re-trigger.
         io.github.sceneview.demo.DemoSettings.arPendingPlaybackFile = null
@@ -208,12 +217,28 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                 }
                 Mode.RECORD -> {
                     Text(
-                        text = "Recordings are saved to app-private external storage. They " +
-                            "include camera frames, IMU, planes, depth and anchors — anything " +
-                            "the session sees.",
+                        text = "Tap ● Record to capture an AR session — camera frames, IMU, " +
+                            "planes, depth and anchors. Hit ■ Stop and the recording lands in " +
+                            "the Playback tab where you can replay or share it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    // Strong feedback right after a save — without it, hitting Stop felt like
+                    // nothing happened (the recordings list lives in a different tab).
+                    lastSavedFile?.let { file ->
+                        Spacer(Modifier.height(8.dp))
+                        SavedRecordingCallout(
+                            file = file,
+                            recordingsCount = recordings.size,
+                            onReplay = {
+                                currentPlaybackFile = file
+                                currentMode = Mode.PLAYBACK
+                                lastSavedFile = null
+                            },
+                            onShare = { shareRecording(context, file) },
+                            onDismiss = { lastSavedFile = null }
+                        )
+                    }
                 }
                 Mode.PLAYBACK -> {
                     Text(
@@ -238,6 +263,7 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                                 exportToast = "Exported to Downloads/SceneView/${file.name}"
                             } ?: run { exportToast = "Export failed — see logs" }
                         },
+                        onShare = { file -> shareRecording(context, file) },
                         onRefresh = { refreshRecordings() }
                     )
                 }
@@ -256,7 +282,13 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                     engine = engine,
                     modelLoader = modelLoader,
                     materialLoader = materialLoader,
-                    onRecordingFinished = { refreshRecordings() },
+                    onRecordingFinished = { savedFile ->
+                        refreshRecordings()
+                        // Drive the post-stop callout in the controls panel.
+                        if (savedFile != null && savedFile.exists() && savedFile.length() > 0) {
+                            lastSavedFile = savedFile
+                        }
+                    },
                     recordingsDir = recordingsDir
                 )
             }
@@ -286,7 +318,7 @@ private fun ModeContent(
     engine: com.google.android.filament.Engine,
     modelLoader: io.github.sceneview.loaders.ModelLoader,
     materialLoader: io.github.sceneview.loaders.MaterialLoader,
-    onRecordingFinished: () -> Unit,
+    onRecordingFinished: (File?) -> Unit,
     recordingsDir: File
 ) {
     val context = LocalContext.current
@@ -296,6 +328,9 @@ private fun ModeContent(
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
 
     val recorder = rememberARRecorder()
+    // The file we passed to recorder.start() — kept so we can hand it back to the
+    // outer state on stop, which drives the post-save callout in the controls panel.
+    var pendingRecordingFile by remember { mutableStateOf<File?>(null) }
 
     // Elapsed-time tick — only runs while actively recording so we don't burn cycles.
     var elapsedSeconds by remember { mutableStateOf(0L) }
@@ -317,7 +352,7 @@ private fun ModeContent(
         onDispose {
             if (recorder.state == ARRecorder.State.RECORDING) {
                 recorder.stop()
-                onRecordingFinished()
+                onRecordingFinished(pendingRecordingFile)
             }
         }
     }
@@ -383,14 +418,17 @@ private fun ModeContent(
             elapsedSeconds = elapsedSeconds,
             onStart = {
                 val name = "ar-session-${TIMESTAMP_FORMAT.format(Date())}.mp4"
+                val file = File(recordingsDir, name)
+                pendingRecordingFile = file
                 recorder.start(
-                    file = File(recordingsDir, name),
+                    file = file,
                     recordingRotation = currentDisplayRotation(context)
                 )
             },
             onStop = {
+                val saved = pendingRecordingFile
                 recorder.stop()
-                onRecordingFinished()
+                onRecordingFinished(saved)
             }
         )
     }
@@ -539,6 +577,7 @@ private fun RecordingsList(
     selected: File?,
     onSelect: (File) -> Unit,
     onExport: (File) -> Unit,
+    onShare: (File) -> Unit,
     onRefresh: () -> Unit
 ) {
     Card(
@@ -572,7 +611,8 @@ private fun RecordingsList(
                         file = file,
                         isSelected = selected?.absolutePath == file.absolutePath,
                         onClick = { onSelect(file) },
-                        onExport = { onExport(file) }
+                        onExport = { onExport(file) },
+                        onShare = { onShare(file) }
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -582,7 +622,13 @@ private fun RecordingsList(
 }
 
 @Composable
-private fun RecordingRow(file: File, isSelected: Boolean, onClick: () -> Unit, onExport: () -> Unit) {
+private fun RecordingRow(
+    file: File,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onExport: () -> Unit,
+    onShare: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth(),
@@ -592,35 +638,131 @@ private fun RecordingRow(file: File, isSelected: Boolean, onClick: () -> Unit, o
                        else MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(8.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color.Transparent)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = file.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    text = "${formatBytes(file.length())} • ${formatRelativeAge(file.lastModified())}",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-            OutlinedButton(
-                onClick = onExport,
-                modifier = Modifier.padding(end = 4.dp)
+            Text(
+                text = file.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = "${formatBytes(file.length())} • ${formatRelativeAge(file.lastModified())}",
+                style = MaterialTheme.typography.labelSmall
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text("Export")
-            }
-            Button(onClick = onClick) {
-                Text(if (isSelected) "Replaying" else "Replay")
+                OutlinedButton(
+                    onClick = onShare,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Share") }
+                OutlinedButton(
+                    onClick = onExport,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Export") }
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (isSelected) "Replaying" else "Replay")
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SavedRecordingCallout(
+    file: File,
+    recordingsCount: Int,
+    onReplay: () -> Unit,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "✓ Recording saved",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "$recordingsCount in Playback",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = file.name,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = formatBytes(file.length()),
+                style = MaterialTheme.typography.labelSmall
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onShare,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Share") }
+                Button(
+                    onClick = onReplay,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Replay") }
+            }
+            Spacer(Modifier.height(2.dp))
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Record another") }
+        }
+    }
+}
+
+private fun shareRecording(context: Context, file: File) {
+    val authority = "${context.packageName}.fileprovider"
+    val uri = try {
+        FileProvider.getUriForFile(context, authority, file)
+    } catch (e: IllegalArgumentException) {
+        // Misconfigured FileProvider — surface to the user rather than crashing.
+        android.widget.Toast.makeText(
+            context,
+            "Couldn't share — FileProvider misconfigured: ${e.message}",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        return
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "video/mp4"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, "AR session recording — SceneView")
+        putExtra(
+            Intent.EXTRA_TEXT,
+            "ARCore session recording from SceneView. Replay 1:1 with " +
+                "ARSceneView(playbackDataset = file)."
+        )
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share AR recording"))
 }
 
 /**

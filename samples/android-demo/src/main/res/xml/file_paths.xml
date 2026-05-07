@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+        Surfaces app-private external storage as content:// URIs so the
+        Android Sharesheet (and other apps that receive an ACTION_SEND
+        intent) can read AR session recordings without the app having
+        WRITE_EXTERNAL_STORAGE.
+
+        Used by ARRecordPlaybackDemo's "Share" button, which exposes
+        files in `getExternalFilesDir("ar-recordings")` via
+        FileProvider.getUriForFile().
+    -->
+    <external-files-path name="ar-recordings" path="ar-recordings/" />
+</paths>

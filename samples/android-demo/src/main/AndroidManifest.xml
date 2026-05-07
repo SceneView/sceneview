@@ -42,6 +42,21 @@
             android:name="com.google.android.ar.API_KEY"
             android:value="${arcoreApiKey}" />
 
+        <!-- FileProvider — surfaces app-private external storage (notably
+             `getExternalFilesDir("ar-recordings")`) as content:// URIs for
+             ACTION_SEND share intents. Used by ARRecordPlaybackDemo's
+             Share button. The authority is namespaced with `.fileprovider`
+             so it never collides with other modules' providers. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode"
