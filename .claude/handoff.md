@@ -4,6 +4,50 @@
 
 ---
 
+## TRIAGE AUTOMATIQUE — 2026-05-07 — Daily GitHub triage (no-op sweep)
+
+**Type:** Scheduled task `daily-github-triage`
+
+### Résultat
+
+✅ **Repo en bon état** — rien à faire.
+
+| Catégorie | État |
+|---|---|
+| PRs ouvertes | **0** |
+| Issues ouvertes | **4** (toutes self-filed enhancements, déjà documentées dans handoff) |
+| CI/CD sur `main` | ✅ Tout vert (quality-gate + CI 25484530361/319 success, run le plus récent à 08:21 UTC) |
+| Workflows en échec | Aucun |
+
+### Issues ouvertes (4) — toutes self-filed par `thomas-gorisse`
+
+| # | Type | Note |
+|---|---|---|
+| [#876](https://github.com/sceneview/sceneview/issues/876) | enhancement | ARRecorder stateless `logFrame(session,frame)` API + `onPlaybackFailed` — déjà tracké pour v4.1 (breaks public API) |
+| [#874](https://github.com/sceneview/sceneview/issues/874) | enhancement | Frame-deferred destroy queue ImageNode/ViewNode (issue d'origine PR #851 review). Pas urgent (one-Activity OK) |
+| [#873](https://github.com/sceneview/sceneview/issues/873) | perf | Cache `SurfaceOrientation` dans `AugmentedFaceNode.computeTangents` (~30 Hz JNI alloc). Caveat = snapshot vs ref semantics à vérifier |
+| [#863](https://github.com/sceneview/sceneview/issues/863) | test | Regression test GLB sans TANGENTS (couvre #836 silent close) |
+
+Aucune n'est un bug externe nécessitant un fix immédiat. Aucun ack/comment à poster — Thomas est l'auteur. Pas de doublons.
+
+### PRs
+
+Aucune PR ouverte. Liste vide à 09:30 Paris.
+
+### CI/CD
+
+15 derniers runs sur `main` : tous `success` ou `cancelled` (concurrent-run cancellations, normal). Pas un seul `failure`. Dernier push (`e54be770` docs: handoff + CLAUDE.md updates for wizardly-elbakyan session) → quality-gate + CI verts.
+
+### Working tree
+
+`git status` montre des résidus non-commités hors scope (mcp-interior/, mcp/packages/automotive|healthcare, samples/android-demo-assets/*.glb supprimés, etc.) — flagués comme stale residues dans `CLAUDE.md` règles globales, **pas touchés**.
+
+### Action prise
+
+Aucune action sortante (pas de merge, pas de comment, pas de close). Report only — la sweep automatique a confirmé que le repo est dans l'état laissé par les sessions précédentes (5 commits aujourd'hui : `e54be770`, `6cd60e1f`, `cbf01d3b`, `8b768fe1`, `baa5222e`).
+
+---
+
 ## SESSION 2026-05-07 — objective-proskuriakova-ca1b73 — Rescue d'une session tuée par image >2000px
 
 ### TL;DR
