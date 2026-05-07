@@ -46,9 +46,13 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 @Ignore(
-    "Filament capturePixels() crashes SwiftShader CI emulator (Process crashed). "
-            + "Tests pass on real GPU devices/emulators. Tracked in #803. "
-            + "Coverage provided by iOS simulator, Web Playwright, and Android demo screenshot jobs."
+    "RenderTestHarness.capturePixels() relies on Filament's async readPixels callback, " +
+            "which never fires on the Apple Silicon emulator (gfxstream OpenGL ES → Metal " +
+            "translator) — same root cause as DemoParametersRenderTest. Tracked in #803. " +
+            "Coverage on emulator is provided by samples/android-demo's UiAutomator " +
+            "DemoRenderingScreenshotTest (capture via device.takeScreenshot which works on " +
+            "any backend). Re-enable on a hardware-accelerated GPU runner or once Filament " +
+            "ships a translator-compatible readback path."
 )
 class GeometryRenderTest {
 
