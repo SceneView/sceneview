@@ -73,10 +73,9 @@
                 both the Play App Signing SHA-256 and the local upload key
                 so verification succeeds for Play Store installs AND for
                 local `adb install` / `assembleDebug` builds.
-                Verify on a phone with:
-                  adb shell pm verify-app-links --re-verify io.github.sceneview.demo
-                  adb shell pm get-app-links io.github.sceneview.demo
-                Expected: "sceneview.github.io: verified".
+                Verify on a phone via `adb shell pm get-app-links
+                io.github.sceneview.demo` (expected: "sceneview.github.io:
+                verified"); `pm verify-app-links` re-runs verification.
             -->
             <intent-filter android:label="Open in SceneView Demo" android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
