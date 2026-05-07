@@ -4,6 +4,57 @@
 
 ---
 
+## SESSION 2026-05-07 — nice-chaum-95b7ea — `createUnlitColorInstance` + cross-platform parity
+
+### TL;DR
+Closed [#871](https://github.com/sceneview/sceneview/issues/871) (Ma'ruf Firdaus — request for unlit color material). Added `MaterialLoader.createUnlitColorInstance(color)` on Android, promoted Apple's `CustomMaterial.debug(color:)` to `.unlit(color:)` for vocabulary parity, regenerated MCP llms-txt, migrated 3 sample demos. Multi-agent review (4 Opus reviewers in parallel) caught 0 blockers — applied all NIT findings (`doubleSided: true` on transparent variant, KDoc cross-links, llms.txt example block + iOS parity table row).
+
+**Commit on main**: [`8ac84e40`](https://github.com/sceneview/sceneview/commit/8ac84e40) `feat(materials): add createUnlitColorInstance for flat colors that ignore lighting`. Issue auto-closed.
+
+### What's actually published
+- **Nothing** — feature is on `main` only. **No release was triggered** (single small additive feature → wait for next regroup with Streetscape/EIS/AR record-playback features).
+- Maven Central / npm / stores still on v4.0.6 / sceneview-mcp@4.0.8 (no change from previous session).
+
+### Files changed (22 files, +264/-32)
+- **NEW**: `sceneview/src/main/materials/{opaque,transparent}_unlit_colored.mat` + compiled `.filamat` (matc 1.71.0, `-a opengl -p mobile`). Transparent variant has `doubleSided: true` for HUD/sprite use cases.
+- **API**: `sceneview/src/main/java/io/github/sceneview/loaders/MaterialLoader.kt` — 3 new overloads (`Color`, `androidx.compose.ui.graphics.Color`, `Int`).
+- **Apple parity**: `SceneViewSwift/Sources/SceneViewSwift/Material/CustomMaterial.swift` — promoted `.debug(color:)` → `.unlit(color:)`. `.debug` kept as `@available(*, deprecated)` alias. Tests updated.
+- **Docs**: `llms.txt` (code example near geometry-nodes block + iOS parity table row), `docs/docs/llms.txt`.
+- **MCP**: regenerated `mcp/src/generated/llms-txt.ts` (5 occurrences round-trip). dist/* committed.
+- **Samples (android-demo)**: migrated `Axes3DNode.kt` + `CollisionDemo.kt` + `LinesPathsDemo.kt` to unlit (textbook gizmo/highlight/lines cases — comment in Axes3DNode literally said "unlit-style colour materials" but used PBR).
+
+### Cross-platform follow-ups (queued, NOT urgent)
+- **`sceneview-web`**: no `MaterialLoader` exists on web today (`Filament.createMaterial(urlOrBuffer)` only). Adding unlit alone would be incomplete — needs a dedicated design pass for the full PBR+unlit factory set. Consider when web demo / Filament.js work is on the table again.
+- **`flutter` / `react-native`**: bridges expose only `color: int|string`. Add `unlit: bool` flag to node configs when use cases appear.
+- **`android-demo` ARFaceDemo.kt**: reviewer flagged this as a STRONG migration candidate (existing comment fights lighting, has explicit fill light to compensate — unlit would simplify all of it). Did NOT migrate in this PR to keep the reviewable rationale in its own commit.
+
+### Multi-agent review pattern used (worth reusing)
+Launched 4 Opus reviewers in parallel via Agent tool (one round-trip):
+1. Filament `.mat` correctness (shading model, blending, requires, doubleSided)
+2. API + AI-friendliness (KDoc, llms.txt, naming, overloads)
+3. Cross-platform parity gap audit (SceneViewSwift, sceneview-web, MCP, Flutter, RN)
+4. Sample usage opportunity sweep (which `createColorInstance` callsites should migrate)
+0 blockers reported. Pattern documented in memory `feedback_pr_review_workflow.md`.
+
+### Verifications passed
+- `:sceneview:compileReleaseKotlin` + `:arsceneview:compileReleaseKotlin` ✅
+- `:samples:android-demo:compileDebugKotlin` ✅
+- `:sceneview:test` + `:arsceneview:testDebugUnitTest` ✅
+- MCP **2646 tests** ✅
+- SceneViewSwift **14 CustomMaterialTests** (incl. 2 new for `.unlit`) ✅
+
+### State of repos at session close
+- **main**: was at `387b9d08`, my commit pushed as `8ac84e40`, then another session pushed `3b9006c9` on top (AR JVM tests #875 + docs #877 + EIS demo). My commit preserved.
+- **My worktree** `claude/nice-chaum-95b7ea`: still alive, branch on `8ac84e40` (1 commit behind main now). Safe to delete since work is merged.
+- **Other worktrees**: 7 still active (2 locked: `agent-a08fb42ce042320a8` augmented-face-normals + `agent-a9bad0693cd8929ad` augmented-face-tracking-state-callback). Do NOT touch their branches.
+- **Main repo dirty state at session close** (NOT mine, belongs to other sessions): `mcp-interior/dist/room-planner.js`, `mcp-interior/src/room-planner.ts`, `mcp/packages/automotive/src/tools.ts`, `mcp/packages/healthcare/src/tools.ts`, `package-lock.json`. Left untouched.
+
+### Next session pickups
+- If batching the next release: `createUnlitColorInstance` (this session) + ARRecorder JVM tests + EIS demo (#875/#877 from parallel session) is enough material for a coherent v4.0.8 patch. Run `/version-bump` then `/release`.
+- If parity push: tackle ARFaceDemo migration + sceneview-web MaterialLoader scaffold.
+
+---
+
 ## SESSION 2026-05-06 — eloquent-panini — Pixel 9 review RESCUE + v4.0.4/5/6 SHIPPED + ARCore Cloud key wired
 
 ### TL;DR
