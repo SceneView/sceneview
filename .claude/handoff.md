@@ -10,11 +10,25 @@
 
 Marathon session — **2 releases shipped** (v4.0.8 + v4.0.9), 5 parallel Opus agent reviews, cross-platform unlit parity (Android + Apple + RN + Flutter + **web KHR_materials_unlit**), Android demo APK **161 → 100 MB (-38%)**, Play Store internal-track race fixed. **14 commits on main**, all stores re-deployed.
 
-### v4.0.9 cut at session close
+### v4.0.9 cut + ARRecorder export + AR testing infrastructure (post-tag)
 
-- **Tag** v4.0.9 pushed at 10:54Z, `release.yml` [run 25491540667](https://github.com/sceneview/sceneview/actions/runs/25491540667) running
-- **Bumped 29 locations** (sync-versions clean) — gradle, npm sceneview-web@4.0.9, sceneview-mcp@4.0.11, RN/Flutter pubspec/podspec, iOS pbxproj, all docs/llms.txt
-- **No public Kotlin/Swift/Filament API change vs v4.0.8** — release narrative is "cross-platform unlit parity + 38% smaller demo APK + Play Store fix"
+- **Tag** v4.0.9 pushed, `release.yml` ✅ — Maven Central 4.0.9, npm sceneview-web@4.0.9 + sceneview-mcp@4.0.11, GitHub Release v4.0.9 (CHANGELOG narrative pushed via `gh release edit`)
+- **Play Store production hit a duplicate-versionCode error** (Google Play forbids reusing versionCode across tracks). Workflow fixed in [`80617bd6`](https://github.com/sceneview/sceneview/commit/80617bd6) — tag pushes now publish to **production only** (internal already gets the same versionCode via the branch push that always precedes the tag; double-publish was the bug). Triggered `gh workflow run play-store.yml -f track=production` to redeploy v4.0.9 to production with a fresh AAB (new run_number → new versionCode).
+- **ARRecorder.exportToDownloads()** added (lib API) — copies recordings from app-private storage to public `Downloads/SceneView/` so they can be `adb pull`'d. 8 JVM tests pin the contract.
+- **`samples/android-demo/AR_TESTING.md`** — record-once playback-many workflow guide (capture baseline → export → commit MP4 fixture → `connectedDebugAndroidTest` replays it forever).
+- **`ARDemoPlaybackSmokeTest`** scaffold under `androidTest/` — discovers MP4 fixtures, deploys each into the demo's external-files dir, launches via `am start --es demo ar-record-playback`, asserts 6 s of healthy replay. `assumeTrue`-skipped on a fresh clone (no fixtures = no test). The instant a contributor records and commits the first baseline, regressions get caught automatically — no human visual check needed.
+
+### What still blocks "fully automatic demo regression detection"
+
+User-asked goal at session close: "comment on peut faire pour pas que j'ai besoin de tout checker visuellement moi-même".
+
+**For AR demos**: solved (modulo the one-time human action of recording the baseline). Next session needs to either record on Pixel 9 + commit baseline, OR add the corresponding tests once Thomas drops a fixture in `androidTest/assets/ar-recordings/`.
+
+**For non-AR demos** (the 3 reconstructed this session — Animation/Geometry/MultiModel): NOT solved. The composables intermix `SceneView { … }` (Filament-backed, JNI) with the testable controls layer. Robolectric stubs Android but not Filament — instantiating the composable in a JVM test would crash trying to create the Engine. Two paths forward (filed for next session):
+1. **Extract state-machine logic** out of the composables into pure-Kotlin functions, then test those (refactor risk).
+2. **Roborazzi snapshot the controls panel** by extracting it as a separate composable that doesn't touch SceneView (smaller refactor).
+
+Both require touching the demos themselves, so they belong in their own session with a fresh design pass. Filed as a follow-up issue (TODO).
 
 ### v4.0.8 published (verified earlier in session)
 
