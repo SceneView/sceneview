@@ -274,6 +274,29 @@ claude mcp add sceneview -- npx sceneview-mcp
 { "mcpServers": { "sceneview": { "command": "npx", "args": ["-y", "sceneview-mcp"] } } }
 ```
 
+### Claude Code plugin (MCP + slash commands + hooks)
+
+Want the MCP server **plus** the full SceneView contributor toolkit (one-shot release, review, cross-platform sync, version-bump, etc.) in a single install? Use the [Claude Code plugin marketplace](.claude-plugin/marketplace.json) hosted in this repo:
+
+```bash
+/plugin marketplace add sceneview/sceneview
+/plugin install sceneview@sceneview
+```
+
+You get:
+- **`sceneview-mcp` server** — same as above, started automatically
+- **11 namespaced slash commands** — `/sceneview:contribute`, `/sceneview:release`, `/sceneview:review`, `/sceneview:test`, `/sceneview:document`, `/sceneview:quality-gate`, `/sceneview:publish-check`, `/sceneview:sync-check`, `/sceneview:version-bump`, `/sceneview:evaluate`, `/sceneview:maintain`
+- **Cross-platform reminder hooks** — gentle nudges when you edit Android, iOS, Web, or KMP-core APIs to keep the other platforms in sync
+
+The same marketplace also publishes 4 vertical MCP plugins:
+
+```bash
+/plugin install realestate-3d@sceneview      # 3D listings, virtual tours, floor plans
+/plugin install french-admin@sceneview       # impôts, URSSAF, CAF, ARE, Service-Public.fr
+/plugin install ecommerce-3d@sceneview       # 3D product viewers, AR try-on, Shopify
+/plugin install architecture-3d@sceneview    # 3D building concepts, lighting studies
+```
+
 ### Specialty MCP Servers
 
 | Domain | Install | Tools |

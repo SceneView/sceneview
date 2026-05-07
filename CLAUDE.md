@@ -164,7 +164,20 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.9 SHIPPED + 5-agent review + Play Store fix)
+### Current state (last updated: 2026-05-07, session bold-villani-42902e — Claude Code plugin marketplace SHIPPED)
+
+- 🚀 **Claude Code plugin marketplace LIVE on `main`** ([commit `19d35613`](https://github.com/sceneview/sceneview/commit/19d35613)). 5 plugins published in a single marketplace at `.claude-plugin/marketplace.json`:
+  - **sceneview** v4.0.9 — sceneview-mcp + 11 contributor commands (`/sceneview:contribute`, `/release`, `/review`, `/test`, `/document`, `/quality-gate`, `/publish-check`, `/sync-check`, `/version-bump`, `/evaluate`, `/maintain`) + 5 cross-platform reminder hooks
+  - **realestate-3d** v2.2.0 — wraps `realestate-mcp` (1 276 DL/mo)
+  - **french-admin** v2.2.1 — wraps `french-admin-mcp` via `mcp-tools-lab` (1 268 DL/mo, CDI-safe routing)
+  - **ecommerce-3d** v2.1.0 — wraps `ecommerce-3d-mcp` (1 153 DL/mo)
+  - **architecture-3d** v2.1.0 — wraps `architecture-mcp` (1 134 DL/mo)
+- Install: `/plugin marketplace add sceneview/sceneview` then `/plugin install <name>@sceneview`
+- All 6 manifests pass `claude plugin validate` cleanly. `sync-versions.sh` extended with plugin + marketplace checks.
+- Side effect: enriched `.claude/commands/*.md` with YAML frontmatter (`description:`) so `/help` now shows one-line summaries for every contributor command.
+- README.md updated with "Claude Code plugin" section explaining MCP + commands + hooks bundle.
+
+### Previous state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.9 SHIPPED + 5-agent review + Play Store fix)
 
 - 🚀 **v4.0.9 fully published end-to-end** (verified):
   - Maven Central `sceneview/arsceneview/sceneview-core 4.0.8` ✅ (`<latest>4.0.8</latest>`)

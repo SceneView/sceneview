@@ -40,6 +40,60 @@ Two commits on main: the [website-static/rerun/](website-static/rerun/index.html
 
 ---
 
+## SESSION 2026-05-07 (cont.) — Claude Code plugin marketplace shipped (bold-villani-42902e)
+
+### TL;DR
+
+Pushed **[`19d35613`](https://github.com/sceneview/sceneview/commit/19d35613)** on main: shipped a publishable Claude Code plugin marketplace at `/.claude-plugin/marketplace.json` listing 5 plugins. The main `sceneview` plugin (v4.0.9) bundles `sceneview-mcp` + 11 namespaced contributor commands (`/sceneview:contribute`, `/release`, `/review`, `/test`, `/document`, `/quality-gate`, `/publish-check`, `/sync-check`, `/version-bump`, `/evaluate`, `/maintain`) + 5 cross-platform reminder hooks. The 4 sister plugins wrap the highest-traffic vertical MCPs via `npx` (no code vendoring): `realestate-3d` (1 276 DL/mo), `french-admin` (1 268 DL/mo, routed via `mcp-tools-lab` for CDI-safety), `ecommerce-3d` (1 153 DL/mo), `architecture-3d` (1 134 DL/mo). All 6 manifests pass `claude plugin validate` cleanly with 0 warnings.
+
+### Install command (live now)
+
+```
+/plugin marketplace add sceneview/sceneview
+/plugin install sceneview@sceneview
+/plugin install realestate-3d@sceneview     # or french-admin / ecommerce-3d / architecture-3d
+```
+
+### Side effects landed in the same commit
+
+- Enriched `.claude/commands/*.md` with YAML `description:` frontmatter — the 11 contributor commands now show one-line summaries in `/help` (no behavior change, pure metadata)
+- Added `!plugins/*/.mcp.json` exception to `.gitignore` so plugin MCP configs commit cleanly while leaving repo-root `.mcp.json` ignored as before
+
+### Follow-ups in this commit (extra round)
+
+- **README.md**: new "Claude Code plugin (MCP + slash commands + hooks)" section between the MCP-server snippet and the Specialty MCP table, with full install + plugin enumeration
+- **`.claude/scripts/sync-versions.sh`**: added section 7b checking `plugins/sceneview/plugin.json` and the marketplace.json sceneview entry against `gradle.properties` VERSION_NAME (currently 4.0.9, both align — green)
+- **CLAUDE.md**: session-state header rewritten with plugin-marketplace milestone (the prior `exciting-napier-1c8c70` v4.0.9 block moved to "Previous state")
+- **Drafts ready (NOT submitted)** in `~/Projects/profile-private/announcements/`:
+  - `2026-05-07-claude-code-plugin-reddit.md` (r/ClaudeAI primary, r/androiddev backup)
+  - `2026-05-07-claude-code-plugin-hackernews.md` (Show HN format with title options + comment-thread playbook)
+- **Anthropic marketplace submission guide**: `.claude/marketplace-submissions/2026-05-07-anthropic-marketplace-submission.md` — pre-filled answers for the [claude.ai/settings/plugins/submit](https://claude.ai/settings/plugins/submit) form, pre-submission checklist, post-approval action list, common rejection-reason fixes
+
+### Why a marketplace and not 5 standalone plugins
+
+- Single source-of-truth for versions across a portfolio (validated by the new sync-versions.sh check)
+- One `add` command unlocks all 5 plugins
+- Single install/test/CI/validate pipeline
+- Each plugin can still graduate to its own repo later — `source` field in marketplace.json supports both relative paths and external git URLs
+- Discoverability: a Claude Code user who finds the SceneView plugin sees the 4 vertical bridges in the same `/plugin install` namespace
+
+### What is NOT done (next-session candidates)
+
+1. **Submit to the official Anthropic marketplace** — guide is ready at `.claude/marketplace-submissions/2026-05-07-anthropic-marketplace-submission.md`. Thomas needs to click through the in-app form (it requires logged-in session, can't be automated).
+2. **Public announcement** — Reddit + HN drafts are ready but require Thomas to post them himself (memory rule: per `feedback_linkedin_validation_required` LinkedIn is gated, the others are post-when-ready).
+3. **Bridge-plugin version drift** — the 4 wrapper plugins are NOT included in `sync-versions.sh`. They follow the wrapped npm MCP versions (e.g. `realestate-mcp@2.2.0` → `plugins/realestate-3d/plugin.json` v2.2.0). Add a `bash .claude/scripts/sync-plugin-versions.sh` (separate from the main script) that checks each plugin.json against `npm view <pkg> version` if/when the bridge plugins start drifting.
+4. **Website mention** — no banner / nav-link added to `website-static/index.html` yet. Suggest a one-liner in the "Use with AI" hero block once the Anthropic submission is approved (so the install command lands more relevant traffic).
+5. **5-agent independent review** — not run on this work. The plugin manifests are mostly metadata + the validator passed, so risk is low. If we want a sanity check before HN submission, it's worth a 3-agent Opus parallel pass on `/.claude-plugin/marketplace.json` + `plugins/*/plugin.json` for naming, license consistency, and description alignment.
+
+### Memory rules observed
+
+- `feedback_mcp_name_exposure`: `french-admin` plugin authored under `mcp-tools-lab` (not `thomas-gorisse`) — verified `npm view french-admin-mcp repository.url` resolves to `mcp-tools-lab/french-admin-mcp`. CDI-safe.
+- `feedback_english_only`: every plugin README, plugin.json description, and marketplace metadata is in English.
+- `feedback_branch_discipline`: shipped on the worktree branch `claude/bold-villani-42902e`, pushed direct to `main` per `feedback_merge_direct_main`.
+- `feedback_no_pr_burst`: single bundled commit (the 5 plugins + docs + marketplace), not a burst of PRs/issues. The repo is sceneview/sceneview (Thomas-owned), not an external repo.
+
+---
+
 ## SESSION 2026-05-07 (cont.) — landing alignment + Play Store screenshot refresh (agitated-meitner-a66271)
 
 ### TL;DR
