@@ -165,15 +165,12 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-07, session bold-villani-42902e — Claude Code plugin marketplace SHIPPED + 4-agent review fixes)
+### Current state (last updated: 2026-05-07, session bold-villani-42902e — Claude Code plugin marketplace SHIPPED + 4-agent review fixes + brand-scope tightening)
 
-- 🚀 **Claude Code plugin marketplace LIVE** in dedicated repo [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace). 5 plugins:
+- 🚀 **Claude Code plugin marketplace LIVE** in dedicated repo [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace) — single plugin, scoped strictly to the SceneView SDK product:
   - **sceneview** v4.0.11 (Apache-2.0) — `sceneview-mcp` + 11 namespaced contributor commands + cross-platform reminder hooks
-  - **realestate-3d** v2.2.0 (MIT) — wraps `realestate-mcp`
-  - **french-admin** v2.2.1 (MIT) — wraps `french-admin-mcp` via `mcp-tools-lab` (CDI-safe routing)
-  - **ecommerce-3d** v2.1.0 (MIT) — wraps `ecommerce-3d-mcp`
-  - **architecture-3d** v2.1.0 (MIT) — wraps `architecture-mcp`
-- Install: `/plugin marketplace add sceneview/claude-marketplace` then `/plugin install <name>@sceneview`
+- Install: `/plugin marketplace add sceneview/claude-marketplace` then `/plugin install sceneview@sceneview`
+- ⛔ Strict rule recorded in memory `feedback_sceneview_org_strict`: the `sceneview` GitHub org hosts ONLY SceneView-SDK-related artefacts. Personal-portfolio MCPs (french-admin, realestate, ecommerce-3d, architecture, etc.) belong in `mcp-tools-lab` or `sceneview-tools`, never in `sceneview/*`.
 - 4-agent independent Opus review caught 6 BLOCKING + 5 MAJOR before public announcement: dead-code hooks (matcher syntax invalid, validator missed it), license mismatch (Apache-2.0 vs MIT), 1.4 GB monolithic clone (split to dedicated repo to fix), `/review` `/test` namespace collision with built-in skills, version drift (plugin pinned 4.0.9 vs npm @4.0.11), DL/mo numbers gonflés in announcement drafts. All BLOCKING fixed in [`a88f7f8c`](https://github.com/sceneview/sceneview/commit/a88f7f8c) + the marketplace migration.
 - 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
 - Side effect: enriched `.claude/commands/*.md` with YAML frontmatter (`description:`) so `/help` now shows one-line summaries for every contributor command.
