@@ -2,47 +2,27 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit(*/gradle.properties)",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'SceneView: gradle.properties edited — run sync-versions.sh to keep all 30+ version locations aligned (root + module gradle.properties, mcp/package.json, llms.txt, README.md, sceneview-web/package.json, flutter pubspec+podspec, docs).'"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit(*/sceneview/src/*)",
-        "hooks": [
+            "command": "jq -r '.tool_input.file_path' | grep -qE '/gradle\\.properties$' && echo 'SceneView: gradle.properties edited — run sync-versions.sh to keep all 30+ version locations aligned (root + module gradle.properties, mcp/package.json, llms.txt, README.md, sceneview-web/package.json, flutter pubspec+podspec, docs).' || true"
+          },
           {
             "type": "command",
-            "command": "echo 'SceneView: Android API changed — check whether SceneViewSwift/, sceneview-web/, llms.txt, and mcp/src/ tools need a matching change.'"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit(*/SceneViewSwift/Sources/*)",
-        "hooks": [
+            "command": "jq -r '.tool_input.file_path' | grep -qE '/sceneview/src/' && echo 'SceneView: Android API changed — check whether SceneViewSwift/, sceneview-web/, llms.txt, and mcp/src/ tools need a matching change.' || true"
+          },
           {
             "type": "command",
-            "command": "echo 'SceneView: Swift API changed — check whether sceneview/ (Android), llms.txt (iOS section), and mcp/src/ tools need a matching change.'"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit(*/sceneview-web/src/*)",
-        "hooks": [
+            "command": "jq -r '.tool_input.file_path' | grep -qE '/SceneViewSwift/Sources/' && echo 'SceneView: Swift API changed — check whether sceneview/ (Android), llms.txt (iOS section), and mcp/src/ tools need a matching change.' || true"
+          },
           {
             "type": "command",
-            "command": "echo 'SceneView: Web API changed — check whether sceneview/ (Android) and llms.txt (Web section) need a matching change.'"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit(*/sceneview-core/src/*)",
-        "hooks": [
+            "command": "jq -r '.tool_input.file_path' | grep -qE '/sceneview-web/src/' && echo 'SceneView: Web API changed — check whether sceneview/ (Android) and llms.txt (Web section) need a matching change.' || true"
+          },
           {
             "type": "command",
-            "command": "echo 'SceneView: KMP core changed — affects ALL platforms (Android, iOS, Web). Run :sceneview-core:allTests.'"
+            "command": "jq -r '.tool_input.file_path' | grep -qE '/sceneview-core/src/' && echo 'SceneView: KMP core changed — affects ALL platforms (Android, iOS, Web). Run :sceneview-core:allTests.' || true"
           }
         ]
       }

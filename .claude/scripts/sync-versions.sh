@@ -200,21 +200,10 @@ fi
 # each other, but NOT gradle.properties VERSION_NAME.
 echo -e "${CYAN}--- MCP Source/Dist (independent track, not checked) ---${NC}"
 
-# ─── 7b. Claude Code plugin (sceneview) ─────────────────────────────────
-# The 'sceneview' Claude Code plugin tracks the SDK version. The 4 bridge
-# plugins (realestate-3d, french-admin, ecommerce-3d, architecture-3d) follow
-# their wrapped npm MCP versions and are NOT checked here.
-echo -e "${CYAN}--- Claude Code Plugin ---${NC}"
-PLUGIN_JSON="$REPO_ROOT/plugins/sceneview/.claude-plugin/plugin.json"
-if [ -f "$PLUGIN_JSON" ]; then
-    V=$(python3 -c "import json; print(json.load(open('$PLUGIN_JSON'))['version'])" 2>/dev/null || echo "MISSING")
-    add_check "plugins/sceneview plugin.json" "$V"
-fi
-MARKETPLACE_JSON="$REPO_ROOT/.claude-plugin/marketplace.json"
-if [ -f "$MARKETPLACE_JSON" ]; then
-    V=$(python3 -c "import json; m=json.load(open('$MARKETPLACE_JSON')); p=[x for x in m['plugins'] if x['name']=='sceneview'][0]; print(p.get('version','MISSING'))" 2>/dev/null || echo "MISSING")
-    add_check "marketplace.json (sceneview entry)" "$V"
-fi
+# ─── 7b. Claude Code plugin ─────────────────────────────────────────────
+# All 5 plugins (sceneview + 4 bridges) track their wrapped npm MCP versions,
+# NOT gradle.properties. Use sync-plugin-versions.sh for that check —
+# decoupled from the SDK version cycle.
 
 # ─── 8. iOS demo ────────────────────────────────────────────────────────
 IOS_ABOUT="$REPO_ROOT/SceneViewSwift/Examples/SceneViewDemo/SceneViewDemo/Views/AboutView.swift"

@@ -18,7 +18,7 @@
 - `{platform}-demo` naming convention across all 7 platforms
 
 ### Infrastructure
-- SceneView MCP on official MCP Registry (io.github.ThomasGorisse/sceneview)
+- SceneView MCP on official MCP Registry (io.github.sceneview/mcp)
 - 21 GitHub Secrets configured (Android + iOS + Maven + npm)
 - Apple Distribution certificate + App Store Connect API key
 - Kobweb website deployed with v3.3.0 content

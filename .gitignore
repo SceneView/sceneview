@@ -13,6 +13,24 @@ Desktop.ini
 .claude/scheduled_tasks.lock
 .mcp.json
 !plugins/*/.mcp.json
+# Private session artefacts (CDI-safety: do not expose employer/maintainer identity)
+.claude/handoff*.md
+.claude/SESSION_*.md
+.claude/SESSION-*.md
+.claude/NEXT_SESSION_PROMPT.md
+.claude/NOTICE-*.md
+.claude/active-branches.md
+.claude/audit-*.md
+.claude/pixel9-*.md
+.claude/website-review-*.md
+.claude/launch.json
+.claude/plans/
+.claude/marketplace-submissions/
+.claude/reports/
+RERUN-CHECK.md
+
+# ── Flutter tooling artefacts ─────────────────────────────
+flutter/**/.dart_tool/
 
 # ── Gradle ────────────────────────────────────────────────
 /local.properties

@@ -704,7 +704,7 @@ Git tag `v4.0.0-rc.1` + GitHub pre-release created. `release.yml` only matches s
 - Blue branding with isometric cube icon
 
 ### Infrastructure
-- **MCP Registry** — SceneView MCP published at `io.github.ThomasGorisse/sceneview`
+- **MCP Registry** — SceneView MCP published at `io.github.sceneview/mcp`
 - **21 GitHub Secrets** — Android + iOS + Maven + npm fully configured
 - **Apple Developer** — Distribution certificate, provisioning profile, API key
 - **CI/CD** — Play Store + App Store workflows ready

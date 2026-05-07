@@ -2,7 +2,7 @@
  * social-media-mcp pilot library.
  *
  * Upstream: `social-media-mcp` (#10 DL/mo, ~341), owned by the
- * `thomasgorisse` GitHub org. Content planning, caption variants,
+ * `mcp-tools-lab` GitHub org. Content planning, caption variants,
  * hashtag suggestions, analytics summaries.
  *
  * IMPORTANT: social-media-mcp NEVER publishes content on the user's

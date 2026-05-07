@@ -1,14 +1,14 @@
 {
   "name": "sceneview",
-  "version": "4.0.9",
-  "description": "AI-first toolkit for building 3D and AR apps with SceneView (Android, iOS, Web). Bundles the SceneView MCP server plus contributor commands for documenting, reviewing, testing, version-bumping, and releasing the SDK.",
+  "version": "4.0.11",
+  "description": "Toolkit for building 3D and AR apps with SceneView (Android, iOS, Web). Bundles the SceneView MCP server plus contributor commands for documenting, reviewing, testing, version-bumping, and releasing the SDK.",
   "author": {
     "name": "SceneView",
     "url": "https://github.com/sceneview"
   },
   "homepage": "https://sceneview.github.io",
   "repository": "https://github.com/sceneview/sceneview",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": [
     "sceneview",
     "3d",

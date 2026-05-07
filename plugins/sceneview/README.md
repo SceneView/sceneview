@@ -1,6 +1,6 @@
 # SceneView plugin for Claude Code
 
-AI-first toolkit for building 3D and AR apps with [SceneView](https://github.com/sceneview/sceneview) — the cross-platform 3D & AR SDK for Android (Jetpack Compose), iOS / macOS / visionOS (SwiftUI), and Web.
+Toolkit for building 3D and AR apps with [SceneView](https://github.com/sceneview/sceneview) — the cross-platform 3D & AR SDK for Android (Jetpack Compose), iOS / macOS / visionOS (SwiftUI), and Web.
 
 ## What you get
 
@@ -15,6 +15,8 @@ AI-first toolkit for building 3D and AR apps with [SceneView](https://github.com
 ```
 
 The MCP server starts automatically. To use the contributor commands, run any `/sceneview:*` skill.
+
+> **Tip — namespace conflicts:** Two of the bundled commands (`review`, `test`) share names with built-in Claude Code skills. After installing the plugin, **always use the prefixed form** `/sceneview:review` and `/sceneview:test` to disambiguate. The other 9 commands have unique names but the prefix still works.
 
 ## Use cases
 

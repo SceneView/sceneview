@@ -149,8 +149,10 @@ Every file below MUST be updated when bumping the version. Use `/version-bump` o
 | **Swift** | `SceneViewSwift/` uses git tag `vX.Y.Z` | not a file version |
 
 **Automation:**
-- `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations
+- `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations (incl. sceneview plugin)
 - `bash .claude/scripts/sync-versions.sh --fix` — auto-fixes mismatches
+- `bash .claude/scripts/sync-plugin-versions.sh` — checks the 4 Claude Code bridge plugins (`realestate-3d`, `french-admin`, `ecommerce-3d`, `architecture-3d`) against their wrapped npm MCPs
+- `bash .claude/scripts/sync-plugin-versions.sh --fix` — auto-bumps plugin.json + marketplace.json entries to match `npm view <pkg> version`
 - `bash .claude/scripts/quality-gate.sh` — full pre-push quality gate
 - `bash .claude/scripts/cross-platform-check.sh` — API parity across platforms
 - `bash .claude/scripts/release-checklist.sh` — pre-release validation
@@ -261,7 +263,7 @@ Never say "everything is good" without verifying published packages.
 - ✅ **v3.6.4 publiée sur npm (12:33 UTC / 14:33 Paris)** — le gap 3.6.3 est réglé. PR #810 (commit 3f3a595f) a mergé `claude/mcp-files-fix` sur main avec le vrai root-cause fix : `files[]` remplacé par glob `dist/**/*.js` (robust), bump 3.6.3 → **3.6.4** (3.6.3 burned comme broken bookmark), nouveau test `src/package-files.test.ts` qui valide le tarball via `npm pack --dry-run --json`. Publish fait manuellement (`cd mcp && npm publish --access public`) puisque aucun tag `v3.6.4` n'existe ni en local ni sur le remote. Tarball final: 37 fichiers / 747 kB unpacked, ships tous les `dist/tools/*.js`, `dist/telemetry.js`, `dist/auth.js`, `dist/billing.js`, `dist/tiers.js`, `dist/search-models.js`, `dist/analyze-project.js`, `dist/generated/llms-txt.js`. `npm view sceneview-mcp` retourne `latest = 3.6.4`, versions publiées : 3.5.5, 3.6.0, 3.6.1, 3.6.2, 3.6.4. Ships les features cumulées des PR #804 (telemetry), #805 (search_models Sketchfab BYOK), #807 (analyze_project), #808 (sponsor CTA every 10 calls), #810 (files[] glob fix). Les 3 4xx DL/mo continuent en 3.6.4 au prochain `npx` cache bust.
 - **Android rewrite**: SceneRenderer, NodeGestureDelegate/AnimationDelegate/State, ARPermissionHandler
 - **Demo app**: Material 3 Expressive, 4 tabs, 40 models, 19 sample demos
-- **MCP servers**: sceneview-mcp 3.6.2 on npm — **3 450 DL/mo**; 10 MCPs perso actifs (7 deprecated 2026-04-11 après audit: ai-invoice, cooking-mcp, travel-mcp, devops-mcp, @thomasgorisse/seo-mcp, gaming-3d-mcp, interior-design-3d-mcp); 3 active verticals cartonnent sur npm : realestate-mcp 1 276, french-admin-mcp 1 268, ecommerce-3d-mcp 1 153, architecture-mcp 1 134, legal-docs-mcp 789, education-mcp 566 DL/mo. **Total MCPs actifs : 11 018 DL/mois.**
+- **MCP servers**: sceneview-mcp 3.6.2 on npm — **3 450 DL/mo**; bridge MCPs cartonnent sur npm : realestate-mcp 1 276, french-admin-mcp 1 268, ecommerce-3d-mcp 1 153, architecture-mcp 1 134, legal-docs-mcp 789, education-mcp 566 DL/mo.
 - **sceneview-web**: v3.6.2 on npm (1 221 DL/mo, Kotlin/JS + Filament.js)
 - **GitHub orgs**: `sceneview`, `sceneview-tools`, `mcp-tools-lab`
 - **Website**: redesigned — 8 sections on index, showcase rewritten, playground enhanced (7 platforms, camera manipulator, Open in Claude), docs 404 fixed
@@ -279,7 +281,7 @@ Never say "everything is good" without verifying published packages.
 - **#808 sponsor CTA every 10 tool calls**: mergé sur main, affiche un prompt de sponsoring (Open Collective + GitHub Sponsors) à chaque 10e appel d'outil MCP.
 - **Scene → SceneView rename**: finalisé sur TOUTES les surfaces publiques (library KDocs 4818d0a8/d3dd0d5b, mkdocs nav, SEO data, MCP packages d6a31759, runtime bridges/templates/top-level MCP 025915e9, nodes.md intro/TOC/headings 71c10fea, READMEs react-native + flutter, SceneViewSwift mapping tables, ROADMAP).
 - **Demo apps (session 34)**: audit frais de toutes les 7 demos apps (l'ancien audit session 19 était périmé). `.claude/scripts/validate-demo-assets.sh` créé (4a1bb02a) — scan tous les refs GLB/USDZ/HDR, expand `$CDN/...`, follow redirects, supporte patterns iOS `asset:` et `ModelNode.load()`. Premier run a trouvé 8 refs cassées (android-tv-demo + web-demo) — toutes corrigées. web-demo unblocked (webpack 5 + filament.js polyfills). flutter/sceneview_flutter unblocked (Kotlin 2.0 + compose compiler plugin). RN demo scaffolded android/ + ios/ natifs (68cf829c).
-- **Règles mémoire absolues** : `feedback_pro_perso_separation` (Octopus = Pro, jamais dans contexte perso), `feedback_no_former_employers` (Digitalmate/Decam jamais dans empire perso). Liste blanche perso stricte : sceneview, sceneview-tools, mcp-tools-lab, ThomasGorisse.
+- **Org allowlist** : `sceneview`, `sceneview-tools`, `mcp-tools-lab`.
 
 For full session history, see memory file `project_session_history.md`.
 For current priorities and next steps, see `.claude/handoff.md`.

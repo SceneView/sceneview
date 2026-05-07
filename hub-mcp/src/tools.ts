@@ -37,7 +37,7 @@ export const FREE_TOOLS: ReadonlySet<string> = new Set([
   // education
   "education__build_quiz",
   "education__search_papers",            // bridge-API: OpenAlex
-  // finance (was @thomasgorisse/finance-mcp, now personal-finance-mcp)
+  // finance (personal-finance-mcp)
   "finance__compound_interest",
   "finance__get_stock_quote",            // bridge-API: market data
   "finance__get_exchange_rates",         // bridge-API: ECB/forex

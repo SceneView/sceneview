@@ -2,9 +2,9 @@
  * health-fitness-mcp pilot library.
  *
  * Upstream: `health-fitness-mcp` (#11 DL/mo, ~335), owned by the
- * `thomasgorisse` GitHub org. Upstream repo is currently a 404 —
+ * `mcp-tools-lab` GitHub org. Upstream repo is currently a 404 —
  * package.json on npm points at a non-existent GitHub URL. Repo
- * creation is tracked in .claude/SESSION_PROMPT.md.
+ * creation is a follow-up backlog item.
  *
  * IMPORTANT: health-fitness-mcp is INFORMATIONAL ONLY and NEVER
  * provides medical advice or prescriptions. The dispatcher must

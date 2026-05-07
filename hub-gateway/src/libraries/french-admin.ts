@@ -2,7 +2,7 @@
  * french-admin-mcp pilot library.
  *
  * Upstream: `french-admin-mcp` (#3 DL/mo, ~1 268), owned by the
- * `thomasgorisse` GitHub org. Bridge to French administrative APIs:
+ * `mcp-tools-lab` GitHub org. Bridge to French administrative APIs:
  * impôts, CAF, Ameli, Pôle Emploi, démarches administratives.
  *
  * This is a bridge-API MCP, which historically outperforms pure

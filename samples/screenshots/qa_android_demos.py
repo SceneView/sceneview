@@ -18,7 +18,7 @@ sys.stderr.reconfigure(line_buffering=True)
 ADB = os.path.expanduser("~/Library/Android/sdk/platform-tools/adb")
 PACKAGE = "io.github.sceneview.demo"
 ACTIVITY = "io.github.sceneview.demo.MainActivity"
-SCREENSHOT_DIR = "/Users/thomasgorisse/Projects/sceneview/samples/screenshots/android"
+SCREENSHOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "android")
 
 DEMOS = [
     "Model Viewer",

@@ -12,13 +12,13 @@
  *   [all active portfolio MCPs — real upstream handlers]
  *   - architecture-mcp      (1 134 DL/mo, sceneview-tools)
  *   - realestate-mcp        (1 276 DL/mo, sceneview-tools)
- *   - french-admin-mcp      (1 268 DL/mo, thomasgorisse)
+ *   - french-admin-mcp      (1 268 DL/mo, mcp-tools-lab)
  *   - ecommerce-3d-mcp      (1 153 DL/mo, sceneview-tools)
  *   - legal-docs-mcp          (789 DL/mo, orphan — needs repo)
  *   - finance-mcp             (585 DL/mo, mcp-tools-lab)
  *   - education-mcp           (566 DL/mo, mcp-tools-lab)
- *   - social-media-mcp        (341 DL/mo, thomasgorisse)
- *   - health-fitness-mcp      (335 DL/mo, thomasgorisse — repo 404)
+ *   - social-media-mcp        (341 DL/mo, mcp-tools-lab)
+ *   - health-fitness-mcp      (335 DL/mo, mcp-tools-lab — repo 404)
  *   - automotive-3d-mcp     (sceneview monorepo)
  *   - healthcare-3d-mcp     (sceneview monorepo)
  *

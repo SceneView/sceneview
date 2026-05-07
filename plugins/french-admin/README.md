@@ -25,7 +25,7 @@ Tools answer in French by default. Pass `lang: "en"` for English summaries.
 ## Links
 
 - npm: https://www.npmjs.com/package/french-admin-mcp
-- Issues: https://github.com/thomas-gorisse/french-admin-mcp/issues
+- Issues: https://github.com/mcp-tools-lab/french-admin-mcp/issues
 
 ## License
 
