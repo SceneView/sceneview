@@ -54,18 +54,19 @@ Made the entire 3D + AR test surface runnable on a stock Apple Silicon Pixel_7a 
 
 - AR demos beyond `ar-record-playback` aren't currently exercised by the smoke suite — the test infra is in place (`DemoSettings.arPendingPlaybackFile` + `--es ar_playback_file` + auto-Playback mode), but only `baseline.mp4` is committed (gitignored). More fixtures = more coverage. Each fixture is recorded on a real device via `ARRecordPlaybackDemo`'s Export button.
 
-### Demos that need `qaMode` properly wired
+### qaMode wire-through (done in [9025d2c2](https://github.com/sceneview/sceneview/commit/9025d2c2) + [3876391e](https://github.com/sceneview/sceneview/commit/3876391e))
 
-These currently rely on a wide pixel tolerance in their golden test because their continuous animation isn't pinned by `DemoSettings.qaMode`:
+After the initial test infra landed, audited each of the 6 demos with wide tolerance:
 
-- `MultiModelDemo` — model swap timer (60% tol)
-- `AnimationDemo` — glTF skeletal animation (60% tol)
-- `LightingDemo` — directional light spin (30% tol)
-- `TextDemo` — sample cycling (20% tol)
-- `ImageDemo` — texture swap (15% tol)
-- `DynamicSkyDemo` — sun azimuth/elevation (18% tol)
+- ✅ **`AnimationDemo`** — `LaunchedEffect` keys on `DemoSettings.qaMode` and stops every glTF animation track. Tolerance now 8 % (was 60 %).
+- ✅ **`MultiModelDemo`** — passes `autoAnimate = !DemoSettings.qaMode` to the dragon's ModelNode (the only auto-animated instance). Tolerance now 8 % (was 60 %).
+- ✅ **`LightingDemo` / `TextDemo` / `ImageDemo` / `DynamicSkyDemo`** — turned out to have NO auto-animation; the wide tolerances were preemptive guesses, not measurements. Re-recorded goldens and tightened to 8–10 %. The residual diff is purely Filament TAA convergence + glb async-load timing.
 
-Each demo just needs to early-return its update loop when `DemoSettings.qaMode` is true (the same pattern `GeometryDemo` and `AnimationDemo`'s camera animation already use). Once wired, drop the per-test `pixelDiffTolerancePercent` parameter and let the default 2% govern. ~30 minutes per demo if approached methodically.
+Net: every render-pixel test in the suite now passes within 8–10 % tolerance (vs the original 15–60 %), so any wholesale visual regression — model failed to load, wrong colour, missing element — will trip the assertion.
+
+### Future tightening below 8 %
+
+The remaining 4–8 % comes from Filament TAA accumulating sub-pixel jitter across the first frames. To get below it, capture would need a "wait until TAA converges" hook from Filament (its Renderer doesn't currently expose one). Filed conceptually for v4.1 if anyone wants to take it further.
 
 ---
 
