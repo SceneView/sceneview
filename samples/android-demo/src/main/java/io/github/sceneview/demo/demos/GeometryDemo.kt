@@ -103,34 +103,17 @@ fun GeometryDemo(onBack: () -> Unit) {
         title = "Geometry Primitives",
         onBack = onBack,
         controls = {
-            Text("Visible Shapes", style = MaterialTheme.typography.labelLarge)
-            // horizontalScroll on the chip row so a narrow viewport (or future
-            // additional shape chips) still fits without overflow / line break.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(showCube, onClick = { showCube = !showCube }, label = { Text("Cube") })
-                FilterChip(showSphere, onClick = { showSphere = !showSphere }, label = { Text("Sphere") })
-                FilterChip(showCylinder, onClick = { showCylinder = !showCylinder }, label = { Text("Cylinder") })
-                FilterChip(showPlane, onClick = { showPlane = !showPlane }, label = { Text("Plane") })
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                "Metallic: ${"%.2f".format(metallic)}",
-                style = MaterialTheme.typography.labelLarge,
+            // Controls extracted into a separate composable so a Roborazzi snapshot
+            // test can capture the panel layout in pure JVM (no Filament, no SceneView).
+            // See GeometryDemoControlsSnapshotTest. Pattern from issue #880.
+            GeometryDemoControls(
+                showCube = showCube, onShowCubeChange = { showCube = it },
+                showSphere = showSphere, onShowSphereChange = { showSphere = it },
+                showCylinder = showCylinder, onShowCylinderChange = { showCylinder = it },
+                showPlane = showPlane, onShowPlaneChange = { showPlane = it },
+                metallic = metallic, onMetallicChange = { metallic = it },
+                roughness = roughness, onRoughnessChange = { roughness = it },
             )
-            Slider(value = metallic, onValueChange = { metallic = it }, valueRange = 0f..1f)
-
-            Text(
-                "Roughness: ${"%.2f".format(roughness)}",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Slider(value = roughness, onValueChange = { roughness = it }, valueRange = 0f..1f)
         }
     ) {
         SceneView(
@@ -208,4 +191,52 @@ fun GeometryDemo(onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Controls panel for [GeometryDemo], extracted into a separate `@Composable` so a
+ * Roborazzi snapshot test (`GeometryDemoControlsSnapshotTest`) can capture the panel
+ * layout in pure JVM — no Filament Engine, no `SceneView`, no Choreographer.
+ *
+ * State + callbacks are passed in by the parent: this composable is **stateless** in
+ * the Compose sense, which makes it both unit-testable and straightforwardly
+ * reusable. See issue [#880](https://github.com/sceneview/sceneview/issues/880).
+ */
+@Composable
+internal fun GeometryDemoControls(
+    showCube: Boolean, onShowCubeChange: (Boolean) -> Unit,
+    showSphere: Boolean, onShowSphereChange: (Boolean) -> Unit,
+    showCylinder: Boolean, onShowCylinderChange: (Boolean) -> Unit,
+    showPlane: Boolean, onShowPlaneChange: (Boolean) -> Unit,
+    metallic: Float, onMetallicChange: (Float) -> Unit,
+    roughness: Float, onRoughnessChange: (Float) -> Unit,
+) {
+    Text("Visible Shapes", style = MaterialTheme.typography.labelLarge)
+    // horizontalScroll on the chip row so a narrow viewport (or future
+    // additional shape chips) still fits without overflow / line break.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(showCube, onClick = { onShowCubeChange(!showCube) }, label = { Text("Cube") })
+        FilterChip(showSphere, onClick = { onShowSphereChange(!showSphere) }, label = { Text("Sphere") })
+        FilterChip(showCylinder, onClick = { onShowCylinderChange(!showCylinder) }, label = { Text("Cylinder") })
+        FilterChip(showPlane, onClick = { onShowPlaneChange(!showPlane) }, label = { Text("Plane") })
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Text(
+        "Metallic: ${"%.2f".format(metallic)}",
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Slider(value = metallic, onValueChange = onMetallicChange, valueRange = 0f..1f)
+
+    Text(
+        "Roughness: ${"%.2f".format(roughness)}",
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Slider(value = roughness, onValueChange = onRoughnessChange, valueRange = 0f..1f)
 }
