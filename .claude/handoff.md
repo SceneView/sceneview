@@ -4,11 +4,24 @@
 
 ---
 
-## SESSION 2026-05-07 — exciting-napier-1c8c70 — v4.0.8 SHIPPED end-to-end + 5-agent review + Play Store fix + RN/Flutter parity
+## SESSION 2026-05-07 — exciting-napier-1c8c70 — v4.0.8 + v4.0.9 cuts + 38% APK reduction + 5-agent review
 
 ### TL;DR
 
-Marathon session: v4.0.8 cut + fully published + 5 parallel Opus agent reviews + 13 findings triaged + all BLOCKING/MAJOR/MINOR fixed + Play Store race fixed + cross-platform unlit parity for RN/Flutter. **6 commits sur main**, **all stores deployed and verified**, **0 BLOCKING ouvert** au close.
+Marathon session — **2 releases shipped** (v4.0.8 + v4.0.9), 5 parallel Opus agent reviews, cross-platform unlit parity (Android + Apple + RN + Flutter + **web KHR_materials_unlit**), Android demo APK **161 → 100 MB (-38%)**, Play Store internal-track race fixed. **14 commits on main**, all stores re-deployed.
+
+### v4.0.9 cut at session close
+
+- **Tag** v4.0.9 pushed at 10:54Z, `release.yml` [run 25491540667](https://github.com/sceneview/sceneview/actions/runs/25491540667) running
+- **Bumped 29 locations** (sync-versions clean) — gradle, npm sceneview-web@4.0.9, sceneview-mcp@4.0.11, RN/Flutter pubspec/podspec, iOS pbxproj, all docs/llms.txt
+- **No public Kotlin/Swift/Filament API change vs v4.0.8** — release narrative is "cross-platform unlit parity + 38% smaller demo APK + Play Store fix"
+
+### v4.0.8 published (verified earlier in session)
+
+- Maven Central `sceneview/arsceneview/sceneview-core 4.0.8` ✅
+- npm `sceneview-mcp@4.0.10` ✅, `sceneview-web@4.0.8` ✅
+- App Store iOS v4.0.8 build 364 ✅, Play Store Android v4.0.8 production ✅
+- GitHub Release [v4.0.8](https://github.com/sceneview/sceneview/releases/tag/v4.0.8) with full CHANGELOG body ✅
 
 ### What's actually published (verified)
 
@@ -21,15 +34,35 @@ Marathon session: v4.0.8 cut + fully published + 5 parallel Opus agent reviews +
 - **Play Store Android** v4.0.8 production track deployed → Google review in progress
 - **Play Store internal track** ✅ on the second push (the `max-parallel: 1` fix worked first try)
 
-### 6 commits on main
+### 14 commits on main
 
 ```
 13f8e0a4 chore(release): v4.0.8 — unlit material + 3 demo refresh + GLB no-TANGENTS test
-829faeb5 chore(handoff): document v4.0.8 cut session — exciting-napier-1c8c70
+829faeb5 chore(handoff): document v4.0.8 cut session
 f2829214 chore: Play Store race fix + cross-platform unlit parity (Flutter / RN)
 04e75ad5 review: apply 5-agent independent review fixes — 2 BLOCKING + 4 follow-ups
+4a47174b chore(handoff): close session + #878 filed
+7669297e chore(website): refresh community metrics
+4b8e3033 feat(sceneview-web): unlit material parity via KHR_materials_unlit
+f78299de feat(samples/web-demo): unlit checkbox showcase + SDK_VERSION 3.6.1 → 4.0.8
+7a466736 chore(samples): drop 9 orphan assets — APK 161 → 131 MB (-19%)
+9877918e perf(samples): split TV-only assets — APK 131 → 100 MB (-24%) (closes #879)
+c2fe9010 chore(samples): drop disabled asset-pack module (-186 MB repo)
+e13788cd chore(release): v4.0.9 — web unlit + APK -38% + Play Store fix
 + this handoff update
 ```
+
+### Asset cleanup arc (Android demo APK)
+
+| Step | Phone APK release | Notes |
+|---|---|---|
+| Initial baseline | **161 MB** | + 186 MB disabled asset-pack module on disk |
+| `7a466736` drop 9 orphan assets | 131 MB (-19%) | 5 models + 4 envs none referenced anywhere |
+| `9877918e` split TV-only via sourceSets | **100 MB** (-38%) | 6 TV-only models moved + sourceSets srcDirs setup |
+| `c2fe9010` drop disabled asset-pack module | unchanged | -186 MB repo on-disk only |
+
+iOS demo (220 MB) audited: all 28 USDZ + 6 HDR referenced → no orphans.
+website-static/models/platforms/ (242 MB, 34 GLBs) audited: all referenced in docs/llms.txt/playground → no orphans.
 
 ### Multi-agent review pattern (5 Opus agents in parallel — worth reusing)
 
