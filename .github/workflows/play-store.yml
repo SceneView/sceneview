@@ -173,8 +173,18 @@ jobs:
     timeout-minutes: 15
 
     # Track list comes from the build job — see its `Compute target tracks` step.
+    #
+    # `max-parallel: 1` serialises the matrix entries because Google's Edits
+    # API gives every editing session a single Edit ID per app — when two
+    # parallel jobs both upload-and-commit to the same packageName they race
+    # for that ID, one finishes first, and the other returns "This Edit has
+    # been deleted" because the Edit it was holding got committed-and-discarded
+    # by its sibling. Running the tracks sequentially eliminates the race.
+    # Total wall time is ~50 s × N tracks (vs ~50 s in the rare parallel-works
+    # case), well within budget.
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         track: ${{ fromJSON(needs.build.outputs.tracks) }}
 

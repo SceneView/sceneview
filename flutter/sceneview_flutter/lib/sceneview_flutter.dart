@@ -80,6 +80,15 @@ class GeometryNode {
   /// Fill color as an ARGB integer (e.g. 0xFF6750A4).
   final int color;
 
+  /// When `true` the material ignores all scene lighting (no PBR shading,
+  /// no IBL, no shadows) and renders the flat [color] straight to the
+  /// framebuffer. Use for HUD overlays, gizmos, axes, lines, or AR face/body
+  /// meshes — anywhere lighting would fight the use case.
+  ///
+  /// Defaults to `false` (lit PBR). Forwarded to the Android bridge as
+  /// `MaterialLoader.createUnlitColorInstance(color)` when `true`.
+  final bool unlit;
+
   const GeometryNode({
     required this.type,
     this.x = 0.0,
@@ -87,6 +96,7 @@ class GeometryNode {
     this.z = 0.0,
     this.size = 1.0,
     this.color = 0xFF888888,
+    this.unlit = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -96,6 +106,7 @@ class GeometryNode {
         'z': z,
         'size': size,
         'color': color,
+        'unlit': unlit,
       };
 }
 

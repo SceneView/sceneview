@@ -104,12 +104,16 @@ class SceneViewManager : SimpleViewManager<FrameLayout>() {
                         val colorInt = geom.color?.let {
                             runCatching { android.graphics.Color.parseColor(it) }.getOrNull()
                         }
-                        // Cache material instance per color to avoid leaking on recomposition.
+                        // Cache material instance per (color, unlit) to avoid leaking on recomposition.
+                        // The unlit flag is part of the cache key — switching from lit ↔ unlit
+                        // returns a fresh instance because the underlying .filamat is different.
                         val mat = colorInt?.let { c ->
-                            val instance = remember(c) {
-                                materialLoader.createColorInstance(c)
+                            val key = c to geom.unlit
+                            val instance = remember(key) {
+                                if (geom.unlit) materialLoader.createUnlitColorInstance(c)
+                                else materialLoader.createColorInstance(c)
                             }
-                            DisposableEffect(c) {
+                            DisposableEffect(key) {
                                 onDispose {
                                     materialLoader.destroyMaterialInstance(instance)
                                 }
@@ -245,6 +249,7 @@ class SceneViewManager : SimpleViewManager<FrameLayout>() {
                 val rotation = readRotation(map, "rotation")
                 val scale = readScale(map, "scale")
                 val color = if (map.hasKey("color")) map.getString("color") else null
+                val unlit = map.hasKey("unlit") && map.getBoolean("unlit")
                 state.geometryNodes.add(
                     GeometryNodeData(
                         type = type,
@@ -253,6 +258,7 @@ class SceneViewManager : SimpleViewManager<FrameLayout>() {
                         rotation = rotation,
                         scale = scale,
                         color = color,
+                        unlit = unlit,
                     )
                 )
             }
@@ -307,6 +313,13 @@ data class GeometryNodeData(
     val rotation: Rotation = Rotation(x = 0f),
     val scale: Scale = Scale(1f),
     val color: String? = null,
+    /**
+     * When `true` the node's material ignores all scene lighting (no PBR shading,
+     * no IBL, no shadows) and renders the flat [color] straight to the framebuffer.
+     * Use for HUD overlays, gizmos, axes, lines, AR face/body meshes — anywhere
+     * lighting would fight the use case. Defaults to `false` (lit PBR).
+     */
+    val unlit: Boolean = false,
 )
 
 data class LightNodeData(

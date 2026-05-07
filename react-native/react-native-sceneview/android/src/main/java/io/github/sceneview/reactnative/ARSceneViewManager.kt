@@ -83,12 +83,14 @@ class ARSceneViewManager : SimpleViewManager<FrameLayout>() {
                         val colorInt = geom.color?.let {
                             runCatching { android.graphics.Color.parseColor(it) }.getOrNull()
                         }
-                        // Cache material instance per color to avoid leaking on recomposition.
+                        // Cache material instance per (color, unlit) to avoid leaking on recomposition.
                         val mat = colorInt?.let { c ->
-                            val instance = remember(c) {
-                                materialLoader.createColorInstance(c)
+                            val key = c to geom.unlit
+                            val instance = remember(key) {
+                                if (geom.unlit) materialLoader.createUnlitColorInstance(c)
+                                else materialLoader.createColorInstance(c)
                             }
-                            DisposableEffect(c) {
+                            DisposableEffect(key) {
                                 onDispose {
                                     materialLoader.destroyMaterialInstance(instance)
                                 }
@@ -226,6 +228,7 @@ class ARSceneViewManager : SimpleViewManager<FrameLayout>() {
                 val rotation = readRotation(map, "rotation")
                 val scale = readScale(map, "scale")
                 val color = if (map.hasKey("color")) map.getString("color") else null
+                val unlit = map.hasKey("unlit") && map.getBoolean("unlit")
                 state.geometryNodes.add(
                     GeometryNodeData(
                         type = type,
@@ -234,6 +237,7 @@ class ARSceneViewManager : SimpleViewManager<FrameLayout>() {
                         rotation = rotation,
                         scale = scale,
                         color = color,
+                        unlit = unlit,
                     )
                 )
             }
