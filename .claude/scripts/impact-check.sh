@@ -114,7 +114,7 @@ echo -e "${CYAN}--- SPM version consistency ---${NC}"
 
 GRADLE_VERSION=$(grep '^VERSION_NAME=' gradle.properties 2>/dev/null | cut -d= -f2)
 SPM_STALE=$(grep -rl "sceneview-swift.*from.*\"[0-9]" --include='*.md' --include='*.txt' . 2>/dev/null | \
-    grep -v 'node_modules\|build/\|.git/\|docs/site/\|.claude/worktrees/' | \
+    grep -v 'node_modules\|build/\|.git/\|docs/site/\|.claude/worktrees/\|.claude/plans/' | \
     xargs grep -l "sceneview-swift" 2>/dev/null | \
     xargs grep -L "from.*\"$GRADLE_VERSION\"" 2>/dev/null || true)
 

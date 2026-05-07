@@ -83,7 +83,7 @@ No boilerplate. No manual cleanup. Just declare what you want.
 === "Swift (iOS / macOS / visionOS)"
 
     ```swift
-    // Package.swift: .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.0.2")
+    // Package.swift: .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.0.9")
 
     SceneView { root in
         let model = try? await ModelNode.load("helmet.usdz")
@@ -207,7 +207,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
 
     ```swift
     // Package.swift or Xcode > Add Package Dependency
-    .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.0.2")
+    .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.0.9")
     ```
 
 === "Web"

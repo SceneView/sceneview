@@ -45,7 +45,7 @@ SceneViewSwift provides a native SwiftUI library powered by RealityKit and ARKit
 - **3D**: `SceneView { }` with ModelNode, GeometryNode, LightNode, and more
 - **AR**: `ARSceneView()` with plane detection and tap-to-place (iOS only)
 - **Min versions**: iOS 17+, macOS 14+, visionOS 1+
-- **Install**: `.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.2")`
+- **Install**: `.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.9")`
 
 [:octicons-arrow-right-24: Apple Quickstart](quickstart-ios.md)
 
