@@ -34,8 +34,9 @@ import io.github.sceneview.rememberModelLoader
  * Augmented face mesh tracking demo.
  *
  * Configures the AR session with the front camera and [Config.AugmentedFaceMode.MESH3D] to
- * detect face meshes. When a face is detected, an [AugmentedFaceNode] renders a semi-transparent
- * colored mesh overlay on the user's face.
+ * detect face meshes. When a face is detected, an [AugmentedFaceNode] renders a translucent
+ * unlit-blue mesh overlay on the user's face — alpha 0.4 so the user's actual facial features
+ * remain visible underneath the fitted topology.
  *
  * Requires a device with a front-facing camera and ARCore face mesh support.
  */
@@ -48,18 +49,23 @@ fun ARFaceDemo(onBack: () -> Unit) {
     var detectedFaces by remember { mutableStateOf<List<AugmentedFace>>(emptyList()) }
     var faceCount by remember { mutableStateOf(0) }
 
-    // Unlit colour overlay for the face mesh. ARCore disables `ENVIRONMENTAL_HDR`
+    // Unlit translucent overlay for the face mesh. ARCore disables `ENVIRONMENTAL_HDR`
     // light estimation when the front camera is in use, so any lit material falls
     // back to whatever neutral IBL is in scope — which historically rendered the
     // mesh near-invisible even after the tangent-quaternion fix in `35e5990d`.
     //
-    // `createUnlitColorInstance` ships a flat colour straight to the framebuffer
-    // (no PBR shading, no IBL dependency, no self-blend stacking), so the overlay
-    // reads as a clean SceneView-blue tone regardless of front-camera lighting.
-    // No fill light needed — the previous explicit 100 000 lux directional was
-    // a workaround for the lit material that's now obsolete.
+    // `createUnlitColorInstance` ships the mesh's flat colour in a single fragment
+    // pass (no PBR shading, no IBL dependency), so the overlay reads as a clean
+    // SceneView-blue tone regardless of front-camera lighting. No fill light needed —
+    // the previous explicit 100 000 lux directional was a workaround for the lit
+    // material that's now obsolete.
+    //
+    // [SceneViewColors.PrimaryOverlay] (alpha 0.4) routes through `transparent_unlit_colored.mat`
+    // which is `doubleSided: true` — pairs with `culling(false)` on the face mesh.
+    // We use a translucent overlay (not opaque blue) so the user can SEE their face
+    // through the fitted topology — that's the entire point of a face-mesh demo.
     val faceMaterial = remember(materialLoader) {
-        materialLoader.createUnlitColorInstance(SceneViewColors.Primary)
+        materialLoader.createUnlitColorInstance(SceneViewColors.PrimaryOverlay)
     }
 
     DemoScaffold(

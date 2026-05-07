@@ -48,35 +48,38 @@ class NoTangentsGlbContractTest {
 
     @Test
     fun `synthetic GLB JSON chunk declares POSITION and NORMAL`() {
-        val json = readJsonChunk(buildNoTangentsGlb())
+        val attrs = readPrimitiveAttributesBlock(buildNoTangentsGlb())
         assertTrue(
             "Primitive must declare POSITION attribute (vertex positions)",
-            json.contains("\"POSITION\""),
+            attrs.containsAttributeKey("POSITION"),
         )
         assertTrue(
             "Primitive must declare NORMAL attribute — auto-tangent synthesis " +
                 "in gltfio requires normals + UVs as input.",
-            json.contains("\"NORMAL\""),
+            attrs.containsAttributeKey("NORMAL"),
         )
     }
 
     @Test
     fun `synthetic GLB JSON chunk does NOT declare TANGENT — this is the bug input`() {
-        val json = readJsonChunk(buildNoTangentsGlb())
+        val attrs = readPrimitiveAttributesBlock(buildNoTangentsGlb())
         // The whole point of this fixture: it represents the asset shape that
         // triggered #836. If a future change "fixes" the fixture by adding TANGENTS,
-        // we lose the regression target.
+        // we lose the regression target. Match against the attributes block only —
+        // a future contributor adding `"comment": "no TANGENT attribute"` to the
+        // manifest must not silently false-positive this assertion.
         assertFalse(
-            "Fixture must NOT declare TANGENT — it represents the GLB shape that " +
-                "triggered #836. Adding TANGENT here makes the fixture useless as a " +
-                "regression target for gltfio's auto-tangent synthesis path.",
-            json.contains("\"TANGENT\""),
+            "Fixture must NOT declare TANGENT in the primitive attributes — it " +
+                "represents the GLB shape that triggered #836. Adding TANGENT here " +
+                "makes the fixture useless as a regression target for gltfio's " +
+                "auto-tangent synthesis path.",
+            attrs.containsAttributeKey("TANGENT"),
         )
     }
 
     @Test
     fun `synthetic GLB JSON chunk declares TEXCOORD_0 — auto-tangent needs UVs`() {
-        val json = readJsonChunk(buildNoTangentsGlb())
+        val attrs = readPrimitiveAttributesBlock(buildNoTangentsGlb())
         // Mikkelsen tangent basis = function of (position, normal, UV). Without UVs,
         // gltfio cannot synthesize tangents and the model still renders black —
         // which is a separate bug class. Pin UV presence so the fixture stays in the
@@ -84,7 +87,26 @@ class NoTangentsGlbContractTest {
         assertTrue(
             "Primitive must declare TEXCOORD_0 — gltfio's Mikkelsen tangent basis " +
                 "synthesis requires UVs.",
-            json.contains("\"TEXCOORD_0\""),
+            attrs.containsAttributeKey("TEXCOORD_0"),
+        )
+    }
+
+    @Test
+    fun `BIN chunk byte length matches positions + normals + UVs + indices + padding`() {
+        val glb = buildNoTangentsGlb()
+        glb.order(ByteOrder.LITTLE_ENDIAN)
+        val jsonLen = glb.getInt(12)
+        val binChunkOffset = 12 + 8 + jsonLen
+        val binLen = glb.getInt(binChunkOffset)
+        // 3 verts × (POSITION 3*float + NORMAL 3*float + UV 2*float = 32 bytes)
+        // + 3 indices × short (6 bytes) + 2 bytes padding to 4-byte boundary = 104.
+        // Pin the math so a future fixture edit catches arithmetic errors before
+        // they slip through to gltfio with a malformed binary.
+        assertEquals("BIN chunk total bytes", 104, binLen)
+        assertEquals(
+            "GLB total length = 12 (header) + 8 (JSON header) + paddedJson + 8 (BIN header) + binLen",
+            glb.capacity(),
+            binChunkOffset + 8 + binLen,
         )
     }
 
@@ -105,10 +127,13 @@ class NoTangentsGlbContractTest {
     // ── Fixture builder ────────────────────────────────────────────────────────────
 
     /**
-     * Reads the JSON chunk's UTF-8 payload from the GLB binary as a String. We use
-     * `contains("\"FIELD\"")` rather than a JSON parser because `org.json` is the
-     * Android stub here (throws RuntimeException in pure JVM tests) and pulling in
-     * gson/moshi just for this fixture isn't worth it.
+     * Reads the JSON chunk's UTF-8 payload from the GLB binary as a String. We work
+     * with strings rather than a JSON parser because `org.json` is the Android stub
+     * here (throws RuntimeException in pure JVM tests) and pulling in gson/moshi
+     * just for this fixture isn't worth it.
+     *
+     * Each call reads from a freshly-built buffer, so position state is not shared
+     * across tests.
      */
     private fun readJsonChunk(glb: ByteBuffer): String {
         glb.rewind()
@@ -120,6 +145,33 @@ class NoTangentsGlbContractTest {
         glb.get(jsonBytes)
         return String(jsonBytes, Charsets.UTF_8)
     }
+
+    /**
+     * Returns the slice of the JSON chunk that lies between `"attributes": {` and
+     * the closing `}` of that object. Lets attribute-key assertions ignore unrelated
+     * JSON content (a future contributor adding `"comment": "no TANGENT"` somewhere
+     * in the manifest must not false-positive these assertions).
+     */
+    private fun readPrimitiveAttributesBlock(glb: ByteBuffer): String {
+        val json = readJsonChunk(glb)
+        val open = json.indexOf("\"attributes\"")
+        require(open >= 0) { "Synthetic glTF must declare \"attributes\" — fixture is malformed." }
+        val braceStart = json.indexOf('{', startIndex = open)
+        val braceEnd = json.indexOf('}', startIndex = braceStart)
+        require(braceStart in 0 until braceEnd) {
+            "\"attributes\" object braces malformed in synthetic glTF — fixture is broken."
+        }
+        return json.substring(braceStart, braceEnd + 1)
+    }
+
+    /**
+     * `true` if the attributes block declares the named key as a JSON property
+     * (matches `"NAME":` with optional whitespace, anchored to the key boundaries).
+     * Substring-matching `"NAME"` would false-positive on values like
+     * `"NAME_DEBUG"` — we only want exact key matches.
+     */
+    private fun String.containsAttributeKey(name: String): Boolean =
+        Regex("\"" + Regex.escape(name) + "\"\\s*:").containsMatchIn(this)
 
     /**
      * Authors a minimal valid glTF 2.0 GLB binary in memory: a single triangle with

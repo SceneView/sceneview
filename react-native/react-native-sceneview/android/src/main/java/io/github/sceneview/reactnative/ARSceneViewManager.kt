@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.annotations.ReactProp
@@ -84,13 +85,13 @@ class ARSceneViewManager : SimpleViewManager<FrameLayout>() {
                             runCatching { android.graphics.Color.parseColor(it) }.getOrNull()
                         }
                         // Cache material instance per (color, unlit) to avoid leaking on recomposition.
+                        // Use varargs `keys` to skip the per-recomposition Pair allocation.
                         val mat = colorInt?.let { c ->
-                            val key = c to geom.unlit
-                            val instance = remember(key) {
+                            val instance = remember(c, geom.unlit) {
                                 if (geom.unlit) materialLoader.createUnlitColorInstance(c)
                                 else materialLoader.createColorInstance(c)
                             }
-                            DisposableEffect(key) {
+                            DisposableEffect(c, geom.unlit) {
                                 onDispose {
                                     materialLoader.destroyMaterialInstance(instance)
                                 }
@@ -228,7 +229,10 @@ class ARSceneViewManager : SimpleViewManager<FrameLayout>() {
                 val rotation = readRotation(map, "rotation")
                 val scale = readScale(map, "scale")
                 val color = if (map.hasKey("color")) map.getString("color") else null
-                val unlit = map.hasKey("unlit") && map.getBoolean("unlit")
+                // Type-safe `unlit` parsing — guards against JS sending `"true"` or `1`.
+                val unlit = map.hasKey("unlit") &&
+                    map.getType("unlit") == ReadableType.Boolean &&
+                    map.getBoolean("unlit")
                 state.geometryNodes.add(
                     GeometryNodeData(
                         type = type,

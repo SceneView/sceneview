@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.annotations.ReactProp
@@ -107,13 +108,14 @@ class SceneViewManager : SimpleViewManager<FrameLayout>() {
                         // Cache material instance per (color, unlit) to avoid leaking on recomposition.
                         // The unlit flag is part of the cache key — switching from lit ↔ unlit
                         // returns a fresh instance because the underlying .filamat is different.
+                        // Use varargs `keys` (Compose handles Boolean autobox internally without
+                        // a per-recomposition Pair allocation).
                         val mat = colorInt?.let { c ->
-                            val key = c to geom.unlit
-                            val instance = remember(key) {
+                            val instance = remember(c, geom.unlit) {
                                 if (geom.unlit) materialLoader.createUnlitColorInstance(c)
                                 else materialLoader.createColorInstance(c)
                             }
-                            DisposableEffect(key) {
+                            DisposableEffect(c, geom.unlit) {
                                 onDispose {
                                     materialLoader.destroyMaterialInstance(instance)
                                 }
@@ -249,7 +251,12 @@ class SceneViewManager : SimpleViewManager<FrameLayout>() {
                 val rotation = readRotation(map, "rotation")
                 val scale = readScale(map, "scale")
                 val color = if (map.hasKey("color")) map.getString("color") else null
-                val unlit = map.hasKey("unlit") && map.getBoolean("unlit")
+                // `getBoolean` throws on type-mismatch; guard against JS sending
+                // `unlit: "true"` (string) or `unlit: 1` (number) which would crash
+                // the property setter and leave the view in a partial state.
+                val unlit = map.hasKey("unlit") &&
+                    map.getType("unlit") == ReadableType.Boolean &&
+                    map.getBoolean("unlit")
                 state.geometryNodes.add(
                     GeometryNodeData(
                         type = type,

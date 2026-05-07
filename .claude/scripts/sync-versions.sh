@@ -209,6 +209,17 @@ if [ -f "$IOS_ABOUT" ]; then
     fi
 fi
 
+# samples/ios-demo Xcode project — MARKETING_VERSION is the user-visible iOS demo
+# version. Was a release blind spot until v4.0.8 (caught by an audit). Bump this
+# in lockstep with the Android demo versionName + AboutView.swift.
+IOS_DEMO_PBXPROJ="$REPO_ROOT/samples/ios-demo/SceneViewDemo.xcodeproj/project.pbxproj"
+if [ -f "$IOS_DEMO_PBXPROJ" ]; then
+    V=$(grep -oE 'MARKETING_VERSION = [0-9]+\.[0-9]+\.[0-9]+' "$IOS_DEMO_PBXPROJ" | head -1 | awk '{print $NF}' || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "samples/ios-demo MARKETING_VERSION" "$V" "false"
+    fi
+fi
+
 # ─── 9. Website (static) ────────────────────────────────────────────────
 echo -e "${CYAN}--- Website Static ---${NC}"
 WEBSITE_INDEX="$REPO_ROOT/website-static/index.html"
