@@ -24,12 +24,12 @@ When generating code for Android 3D or AR:
 
 ## Version & Dependencies
 
-- **SceneView:** 3.6.2 (March 2026)
+- **SceneView:** 4.0.9 (May 2026)
 - **License:** Apache 2.0 (free for commercial use)
 - **Min SDK:** Android 7.0 (API 24)
 - **Target SDK:** Android 15 (API 36)
 - **Kotlin:** 2.3.20 with Compose 1.10.5
-- **Filament:** 1.70.0 (Google's real-time PBR rendering engine)
+- **Filament:** 1.71.0 (Google's real-time PBR rendering engine)
 - **ARCore:** 1.53.0 (Google's AR tracking)
 - **Distribution:** Maven Central (`io.github.sceneview`)
 - **MCP:** `npx -y sceneview-mcp`

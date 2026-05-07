@@ -186,6 +186,34 @@ if [ -f "$DOCS_LLMS" ]; then
     fi
 fi
 
+# ─── 5b. llms.txt root↔docs full-content sync (issue #899) ──────────────
+# `docs/docs/llms.txt` must be a byte-for-byte mirror of root `llms.txt` so
+# mkdocs serves the same content as the raw GitHub URL that LLMs fetch. The
+# `io.github.sceneview:sceneview:X.Y.Z` check above only catches ONE line —
+# this catches any drift in prose/SPM/web/flutter snippets.
+if [ -f "$LLMS" ] && [ -f "$DOCS_LLMS" ]; then
+    if ! diff -q "$LLMS" "$DOCS_LLMS" >/dev/null 2>&1; then
+        echo -e "${RED}MISMATCH: docs/docs/llms.txt has drifted from root llms.txt${NC}"
+        if [ "$FIX_MODE" = "--fix" ]; then
+            cp "$LLMS" "$DOCS_LLMS"
+            echo -e "${GREEN}  Fixed: copied root llms.txt over docs/docs/llms.txt${NC}"
+        else
+            echo "  Diff (first 5 hunks):"
+            diff -u "$LLMS" "$DOCS_LLMS" 2>&1 | head -25 | sed 's/^/    /'
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+fi
+
+# Flutter snippet inside llms.txt (`sceneview_flutter: ^X.Y.Z`) — separate
+# from the maven `sceneview:` line, so the existing -m1 check misses it.
+if [ -f "$LLMS" ]; then
+    V=$(grep -m1 'sceneview_flutter:' "$LLMS" | grep -oE '\^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | sed 's/^\^//' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "llms.txt (flutter snippet)" "$V"
+    fi
+fi
+
 # ─── 6. Android demo app ────────────────────────────────────────────────
 echo -e "${CYAN}--- Sample Apps ---${NC}"
 DEMO_GRADLE="$REPO_ROOT/samples/android-demo/build.gradle"
