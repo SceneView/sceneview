@@ -37,14 +37,10 @@
     "interior-design-3d-mcp": "dist/index.js"
   },
   "files": [
-    "dist/index.js",
-    "dist/room-planner.js",
-    "dist/furniture-placement.js",
-    "dist/material-switcher.js",
-    "dist/lighting-design.js",
-    "dist/room-tour.js",
-    "dist/furniture-models.js",
-    "dist/validator.js"
+    "dist/**/*.js",
+    "!dist/**/*.test.js",
+    "!dist/**/__fixtures__/**",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"

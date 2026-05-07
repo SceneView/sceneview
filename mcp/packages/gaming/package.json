@@ -38,14 +38,10 @@
     "gaming-3d-mcp": "dist/index.js"
   },
   "files": [
-    "dist/index.js",
-    "dist/character-viewer.js",
-    "dist/level-editor.js",
-    "dist/physics-game.js",
-    "dist/particle-effects.js",
-    "dist/inventory-3d.js",
-    "dist/game-models.js",
-    "dist/validator.js"
+    "dist/**/*.js",
+    "!dist/**/*.test.js",
+    "!dist/**/__fixtures__/**",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
