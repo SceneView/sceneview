@@ -179,20 +179,22 @@ expand_cdn() {
 check_bundled_ref() {
     local ref="$1"
     local source="$2"
-    local bundle_root="$3"
+    local bundle_roots="$3"  # one or more roots separated by ':' — e.g. android-tv-demo merges assets from android-demo via sourceSets
 
     total_bundled=$((total_bundled + 1))
-    # Candidate paths to try (platforms stash things differently)
-    local candidates=(
-        "$bundle_root/$ref"
-        "$bundle_root/models/$ref"
-        "$bundle_root/environments/$ref"
-        "$bundle_root/$(basename "$ref")"
-    )
-    for c in "${candidates[@]}"; do
-        if [ -f "$c" ]; then
-            return 0
-        fi
+    local IFS=':'
+    for root in $bundle_roots; do
+        local candidates=(
+            "$root/$ref"
+            "$root/models/$ref"
+            "$root/environments/$ref"
+            "$root/$(basename "$ref")"
+        )
+        for c in "${candidates[@]}"; do
+            if [ -f "$c" ]; then
+                return 0
+            fi
+        done
     done
     missing_bundled=$((missing_bundled + 1))
     local rel_source="${source#$REPO_ROOT/}"
@@ -260,10 +262,12 @@ if [ "$platforms" = "all" ] || [ "$platforms" = "android" ]; then
 fi
 
 if [ "$platforms" = "all" ] || [ "$platforms" = "tv" ]; then
+    # TV demo merges its own assets/ folder with android-demo's via build.gradle:
+    # `sourceSets.main.assets.srcDirs += '../android-demo/src/main/assets'`
     process_platform_refs \
         "android-tv-demo" \
         "samples/android-tv-demo/src/main/java" \
-        "samples/android-tv-demo/src/main/assets" \
+        "samples/android-tv-demo/src/main/assets:samples/android-demo/src/main/assets" \
         "glb|gltf|hdr"
 fi
 
