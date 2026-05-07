@@ -104,6 +104,13 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
 
     var currentMode by remember { mutableStateOf(Mode.LIVE) }
     var currentPlaybackFile by remember { mutableStateOf<File?>(null) }
+    var exportToast by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(exportToast) {
+        if (exportToast != null) {
+            android.widget.Toast.makeText(context, exportToast, android.widget.Toast.LENGTH_LONG).show()
+            exportToast = null
+        }
+    }
 
     // List of recordings on disk — refreshed when a recording finishes or the user enters
     // PLAYBACK mode.
@@ -202,7 +209,9 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                 Mode.PLAYBACK -> {
                     Text(
                         text = "Pick a recording to replay. ARCore re-runs it as if the camera " +
-                            "were live — anchors, planes and tracking all replay deterministically.",
+                            "were live — anchors, planes and tracking all replay deterministically. " +
+                            "Tap \"Export\" to copy a recording to Downloads/SceneView/ so you can " +
+                            "pull it via `adb pull /sdcard/Download/SceneView/…` or share it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -214,6 +223,11 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                             // Re-key the ARSceneView so ARCore gets a fresh Session bound to
                             // the new playback dataset.
                             currentPlaybackFile = file
+                        },
+                        onExport = { file ->
+                            ARRecorder.exportToDownloads(context, file)?.let { uri ->
+                                exportToast = "Exported to Downloads/SceneView/${file.name}"
+                            } ?: run { exportToast = "Export failed — see logs" }
                         },
                         onRefresh = { refreshRecordings() }
                     )
@@ -515,6 +529,7 @@ private fun RecordingsList(
     recordings: List<File>,
     selected: File?,
     onSelect: (File) -> Unit,
+    onExport: (File) -> Unit,
     onRefresh: () -> Unit
 ) {
     Card(
@@ -547,7 +562,8 @@ private fun RecordingsList(
                     RecordingRow(
                         file = file,
                         isSelected = selected?.absolutePath == file.absolutePath,
-                        onClick = { onSelect(file) }
+                        onClick = { onSelect(file) },
+                        onExport = { onExport(file) }
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -557,7 +573,7 @@ private fun RecordingsList(
 }
 
 @Composable
-private fun RecordingRow(file: File, isSelected: Boolean, onClick: () -> Unit) {
+private fun RecordingRow(file: File, isSelected: Boolean, onClick: () -> Unit, onExport: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth(),
@@ -584,6 +600,12 @@ private fun RecordingRow(file: File, isSelected: Boolean, onClick: () -> Unit) {
                     text = "${formatBytes(file.length())} • ${formatRelativeAge(file.lastModified())}",
                     style = MaterialTheme.typography.labelSmall
                 )
+            }
+            OutlinedButton(
+                onClick = onExport,
+                modifier = Modifier.padding(end = 4.dp)
+            ) {
+                Text("Export")
             }
             Button(onClick = onClick) {
                 Text(if (isSelected) "Replaying" else "Replay")
