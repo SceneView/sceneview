@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "architecture": {
-      "command": "npx",
-      "args": ["-y", "architecture-mcp"]
-    }
-  }
-}

@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "french-admin": {
-      "command": "npx",
-      "args": ["-y", "french-admin-mcp"]
-    }
-  }
-}

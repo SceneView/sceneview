@@ -201,9 +201,9 @@ fi
 echo -e "${CYAN}--- MCP Source/Dist (independent track, not checked) ---${NC}"
 
 # ─── 7b. Claude Code plugin ─────────────────────────────────────────────
-# All 5 plugins (sceneview + 4 bridges) track their wrapped npm MCP versions,
-# NOT gradle.properties. Use sync-plugin-versions.sh for that check —
-# decoupled from the SDK version cycle.
+# Plugins live in github.com/sceneview/claude-marketplace (separate repo).
+# Run `bash scripts/sync-plugin-versions.sh` THERE, not here. Plugin versions
+# track npm MCP versions, not gradle.properties.
 
 # ─── 8. iOS demo ────────────────────────────────────────────────────────
 IOS_ABOUT="$REPO_ROOT/SceneViewSwift/Examples/SceneViewDemo/SceneViewDemo/Views/AboutView.swift"

@@ -149,10 +149,9 @@ Every file below MUST be updated when bumping the version. Use `/version-bump` o
 | **Swift** | `SceneViewSwift/` uses git tag `vX.Y.Z` | not a file version |
 
 **Automation:**
-- `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations (incl. sceneview plugin)
+- `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations
 - `bash .claude/scripts/sync-versions.sh --fix` — auto-fixes mismatches
-- `bash .claude/scripts/sync-plugin-versions.sh` — checks the 4 Claude Code bridge plugins (`realestate-3d`, `french-admin`, `ecommerce-3d`, `architecture-3d`) against their wrapped npm MCPs
-- `bash .claude/scripts/sync-plugin-versions.sh --fix` — auto-bumps plugin.json + marketplace.json entries to match `npm view <pkg> version`
+- Claude Code plugin marketplace lives in [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace) — run `bash scripts/sync-plugin-versions.sh` from THAT repo
 - `bash .claude/scripts/quality-gate.sh` — full pre-push quality gate
 - `bash .claude/scripts/cross-platform-check.sh` — API parity across platforms
 - `bash .claude/scripts/release-checklist.sh` — pre-release validation
@@ -166,18 +165,19 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-07, session bold-villani-42902e — Claude Code plugin marketplace SHIPPED)
+### Current state (last updated: 2026-05-07, session bold-villani-42902e — Claude Code plugin marketplace SHIPPED + 4-agent review fixes)
 
-- 🚀 **Claude Code plugin marketplace LIVE on `main`** ([commit `19d35613`](https://github.com/sceneview/sceneview/commit/19d35613)). 5 plugins published in a single marketplace at `.claude-plugin/marketplace.json`:
-  - **sceneview** v4.0.9 — sceneview-mcp + 11 contributor commands (`/sceneview:contribute`, `/release`, `/review`, `/test`, `/document`, `/quality-gate`, `/publish-check`, `/sync-check`, `/version-bump`, `/evaluate`, `/maintain`) + 5 cross-platform reminder hooks
-  - **realestate-3d** v2.2.0 — wraps `realestate-mcp` (1 276 DL/mo)
-  - **french-admin** v2.2.1 — wraps `french-admin-mcp` via `mcp-tools-lab` (1 268 DL/mo, CDI-safe routing)
-  - **ecommerce-3d** v2.1.0 — wraps `ecommerce-3d-mcp` (1 153 DL/mo)
-  - **architecture-3d** v2.1.0 — wraps `architecture-mcp` (1 134 DL/mo)
-- Install: `/plugin marketplace add sceneview/sceneview` then `/plugin install <name>@sceneview`
-- All 6 manifests pass `claude plugin validate` cleanly. `sync-versions.sh` extended with plugin + marketplace checks.
+- 🚀 **Claude Code plugin marketplace LIVE** in dedicated repo [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace). 5 plugins:
+  - **sceneview** v4.0.11 (Apache-2.0) — `sceneview-mcp` + 11 namespaced contributor commands + cross-platform reminder hooks
+  - **realestate-3d** v2.2.0 (MIT) — wraps `realestate-mcp`
+  - **french-admin** v2.2.1 (MIT) — wraps `french-admin-mcp` via `mcp-tools-lab` (CDI-safe routing)
+  - **ecommerce-3d** v2.1.0 (MIT) — wraps `ecommerce-3d-mcp`
+  - **architecture-3d** v2.1.0 (MIT) — wraps `architecture-mcp`
+- Install: `/plugin marketplace add sceneview/claude-marketplace` then `/plugin install <name>@sceneview`
+- 4-agent independent Opus review caught 6 BLOCKING + 5 MAJOR before public announcement: dead-code hooks (matcher syntax invalid, validator missed it), license mismatch (Apache-2.0 vs MIT), 1.4 GB monolithic clone (split to dedicated repo to fix), `/review` `/test` namespace collision with built-in skills, version drift (plugin pinned 4.0.9 vs npm @4.0.11), DL/mo numbers gonflés in announcement drafts. All BLOCKING fixed in [`a88f7f8c`](https://github.com/sceneview/sceneview/commit/a88f7f8c) + the marketplace migration.
+- 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
 - Side effect: enriched `.claude/commands/*.md` with YAML frontmatter (`description:`) so `/help` now shows one-line summaries for every contributor command.
-- README.md updated with "Claude Code plugin" section explaining MCP + commands + hooks bundle.
+- README.md "Claude Code plugin" section explains the MCP + commands + hooks bundle and points at the dedicated marketplace repo.
 
 ### Previous state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.9 SHIPPED + 5-agent review + Play Store fix)
 

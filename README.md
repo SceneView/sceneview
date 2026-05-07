@@ -276,10 +276,10 @@ claude mcp add sceneview -- npx sceneview-mcp
 
 ### Claude Code plugin (MCP + slash commands + hooks)
 
-Want the MCP server **plus** the full SceneView contributor toolkit (one-shot release, review, cross-platform sync, version-bump, etc.) in a single install? Use the [Claude Code plugin marketplace](.claude-plugin/marketplace.json) hosted in this repo:
+Want the MCP server **plus** the full SceneView contributor toolkit (one-shot release, review, cross-platform sync, version-bump, etc.) in a single install? Use the [SceneView Claude Code marketplace](https://github.com/sceneview/claude-marketplace):
 
 ```bash
-/plugin marketplace add sceneview/sceneview
+/plugin marketplace add sceneview/claude-marketplace
 /plugin install sceneview@sceneview
 ```
 
