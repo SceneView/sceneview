@@ -1,14 +1,21 @@
 package io.github.sceneview.demo.ar
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.FileOutputStream
+import kotlin.math.abs
 
 /**
  * Replay-driven AR-demo smoke tests.
@@ -58,14 +65,109 @@ class ARDemoPlaybackSmokeTest {
                 // Give the activity time to boot, the AR session to initialize, and
                 // ARCore to consume at least the first few frames of the dataset.
                 Thread.sleep(MIN_PLAYBACK_MILLIS)
-                // If we got here without an uncaught crash, the smoke test passed for
-                // this fixture. The next iteration deploys the next fixture and reruns.
+
+                // Capture the rendered AR frame and compare to the per-fixture golden.
+                // This is the actual visual regression check — anchors, planes, lighting,
+                // model placements all replay deterministically from the MP4, so the
+                // captured screen should match the golden modulo GPU fp drift.
+                val goldenName = fixture.removeSuffix(".mp4")
+                captureAndCompareAgainstGolden(goldenName)
             } finally {
                 // Tear down: kill the demo activity so the next iteration starts clean.
                 device.pressHome()
                 deployed.delete()
             }
         }
+    }
+
+    /**
+     * Takes a UiAutomator screenshot of the current screen, then compares it to
+     * `androidTest/assets/ar-render-goldens/<goldenName>.png`. On first run (golden
+     * absent), saves the capture to the device for promotion as the new golden.
+     *
+     * Tolerance: 8/255 max channel diff, 2% pixels allowed to fail. AR rendering
+     * has more fp drift than 3D-only because depth + light estimation depend on
+     * driver versions; loosen further per-fixture if a particular scene jitters.
+     */
+    private fun captureAndCompareAgainstGolden(goldenName: String) {
+        val testContext = InstrumentationRegistry.getInstrumentation().context
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val captured = File(targetContext.cacheDir, "ar-capture-$goldenName.png")
+        val ok = device.takeScreenshot(captured)
+        assertTrue("UiAutomator screenshot capture must succeed for $goldenName", ok)
+        val capturedBitmap = BitmapFactory.decodeFile(captured.absolutePath)
+        assertNotNull("Captured bitmap must decode for $goldenName", capturedBitmap)
+
+        val goldenAsset = "ar-render-goldens/$goldenName.png"
+        val golden = runCatching {
+            testContext.assets.open(goldenAsset).use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()
+
+        if (golden == null) {
+            // First-run path — save as candidate golden and skip.
+            val saved = saveToDeviceForReview(capturedBitmap, "${goldenName}_first_run")
+            assumeTrue(
+                "No AR golden at $goldenAsset — capture saved to $saved. " +
+                    "Pull via adb, review, then commit:\n" +
+                    "  adb pull $saved samples/android-demo/src/androidTest/assets/$goldenAsset",
+                false,
+            )
+            return
+        }
+
+        val result = compareBitmaps(capturedBitmap, golden)
+        if (!result.passed) {
+            result.diff?.let { saveToDeviceForReview(it, "${goldenName}_diff") }
+            saveToDeviceForReview(capturedBitmap, "${goldenName}_actual")
+        }
+        assertTrue("[$goldenName] ${result.message}", result.passed)
+    }
+
+    private data class CompareResult(val passed: Boolean, val message: String, val diff: Bitmap?)
+
+    private fun compareBitmaps(
+        rendered: Bitmap, golden: Bitmap,
+        maxChannelDiff: Int = 8, maxFailPercent: Float = 2.0f,
+    ): CompareResult {
+        if (rendered.width != golden.width || rendered.height != golden.height) {
+            return CompareResult(
+                false,
+                "Size mismatch: rendered=${rendered.width}x${rendered.height}, " +
+                    "golden=${golden.width}x${golden.height}",
+                null,
+            )
+        }
+        val w = rendered.width; val h = rendered.height; val total = w * h
+        val diff = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        var failing = 0; var maxDiff = 0
+        for (y in 0 until h) for (x in 0 until w) {
+            val rp = rendered.getPixel(x, y); val gp = golden.getPixel(x, y)
+            val cmax = maxOf(
+                abs(Color.red(rp) - Color.red(gp)),
+                abs(Color.green(rp) - Color.green(gp)),
+                abs(Color.blue(rp) - Color.blue(gp)),
+            )
+            if (cmax > maxChannelDiff) {
+                failing++
+                diff.setPixel(x, y, Color.argb(255, cmax.coerceIn(50, 255), 0, 0))
+            } else {
+                diff.setPixel(x, y, Color.argb(255, 0, 30, 0))
+            }
+            maxDiff = maxOf(maxDiff, cmax)
+        }
+        val pct = failing * 100f / total
+        val passed = pct <= maxFailPercent
+        val msg = if (passed) "OK — $failing px (${"%.2f".format(pct)}%), max=$maxDiff"
+                  else "FAIL — $failing/$total px (${"%.2f".format(pct)}%), max=$maxDiff"
+        return CompareResult(passed, msg, if (passed) null else diff)
+    }
+
+    private fun saveToDeviceForReview(bitmap: Bitmap, name: String): File {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val dir = ctx.getExternalFilesDir("ar-render-output")!!.also { it.mkdirs() }
+        val file = File(dir, "$name.png")
+        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return file
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

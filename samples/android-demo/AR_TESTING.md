@@ -1,9 +1,25 @@
-# AR demo testing — record once, replay forever
+# AR + 3D demo rendering tests — capture pixels, compare to golden
 
-> Audience: SceneView contributors (and Claude sessions) editing AR demos. Goal: catch
-> regressions on every commit without anyone having to point a phone at the scene.
+> Audience: SceneView contributors (and Claude sessions) editing demos. Goal: catch
+> visual regressions on every commit without anyone having to look at the screen.
 
-## TL;DR
+## TL;DR — what's tested
+
+Two layers of real-rendering tests in `samples/android-demo/src/androidTest/`:
+
+1. **`DemoRenderingScreenshotTest`** (3D demos): launches each demo via deep-link,
+   waits N seconds, screenshots via UiAutomator, compares to a golden in
+   `androidTest/assets/render-goldens/`.
+2. **`ARDemoPlaybackSmokeTest`** (AR demos): for each MP4 fixture in
+   `androidTest/assets/ar-recordings/`, replays it via
+   `ARSceneView(playbackDataset = file)`, screenshots, compares to a golden in
+   `androidTest/assets/ar-render-goldens/`.
+
+Both run on `connectedDebugAndroidTest` (real device / hardware-accelerated emulator —
+SwiftShader CI crashes on Filament pixel readback). Diff images on failure dump to
+`/sdcard/Android/data/io.github.sceneview.demo/files/render-test-output/` for review.
+
+## The AR record-once playback-many workflow
 
 1. **Record one baseline session per AR scenario** on a real device (Pixel 7a / 9 / Galaxy
    S-something — any ARCore device with depth, planes, light estimation).
@@ -11,12 +27,12 @@
    in `ARRecordPlaybackDemo` → Playback tab → tap **Export**.
 3. **Pull it** with `adb pull /sdcard/Download/SceneView/<scenario>.mp4
    samples/android-demo/src/androidTest/assets/ar-recordings/`.
-4. **Commit the MP4** as a fixture. From then on, every push runs
-   `:samples:android-demo:connectedDebugAndroidTest` which loads each AR demo against the
-   recorded baseline via `ARSceneView(playbackDataset = file)` and asserts the demo doesn't
-   crash, plane detection completes, and pixel hashes match the golden snapshot.
+4. **Commit the MP4** as a fixture. From then on, every `connectedDebugAndroidTest` run
+   loads each AR demo against the recorded baseline, captures the rendered frame, and
+   compares to its golden — anchors land in the same place, planes are detected at the
+   same frame, lighting estimation returns the same colour temperature.
 
-No phone, no hands required. The recording becomes the deterministic input.
+No phone, no hands required for the regression run. Recording is a one-time human action.
 
 ---
 
