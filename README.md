@@ -59,8 +59,9 @@ SceneView(environment: .studio) {
 ```
 
 ```html
-<!-- Web — one script tag -->
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
+<!-- Web — friendly DSL (Filament.js engine + SceneView wrapper) -->
+<script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@v4.0.9/website-static/js/filament/filament.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@v4.0.9/website-static/js/sceneview.js"></script>
 <script> SceneView.modelViewer("canvas", "model.glb") </script>
 ```
 
@@ -104,9 +105,12 @@ dependencies {
 https://github.com/sceneview/sceneview-swift.git  (from: 4.0.9)
 ```
 
-**Web** (sceneview.js — one line):
+**Web** (sceneview.js — friendly DSL, two `<script>` tags):
 ```html
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
+<!-- 1. Filament.js engine (WASM) -->
+<script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@v4.0.9/website-static/js/filament/filament.js"></script>
+<!-- 2. SceneView wrapper (exposes SceneView.modelViewer / .create / .startAR) -->
+<script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@v4.0.9/website-static/js/sceneview.js"></script>
 ```
 
 **Web** (Kotlin/JS):
@@ -290,13 +294,21 @@ Plus the **iOS `RerunBridge`** with the same wire format as Android, and a `Node
 
 ## SceneView Web (JavaScript + Kotlin/JS)
 
-The lightest way to add 3D to any website. One script tag, one function call.
-~25 KB library powered by Filament.js WASM — the same engine behind Android SceneView.
+The lightest way to add 3D to any website. Two `<script>` tags, one function call.
+Friendly DSL (~25 KB) powered by Filament.js WASM (~210 KB) — the same engine behind Android SceneView.
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
+<!-- 1. Filament.js engine (WASM) -->
+<script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@v4.0.9/website-static/js/filament/filament.js"></script>
+<!-- 2. SceneView wrapper -->
+<script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@v4.0.9/website-static/js/sceneview.js"></script>
 <script> SceneView.modelViewer("canvas", "model.glb") </script>
 ```
+
+> **Note:** the `sceneview-web` npm package is the lower-level Kotlin/JS UMD
+> bundle — it expects a `Filament` global and does not include the friendly
+> `SceneView.modelViewer` DSL. Use the snippet above for vanilla-JS sites.
+> The npm package is intended for Kotlin/JS or webpack-based projects.
 
 **JavaScript API (script-tag):**
 - `SceneView.modelViewer(canvasOrId, url, options?)` — all-in-one viewer with orbit + auto-rotate
