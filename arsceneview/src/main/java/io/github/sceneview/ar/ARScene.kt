@@ -17,6 +17,9 @@ import android.view.SurfaceView
 import android.view.TextureView
 import android.view.WindowManager as AndroidWindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -817,12 +820,53 @@ fun rememberAREnvironment(
     }
 }
 
+/**
+ * Placeholder displayed when [ARSceneView] is composed inside Android Studio's `@Preview`
+ * panel (i.e. `LocalInspectionMode.current == true`).
+ *
+ * ARCore + Filament are JNI-only and can't run in AS LayoutLib, so the preview pane shows
+ * an informative gradient panel pointing the developer at Live Edit on a connected device
+ * for the real AR session. Same rationale as the 3D-only `ScenePreview` in `Scene.kt`.
+ */
 @Composable
 private fun ARScenePreview(modifier: Modifier) {
     Box(
         modifier = modifier
-            .background(Color.DarkGray)
-    )
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        androidx.compose.ui.graphics.Color(0xFF1E3A8A), // blue-900
+                        androidx.compose.ui.graphics.Color(0xFF0F172A), // slate-900
+                    ),
+                ),
+            ),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(16.dp),
+        ) {
+            androidx.compose.foundation.text.BasicText(
+                text = "📷  ARSceneView preview",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = androidx.compose.ui.graphics.Color(0xFFDBEAFE),
+                    fontSize = 16.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                ),
+            )
+            androidx.compose.foundation.text.BasicText(
+                text = "AR rendering needs ARCore + Filament JNI, neither loaded by AS LayoutLib.\n" +
+                    "Use Android Studio Live Edit on an ARCore-supported device for the live session.",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = androidx.compose.ui.graphics.Color(0xFF93C5FD),
+                    fontSize = 12.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 16.sp,
+                ),
+            )
+        }
+    }
 }
 
 /**

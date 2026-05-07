@@ -3,6 +3,7 @@ package io.github.sceneview.demo.demos
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,13 +22,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.LightManager
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
+import io.github.sceneview.demo.DemoPreviewPlaceholder
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.demo.demos.internal.DemoMath
+import io.github.sceneview.demo.theme.SceneViewDemoTheme
 import io.github.sceneview.material.setMetallic
 import io.github.sceneview.material.setRoughness
 import io.github.sceneview.math.Direction
@@ -50,6 +55,15 @@ import io.github.sceneview.rememberMaterialLoader
  */
 @Composable
 fun GeometryDemo(onBack: () -> Unit) {
+    // Inspection mode (Android Studio @Preview pane, Roborazzi snapshot tests):
+    // bypass the entire Filament-backed body BEFORE any rememberEngine() call. Without
+    // this, the preview pane crashes loading the .so files (Android-arch only, AS
+    // LayoutLib doesn't ship them). See DemoPreviewPlaceholder.
+    if (LocalInspectionMode.current) {
+        DemoPreviewPlaceholder(title = "Geometry Primitives", onBack = onBack)
+        return
+    }
+
     var showCube by remember { mutableStateOf(true) }
     var showSphere by remember { mutableStateOf(true) }
     var showCylinder by remember { mutableStateOf(true) }
@@ -239,4 +253,48 @@ internal fun GeometryDemoControls(
         style = MaterialTheme.typography.labelLarge,
     )
     Slider(value = roughness, onValueChange = onRoughnessChange, valueRange = 0f..1f)
+}
+
+// ── Android Studio @Preview support ────────────────────────────────────────────
+//
+// `LocalInspectionMode.current == true` inside the preview pane (and inside Roborazzi
+// snapshot tests) makes the demo body short-circuit to DemoPreviewPlaceholder above,
+// so AS Preview shows the scaffold + a placeholder explaining that the actual 3D
+// content is rendered via Live Edit on a connected device. The two previews below
+// give the IDE a default + a dark-theme variant — the same pattern can be lifted
+// to every demo for "free" preview support.
+
+@Preview(name = "Demo (light)", showBackground = true)
+@Composable
+private fun GeometryDemoPreview_Light() {
+    SceneViewDemoTheme(darkTheme = false) {
+        GeometryDemo(onBack = {})
+    }
+}
+
+@Preview(name = "Demo (dark)", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun GeometryDemoPreview_Dark() {
+    SceneViewDemoTheme(darkTheme = true) {
+        GeometryDemo(onBack = {})
+    }
+}
+
+@Preview(name = "Controls only", showBackground = true)
+@Composable
+private fun GeometryDemoControlsPreview() {
+    SceneViewDemoTheme(darkTheme = false) {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.padding(16.dp),
+        ) {
+            GeometryDemoControls(
+                showCube = true, onShowCubeChange = {},
+                showSphere = true, onShowSphereChange = {},
+                showCylinder = false, onShowCylinderChange = {},
+                showPlane = true, onShowPlaneChange = {},
+                metallic = 0.3f, onMetallicChange = {},
+                roughness = 0.5f, onRoughnessChange = {},
+            )
+        }
+    }
 }

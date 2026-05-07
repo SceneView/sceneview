@@ -3,7 +3,9 @@ package io.github.sceneview.demo.demos
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
@@ -114,6 +116,27 @@ class GeometryDemoControlsSnapshotTest {
                             roughness = 0.0f, onRoughnessChange = {},
                         )
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun fullDemo_in_preview_mode_shows_placeholder() {
+        // Snapshot the FULL GeometryDemo composable in inspection mode. The demo body
+        // short-circuits to DemoPreviewPlaceholder before any rememberEngine() call,
+        // so this works in pure JVM with no Filament JNI. Roborazzi by default does
+        // NOT set LocalInspectionMode (Robolectric runs the actual app code), so we
+        // force it here via CompositionLocalProvider — same value AS Preview pane uses.
+        // Catches regressions in:
+        //   - the inspection-mode short-circuit (e.g. someone moves rememberEngine
+        //     above the LocalInspectionMode check, breaking @Preview)
+        //   - the placeholder layout / labels / colours
+        //   - the DemoScaffold TopAppBar styling
+        captureRoboImage("src/test/snapshots/geometry_demo_preview_placeholder.png") {
+            SceneViewDemoTheme(darkTheme = false) {
+                CompositionLocalProvider(LocalInspectionMode provides true) {
+                    GeometryDemo(onBack = {})
                 }
             }
         }

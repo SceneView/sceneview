@@ -9,6 +9,9 @@ import android.view.TextureView
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -1165,12 +1168,58 @@ fun rememberViewNodeManager(
     return windowManager
 }
 
+/**
+ * Placeholder displayed when [SceneView] is composed inside Android Studio's `@Preview` panel
+ * (i.e. `LocalInspectionMode.current == true`).
+ *
+ * Filament's native libraries are Android-arch only and aren't loaded by AS LayoutLib, so we
+ * cannot render the actual 3D scene in the IDE's preview pane. Instead we show a labelled
+ * gradient panel with a hint pointing the developer at Android Studio's Live Edit feature —
+ * which DOES iterate on the live device with the real Filament renderer.
+ *
+ * The placeholder also makes Roborazzi snapshot tests of demos containing a [SceneView]
+ * deterministic in pure JVM (Robolectric inspection mode = true) — they capture this panel
+ * instead of crashing on the missing Filament JNI.
+ */
 @Composable
 private fun ScenePreview(modifier: Modifier) {
     Box(
         modifier = modifier
-            .background(Color.DarkGray)
-    )
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        androidx.compose.ui.graphics.Color(0xFF1F2937), // slate-800
+                        androidx.compose.ui.graphics.Color(0xFF0F172A), // slate-900
+                    ),
+                ),
+            ),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(16.dp),
+        ) {
+            androidx.compose.foundation.text.BasicText(
+                text = "🧊  SceneView preview",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = androidx.compose.ui.graphics.Color(0xFFE0E7FF),
+                    fontSize = 16.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                ),
+            )
+            androidx.compose.foundation.text.BasicText(
+                text = "3D rendering needs Filament JNI which AS LayoutLib does not load.\n" +
+                    "Use Android Studio Live Edit on a connected device for the real scene.",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = androidx.compose.ui.graphics.Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 16.sp,
+                ),
+            )
+        }
+    }
 }
 
 /**

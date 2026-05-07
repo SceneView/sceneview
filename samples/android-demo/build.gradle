@@ -102,6 +102,13 @@ dependencies {
     // Material 3 Expressive APIs (alpha, newer than BOM's stable release)
     implementation libs.androidx.compose.material3.expressive
 
+    // Compose @Preview annotation — needed at compile time so the AS preview pane and
+    // Roborazzi snapshot tests can discover @Preview functions on the demos.
+    implementation libs.androidx.compose.ui.tooling.preview
+    // ui-tooling provides the runtime that renders @Preview functions in the AS pane;
+    // shipping it in debug only avoids bundling the inspector into release APKs.
+    debugImplementation libs.androidx.compose.ui.tooling
+
     // SceneView — 3D + AR
     implementation project(":sceneview")
     implementation project(":arsceneview")
