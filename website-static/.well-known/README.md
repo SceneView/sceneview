@@ -28,9 +28,9 @@ upload key, and on Google's signing service for the App Signing key).
 
 [playconsole]: https://play.google.com/console
 
-After updating the file, also flip `android:autoVerify="true"` on the
-HTTPS intent-filter in `samples/android-demo/src/main/AndroidManifest.xml`
-(currently commented). Verify with:
+The HTTPS intent-filter in `samples/android-demo/src/main/AndroidManifest.xml`
+already has `android:autoVerify="true"` so the OS fetches this file at
+install time. Verify on a phone with:
 
 ```bash
 adb shell pm verify-app-links --re-verify io.github.sceneview.demo
@@ -44,18 +44,16 @@ Wires `https://sceneview.github.io/open?demo=<id>` to the iOS
 **SceneView** app (App Store id `6761329763`, bundle
 `io.github.sceneview.demo`, TEAM_ID `5G3DZ3TH45`).
 
-> ⚠️ **Action required for the file to apply** — Apple needs the
-> Associated Domains entitlement on a re-signed build:
->
-> 1. In `samples/ios-demo/SceneViewDemo.xcodeproj`, add
->    `applinks:sceneview.github.io` to the project's Associated Domains.
-> 2. Re-archive + upload to App Store Connect.
-> 3. iOS fetches AASA on first install or after an OS upgrade — so
->    existing 1.0 installs won't see Universal Links until they update.
+The Associated Domains entitlement (`applinks:sceneview.github.io`) is
+already wired in
+[`samples/ios-demo/SceneViewDemo/SceneViewDemo.entitlements`](../../samples/ios-demo/SceneViewDemo/SceneViewDemo.entitlements).
+iOS fetches the AASA on first install or after an OS upgrade — so any
+build at-or-after the version that landed Universal Links picks the
+mapping up automatically.
 
-The custom scheme `sceneview://demo/<id>` (already wired in
-`Info.plist > CFBundleURLTypes`) keeps working with the current 1.0
-build — no app update required to support QR codes today.
+The custom scheme `sceneview://demo/<id>` (also wired in
+`Info.plist > CFBundleURLTypes`) keeps working as a fallback for users
+running pre-Universal-Links builds.
 
 ## Serving notes
 

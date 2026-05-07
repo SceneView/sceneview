@@ -69,13 +69,14 @@
 
             <!--
                 Verified App-Link over HTTPS — pairs with
-                `website-static/.well-known/assetlinks.json`. autoVerify is
-                kept ON so the system fetches the manifest at install time;
-                until the Play App Signing SHA-256 is added to assetlinks.json
-                (TODO in that file), verification will silently fail for Play
-                Store installs and the URL falls back to the disambiguation
-                picker. Local debug installs (signed with the upload key)
-                already verify successfully.
+                `website-static/.well-known/assetlinks.json`, which lists
+                both the Play App Signing SHA-256 and the local upload key
+                so verification succeeds for Play Store installs AND for
+                local `adb install` / `assembleDebug` builds.
+                Verify on a phone with:
+                  adb shell pm verify-app-links --re-verify io.github.sceneview.demo
+                  adb shell pm get-app-links io.github.sceneview.demo
+                Expected: "sceneview.github.io: verified".
             -->
             <intent-filter android:label="Open in SceneView Demo" android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
