@@ -27,12 +27,39 @@ SwiftShader CI crashes on Filament pixel readback). Diff images on failure dump 
    in `ARRecordPlaybackDemo` → Playback tab → tap **Export**.
 3. **Pull it** with `adb pull /sdcard/Download/SceneView/<scenario>.mp4
    samples/android-demo/src/androidTest/assets/ar-recordings/`.
-4. **Commit the MP4** as a fixture. From then on, every `connectedDebugAndroidTest` run
+4. **Audit the MP4 for PII before committing** — see the checklist below. ARCore datasets
+   are full camera-feed videos; they capture **everything the camera saw** during the
+   recording session. This is a public repo.
+5. **Commit the MP4** as a fixture. From then on, every `connectedDebugAndroidTest` run
    loads each AR demo against the recorded baseline, captures the rendered frame, and
    compares to its golden — anchors land in the same place, planes are detected at the
    same frame, lighting estimation returns the same colour temperature.
 
 No phone, no hands required for the regression run. Recording is a one-time human action.
+
+### PII audit checklist (mandatory before every fixture commit)
+
+ARCore recordings are MP4 videos that bundle the **full camera feed**, IMU, depth maps,
+and (on Geospatial) GPS coordinates. Treat each fixture like a public-facing video upload:
+
+- [ ] **Faces** — front-camera or back-camera framing of any human face, including bystanders
+- [ ] **Voices** — back-channel mic audio captured by ARCore, even if you didn't speak
+- [ ] **Home interior** — recognisable furniture, art, books, mail, screens, paperwork
+- [ ] **Personal documents** — laptop screens, phone screens, notebook pages caught in frame
+- [ ] **Geolocation** — Geospatial recordings include real lat/lng metadata (and frames
+      from a public landmark are still publicly tied to your route there)
+- [ ] **Children, pets** — implicit consent issues even for your own family members
+- [ ] **Reflective surfaces** — mirrors / TVs / glass that incidentally captured anything
+      from the above categories
+
+If any check fails, **don't commit** — re-record at a public location (a SceneView
+contributor used a co-working space lounge) or against a printed paper texture taped to
+a wall. When in doubt, record at the same controlled setup the existing fixtures use
+(see `ar-recordings/baseline.mp4` for the established pattern).
+
+Repo memory: the test suite already had to retract leaked goldens once
+([55f183c3](https://github.com/sceneview/sceneview/commit/55f183c3)). MP4 fixtures are
+much heavier in PII surface than PNG goldens.
 
 ---
 

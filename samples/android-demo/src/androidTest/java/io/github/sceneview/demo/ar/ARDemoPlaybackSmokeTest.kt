@@ -106,8 +106,17 @@ class ARDemoPlaybackSmokeTest {
         val captured = File(targetContext.cacheDir, "ar-capture-$goldenName.png")
         val ok = device.takeScreenshot(captured)
         assertTrue("UiAutomator screenshot capture must succeed for $goldenName", ok)
-        val capturedBitmap = BitmapFactory.decodeFile(captured.absolutePath)
-        assertNotNull("Captured bitmap must decode for $goldenName", capturedBitmap)
+        val rawCapture = BitmapFactory.decodeFile(captured.absolutePath)
+        assertNotNull("Captured bitmap must decode for $goldenName", rawCapture)
+        // Strip the system status bar overlay (top 96 px) so re-records on a real device
+        // don't bake clock / weather / notification icons into the AR golden. Same
+        // mitigation as DemoRenderingScreenshotTest for the same root cause.
+        val capturedBitmap = if (rawCapture.height > STATUS_BAR_PX) {
+            Bitmap.createBitmap(
+                rawCapture, 0, STATUS_BAR_PX,
+                rawCapture.width, rawCapture.height - STATUS_BAR_PX,
+            )
+        } else rawCapture
 
         val goldenAsset = "ar-render-goldens/$goldenName.png"
         val golden = runCatching {
@@ -149,22 +158,28 @@ class ARDemoPlaybackSmokeTest {
             )
         }
         val w = rendered.width; val h = rendered.height; val total = w * h
-        val diff = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        // Bulk-extract pixel arrays (one JNI call each) instead of per-pixel
+        // getPixel/setPixel which would JNI-roundtrip 2.5 M times for a 1080×2304 frame.
+        val rendPx = IntArray(total).also { rendered.getPixels(it, 0, w, 0, 0, w, h) }
+        val goldPx = IntArray(total).also { golden.getPixels(it, 0, w, 0, 0, w, h) }
+        val diffPx = IntArray(total)
         var failing = 0; var maxDiff = 0
-        for (y in 0 until h) for (x in 0 until w) {
-            val rp = rendered.getPixel(x, y); val gp = golden.getPixel(x, y)
-            val cmax = maxOf(
-                abs(Color.red(rp) - Color.red(gp)),
-                abs(Color.green(rp) - Color.green(gp)),
-                abs(Color.blue(rp) - Color.blue(gp)),
-            )
-            if (cmax > maxChannelDiff) {
+        for (i in 0 until total) {
+            val rp = rendPx[i]; val gp = goldPx[i]
+            val dr = abs(((rp shr 16) and 0xFF) - ((gp shr 16) and 0xFF))
+            val dg = abs(((rp shr 8) and 0xFF) - ((gp shr 8) and 0xFF))
+            val db = abs((rp and 0xFF) - (gp and 0xFF))
+            val cmax = maxOf(dr, dg, db)
+            diffPx[i] = if (cmax > maxChannelDiff) {
                 failing++
-                diff.setPixel(x, y, Color.argb(255, cmax.coerceIn(50, 255), 0, 0))
+                (0xFF shl 24) or (cmax.coerceIn(50, 255) shl 16)
             } else {
-                diff.setPixel(x, y, Color.argb(255, 0, 30, 0))
+                (0xFF shl 24) or (30 shl 8)
             }
-            maxDiff = maxOf(maxDiff, cmax)
+            if (cmax > maxDiff) maxDiff = cmax
+        }
+        val diff = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply {
+            setPixels(diffPx, 0, w, 0, 0, w, h)
         }
         val pct = failing * 100f / total
         val passed = pct <= maxFailPercent
@@ -241,5 +256,8 @@ class ARDemoPlaybackSmokeTest {
          * sweep stays under 90 s wall-clock for CI.
          */
         const val MIN_PLAYBACK_MILLIS = 6_000L
+
+        /** System status bar height in pixels. See DemoRenderingScreenshotTest for rationale. */
+        const val STATUS_BAR_PX = 96
     }
 }

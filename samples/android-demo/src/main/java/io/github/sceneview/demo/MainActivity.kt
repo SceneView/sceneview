@@ -95,12 +95,16 @@ class MainActivity : ComponentActivity() {
         // QA mode ingress: `--ez qa_mode true` freezes auto-rotation / orbit / animations
         // so screenshot tests get a deterministic frame. Same setting reachable via the
         // long-press gesture on the demo title bar (see DemoScaffold). Off by default.
-        if (intent?.getBooleanExtra("qa_mode", false) == true) DemoSettings.qaMode = true
-        // Optional path to an ARCore playback fixture (.mp4). When set, the AR Record &
-        // Playback demo auto-loads this file in Mode.PLAYBACK on first composition, used by
-        // `ARDemoPlaybackSmokeTest` to drive a deterministic replay without UiAutomator
-        // having to click the mode chips and recording row.
-        intent?.getStringExtra("ar_playback_file")?.let { DemoSettings.arPendingPlaybackFile = it }
+        // QA-mode tracks the latest intent, not "stickily true forever" — otherwise any
+        // app on the device could flip it on once via `--ez qa_mode true` and leave the
+        // showcase frozen until process death.
+        DemoSettings.qaMode = intent?.getBooleanExtra("qa_mode", false) ?: false
+        // Optional path to an ARCore playback fixture (.mp4). Confined to the app's own
+        // external-files dir so a malicious deep link can't probe arbitrary device paths
+        // (`/data/data/...`, photos, configs). The path is consumed once by
+        // `ARRecordPlaybackDemo` then nulled.
+        DemoSettings.arPendingPlaybackFile = intent?.getStringExtra("ar_playback_file")
+            ?.takeIf { isWithinAppFilesDir(it) }
         setContent {
             SceneViewDemoTheme {
                 SceneViewDemoApp(activity = this)
@@ -116,12 +120,28 @@ class MainActivity : ComponentActivity() {
         // Same dual-ingress policy as onCreate — `--es demo` first, URL second.
         pendingDemoId.value = intent.getStringExtra("demo")
             ?: DeepLinkRouter.parse(intent.data)
-        if (intent.getBooleanExtra("qa_mode", false)) DemoSettings.qaMode = true
-        intent.getStringExtra("ar_playback_file")?.let { DemoSettings.arPendingPlaybackFile = it }
+        DemoSettings.qaMode = intent.getBooleanExtra("qa_mode", false)
+        DemoSettings.arPendingPlaybackFile = intent.getStringExtra("ar_playback_file")
+            ?.takeIf { isWithinAppFilesDir(it) }
     }
 
     fun consumePendingDemo() {
         pendingDemoId.value = null
+    }
+
+    /**
+     * Returns `true` if the given path is inside this app's external-files directory
+     * (the only location where AR fixtures legitimately live). Anything else — system
+     * paths, other apps' data, photos, downloads — gets rejected. Without this guard,
+     * any app on the device could craft a deep link with `--es ar_playback_file <path>`
+     * and trick the demo into opening arbitrary files (Logcat would log the path,
+     * leaking it). MP4 parsing itself is safe (ARCore rejects non-datasets), but
+     * defence-in-depth.
+     */
+    private fun isWithinAppFilesDir(path: String): Boolean {
+        val base = getExternalFilesDir(null)?.absolutePath ?: return false
+        val canonical = runCatching { java.io.File(path).canonicalPath }.getOrNull() ?: return false
+        return canonical.startsWith(base)
     }
 
     override fun onResume() {
