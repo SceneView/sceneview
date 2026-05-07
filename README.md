@@ -11,8 +11,8 @@ Same concepts, same simplicity — Android, iOS, Web, Desktop, TV, Flutter, Reac
 [![iOS / macOS / visionOS](https://img.shields.io/github/v/release/sceneview/sceneview?label=Swift&logo=swift&color=f05138)](https://github.com/sceneview/sceneview-swift)
 [![sceneview.js](https://img.shields.io/npm/v/sceneview-web?label=sceneview.js&logo=javascript&color=f7df1e)](https://www.npmjs.com/package/sceneview-web)
 [![MCP Server](https://img.shields.io/npm/v/sceneview-mcp?label=MCP&logo=anthropic&color=d97706)](https://www.npmjs.com/package/sceneview-mcp)
-[![Flutter](https://img.shields.io/badge/Flutter-4.0.0-02569B?logo=flutter)](https://github.com/sceneview/sceneview/tree/main/flutter)
-[![React Native](https://img.shields.io/badge/React%20Native-4.0.0-61DAFB?logo=react)](https://github.com/sceneview/sceneview/tree/main/react-native)
+[![Flutter](https://img.shields.io/badge/Flutter-v4.0.9-02569B?logo=flutter)](https://github.com/sceneview/sceneview/tree/main/flutter)
+[![React Native](https://img.shields.io/badge/React%20Native-v4.0.9-61DAFB?logo=react)](https://github.com/sceneview/sceneview/tree/main/react-native)
 
 <!-- Status -->
 [![CI](https://img.shields.io/github/actions/workflow/status/sceneview/sceneview/ci.yml?branch=main&label=CI&logo=github)](https://github.com/sceneview/sceneview/actions/workflows/ci.yml)
