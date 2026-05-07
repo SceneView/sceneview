@@ -19,9 +19,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -475,26 +475,39 @@ private fun RecordOverlay(
             }
         }
 
-        // Big start/stop button, bottom-center.
+        // Camera-style shutter button, bottom-center. Outer white ring + inner
+        // colored disc — round red disc when idle (start), red rounded square
+        // when recording (stop). Sized like a typical mobile camera app's
+        // shutter (72 dp outer / 60 dp inner) so it reads as "tap here to
+        // capture" without needing a label, and so the tap target meets
+        // accessibility minimums (48 dp) with margin.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 32.dp)
         ) {
-            when (recorder.state) {
-                ARRecorder.State.RECORDING -> {
-                    Button(
-                        onClick = onStop,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("■  Stop")
-                    }
-                }
-                ARRecorder.State.IDLE,
-                ARRecorder.State.ERROR -> {
-                    Button(onClick = onStart) {
-                        Text("●  Record")
-                    }
+            val isRecording = recorder.state == ARRecorder.State.RECORDING
+            Surface(
+                onClick = if (isRecording) onStop else onStart,
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color.White.copy(alpha = 0.18f),
+                contentColor = Color.White,
+                border = androidx.compose.foundation.BorderStroke(3.dp, Color.White),
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (isRecording) 30.dp else 56.dp)
+                            .background(
+                                color = Color.Red,
+                                shape = if (isRecording) RoundedCornerShape(6.dp)
+                                        else androidx.compose.foundation.shape.CircleShape
+                            )
+                    )
                 }
             }
         }
