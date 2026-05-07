@@ -27,6 +27,16 @@ class GeometryConfig {
     var colorG = 0.8; private set
     var colorB = 0.8; private set
     var colorA = 1.0; private set
+    /**
+     * When `true`, the material ignores all scene lighting (no PBR shading,
+     * no IBL, no shadows) and renders the flat colour straight to the framebuffer
+     * via the glTF 2.0 `KHR_materials_unlit` extension. Use for HUD overlays,
+     * gizmos, axes, lines, sprites — anywhere lighting would fight the use case.
+     *
+     * Cross-platform parity with `MaterialLoader.createUnlitColorInstance` on
+     * Android and `CustomMaterial.unlit(color:)` on Apple. Defaults to `false`.
+     */
+    var unlit = false; private set
     var positionX = 0.0; private set
     var positionY = 0.0; private set
     var positionZ = 0.0; private set
@@ -73,6 +83,9 @@ class GeometryConfig {
     fun color(r: Double, g: Double, b: Double, a: Double = 1.0) {
         colorR = r; colorG = g; colorB = b; colorA = a
     }
+
+    /** Toggle unlit shading on this geometry (ignores all lighting; flat colour only). */
+    fun unlit(value: Boolean = true) { unlit = value }
 
     /** Set the position in world space. */
     fun position(x: Double, y: Double, z: Double) {

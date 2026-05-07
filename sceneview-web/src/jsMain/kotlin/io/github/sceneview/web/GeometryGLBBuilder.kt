@@ -186,7 +186,12 @@ internal object GeometryGLBBuilder {
         // Mesh with position + normal attributes
         gltf.meshes = js("([{primitives: [{attributes: {POSITION: 0, NORMAL: 1}, indices: 2, material: 0, mode: 4}]}])")
 
-        // PBR material with the configured color
+        // Material with the configured color. When `config.unlit` is true we add the
+        // `KHR_materials_unlit` extension — Filament.js supports it natively and the
+        // shader skips PBR / IBL evaluation entirely, matching `createUnlitColorInstance`
+        // on Android and `CustomMaterial.unlit(color:)` on Apple. The pbrMetallicRoughness
+        // baseColorFactor is still authoritative for the colour value (the extension just
+        // changes how it's lit).
         val material = js("{}")
         material.name = "${typeName}_mat"
         material.pbrMetallicRoughness = js("{}")
@@ -194,10 +199,24 @@ internal object GeometryGLBBuilder {
         material.pbrMetallicRoughness.baseColorFactor.push(config.colorR, config.colorG, config.colorB, config.colorA)
         material.pbrMetallicRoughness.metallicFactor = 0.1
         material.pbrMetallicRoughness.roughnessFactor = 0.6
-        material.doubleSided = false
+        // Transparent unlit benefits from being doubleSided (overlay use case),
+        // matching the Android `transparent_unlit_colored.mat` definition.
+        material.doubleSided = config.unlit && config.colorA < 1.0
+        if (config.unlit) {
+            material.extensions = js("{}")
+            material.extensions["KHR_materials_unlit"] = js("{}")
+        }
 
         gltf.materials = js("[]")
         gltf.materials.push(material)
+
+        // Declare the unlit extension at the glTF root when used (per spec — unused
+        // extensions in extensionsUsed are tolerated but using one without declaring
+        // breaks loaders that strictly validate.)
+        if (config.unlit) {
+            gltf.extensionsUsed = js("[]")
+            gltf.extensionsUsed.push("KHR_materials_unlit")
+        }
 
         // Accessors: position (VEC3), normal (VEC3), indices (SCALAR)
         val posAccessor = js("{}")

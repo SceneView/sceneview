@@ -2519,6 +2519,9 @@ SceneView.create(canvas, configure = {
         cube()                     // or: sphere() / cylinder() / plane()
         size(1.0, 1.0, 1.0)       // cube: w/h/d; sphere/cylinder: use radius()/height()
         color(1.0, 0.0, 0.0, 1.0) // RGBA 0-1
+        unlit()                    // optional — flat color, ignores all lighting
+                                   //  (KHR_materials_unlit). For HUD overlays, gizmos,
+                                   //  axes — anywhere PBR shading would fight the use case.
         position(0.0, 0.5, -2.0)
         rotation(0.0, 45.0, 0.0)  // Euler degrees
         scale(1.0)
