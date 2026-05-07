@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.demo.rememberHeroYaw
 import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.math.Position
@@ -162,17 +163,11 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     Display(showDragon, dragon, x = -0.45f, z = -1.7f, scale = 0.4f),
                     Display(showLantern, lantern, x = 0.55f, z = -1.7f, scale = 0.5f),
                 )
-                val yawRad = Math.toRadians(sceneYaw.toDouble())
-                val cosYaw = kotlin.math.cos(yawRad).toFloat()
-                val sinYaw = kotlin.math.sin(yawRad).toFloat()
                 for (d in displays) {
                     if (!d.show || d.instance == null) continue
-                    // Rotate (x, z - centerZ) by sceneYaw around centre, then translate
-                    // back. Equivalent to wrapping all models in a parent rotated node.
-                    val dx = d.x
-                    val dz = d.z - centerZ
-                    val rx = dx * cosYaw + dz * sinYaw
-                    val rz = -dx * sinYaw + dz * cosYaw
+                    // Rotation math lives in DemoMath.rotateAroundCentre so it can be
+                    // JVM-unit-tested without firing up Filament / Compose.
+                    val (rx, rz) = DemoMath.rotateAroundCentre(d.x, d.z - centerZ, sceneYaw)
                     ModelNode(
                         modelInstance = d.instance,
                         scaleToUnits = d.scale,

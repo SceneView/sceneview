@@ -27,6 +27,7 @@ import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.material.setMetallic
 import io.github.sceneview.material.setRoughness
 import io.github.sceneview.math.Direction
@@ -75,15 +76,15 @@ fun GeometryDemo(onBack: () -> Unit) {
     // Continuous Y-axis spin shared by all primitives. withFrameNanos drives the
     // angle off the Choreographer so it runs at the display's refresh rate without
     // a separate Animatable per shape — one frame loop, four nodes share the value.
+    // The math (advance + 360° wrap) is in DemoMath.nextSpinDegrees so it can be JVM-
+    // unit-tested without firing up Compose / the Choreographer.
     var spinDegrees by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var lastNanos = 0L
         while (true) {
             withFrameNanos { nanos ->
                 if (lastNanos != 0L) {
-                    val deltaSec = (nanos - lastNanos) / 1_000_000_000f
-                    // 36°/s → one full revolution every 10 s. Wrap to keep the float small.
-                    spinDegrees = (spinDegrees + deltaSec * 36f) % 360f
+                    spinDegrees = DemoMath.nextSpinDegrees(spinDegrees, nanos - lastNanos)
                 }
                 lastNanos = nanos
             }

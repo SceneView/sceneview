@@ -103,11 +103,21 @@ jobs:
           echo "Version: $VERSION_NAME ($VERSION_CODE)"
 
       # Track selection logic for the matrix in the publish job:
-      #   - tag push (v*.*.*)                          → ["internal", "production"]
+      #   - tag push (v*.*.*)                          → ["production"]
       #   - branch push (snapshot)                     → ["internal"]
       #   - manual dispatch with explicit single track → that track only
-      #   - manual dispatch with `internal+production` → both
+      #   - manual dispatch with `internal+production` → both (with separate version codes
+      #                                                  required — see workflow guide)
       #   - manual dispatch with `auto`                → falls back to push semantics
+      #
+      # Why tag pushes only target production: Google Play tracks each `versionCode` as
+      # globally-unique within the app, and the SAME versionCode cannot be uploaded to
+      # two different tracks in a single matrix run (`r0adkll/upload-google-play` fails
+      # the second matrix entry with "Version code N has already been used"). Branch
+      # pushes always hit internal first; the eventual tag push that promotes the same
+      # build to production has the same versionCode, so we'd hit the conflict on every
+      # tag. Limiting tags to production alone avoids the dup, and the prior internal
+      # release made by an earlier branch push remains available to testers anyway.
       - name: Compute target tracks
         id: tracks
         run: |
@@ -119,7 +129,7 @@ jobs:
               TRACKS="[\"$INPUT_TRACK\"]"
             fi
           elif [[ '${{ github.ref }}' == refs/tags/v* ]]; then
-            TRACKS='["internal","production"]'
+            TRACKS='["production"]'
           else
             TRACKS='["internal"]'
           fi
