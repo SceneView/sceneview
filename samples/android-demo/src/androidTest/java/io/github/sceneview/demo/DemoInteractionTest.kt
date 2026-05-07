@@ -155,9 +155,16 @@ class DemoInteractionTest {
         // isn't visible, scroll the controls panel up — the controls Column wraps demos
         // with many controls and the bottom rows (e.g. AnimationDemo's Loop/Once chips)
         // sit below the fold on the Pixel_7a AVD's 1080x2400 viewport.
-        if (!device.wait(Until.hasObject(By.text(text)), 1500)) {
+        // 3 s wait covers Compose's recomposition tail when run as part of the larger
+        // suite, where state from a previous test (Filament Engine, NavHost, etc.) may
+        // still be settling.
+        if (!device.wait(Until.hasObject(By.text(text)), 3000)) {
             scrollControlsToFind(text)
         }
+        // After scrolling, give Compose another beat to draw + lay out the newly-visible
+        // chips before findObject — without this, on slow emulator runs the
+        // AccessibilityNodeInfo tree can lag the visible state by 100-300 ms.
+        device.wait(Until.hasObject(By.text(text)), 2000)
         val node = device.findObject(By.text(text))
             ?: error("Clickable '$text' not found on screen")
         // Text inside a FilterChip / Button / Card is not clickable — walk up to the
