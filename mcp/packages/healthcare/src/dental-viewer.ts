@@ -374,7 +374,7 @@ import io.github.sceneview.rememberCollisionSystem
  *   <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
  *   <meta-data android:name="com.google.ar.core" android:value="required" />
  *
- * Gradle: implementation("io.github.sceneview:arsceneview:3.6.0")
+ * Gradle: implementation("io.github.sceneview:arsceneview:4.0.9")
  */
 @Composable
 fun ${composableName}AR() {

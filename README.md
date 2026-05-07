@@ -60,7 +60,7 @@ SceneView(environment: .studio) {
 
 ```html
 <!-- Web — one script tag -->
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
 <script> SceneView.modelViewer("canvas", "model.glb") </script>
 ```
 
@@ -101,18 +101,18 @@ dependencies {
 
 **iOS / macOS / visionOS** (Swift Package Manager):
 ```
-https://github.com/sceneview/sceneview-swift.git  (from: 4.0.0)
+https://github.com/sceneview/sceneview-swift.git  (from: 4.0.9)
 ```
 
 **Web** (sceneview.js — one line):
 ```html
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
 ```
 
 **Web** (Kotlin/JS):
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview-web:4.0.0")
+    implementation("io.github.sceneview:sceneview-web:4.0.9")
 }
 ```
 
@@ -157,17 +157,21 @@ SceneView(
 }
 ```
 
-### Node types
+### Node types — 26+ composables
 
-| Node | What it does |
-|---|---|
-| `ModelNode` | glTF/GLB model with animations. `isEditable = true` for gestures. |
-| `LightNode` | Sun, directional, point, or spot light. `apply` is a **named parameter**. |
-| `CubeNode` / `SphereNode` / `CylinderNode` / `PlaneNode` | Procedural geometry |
-| `ImageNode` | Image on a plane |
-| `ViewNode` | **Compose UI rendered as a 3D surface** |
-| `MeshNode` | Custom GPU mesh |
-| `Node` | Group / pivot |
+| Category | Nodes | What they do |
+|---|---|---|
+| **Models** | `ModelNode` | glTF/GLB with skeletal/morph animations. `isEditable = true` for gestures. |
+| **Primitives** | `CubeNode` · `SphereNode` · `CylinderNode` · `ConeNode` · `TorusNode` · `CapsuleNode` · `PlaneNode` | Procedural geometry, parametric size/segments |
+| **Curves & shapes** | `LineNode` · `PathNode` · `ShapeNode` | Single segments, polylines, extruded 2D polygons |
+| **Custom geometry** | `GeometryNode` · `MeshNode` | Direct Filament `IndexBuffer` / `VertexBuffer` |
+| **Surfaces** | `ImageNode` · `VideoNode` · `BillboardNode` | PNG/JPG plane, video plane (MediaPlayer), camera-facing sprite |
+| **3D text** | `TextNode` | World-space text label that always faces the camera |
+| **Compose-in-3D** | `ViewNode` | **Any Compose UI rendered as a 3D surface** — buttons, lists, animations |
+| **Lighting** | `LightNode` · `ReflectionProbeNode` · `DynamicSkyNode` · `FogNode` | Sun/dir/point/spot lights, local IBL, time-of-day sky, atmospheric fog |
+| **Physics** | `PhysicsNode` | Simple rigid-body simulation (gravity, collisions) |
+| **Cameras** | `CameraNode` · `SecondaryCamera` | Main and picture-in-picture cameras |
+| **Group** | `Node` | Empty pivot for nesting and transform inheritance |
 
 ---
 
@@ -203,17 +207,60 @@ Plane detected → `anchor` set → Compose recomposes → model appears. Clear 
 
 | Node | What it does |
 |---|---|
-| `AnchorNode` | Follows a real-world anchor |
-| `AugmentedImageNode` | Tracks a detected image |
-| `AugmentedFaceNode` | Face mesh overlay |
-| `CloudAnchorNode` | Persistent cross-device anchor |
-| `StreetscapeGeometryNode` | Geospatial streetscape mesh |
+| `AnchorNode` | Pin a node to a real-world ARCore `Anchor` |
+| `HitResultNode` | Live surface cursor — pose comes from each frame's hit-test |
+| `PoseNode` | Position a node at any ARCore `Pose` |
+| `TrackableNode` | Generic wrapper for any `Trackable` |
+| `AugmentedImageNode` | Image tracking — pose + 2D extent of a detected image |
+| `AugmentedFaceNode` | Face mesh overlay (front camera) |
+| `CloudAnchorNode` | Persistent cross-device anchor (host + resolve) |
+| `StreetscapeGeometryNode` | **Geospatial** — semantic city mesh (buildings, terrain) |
+| `TerrainAnchorNode` | **Geospatial** — anchor pinned to ground at a lat/lng |
+| `RooftopAnchorNode` | **Geospatial** — anchor pinned to a building rooftop |
+
+### AR features
+
+Every ARCore feature surfaced as a Compose-friendly API:
+
+| Feature | API surface |
+|---|---|
+| **Plane / depth / instant placement** | `ARSceneView(planeRenderer = …, depthMode = …, instantPlacementMode = …)` |
+| **Geospatial (VPS)** | `Streetscape` + `Terrain` + `Rooftop` anchors via `Earth` session |
+| **Cloud Anchors** | `CloudAnchorNode.host(ttlDays = N)` + `.resolve(id)` |
+| **Augmented Faces & Images** | `AugmentedFaceNode`, `AugmentedImageDatabase`, runtime image add |
+| **Image Stabilization (EIS)** | `ARSceneView(imageStabilizationMode = ImageStabilizationMode.EIS)` |
+| **Camera exposure & focus** | `ARSceneView(cameraConfig = …)`, `ARSceneScope.exposureCompensation` |
+| **Record & Replay** | `rememberARRecorder()` to capture, `ARSceneView(playbackDataset = file)` to replay 1:1 — debug AR without a phone |
+| **Rerun.io live debug** | `rememberRerunBridge()` streams poses/planes/clouds to the Rerun viewer + a hosted [`/rerun/?url=…`](https://sceneview.github.io/rerun/) replay |
+| **Permission flow** | `ARPermissionHandler` — auto-detected from `ComponentActivity` |
+
+See [`docs/docs/ar-recording.md`](docs/docs/ar-recording.md), [`RECORDING_PLAYBACK.md`](samples/android-demo/RECORDING_PLAYBACK.md), and the *AR Debug — Rerun.io* section in [`llms.txt`](./llms.txt).
+
+---
+
+## Capabilities
+
+What you can do across all 3D and AR scenes — beyond placing nodes.
+
+| Capability | What it gives you | Where it lives |
+|---|---|---|
+| **Gestures** | Drag, pinch-to-scale, two-finger rotate, elevate, tap. Per-node opt-in via `isEditable`. | `NodeGestureDelegate`, `OnGestureListener` |
+| **Animations** | Skeletal/morph from glTF, plus per-node spring/property/smooth-transform. | `ModelNode.playAnimation()`, `NodeAnimationDelegate` |
+| **Physics** | Rigid-body dynamics — gravity, collisions, impulses. Pure-KMP simulation (no JNI). | `PhysicsNode`, `sceneview-core` |
+| **Collision & raycasting** | Ray vs Box / Sphere intersections, hit-testing, frustum culling. | `CollisionSystem`, `Ray`, `Box`, `Sphere` |
+| **Procedural geometry** | Generators for cube/sphere/cylinder/cone/torus/capsule, plus extrusion from 2D shapes (Earcut + Delaunator). | `sceneview-core` geometry + triangulation |
+| **HDR environment** | IBL lighting + skybox from `.hdr` / `.ktx`. Async load + reactive swap. | `EnvironmentLoader`, `rememberEnvironment` |
+| **Custom materials** | Filament `.filamat` materials with parameters, plus built-in unlit / lit / overlay variants. | `MaterialLoader` |
+| **Post-processing** | Bloom, depth of field, SSAO, vignette, color grading, tone mapping. | `View.bloomOptions`, `dynamicResolutionOptions`, … |
+| **Compose UI in 3D** | Render any `@Composable` as a textured plane in world space — buttons, lists, animations, all interactive. | `ViewNode` + `ViewNode.WindowManager` |
+| **Multiple cameras** | Picture-in-picture, mini-map, security-camera views. | `SecondaryCamera` |
+| **Reactive scene graph** | Compose-driven recomposition: change state → tree updates. No imperative `parent.addChild()`. | `SceneScope` / `ARSceneScope` DSL |
 
 ---
 
 ## Apple (iOS / macOS / visionOS)
 
-Native Swift Package built on RealityKit. 19 node types.
+Native Swift Package built on RealityKit. **19 node types** mirroring the Android API.
 
 ```swift
 SceneView(environment: .studio) {
@@ -233,28 +280,53 @@ ARSceneView(planeDetection: .horizontal) { position, arView in
 }
 ```
 
-**Install:** `https://github.com/sceneview/sceneview-swift.git` (SPM, from 4.0.0)
+**Nodes available** — `ModelNode` · `GeometryNode` (cube/sphere/cylinder/cone/torus/capsule/plane) · `LightNode` · `ImageNode` · `VideoNode` · `TextNode` · `ViewNode` · `BillboardNode` · `MeshNode` · `LineNode` · `PathNode` · `ShapeNode` · `PhysicsNode` · `ReflectionProbeNode` · `DynamicSkyNode` · `FogNode` · `CameraNode` · `AugmentedImageNode` · `SceneReconstructionNode` (visionOS scene mesh).
+
+Plus the **iOS `RerunBridge`** with the same wire format as Android, and a `NodeBuilder` DSL for declarative composition outside SwiftUI.
+
+**Install:** `https://github.com/sceneview/sceneview-swift.git` (SPM, from 4.0.9)
 
 ---
 
-## SceneView Web (JavaScript)
+## SceneView Web (JavaScript + Kotlin/JS)
 
 The lightest way to add 3D to any website. One script tag, one function call.
 ~25 KB library powered by Filament.js WASM — the same engine behind Android SceneView.
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
 <script> SceneView.modelViewer("canvas", "model.glb") </script>
 ```
 
-**API:**
+**JavaScript API (script-tag):**
 - `SceneView.modelViewer(canvasOrId, url, options?)` — all-in-one viewer with orbit + auto-rotate
 - `SceneView.create(canvasOrId, options?)` — empty viewer, load model later
 - `viewer.loadModel(url)` — load/replace glTF/GLB model
 - `viewer.setAutoRotate(enabled)` — toggle rotation
 - `viewer.dispose()` — clean up resources
 
-**Install:** `npm install sceneview-web` or CDN — [Landing page](https://sceneview.github.io/) — [npm](https://www.npmjs.com/package/sceneview-web)
+### WebXR — AR & VR in the browser
+
+```js
+const ar = await SceneView.startAR("canvas", { hitTest: true })   // immersive-ar
+const vr = await SceneView.startVR("canvas")                       // immersive-vr
+```
+
+| Class | Mode | Use |
+|---|---|---|
+| `ARSceneView` | `immersive-ar` | Phone passthrough AR with hit-test, anchors, light estimation |
+| `VRSceneView` | `immersive-vr` | Headset VR with controller input, reference spaces |
+| `WebXRSession` | both | Low-level frame loop, `XRHitTestSource`, `XRReferenceSpace` |
+
+### Kotlin/JS power-user API
+
+For Kotlin Multiplatform projects, the same engine is exposed as a Kotlin/JS class with an `OrbitCameraController`, a geometry DSL, and reactive node updates:
+
+```kotlin
+implementation("io.github.sceneview:sceneview-web:4.0.0")
+```
+
+**Install:** `npm install sceneview-web` or CDN — [Landing page](https://sceneview.github.io/) — [Playground](https://sceneview.github.io/playground.html) — [npm](https://www.npmjs.com/package/sceneview-web)
 
 ---
 
@@ -273,6 +345,8 @@ claude mcp add sceneview -- npx sceneview-mcp
 # Claude Desktop / Cursor / Windsurf — add to MCP config
 { "mcpServers": { "sceneview": { "command": "npx", "args": ["-y", "sceneview-mcp"] } } }
 ```
+
+Highlights: `generate_scene`, `debug_issue`, `search_models` (Sketchfab BYOK), `analyze_project` (audit existing app), `validate_code` (compile-check before sending), plus per-platform recipes for AR, physics, geometry, and Compose-in-3D.
 
 ### Claude Code plugin (MCP + slash commands + hooks)
 

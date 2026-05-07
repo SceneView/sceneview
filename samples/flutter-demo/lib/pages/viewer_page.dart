@@ -39,7 +39,7 @@ class _ViewerPageState extends State<ViewerPage> {
   static const _sampleModels = [
     _SampleModel('Damaged Helmet', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb', Icons.sports_motorsports),
     _SampleModel('Avocado', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Avocado/glTF-Binary/Avocado.glb', Icons.eco),
-    _SampleModel('Flight Helmet', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/FlightHelmet/glTF-Binary/FlightHelmet.glb', Icons.flight),
+    _SampleModel('Flight Helmet', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/FlightHelmet/glTF/FlightHelmet.gltf', Icons.flight),
     _SampleModel('Water Bottle', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/WaterBottle/glTF-Binary/WaterBottle.glb', Icons.water_drop),
   ];
 

@@ -24,7 +24,7 @@ That's it. The script builds the demo app and installs it on your connected Andr
 ### Try a specific platform demo
 
 ```bash
-./tools/try-demo.sh --sample android-demo       # Full showcase (4 tabs, 14 demos)
+./tools/try-demo.sh --sample android-demo       # Full showcase (37 demos: 24 3D + 13 AR)
 ./tools/try-demo.sh --sample android-tv-demo    # D-pad controlled TV viewer
 ```
 
@@ -39,7 +39,7 @@ Run `./tools/try-demo.sh --help` for the full list.
 <div class="try-download-card">
 <h3>Android Demo</h3>
 <p>Full showcase: 4 tabs, 14 interactive demos, 35+ node types, animations, physics, post-processing.</p>
-<a href="https://github.com/sceneview/sceneview/releases/latest/download/android-demo.apk" class="md-button md-button--primary">
+<a href="https://github.com/sceneview/sceneview/releases/latest/download/sceneview-android-demo.apk" class="md-button md-button--primary">
 Download APK
 </a>
 <p class="try-download-note">Debug-signed — works on any device, no Play Store needed.</p>
@@ -59,9 +59,9 @@ Browse all APKs
 
 ```bash
 # Download and install in one line
-curl -fSL -o /tmp/android-demo.apk \
-  https://github.com/sceneview/sceneview/releases/latest/download/android-demo.apk \
-  && adb install -r /tmp/android-demo.apk
+curl -fSL -o /tmp/sceneview-android-demo.apk \
+  https://github.com/sceneview/sceneview/releases/latest/download/sceneview-android-demo.apk \
+  && adb install -r /tmp/sceneview-android-demo.apk
 ```
 
 Or use the script's download mode (no build required):

@@ -45,7 +45,7 @@ description: "The #1 open-source 3D & AR SDK. Build immersive 3D and AR experien
 </div>
 
 <div class="sv-stat">
-<span class="sv-stat-number">v4.0.0</span>
+<span class="sv-stat-number">v4.0.9</span>
 <span class="sv-stat-label">Latest Release</span>
 </div>
 
@@ -97,7 +97,7 @@ No boilerplate. No manual cleanup. Just declare what you want.
 
     ```html
     <!-- One-liner 3D for the web -->
-    <script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview-web.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
     <scene-view model="helmet.glb" auto-rotate camera-orbit></scene-view>
     ```
 
@@ -213,7 +213,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
 === "Web"
 
     ```html
-    <script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview-web.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
     ```
 
 ---

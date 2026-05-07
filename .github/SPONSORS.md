@@ -32,7 +32,7 @@ Open Collective provides full expense transparency and corporate invoicing.
 
 <!-- Gold sponsor logos here -->
 
-*Become the first Gold Sponsor — [get in touch](https://opencollective.com/sceneview/contribute/gold-sponsor)*
+*Become the first Gold Sponsor — [pick a tier](https://opencollective.com/sceneview/contribute)*
 
 ## Sponsors
 
@@ -40,7 +40,7 @@ Open Collective provides full expense transparency and corporate invoicing.
 
 <!-- Sponsor logos here -->
 
-*No sponsors yet — [become one!](https://opencollective.com/sceneview/contribute/sponsor)*
+*No sponsors yet — [become one!](https://opencollective.com/sceneview/contribute)*
 
 ## Backers
 

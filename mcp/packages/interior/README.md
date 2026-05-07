@@ -27,14 +27,14 @@ Then restart Claude Desktop and ask:
 
 ### Option B — hosted HTTP MCP URL (ChatGPT, Claude Desktop "Remote MCP", Cursor URL)
 
-The 6 interior tools are also exposed (along with sceneview-mcp + automotive/gaming/healthcare/rerun verticals — 63 tools total) on the shared SceneView gateway:
+The 7 interior tools are also exposed (along with sceneview-mcp + automotive/gaming/healthcare/rerun verticals — 63 tools total) on the shared SceneView gateway:
 
 ```
 https://sceneview-mcp.mcp-tools-lab.workers.dev/mcp/public
 ```
 
 - Anonymous, no API key required
-- All 6 interior tools are Pro tier — they return a JSON-RPC ACCESS_DENIED with a `/pricing` pointer until you subscribe
+- All 7 interior tools are Pro tier — they return a JSON-RPC ACCESS_DENIED with a `/pricing` pointer until you subscribe
 - Rate limit: 60 req/h per IP
 
 For the **authenticated Pro tier** (full quota, all tools dispatch):

@@ -381,7 +381,7 @@
           <div class="stat__label">PBR on mobile</div>
         </div>
         <div class="stat">
-          <div class="stat__number">32</div>
+          <div class="stat__number">28</div>
           <div class="stat__label">MCP AI tools</div>
         </div>
         <div class="stat">
@@ -481,7 +481,7 @@
           </div>
           <div class="tabs__panel" data-panel="web">
             <pre class="code-block"><code><span class="syn-green">// One line in your HTML:</span>
-<span class="syn-purple">&lt;script</span> <span class="syn-blue">src</span>=<span class="syn-green-light">"https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview.js"</span><span class="syn-purple">&gt;&lt;/script&gt;</span>
+<span class="syn-purple">&lt;script</span> <span class="syn-blue">src</span>=<span class="syn-green-light">"https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"</span><span class="syn-purple">&gt;&lt;/script&gt;</span>
 
 <span class="syn-green">// Then use the API:</span>
 <span class="syn-blue">SceneView</span>.<span class="syn-blue">modelViewer</span>(<span class="syn-green-light">"canvas"</span>, <span class="syn-green-light">"model.glb"</span>)</code></pre>
@@ -810,6 +810,108 @@
     </div>
   </section>
 
+  <!-- ===== FEATURES ===== -->
+  <section class="features" id="features">
+    <div class="features__container">
+      <h2 class="features__title reveal">What you can build</h2>
+      <p class="features__subtitle reveal">26+ node types, full ARCore + ARKit coverage, physics, post-processing, and Compose UI inside a 3D scene.</p>
+
+      <div class="features__grid">
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">view_in_ar</span>
+          <h3 class="feature-card__title">26+ Node Types</h3>
+          <p class="feature-card__text">Models, primitives (cube, sphere, cone, torus, capsule), curves, shapes, text, video, billboard sprites, lights, reflection probes, dynamic sky, fog, physics, and more &mdash; every one a Composable / SwiftUI view.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Android</span>
+            <span class="feature-card__chip">iOS</span>
+            <span class="feature-card__chip">Web</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">layers</span>
+          <h3 class="feature-card__title">Compose UI in 3D</h3>
+          <p class="feature-card__text"><code>ViewNode</code> renders any <code>@Composable</code> as a textured plane in world space. Buttons, lists, animations &mdash; all interactive, all reactive. The same trick exists in SwiftUI on iOS.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Android</span>
+            <span class="feature-card__chip">iOS</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">public</span>
+          <h3 class="feature-card__title">AR Geospatial</h3>
+          <p class="feature-card__text">Streetscape city mesh, terrain anchors, rooftop anchors, Cloud Anchors for cross-device persistence. Build navigation, geofenced experiences, and scavenger hunts at planet scale.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Android</span>
+            <span class="feature-card__chip">ARCore VPS</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">face</span>
+          <h3 class="feature-card__title">Augmented Faces &amp; Images</h3>
+          <p class="feature-card__text">Face mesh overlay (front camera) with custom materials. Image tracking for posters, business cards, museum exhibits &mdash; with runtime image database building.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Android</span>
+            <span class="feature-card__chip">iOS</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">videocam</span>
+          <h3 class="feature-card__title">AR Record &amp; Replay</h3>
+          <p class="feature-card__text">Capture an outdoor ARCore session once with <code>ARRecorder</code>, replay it 1:1 at the desk via <code>ARSceneView(playbackDataset = file)</code>. Debug AR scenes without a phone in your hand.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Android</span>
+            <span class="feature-card__chip">EIS &mdash; image stabilization</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">animation</span>
+          <h3 class="feature-card__title">Physics &amp; Gestures</h3>
+          <p class="feature-card__text">Rigid-body physics (gravity, collisions, impulses), ray vs box/sphere collision, drag-rotate-scale-elevate gestures &mdash; all opt-in per node via <code>isEditable</code>.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">All platforms</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">brightness_high</span>
+          <h3 class="feature-card__title">PBR Lighting &amp; Post-FX</h3>
+          <p class="feature-card__text">Image-based lighting from <code>.hdr</code> / <code>.ktx</code>, dynamic time-of-day sky, atmospheric fog, reflection probes, plus bloom, depth of field, SSAO, vignette, color grading, and tone mapping.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Filament</span>
+            <span class="feature-card__chip">RealityKit</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">vrpano</span>
+          <h3 class="feature-card__title">WebXR &mdash; AR &amp; VR</h3>
+          <p class="feature-card__text">Same engine on the web. <code>SceneView.startAR(canvas)</code> for phone passthrough AR with hit-test, anchors, light estimation. <code>startVR(canvas)</code> for headset VR with controllers and reference spaces.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Web</span>
+            <span class="feature-card__chip">immersive-ar</span>
+            <span class="feature-card__chip">immersive-vr</span>
+          </div>
+        </div>
+
+        <div class="feature-card reveal">
+          <span class="feature-card__icon material-symbols-outlined">smart_toy</span>
+          <h3 class="feature-card__title">AI-First MCP Server</h3>
+          <p class="feature-card__text">28 MCP tools incl. <code>generate_scene</code>, <code>debug_issue</code>, <code>search_models</code> (Sketchfab), <code>analyze_project</code>, and <code>validate_code</code>. 33 compilable samples + full <code>llms.txt</code> reference.</p>
+          <div class="feature-card__chips">
+            <span class="feature-card__chip">Claude</span>
+            <span class="feature-card__chip">Cursor</span>
+            <span class="feature-card__chip">Windsurf</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ===== COMPARISON TABLE ===== -->
   <section class="comparison" id="comparison">
     <div class="comparison__container">
@@ -876,7 +978,7 @@
             </tr>
             <tr>
               <td class="comparison__label">AI code gen</td>
-              <td class="comparison__highlight"><strong>32 MCP tools</strong></td>
+              <td class="comparison__highlight"><strong>28 MCP tools</strong></td>
               <td>No MCP</td>
               <td>No MCP</td>
               <td>No MCP</td>
@@ -919,6 +1021,40 @@
           </div>
           <a href="/rerun/" class="devtools__card-link">Open hosted viewer &rarr;</a>
           <a href="/open/?demo=ar-rerun" class="devtools__card-link" target="_blank" rel="noopener">Open AR Rerun in the demo app &rarr;</a>
+        </div>
+        <div class="devtools__card reveal">
+          <div class="devtools__card-header">
+            <span class="devtools__card-icon material-symbols-outlined">videocam</span>
+            <span class="devtools__card-badge">v4</span>
+          </div>
+          <h3 class="devtools__card-title">AR Record &amp; Replay</h3>
+          <p class="devtools__card-text">Capture an outdoor ARCore session once with <code>rememberARRecorder()</code>. Replay it 1:1 at the desk via <code>ARSceneView(playbackDataset = file)</code>. Iterate on AR demos without leaving your chair.</p>
+          <div class="devtools__card-platforms">
+            <span class="devtools__card-platform">Android</span>
+            <span class="devtools__card-platform">21 unit tests</span>
+          </div>
+        </div>
+        <div class="devtools__card reveal">
+          <div class="devtools__card-header">
+            <span class="devtools__card-icon material-symbols-outlined">straighten</span>
+            <span class="devtools__card-badge">v4</span>
+          </div>
+          <h3 class="devtools__card-title">Image Stabilization (EIS)</h3>
+          <p class="devtools__card-text">One-line opt-in to ARCore Electronic Image Stabilization for shake-free AR previews on supported devices. <code>ARSceneView(imageStabilizationMode = EIS)</code>.</p>
+          <div class="devtools__card-platforms">
+            <span class="devtools__card-platform">Android</span>
+          </div>
+        </div>
+        <div class="devtools__card reveal">
+          <div class="devtools__card-header">
+            <span class="devtools__card-icon material-symbols-outlined">cloud_sync</span>
+          </div>
+          <h3 class="devtools__card-title">Cloud Anchors</h3>
+          <p class="devtools__card-text">Persistent AR experiences across devices, sessions, and OSes. <code>CloudAnchorNode.host(ttlDays = N)</code> and <code>.resolve(id)</code>. Build multi-user AR by passing a string.</p>
+          <div class="devtools__card-platforms">
+            <span class="devtools__card-platform">Android</span>
+            <span class="devtools__card-platform">iOS</span>
+          </div>
         </div>
         <div class="devtools__card reveal">
           <div class="devtools__card-header">
@@ -1042,7 +1178,7 @@
           <div class="try-card__body">
             <span class="try-card__badge try-card__badge--android">Android</span>
             <h3 class="try-card__title">Android Demo</h3>
-            <p class="try-card__text">Material 3 Expressive, 4 tabs, 14 demos</p>
+            <p class="try-card__text">Material 3 Expressive, 37 demos (24 3D + 13 AR)</p>
           </div>
           <span class="material-symbols-outlined try-card__arrow">arrow_forward</span>
         </a>
@@ -1161,7 +1297,7 @@
                 <span class="cta__terminal-cmd">npm install sceneview-mcp</span>
               </div>
               <div class="cta__terminal-output">
-                + sceneview-mcp@4.0.1<br>
+                + sceneview-mcp@4.0.11<br>
                 added 12 packages from 8 contributors and audited 42 packages in 1.2s<br>
                 <br>
                 <span class="cta__terminal-success">Success!</span> Ready to use SceneView in your project.

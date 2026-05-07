@@ -66,7 +66,7 @@ SceneView(environment: .studio) {
 
 ```html
 <canvas id="canvas" style="width:100%;height:100vh"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@3.6.0/sceneview.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
 <script>
   // sceneview.js supports one model per viewer
   // For multi-model, create the scene and load models sequentially

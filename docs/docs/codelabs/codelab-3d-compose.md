@@ -316,5 +316,5 @@ That's ~35 lines. A production-quality 3D model viewer with orbit camera, HDR li
 - **Add geometry** → Try `CubeNode`, `SphereNode`, `CylinderNode` in the scene block
 - **Embed in a screen** → Replace any `Image()` in your app with this `Box` wrapping a `Scene`
 - **Explore samples** → The [samples page](../samples.md) covers model viewer, glTF camera, camera manipulator, and more
-- **Read the API docs** → [sceneview.github.io/api/sceneview/sceneview](https://sceneview.github.io/api/sceneview/sceneview/)
+- **Read the API docs** → [sceneview source on GitHub](https://github.com/sceneview/sceneview/tree/main/sceneview) (KDoc-decorated) or the [`llms.txt`](https://github.com/sceneview/sceneview/blob/main/llms.txt) machine-readable reference
 - **Building for iOS?** → See the [3D with SwiftUI codelab](codelab-3d-swiftui.md) for the equivalent experience using RealityKit

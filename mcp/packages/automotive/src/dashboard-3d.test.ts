@@ -115,7 +115,7 @@ describe("generateDashboard3d", () => {
     const code = generateDashboard3d({ gauges: ["speedometer"], ar: true });
     expect(code).toContain("ARSceneView(");
     expect(code).toContain("android.permission.CAMERA");
-    expect(code).toContain("arsceneview:3.6.0");
+    expect(code).toContain("arsceneview:4.0.9");
   });
 
   it("includes LightNode with named apply parameter", () => {

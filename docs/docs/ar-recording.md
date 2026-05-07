@@ -100,7 +100,7 @@ ARCore replays at the original capture rate. The session looks identical to live
 
 ## API reference
 
-- `io.github.sceneview.ar.recording.ARRecorder` — full KDoc on the [Dokka API site](https://sceneview.github.io/api/sceneview/arsceneview/).
+- `io.github.sceneview.ar.recording.ARRecorder` — full KDoc in the [arsceneview source](https://github.com/sceneview/sceneview/tree/main/arsceneview/src/main/java/io/github/sceneview/ar/recording).
 - `ARSceneView(playbackDataset: File? = null, …)` — see [API Cheatsheet](cheatsheet.md) for the complete `ARSceneView` signature.
 
 ---

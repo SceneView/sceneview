@@ -82,7 +82,7 @@ One unified showcase app per platform — all features integrated into tabs.
 
 | Directory | Platform | Demonstrates |
 |---|---|---|
-| `samples/android-demo` | Android | Play Store app — 4-tab Material 3 (3D, AR, Samples, About), 14 demos |
+| `samples/android-demo` | Android | Play Store app — 4-tab Material 3 (3D, AR, Samples, About), 37 demos (24 3D + 13 AR) |
 | `samples/android-tv-demo` | Android TV | D-pad controls, model cycling, auto-rotation |
 | `samples/web-demo` | Web | Browser 3D viewer, Filament.js (WASM), WebXR AR/VR |
 | `samples/ios-demo` | iOS | App Store app — 3-tab SwiftUI (3D, AR, Samples) |

@@ -2582,6 +2582,22 @@ ul { list-style: none; }
 }
 
 /* ── Developer Tools ───────────────────────────────────────────────────────── */
+/* ===== FEATURES — what you can build ===== */
+.features { padding: 96px 0; background: var(--surface-section, var(--bg, transparent)); }
+.features__container { max-width: var(--container-width); margin: 0 auto; padding: 0 var(--container-padding); text-align: center; }
+.features__title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing: -0.04em; margin-bottom: 16px; }
+.features__subtitle { font-size: 1.125rem; color: var(--text-secondary); max-width: 720px; margin: 0 auto 48px; }
+.features__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; text-align: left; }
+.feature-card { background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; display: flex; flex-direction: column; }
+.feature-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(0,0,0,0.25); border-color: var(--color-primary, var(--accent)); }
+.feature-card__icon { font-size: 32px; color: var(--color-primary, var(--accent)); margin-bottom: 16px; }
+.feature-card__title { font-size: 1.2rem; font-weight: 700; margin: 0 0 12px; letter-spacing: -0.01em; }
+.feature-card__text { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin: 0 0 16px; flex-grow: 1; }
+.feature-card__text code { font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); font-size: 0.85em; padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,0.06); }
+@media (prefers-color-scheme: dark) { .feature-card__text code { background: rgba(255,255,255,0.08); } }
+.feature-card__chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.feature-card__chip { font-size: 0.72rem; font-weight: 600; background: rgba(var(--accent-rgb, 59,130,246), 0.12); color: var(--color-primary, var(--accent)); padding: 4px 10px; border-radius: 999px; letter-spacing: 0.01em; }
+
 .devtools { padding: 96px 0; }
 .devtools__container { max-width: var(--container-width); margin: 0 auto; padding: 0 var(--container-padding); }
 .devtools__title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing: -0.04em; margin-bottom: 16px; }

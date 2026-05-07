@@ -2,9 +2,9 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.0.0):**
-- 3D only: `io.github.sceneview:sceneview:4.0.0`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.0`
+**Android — Maven artifacts (version 4.0.9):**
+- 3D only: `io.github.sceneview:sceneview:4.0.9`
+- AR + 3D: `io.github.sceneview:arsceneview:4.0.9`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.9")
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.0") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.0.9")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.0.9") // AR (includes sceneview)
 }
 ```
 
@@ -106,6 +106,7 @@ fun ARSceneView(
     materialLoader: MaterialLoader = rememberMaterialLoader(engine),
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     sessionFeatures: Set<Session.Feature> = setOf(),
+    playbackDataset: File? = null,                 // Replay an MP4 recorded via ARRecorder. See "AR Recording & Playback".
     sessionCameraConfig: ((Session) -> CameraConfig)? = null,
     sessionConfiguration: ((session: Session, Config) -> Unit)? = null,
     planeRenderer: Boolean = true,
@@ -338,6 +339,56 @@ SceneView(...) {
 )
 ```
 
+### ConeNode — cone geometry
+```kotlin
+@Composable fun ConeNode(
+    radius: Float = Cone.DEFAULT_RADIUS,           // 1.0f
+    height: Float = Cone.DEFAULT_HEIGHT,           // 2.0f
+    center: Position = Cone.DEFAULT_CENTER,
+    sideCount: Int = Cone.DEFAULT_SIDE_COUNT,      // 24
+    materialInstance: MaterialInstance? = null,
+    position: Position = Position(x = 0f),
+    rotation: Rotation = Rotation(x = 0f),
+    scale: Scale = Scale(1f),
+    apply: ConeNode.() -> Unit = {},
+    content: (@Composable NodeScope.() -> Unit)? = null
+)
+```
+
+### TorusNode — torus (donut) geometry
+```kotlin
+@Composable fun TorusNode(
+    majorRadius: Float = Torus.DEFAULT_MAJOR_RADIUS,   // 1.0f (ring centre)
+    minorRadius: Float = Torus.DEFAULT_MINOR_RADIUS,   // 0.3f (tube thickness)
+    center: Position = Torus.DEFAULT_CENTER,
+    majorSegments: Int = Torus.DEFAULT_MAJOR_SEGMENTS,  // 32
+    minorSegments: Int = Torus.DEFAULT_MINOR_SEGMENTS,  // 16
+    materialInstance: MaterialInstance? = null,
+    position: Position = Position(x = 0f),
+    rotation: Rotation = Rotation(x = 0f),
+    scale: Scale = Scale(1f),
+    apply: TorusNode.() -> Unit = {},
+    content: (@Composable NodeScope.() -> Unit)? = null
+)
+```
+
+### CapsuleNode — capsule (cylinder + hemisphere caps)
+```kotlin
+@Composable fun CapsuleNode(
+    radius: Float = Capsule.DEFAULT_RADIUS,         // 0.5f
+    height: Float = Capsule.DEFAULT_HEIGHT,         // 2.0f (cylinder section; total = h + 2r)
+    center: Position = Capsule.DEFAULT_CENTER,
+    capStacks: Int = Capsule.DEFAULT_CAP_STACKS,    // 8
+    sideSlices: Int = Capsule.DEFAULT_SIDE_SLICES,  // 24
+    materialInstance: MaterialInstance? = null,
+    position: Position = Position(x = 0f),
+    rotation: Rotation = Rotation(x = 0f),
+    scale: Scale = Scale(1f),
+    apply: CapsuleNode.() -> Unit = {},
+    content: (@Composable NodeScope.() -> Unit)? = null
+)
+```
+
 ### PlaneNode — flat quad
 ```kotlin
 @Composable fun PlaneNode(
@@ -361,9 +412,17 @@ SceneView(...) {
     val redMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(Color.Red, metallic = 0f, roughness = 0.6f)
     }
+    // Unlit (flat colour, ignores scene lighting) — for HUD overlays, debug
+    // gizmos, billboards, stylized rendering. No metallic/roughness/reflectance.
+    val unlitGreen = remember(materialLoader) {
+        materialLoader.createUnlitColorInstance(Color.Green)
+    }
     CubeNode(size = Size(0.5f), center = Position(0f, 0.25f, 0f), materialInstance = redMaterial)
     SphereNode(radius = 0.3f, materialInstance = blueMaterial)
     CylinderNode(radius = 0.2f, height = 1.0f, materialInstance = greenMaterial)
+    ConeNode(radius = 0.3f, height = 0.8f, materialInstance = yellowMaterial)
+    TorusNode(majorRadius = 0.5f, minorRadius = 0.15f, materialInstance = purpleMaterial)
+    CapsuleNode(radius = 0.2f, height = 0.6f, materialInstance = orangeMaterial)
     PlaneNode(size = Size(5f, 5f), materialInstance = greyMaterial)
 }
 ```
@@ -495,6 +554,8 @@ SceneView(...) {
     windowManager: ViewNode.WindowManager,
     unlit: Boolean = false,
     invertFrontFaceWinding: Boolean = false,
+    position: Position = Position(x = 0f),
+    rotation: Rotation = Rotation(x = 0f),
     apply: ViewNode.() -> Unit = {},
     content: (@Composable NodeScope.() -> Unit)? = null,
     viewContent: @Composable () -> Unit    // the Compose UI to render
@@ -641,6 +702,19 @@ SceneView {
 `ARSceneScope` extends `SceneScope` with AR-specific composables. All `SceneScope` nodes (ModelNode, CubeNode, etc.) are also available.
 
 **⚠️ Important nesting rule:** AR composables (`AnchorNode`, `CloudAnchorNode`, `AugmentedImageNode`, etc.) can only be declared at the `ARSceneView { }` root level — they are NOT available inside `Node { content }` or other node's `content` blocks. To nest models under an anchor, use `AnchorNode(anchor) { ModelNode(...) }` — the `content` block of `AnchorNode` provides a regular `NodeScope`.
+
+**⚠️ ARCore Cloud API key — required for `CloudAnchorNode`, `StreetscapeGeometryNode`, and any `Config.GeospatialMode.ENABLED` session.** When generating code that uses these features, you MUST include both:
+
+1. The manifest meta-data:
+```xml
+<meta-data
+    android:name="com.google.android.ar.API_KEY"
+    android:value="${arcoreApiKey}" />
+```
+2. The `manifestPlaceholders["arcoreApiKey"] = ...` injection in `app/build.gradle` (read from env var `ARCORE_API_KEY` or `local.properties` — never hardcoded).
+3. `<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />` and a runtime `RequestMultiplePermissions` flow asking for `CAMERA + ACCESS_FINE_LOCATION` BEFORE mounting `ARSceneView`. Geospatial throws `FineLocationPermissionNotGrantedException` otherwise.
+
+Plain plane-finding / hit-testing / face mesh / image detection does NOT require the API key — only Cloud Anchors / Geospatial / Streetscape do. Setup guide with Cloud Console steps: `samples/android-demo/STREETSCAPE_SETUP.md`.
 
 ### AnchorNode — pin to real world
 ```kotlin
@@ -877,7 +951,7 @@ class ModelLoader(engine: Engine, context: Context) {
 ### MaterialLoader
 ```kotlin
 class MaterialLoader(engine: Engine, context: Context) {
-    // Color material — MUST be called on main thread
+    // PBR color material — MUST be called on main thread
     fun createColorInstance(
         color: Color,
         metallic: Float = 0.0f,    // 0 = dielectric, 1 = metal
@@ -885,9 +959,15 @@ class MaterialLoader(engine: Engine, context: Context) {
         reflectance: Float = 0.5f  // Fresnel reflectance
     ): MaterialInstance
 
+    // Unlit (flat) color material — ignores scene lighting (no PBR)
+    // Use for HUD overlays, debug visualizations, billboards, stylized rendering.
+    fun createUnlitColorInstance(color: Color): MaterialInstance
+
     // Also accepts:
     fun createColorInstance(color: androidx.compose.ui.graphics.Color, ...): MaterialInstance
     fun createColorInstance(color: Int, ...): MaterialInstance
+    fun createUnlitColorInstance(color: androidx.compose.ui.graphics.Color): MaterialInstance
+    fun createUnlitColorInstance(color: Int): MaterialInstance
 
     // Texture material
     fun createTextureInstance(texture: Texture, ...): MaterialInstance
@@ -1109,16 +1189,48 @@ Stream an ARCore or ARKit session to the [Rerun](https://rerun.io) viewer for sc
 
 **When to use:** debugging flaky plane detection, tracking drift, anchor instability, or comparing two AR sessions side by side. **Dev-time only** — gate with `BuildConfig.DEBUG` in release builds.
 
+### Two modes
+
+- **Live (default)** — sidecar spawns the Rerun viewer, you debug interactively.
+- **Save & share** — sidecar writes a `.rrd` file you can re-host (R2, GitHub release, gist) and open in any browser via `https://sceneview.github.io/rerun/?url=<encoded>`. Lets you attach a fully-replayable session to a bug report.
+
 ### Architecture
 
 ```
-┌──────────────┐   TCP JSON-lines  ┌──────────────────┐  rerun-sdk   ┌────────────┐
-│  RerunBridge │ ─────────────────▶│ Python sidecar   │ ───────────▶ │ Rerun      │
-│ (Kt or Swift)│   one obj/line \n │ (rerun-bridge.py)│              │ viewer     │
-└──────────────┘                   └──────────────────┘              └────────────┘
+┌──────────────┐   TCP JSON-lines  ┌──────────────────┐  rerun-sdk    ┌──────────────────┐
+│  RerunBridge │ ─────────────────▶│ Python sidecar   │ ─── live ────▶│ Rerun viewer     │
+│ (Kt or Swift)│   one obj/line \n │ (rerun-bridge.py)│ ─── save ────▶│ .rrd file        │
+└──────────────┘   control ack ◀── └──────────────────┘   on demand   └──────────────────┘
+                                                                              │
+                                                                       upload to R2/etc
+                                                                              │
+                                                              https://sceneview.github.io/rerun/
 ```
 
 Same wire format on Android and iOS. A single sidecar handles both platforms.
+
+### Save & share flow
+
+1. Run sidecar in save mode: `python rerun-bridge.py --save`
+2. In the app, tap **Save & Share** while streaming. The bridge sends a `{"type":"control","cmd":"save_now"}` line; the sidecar flushes a `.rrd` and replies with `{"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}`.
+3. Re-host the `.rrd` on a public URL (Cloudflare R2, GitHub release asset, S3, gist).
+4. Open `https://sceneview.github.io/rerun/?url=<encoded-public-url>` in any browser to view + scrub the recording.
+
+The Kotlin API surface for step 2:
+
+```kotlin
+bridge.requestSaveAndShare { result: RerunBridge.ShareResult ->
+    if (result.success) {
+        // result.path = "/home/dev/.sceneview/recordings/2026-05-06_23-30-12.rrd"
+        // result.viewerUrl = "https://sceneview.github.io/rerun/?url=file%3A%2F%2F…"
+        // result.events = 1234
+    } else {
+        // result.reason explains why (e.g. "sidecar started in live mode; relaunch with --save")
+    }
+}
+```
+
+`callback` fires on the bridge's I/O thread — marshal to your UI thread before touching state.
 
 ### Android — `rememberRerunBridge`
 
@@ -1144,6 +1256,19 @@ fun ARDebugScreen() {
 ```
 
 `logFrame` logs camera pose + planes + point cloud in one call, honours `rateHz`. Finer-grained methods are available if you want to emit events selectively: `logCameraPose(Pose, Long)`, `logPlanes(Collection<Plane>, Long)`, `logPointCloud(PointCloud, Long)`, `logAnchors(Collection<Anchor>, Long)`, `logHitResult(HitResult, Long)`.
+
+**Tier-S "wow" events** (call from your own code, not auto-emitted by `logFrame`):
+
+```kotlin
+// Polyline through every accumulated camera position — flat [x,y,z,…] buffer.
+bridge.logCameraTrail(positions = trailFloats, timestampNanos = frame.timestamp)
+
+// Generic scalar timeseries — graphs in the Rerun timeline panel.
+bridge.logScalar(value = trackingQuality, entity = "world/camera/tracking_quality",
+                 timestampNanos = frame.timestamp)
+```
+
+The Python sidecar maps `camera_trail` to `rr.LineStrips3D` and `scalar` to `rr.Scalars`. Same surface in Swift: `bridge.logCameraTrail(positions:timestampNanos:)` and `bridge.logScalar(_:entity:timestampNanos:)`.
 
 **Threading:** the bridge owns a private `Dispatchers.IO` + `SupervisorJob` scope and a `Channel.CONFLATED` outbox. Every `log*` call is non-blocking — the newest event overwrites any pending one (drop-on-backpressure). Filament's render thread is never blocked.
 
@@ -1223,6 +1348,125 @@ The MCP exposes 5 tools: `setup_rerun_project`, `generate_ar_logger`, `generate_
 - **Dev-time only.** Gate with `BuildConfig.DEBUG` / `#if DEBUG`. The bridge is safe to leave wired in release (`setEnabled(false)` short-circuits the hot path), but the socket attempt alone wastes battery.
 - **No Rerun on visionOS yet.** `RerunBridge` is iOS-only because it reads from `ARFrame`, which isn't part of the visionOS API surface.
 - **10 Hz default.** Higher rates are possible but the sidecar becomes a bottleneck beyond ~30 Hz on a typical laptop.
+
+---
+
+## AR Recording & Playback — debug without a phone
+
+ARCore captures the **entire** AR session (camera frames, IMU, planes, depth, anchors, light estimation) into an MP4. SceneView wraps this with [`ARRecorder`](arsceneview/src/main/java/io/github/sceneview/ar/recording/ARRecorder.kt) for recording and a `playbackDataset` parameter on `ARSceneView` for replay. The replayed session re-runs as if you were there: hit-tests return the same results, planes appear at the same moment, anchors track at the same poses.
+
+### Why this matters
+
+- **Iterate at the desk.** Record an outdoor session once; replay it any time without holding a phone in front of the laptop.
+- **Reproduce bugs deterministically.** Share the MP4 with a teammate — they replay your exact session, including the lighting, motion, and surfaces you saw.
+- **CI tests.** Bundle a recording as a test fixture; assert that `onSessionUpdated` reports the expected planes/anchors.
+- **Pair with Rerun.** Record → replay with the [Rerun bridge](#ar-debug--rerunio-integration) attached → inspect every frame in 3D.
+
+### Record a session
+
+```kotlin
+import io.github.sceneview.ar.recording.rememberARRecorder
+import io.github.sceneview.ar.ARSceneView
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+
+@Composable
+fun ARRecord() {
+    val recorder = rememberARRecorder()
+    val context = LocalContext.current
+    val outputDir = remember { context.getExternalFilesDir("ar-recordings")!! }
+
+    Column {
+        Button(onClick = {
+            val name = "ar-${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}.mp4"
+            recorder.start(File(outputDir, name))
+        }) { Text("Record") }
+        Button(onClick = { recorder.stop() }) { Text("Stop") }
+        Text("State: ${recorder.state}")
+    }
+
+    ARSceneView(
+        modifier = Modifier.fillMaxSize(),
+        // Wire attach() ONLY through onSessionUpdated. The recorder publishes the
+        // latest Session via an AtomicReference (cheap), and the same Session
+        // instance survives Activity pause/resume — the swap only happens on full
+        // composable disposal (e.g. key() remount or navigating away and back),
+        // and onSessionUpdated re-fires on the new Session naturally. No need to
+        // also wire onSessionCreated.
+        onSessionUpdated = { session, _ -> recorder.attach(session) }
+    )
+}
+```
+
+`ARRecorder.state`, `recorder.errorMessage`, and `recorder.recordingFile` are all `MutableState`-backed under the hood — read them from a `@Composable` and Compose recomposes / `LaunchedEffect` re-keys when they change. The composable auto-stops on dispose. After `stop()`, `recorder.recordingFile` keeps pointing at the last MP4 so the caller can list / share / replay it.
+
+### Auto-stop after N seconds
+
+Drive `stop()` from a `LaunchedEffect` keyed on `recorder.state` so you don't block the UI thread:
+
+```kotlin
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+
+LaunchedEffect(recorder.state) {
+    if (recorder.state == ARRecorder.State.RECORDING) {
+        delay(30_000L)
+        recorder.stop()
+    }
+}
+// after the LaunchedEffect fires, the file is at recorder.recordingFile
+```
+
+### Replay a session
+
+```kotlin
+@Composable
+fun ARReplay(file: File) {
+    // playbackDataset MUST be set before the session resumes — switching at runtime
+    // requires a full ARSceneView remount, hence the key().
+    key(file) {
+        ARSceneView(
+            modifier = Modifier.fillMaxSize(),
+            playbackDataset = file
+        )
+    }
+}
+```
+
+ARCore replays at the original capture rate. The session looks **identical** to live: planes appear, anchors lock, depth occlusion works, gestures still hit-test correctly. The playback param is a plain `java.io.File` — no FileProvider, no scoped-storage gymnastics.
+
+### Limits
+
+- **Camera permission still required for playback.** ARCore opens the camera even when replaying a dataset; users see no live preview but the permission gate fires regardless. Run your normal permission flow.
+- **Emulator: playback works, recording does not.** ARCore Recording requires a real camera + IMU. Use `getExternalFilesDir("ar-recordings")` to store recordings made on a device, then replay them anywhere.
+- **Same device class.** Playback works best on the device that recorded it, or a similar one. Heavily different sensor sets (e.g. phone → tablet) may degrade tracking.
+- **MP4 file size.** A few tens of MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
+- **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session. Mutating the param after first composition is silently ignored (the value is snapshotted at session creation).
+- **Recording while in playback mode is rejected.** `ARRecorder.start()` returns `false` and surfaces an error message if the session is currently bound to a playback dataset.
+- **`attach(newSession)` mid-RECORDING is a pointer swap, not a graceful handoff.** If the underlying `Session` instance changes while a recording is in flight (e.g. the user navigates away and back, or `key(...)` triggers a full ARSceneView teardown), the old session never receives `stopRecording()` — the in-flight MP4 is left dangling. `stop()` on the new session is a no-op for the orphaned recording. Mitigation: call `stop()` BEFORE any UI action that might dispose the ARSceneView; or hook `onSessionCreated` to detect the new-session event and stop+restart deliberately. Note that ARCore keeps the same `Session` instance across plain Activity pause/resume — you only need to worry about swap on composable disposal.
+
+---
+
+## AR Image Stabilization (EIS)
+
+ARCore 1.37+ exposes **Electronic Image Stabilization** as a single `Config` flag. When enabled, ARCore smooths the camera background image so handheld micro-shake doesn't translate into perceived judder. The virtual content stays anchored at the same world pose either way — only the camera image is stabilized. Useful for handheld AR, panoramic captures, and any video-style recording where jitter is distracting.
+
+```kotlin
+ARSceneView(
+    sessionConfiguration = { session, config ->
+        if (session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)) {
+            config.imageStabilizationMode = Config.ImageStabilizationMode.EIS
+        }
+        // ... your other config flags
+    }
+)
+```
+
+- **Not all devices support EIS.** Always gate with `session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)` — calling `setImageStabilizationMode(EIS)` on an unsupported device throws.
+- **Back-camera only.** EIS is not supported with `Session.Feature.FRONT_CAMERA`. The `isImageStabilizationModeSupported` check returns `false` for front-camera sessions, so the gate above already covers selfie configurations — but be aware that toggling EIS in a front-camera demo will be a no-op.
+- **Toggling at runtime works** via `session.configure {}`, but the camera background can briefly stutter while the stabilization buffers re-prime. If you expose an in-app toggle, prefer remounting via `key(eisEnabled) { ARSceneView(...) }` for a clean swap.
+- **Interactive demo** at [`samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt).
 
 ---
 
@@ -2060,13 +2304,19 @@ let data = SceneSnapshot.pngData(image) // or jpegData(image, quality: 0.9)
 | Environment | `rememberEnvironment(loader) { }` | `.environment(.studio)` |
 | Cube | `CubeNode(size)` | `GeometryNode.cube(size:color:)` |
 | Sphere | `SphereNode(radius)` | `GeometryNode.sphere(radius:)` |
+| Cylinder | `CylinderNode(radius, height)` | `GeometryNode.cylinder(radius:height:)` |
+| Plane | `PlaneNode(size)` | `GeometryNode.plane(width:height:)` |
+| Cone | `ConeNode(radius, height)` | `GeometryNode.cone(radius:height:)` |
+| Torus | `TorusNode(majorRadius, minorRadius)` | `GeometryNode.torus(majorRadius:minorRadius:)` |
+| Capsule | `CapsuleNode(radius, height)` | `GeometryNode.capsule(radius:height:)` |
 | Light | `LightNode(type, apply = { })` | `LightNode.directional(color:intensity:)` |
 | Text | `TextNode(text = "...")` | `TextNode(text:fontSize:color:depth:)` |
 | Line | `LineNode(start, end, materialInstance)` | `LineNode(from:to:color:)` |
 | Image | `ImageNode(bitmap)` / `ImageNode(path)` | `ImageNode.load("img.png")` |
 | Video | `VideoNode(videoPath = "v.mp4")` / `VideoNode(player)` | `VideoNode.load("video.mp4")` |
 | Anchor | `AnchorNode(anchor) { }` | `AnchorNode.world(position:)` |
-| Material | `materialLoader.createColorInstance(Color.Red)` | `.pbr(color:metallic:roughness:)` |
+| Material (PBR) | `materialLoader.createColorInstance(Color.Red)` | `.pbr(color:metallic:roughness:)` |
+| Material (unlit) | `materialLoader.createUnlitColorInstance(Color.Red)` | `CustomMaterial.unlit(color: .red)` |
 | Tap | `onGestureListener(onSingleTapConfirmed = ...)` | `.onEntityTapped { }` / `NodeGesture.onTap(entity)` |
 | Drag | `onGestureListener(onMoveBegin = ...)` | `NodeGesture.onDrag(entity) { translation in }` |
 | Secondary camera | `SecondaryCamera(apply = { })` | `CameraNode()` |
@@ -2100,7 +2350,7 @@ MCP server: `sceneview-mcp`. Add to `.claude/mcp.json`:
 
 ### Complete nodes reference
 
-For an exhaustive, AI-first reference covering every node composable — signatures, copy-paste examples, gotchas, lifecycle behaviour, nesting & coordinate spaces, and common mistakes — see **[docs/docs/nodes.md](https://sceneview.github.io/docs/nodes/)** (`NODES.md`). This file is the authoritative walkthrough for:
+For an exhaustive, AI-first reference covering every node composable — signatures, copy-paste examples, gotchas, lifecycle behaviour, nesting & coordinate spaces, and common mistakes — see **[docs/docs/nodes.md](https://github.com/sceneview/sceneview/blob/main/docs/docs/nodes.md)**. This file is the authoritative walkthrough for:
 
 - **Standard nodes:** ModelNode (animations, `scaleToUnits`), LightNode (intensity units by type, the `apply` trap), ViewNode (Compose UI on a plane, why `viewNodeWindowManager` is mandatory)
 - **Procedural geometry:** CubeNode / SphereNode / CylinderNode / PlaneNode / LineNode / PathNode / MeshNode — with the recomposition model for reactive geometry updates
@@ -2174,7 +2424,7 @@ ferrari_f40.glb
 
 ## SceneView Web (Kotlin/JS + Filament.js)
 
-Package: `sceneview-web` v4.0.0 — npm `sceneview-web`
+Package: `sceneview-web` v4.0.9 — npm `sceneview-web`
 Renderer: **Filament.js (WebGL2/WASM)** — same Filament engine as SceneView Android, compiled to WebAssembly.
 Requires: Chrome 79+, Edge 79+, Firefox 78+ (WebGL2). Safari 15+ (WebGL2).
 
@@ -2186,7 +2436,7 @@ npm install sceneview-web filament
 Script-tag usage (no bundler):
 ```html
 <script src="https://sceneview.github.io/js/filament/filament.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web/build/dist/js/productionExecutable/sceneview-web.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
 ```
 
 After loading, the library registers itself on `window.sceneview`.
@@ -2269,6 +2519,9 @@ SceneView.create(canvas, configure = {
         cube()                     // or: sphere() / cylinder() / plane()
         size(1.0, 1.0, 1.0)       // cube: w/h/d; sphere/cylinder: use radius()/height()
         color(1.0, 0.0, 0.0, 1.0) // RGBA 0-1
+        unlit()                    // optional — flat color, ignores all lighting
+                                   //  (KHR_materials_unlit). For HUD overlays, gizmos,
+                                   //  axes — anywhere PBR shading would fight the use case.
         position(0.0, 0.5, -2.0)
         rotation(0.0, 45.0, 0.0)  // Euler degrees
         scale(1.0)
@@ -2977,7 +3230,7 @@ Backpressure is absorbed by `rateHz`. Wire format: JSON-lines consumed by
 | visionOS | RealityKit | SwiftUI | via SceneViewSwift | Alpha |
 | Web | Filament.js + WebXR | Kotlin/JS | `samples/web-demo` | Alpha |
 
-SceneView Web (sceneview-web v4.0.0) — see "## SceneView Web (Kotlin/JS + Filament.js)" section above for the full API reference.
+SceneView Web (sceneview-web v4.0.9) — see "## SceneView Web (Kotlin/JS + Filament.js)" section above for the full API reference.
 | Desktop | Software renderer | Compose Desktop | `samples/desktop-demo` | Alpha |
 | Flutter | Filament/RealityKit | PlatformView | `samples/flutter-demo` | Alpha |
 | React Native | Filament/RealityKit | Fabric | `samples/react-native-demo` | Alpha |

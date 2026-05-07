@@ -121,9 +121,10 @@ Cross-platform recipes with side-by-side Android + iOS code:
 ## Priority order
 
 1. **Android** — Complete, production-ready (current)
-2. **iOS** — SwiftUI prototype in progress, 7 node types, RealityKit backend
-3. **Desktop** — Compose Desktop + Filament native (planned — Filament already supports macOS/Linux/Windows)
-4. **Web** — Filament WASM exists, Kotlin/Wasm maturing (future)
+2. **iOS / macOS / visionOS** — SceneViewSwift, 19 node types, RealityKit backend (alpha)
+3. **Web** — sceneview-web on npm (Filament.js WASM), 3D + WebXR (AR + VR)
+4. **Flutter / React Native** — PlatformView / Fabric bridges to Android + iOS native renderers
+5. **Desktop** — Compose Desktop wireframe placeholder (Filament JVM bindings still pending)
 
 ## What makes this achievable
 

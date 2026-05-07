@@ -79,10 +79,10 @@ SceneView follows a "native renderer per platform" architecture. Kotlin Multipla
 ```kotlin
 dependencies {
     // 3D only
-    implementation("io.github.sceneview:sceneview:3.6.2")
+    implementation("io.github.sceneview:sceneview:4.0.9")
 
     // AR + 3D (includes sceneview)
-    implementation("io.github.sceneview:arsceneview:3.6.2")
+    implementation("io.github.sceneview:arsceneview:4.0.9")
 }
 ```
 
