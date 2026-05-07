@@ -115,11 +115,28 @@ The local iOS goldens at `samples/ios-demo/goldens/{explore_current,explore_vehi
 
 Tracked here so the next session can pick it up. The Play Store side is already automated via Triple-T Gradle plugin reading `samples/android-demo/play/listings/`; iOS needs equivalent plumbing.
 
-### Android emulator — was offline this session
+### Android emulator — recovered mid-session, fresh v4.0.9 captures shipped
 
-The Pixel_7a AVD that previous sessions used for QA (`emulator-5554`) was in the offline state when this session started. `adb reconnect` did not recover it. Rather than burn 5 minutes rebooting + replaying QA scripts, this session pivoted to using the existing `qa-screenshots/android/*.png` captures (already at exact Play Store spec 1080×2400, dated 2026-04-13) and copied 4 of them into the listing folder. They predate the v4.0.4–4.0.7 ARCore Recording / 6 new AR demos / Streetscape / Pixel 9 Face Mesh + Pose visual sweep, so the *next* opportunity to refresh them with truly current state is when the emulator is back up — at which point the right move is also to grab fresh ones for AR demos (record-replay, terrain anchors, depth occlusion, image stabilization) which aren't represented in the current 4-tile rotation.
+The Pixel_7a AVD started the session in adb-offline state. `adb kill-server` + `adb start-server` recovered it cleanly. From there: built the demo APK (`./gradlew :samples:android-demo:assembleDebug` 15 s with cache), installed on the AVD, captured 4 demos via `am start --es demo <slug>` deep links with an 8-second settle each:
 
-If the emulator stays stuck across sessions: `cd ~/.android/avd/Pixel_7a.avd && rm -f *.lock` then `emulator -avd Pixel_7a -no-snapshot-load -no-boot-anim` from a fresh shell typically unsticks it.
+  1. `model-viewer`  — DamagedHelmet glTF rendered with PBR
+  2. `dynamic-sky`   — Filament physical sky shader, time-of-day slider
+  3. `multi-model`   — 3 GLBs + visibility toggles + spin-scene switch
+  4. `lighting`      — directional / point / spot intensity sweep
+
+Each `screencap` was cropped through Python+PIL (`img.crop((0, 96, w, h))`) to strip the AVD's 96 px system status bar, landing the four assets at exactly 1080×2304 (Play Store-valid 9:19.2 portrait). Variance check on a 3×3 grid of centre pixels confirmed real content (variance 142–755, file sizes 639 KB–1.2 MB vs ~50 KB for a blank frame). Sanity-rendered a 1470×768 thumbnail mosaic for visual confirmation — all 4 demos show the demo title bar, the helmet model, and the appropriate controls panel.
+
+Shipped in [`47f60f97`](https://github.com/sceneview/sceneview/commit/47f60f97) which displaced the 2026-04-13 placeholders from `3b5de2ad`. The Deploy Demo to Play Store run [25522633…](https://github.com/sceneview/sceneview/actions) auto-triggered on push.
+
+**For the next refresh — what to add when the AR demos look ready for store assets**: `am start --es demo ar-rerun`, `ar-record-playback`, `ar-streetscape`, `ar-terrain-anchors`. Bake the capture sequence into `.claude/scripts/capture-play-store-screenshots.sh` so it survives across sessions instead of living inline in chat history.
+
+If the emulator stays stuck across sessions: `adb kill-server && adb start-server` is the canonical fix that worked here. If it still shows offline after that, `cd ~/.android/avd/Pixel_7a.avd && rm -f *.lock` then `emulator -avd Pixel_7a -no-snapshot-load -no-boot-anim` from a fresh shell.
+
+### iOS App Store screenshots — still NOT refreshed
+
+No iPhone 16 Pro Max simulator was available on the host this session (only the device-type spec exists; no booted runtime). Creating + booting + xcodebuild-archiving + signing + capturing would have spanned 15+ minutes with non-trivial cert/signing failure modes — pragmatically out of scope for a session focused on the badge alignment + Play Store. The local `samples/ios-demo/goldens/{explore_current,explore_vehicles}.png` are 1206×2622 which doesn't match Apple's required 6.7"/6.9" 1290×2796 or 1320×2868. App Store Connect rejects anything off-spec.
+
+Right call for next session: spin up `xcrun simctl create "iPhone 16 Pro Max" "iPhone 16 Pro Max" "iOS-26-3"`, `simctl boot`, build SceneViewDemo via xcodebuild, install via `simctl install`, navigate via `simctl io <id> screenshot` after deep-link launch (need to wire URL scheme on the iOS demo first — Android has `--es demo`, iOS would need the equivalent intent extras). Or set up `fastlane snapshot` once and let the App Store deploy workflow drive it.
 
 ---
 
