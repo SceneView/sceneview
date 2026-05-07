@@ -4,6 +4,35 @@
 
 ---
 
+## SESSION 2026-05-07 (cont.) — landing alignment + Play Store screenshot refresh (agitated-meitner-a66271)
+
+### TL;DR
+
+Pushed **[`3b5de2ad`](https://github.com/sceneview/sceneview/commit/3b5de2ad)** on main: fixed the optical mismatch between the Google Play and App Store badges on the README + landing page, added a third "Web Playground" badge so visitors with no phone can try the JS sample, rebalanced the Developer-tools cards (the previously content-light ones now have platform tags + a meaningful link, all 3 align at 412 px / link at the same baseline), and refreshed the 4 Play Store phone-screenshots from the 2026-03-21 mockups to fresh 2026-04-13 1080×2400 captures (model viewer / dynamic sky / multi-model / lighting). CI [run 25519314752](https://github.com/sceneview/sceneview/actions/runs/25519314752) Deploy Website + Deploy Demo to Play Store both kicked off automatically on the push.
+
+### Why the badge fix matters
+
+Google's official `google-play-badge.png` ships with ~17 % built-in padding around its inner button, while Apple's `app-store-badge.svg` is the bare button — so when both images are rendered at the same `height`, the App Store badge looks visibly bigger. Canonical pairing per Google + Apple guidelines is **GP h=60 / AS h=40** which makes the inner button areas match. Applied in:
+- `README.md` (GitHub renders the `<p><a><img>` row)
+- `website-static/index.html` `.hero__store-badges` block
+- `website-static/styles.css` `.hero__store-badge img` rule (PNG → 60 px, SVG → 40 px, mobile breakpoint scaled accordingly)
+
+### iOS App Store screenshots — NOT refreshed this session
+
+The local iOS goldens at `samples/ios-demo/goldens/{explore_current,explore_vehicles}.png` are 1206×2622 — does **not** match Apple's required dimensions (6.7" / 6.9": 1290×2796 or 1320×2868; 6.1": 1179×2556). App Store Connect will reject any other size. Needs either:
+1. A simulator-driven `xcrun simctl io ... screenshot` run on iPhone 16 Pro Max (1320×2868) hitting 4–8 representative demos, OR
+2. A `fastlane snapshot` setup with a Snapfile + Xcode UITests that the App Store deploy workflow can drive automatically.
+
+Tracked here so the next session can pick it up. The Play Store side is already automated via Triple-T Gradle plugin reading `samples/android-demo/play/listings/`; iOS needs equivalent plumbing.
+
+### Android emulator — was offline this session
+
+The Pixel_7a AVD that previous sessions used for QA (`emulator-5554`) was in the offline state when this session started. `adb reconnect` did not recover it. Rather than burn 5 minutes rebooting + replaying QA scripts, this session pivoted to using the existing `qa-screenshots/android/*.png` captures (already at exact Play Store spec 1080×2400, dated 2026-04-13) and copied 4 of them into the listing folder. They predate the v4.0.4–4.0.7 ARCore Recording / 6 new AR demos / Streetscape / Pixel 9 Face Mesh + Pose visual sweep, so the *next* opportunity to refresh them with truly current state is when the emulator is back up — at which point the right move is also to grab fresh ones for AR demos (record-replay, terrain anchors, depth occlusion, image stabilization) which aren't represented in the current 4-tile rotation.
+
+If the emulator stays stuck across sessions: `cd ~/.android/avd/Pixel_7a.avd && rm -f *.lock` then `emulator -avd Pixel_7a -no-snapshot-load -no-boot-anim` from a fresh shell typically unsticks it.
+
+---
+
 ## SESSION 2026-05-07 (cont.) — emulator test infrastructure
 
 ### TL;DR
