@@ -164,7 +164,18 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-06, session nervous-payne — v4.0.2 cut + multi-agent PR sweep)
+### Current state (last updated: 2026-05-06, session wizardly-elbakyan — ARCore feature coverage sprint)
+
+- 🚀 **6 commits shipped on main** — first-class ARCore Recording / Playback in `arsceneview/` (`ARRecorder` + `ARSceneView(playbackDataset = file)`), 6 new AR demos in `samples/android-demo/` (Record & Playback, Depth Occlusion, Instant Placement, Terrain Anchors, Rooftop Anchors, Image Stabilization EIS), 21 JVM unit tests for `ARRecorder` (Robolectric-backed), docs on 5 surfaces (`llms.txt`, mkdocs page, sample-app guide, README, CLAUDE.md). AR demo count went **7 → 13**.
+- ✅ **14 reviews indépendantes Opus** across 3 feature commits (6 + 5 + 3) → 23 fixes applied → 0 BLOCKING dur at the end. 4-bucket triage works.
+- ✅ **2 GitHub issues closed**: [#875](https://github.com/sceneview/sceneview/issues/875) (ARRecorder JVM tests), [#877](https://github.com/sceneview/sceneview/issues/877) (mkdocs page + README + sample-app guide).
+- 🟡 **1 GitHub issue OPEN**: [#876](https://github.com/sceneview/sceneview/issues/876) — refactor `ARRecorder.attach()/start()` to a stateless `recordFrame(session, frame)` pattern matching `RerunBridge`, plus a dedicated `onPlaybackFailed` callback. Breaks the public API → bundle in v4.1 or use deprecation hygiene.
+- ✅ **Build vert + tests verts à chaque push** — `:samples:android-demo:compileDebugKotlin` + `:arsceneview:testDebugUnitTest` (109 tests total: 21 new ARRecorder + 88 existing).
+- ⚠️ **No on-device validation in this session** — emulator alone is insufficient for AR demos. Next session should run the 6 new demos on a Pixel 7a / Pixel 9 before claiming coverage is "done".
+- ⚠️ **ARCore features still NOT exposed** by `arsceneview/` (candidates for next sprint): Scene Semantics (`Config.SemanticMode`), Mesh API (depth → polygonal mesh for physics), runtime AugmentedImageDatabase building (helper exists at `ArSession.kt:182` but no demo).
+- 🟡 **Stale handoff note corrected** — previous "ARCore non encore exposé" list (in `eloquent-panini` session) included Recording/Playback and EIS — both shipped here, so those bullets are obsolete.
+
+### Previous state (last updated: 2026-05-06, session nervous-payne — v4.0.2 cut + multi-agent PR sweep)
 
 - 🚀 **v4.0.2 released** — `release.yml` succeeded end-to-end. Maven Central + npm `sceneview-web@4.0.2` + `sceneview-mcp` (skipped, already at 4.0.8 on independent track) + Dokka API docs + GitHub Release. Tag: `v4.0.2`. Notes: https://github.com/sceneview/sceneview/releases/tag/v4.0.2
 - ✅ **13 PRs merged in this session**: #853 ViewNodeManager cleanup, #854 BillboardNode mirror (closes #838), #855 marketplace submission packet, #830 dependabot roborazzi, #857 ViewNode reactive props (closes #856), #858 BillboardNode JVM regression suite, #859 kotlin-math 1.6→1.8 docs sync, #860 CLAUDE.md session block, #861 handoff.md, #862 hono+postcss security (resolves 13 Dependabot alerts), #864 CHANGELOG Unreleased entry, #865 v4.0.2 version bump, #866 handoff v4.0.2.

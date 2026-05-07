@@ -91,6 +91,67 @@ Launched 4 Opus reviewers in parallel via Agent tool (one round-trip):
 
 ---
 
+## SESSION 2026-05-06 — wizardly-elbakyan — ARCore feature coverage sprint (record/playback + 5 demos + EIS + tests + docs)
+
+### TL;DR
+Audit of ARCore features exposed by `arsceneview/` vs. demonstrated in `samples/android-demo/` revealed 4 lib features wired but never demoed (Depth Occlusion, Instant Placement, Terrain Anchors, Rooftop Anchors) plus several ARCore features not yet wrapped at all. Built **6 new AR demos** + **1 brand-new lib feature** (ARCore Recording / Playback as `ARRecorder` + `ARSceneView(playbackDataset = file)`) + **21 JVM unit tests** + docs on 5 surfaces. AR demo count: **7 → 13**.
+
+### Commits shipped this session (main, oldest first)
+```
+5bf8f9e3 feat(ar): record/playback API + 5 new ARCore demos
+387b9d08 review: apply Bucket A fixes from 6-agent review of 592b7ec0
+3b9006c9 ar: ARRecorder JVM tests (#875) + external docs (#877) + EIS demo
+70f9f85e review: apply 5-agent review fixes for 3b9006c9
+f8e568d5 review: apply round-2 review fixes for 70f9f85e
+```
+
+### What landed
+
+**Library (`arsceneview/`)** — first-class ARCore Recording / Playback:
+- [`ARRecorder`](arsceneview/src/main/java/io/github/sceneview/ar/recording/ARRecorder.kt) + `rememberARRecorder()` Compose helper. State machine `IDLE | RECORDING | ERROR`. Auto-stop on dispose. `RecordingConfig` uses `setMp4DatasetFilePath` + `setAutoStopOnPause(true)` + optional `setRecordingRotation`. Gates `start()` on `session.playbackStatus == NONE`. Swallowed `RecordingFailedException` lands in `state = ERROR` + `errorMessage`.
+- [`ARSceneView(playbackDataset: File? = null)`](arsceneview/src/main/java/io/github/sceneview/ar/ARScene.kt) — when non-null, ARCore replays the MP4 instead of using the live camera. Snapshotted at first composition; switching files requires `key(playbackDataset) { ARSceneView(...) }`. `PlaybackFailedException` routes to `onSessionFailed`.
+- [`ARRecorderTest`](arsceneview/src/test/java/io/github/sceneview/ar/recording/ARRecorderTest.kt) — 21 JVM tests, Robolectric + FakeSession + `ShadowRecordingConfig`. State machine, pre-conditions, ARCore exception paths, RecordingConfig builder calls all pinned. Two surprising current contracts pinned: `stop()` does NOT internally guard the IDLE state, and `attach(newSession)` mid-RECORDING is a pure pointer swap (orphan recording leak — documented in user docs).
+
+**Demos (`samples/android-demo/`)** — 6 new AR demos (registry now 13 AR entries):
+- [`ARRecordPlaybackDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARRecordPlaybackDemo.kt) — 3-mode (LIVE / RECORD / PLAYBACK), keyed remount on switch, recordings under `getExternalFilesDir("ar-recordings")`.
+- [`ARDepthOcclusionDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARDepthOcclusionDemo.kt) — `Config.DepthMode.AUTOMATIC` toggle + device-not-supported banner. Activates the depth-aware occlusion material that was already plumbed in `ARCameraStream` but never surfaced.
+- [`ARInstantPlacementDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARInstantPlacementDemo.kt) — `Config.InstantPlacementMode.LOCAL_Y_UP`. Tracking-method badges flip from "Approximating" to "Tracked" once promoted.
+- [`ARTerrainAnchorDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARTerrainAnchorDemo.kt) — drops a model at the camera's lat/lng on Google's terrain altitude. Earth.cameraGeospatialPose driven, gates on both `TrackingState.TRACKING` and `Earth.EarthState.ENABLED`.
+- [`ARRooftopAnchorDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARRooftopAnchorDemo.kt) — same pattern, snaps to building rooftops. RooftopAnchorState has no `TASK_IN_PROGRESS` (uses NONE as in-flight placeholder).
+- [`ARImageStabilizationDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt) — `Config.ImageStabilizationMode.EIS` toggle. Back-camera only (verified via ARCore docs). Gates on `Session.isImageStabilizationModeSupported`.
+
+**Docs** — 5 surfaces:
+- [`llms.txt`](llms.txt) — new "AR Recording & Playback" section (record + replay + auto-stop snippet) + "AR Image Stabilization (EIS)" section. Imports listed explicitly so AI generators can copy-paste compilably.
+- [`docs/docs/ar-recording.md`](docs/docs/ar-recording.md) — new mkdocs page under Guides, sister to Integrations / Testing.
+- [`samples/android-demo/RECORDING_PLAYBACK.md`](samples/android-demo/RECORDING_PLAYBACK.md) — feature guide for demo users, mirrors STREETSCAPE_SETUP.md tone.
+- [`README.md`](README.md) — "Record & Replay AR sessions" sub-section under Developer tools, sister to Rerun viewer.
+- [`CLAUDE.md`](CLAUDE.md) — `rememberARRecorder()` mentioned in "When writing any SceneView code".
+- [`CHANGELOG.md`](CHANGELOG.md) — Unreleased section enumerating all six demos + lib feature + tests + docs.
+
+### Quality gate
+- **14 reviews indépendantes Opus** (6 + 5 + 3) across 3 feature commits → **23 fixes applied**, **0 BLOCKING dur** at the end. Pattern: 5–7 parallel Opus agents → 4-bucket triage (BLOCKING / MAJOR / MINOR / NIT / OK), per-finding `file:line — finding — why it matters — fix`.
+- Build `:samples:android-demo:compileDebugKotlin` + tests `:arsceneview:testDebugUnitTest` (21 new + 88 existing = 109 green) at every push.
+
+### GitHub issues
+- ✅ [#875](https://github.com/sceneview/sceneview/issues/875) closed — JVM tests for ARRecorder
+- ✅ [#877](https://github.com/sceneview/sceneview/issues/877) closed — Recording/Playback documented on mkdocs + README + sample-app
+- 🟡 [#876](https://github.com/sceneview/sceneview/issues/876) **OPEN** — refactor `ARRecorder.attach()/start(file)` to a stateless `recordFrame(session, frame)` pattern matching `RerunBridge`, plus a dedicated `onPlaybackFailed: ((Exception) -> Unit)?` callback on `ARSceneView` (currently routes to `onSessionFailed` which has the wrong KDoc). Breaks the public API → bundle in v4.1 or use deprecation hygiene. Design discussion required.
+
+### ARCore features still NOT exposed by `arsceneview/`
+For the next session interested in continuing the coverage sprint:
+- **Scene Semantics** (`Config.SemanticMode`) — sky/ground/building/person segmentation. XE Pass devices only. Big visual unlock (sky replacement, etc.).
+- **Mesh API** — depth → polygonal mesh of the scene for realistic physics collisions against real-world geometry. Would synergize with [`PhysicsDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/PhysicsDemo.kt).
+- **AugmentedImageDatabase build at runtime** — current support is read-only (`Config.augmentedImageDatabase = ...`). Adding `Config.addAugmentedImage(session, name, bitmap, widthInMeters)` exists in `arsceneview/src/main/java/io/github/sceneview/ar/arcore/ArSession.kt:182` but no demo uses it; runtime database building (e.g. user-supplied images, e-commerce CMS) is the next step.
+
+### What I would NOT recommend doing
+- Re-running the demos sweep without first stress-testing the new ones on a real device. The build passes and the 21 JVM tests pass, but there is no on-device validation in this session — emulator alone is insufficient for AR demos. **Next session should run the 6 new demos on a Pixel 7a / Pixel 9 before claiming coverage is "done"**.
+- Bumping the version to 4.1 just because of #876. The current 4.0.x line is stable; the API refactor is a v4.1 candidate, not a forcing function.
+
+### Stale handoff fact corrected
+`.claude/handoff.md`'s previous "ARCore non encore exposé par SceneView" list (in `eloquent-panini`'s session) included Recording/Playback and EIS — both shipped in this session, so those bullets are now obsolete. Scene Semantics, Mesh API, and runtime AugmentedImageDatabase building remain.
+
+---
+
 ## SESSION 2026-05-06 — eloquent-panini — Pixel 9 review RESCUE + v4.0.4/5/6 SHIPPED + ARCore Cloud key wired
 
 ### TL;DR
