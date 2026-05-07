@@ -165,12 +165,25 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-07, session bold-villani-42902e — Claude Code plugin marketplace SHIPPED + 4-agent review fixes + brand-scope tightening)
+### Current state (last updated: 2026-05-08, session bold-villani-42902e — plugin marketplace + brand-scope cleanup + portfolio scrub)
 
-- 🚀 **Claude Code plugin marketplace LIVE** in dedicated repo [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace) — single plugin, scoped strictly to the SceneView SDK product:
+- 🚀 **Claude Code plugin marketplace LIVE** at [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace), single plugin scoped strictly to SceneView:
   - **sceneview** v4.0.11 (Apache-2.0) — `sceneview-mcp` + 11 namespaced contributor commands + cross-platform reminder hooks
-- Install: `/plugin marketplace add sceneview/claude-marketplace` then `/plugin install sceneview@sceneview`
-- ⛔ Strict rule recorded in memory `feedback_sceneview_org_strict`: the `sceneview` GitHub org hosts ONLY SceneView-SDK-related artefacts.
+  - Install: `/plugin marketplace add sceneview/claude-marketplace` then `/plugin install sceneview@sceneview`
+- ⛔ **Strict rule** recorded in memory `feedback_sceneview_org_strict`: the `sceneview` GitHub org hosts ONLY SceneView-SDK artefacts. Personal-portfolio MCPs live elsewhere.
+- 🔒 **Big repo scrub** committed in this session:
+  - Removed off-topic personal-portfolio code from public sceneview/sceneview repo: `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy / submission docs that listed every personal MCP
+  - Scrubbed in-place mentions in `CLAUDE.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/docs/ai-context.md`, `.gitignore`
+  - Untracked `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md`, `.dart_tool/`, `qa_log.txt` — these were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references
+  - Verified `git ls-files | grep -iE 'urssaf|impôts|service-public|french-admin'` returns **0 hits** in HEAD
+  - `npm hub-mcp` deprecated with a "project discontinued — use individual MCPs directly" message; local backups deleted
+- ⚠️ **Past git history** still contains the leaked strings + the moved-out files. A `git filter-repo` session is the next-up follow-up — must coordinate with the 9 active worktrees before force-push.
+
+### Followups for next session
+
+1. **filter-repo run** — scrub `octopuscommunity`, `AjaxMusic@gmail`, `thomasgorisse` (lowercase) from the entire git history of `sceneview/sceneview`. See plan in `~/Projects/profile-private/plans/filter-repo-plan.md`.
+2. **Submit Anthropic marketplace** — guide at `~/Projects/profile-private/marketplace-submissions/2026-05-07-anthropic-marketplace-submission.md` (Thomas clicks through the in-app form).
+3. **Reddit + HN posts** — drafts at `~/Projects/profile-private/announcements/` (single-plugin framing, ready to post when Thomas is ready).
 - 4-agent independent Opus review caught 6 BLOCKING + 5 MAJOR before public announcement: dead-code hooks (matcher syntax invalid, validator missed it), license mismatch (Apache-2.0 vs MIT), 1.4 GB monolithic clone (split to dedicated repo to fix), `/review` `/test` namespace collision with built-in skills, version drift (plugin pinned 4.0.9 vs npm @4.0.11), DL/mo numbers gonflés in announcement drafts. All BLOCKING fixed in [`a88f7f8c`](https://github.com/sceneview/sceneview/commit/a88f7f8c) + the marketplace migration.
 - 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
 - Side effect: enriched `.claude/commands/*.md` with YAML frontmatter (`description:`) so `/help` now shows one-line summaries for every contributor command.
