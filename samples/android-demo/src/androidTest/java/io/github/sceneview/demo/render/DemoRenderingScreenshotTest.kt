@@ -75,6 +75,71 @@ class DemoRenderingScreenshotTest {
         captureAndCompare(demoSlug = "lighting", goldenName = "lighting_default", settleSeconds = 3)
     }
 
+    @Test
+    fun modelViewerDemo_default_state() {
+        captureAndCompare(demoSlug = "model-viewer", goldenName = "modelviewer_default", settleSeconds = 4)
+    }
+
+    @Test
+    fun textDemo_default_state() {
+        captureAndCompare(demoSlug = "text", goldenName = "text_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun imageDemo_default_state() {
+        captureAndCompare(demoSlug = "image", goldenName = "image_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun linesPathsDemo_default_state() {
+        captureAndCompare(demoSlug = "lines-paths", goldenName = "linespaths_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun shapeDemo_default_state() {
+        captureAndCompare(demoSlug = "shape", goldenName = "shape_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun collisionDemo_default_state() {
+        captureAndCompare(demoSlug = "collision", goldenName = "collision_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun fogDemo_default_state() {
+        captureAndCompare(demoSlug = "fog", goldenName = "fog_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun reflectionProbesDemo_default_state() {
+        captureAndCompare(demoSlug = "reflection-probes", goldenName = "reflectionprobes_default", settleSeconds = 4)
+    }
+
+    @Test
+    fun environmentDemo_default_state() {
+        captureAndCompare(demoSlug = "environment", goldenName = "environment_default", settleSeconds = 5)
+    }
+
+    @Test
+    fun billboardDemo_default_state() {
+        captureAndCompare(demoSlug = "billboard", goldenName = "billboard_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun viewNodeDemo_default_state() {
+        captureAndCompare(demoSlug = "view-node", goldenName = "viewnode_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun debugOverlayDemo_default_state() {
+        captureAndCompare(demoSlug = "debug-overlay", goldenName = "debugoverlay_default", settleSeconds = 3)
+    }
+
+    @Test
+    fun gestureEditingDemo_default_state() {
+        captureAndCompare(demoSlug = "gesture-editing", goldenName = "gestureediting_default", settleSeconds = 3)
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     /**
@@ -86,6 +151,12 @@ class DemoRenderingScreenshotTest {
     private fun captureAndCompare(demoSlug: String, goldenName: String, settleSeconds: Int) {
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+
+        // Wake + unlock before each test — the device's screen-off timeout can fire
+        // between tests in a long suite, leaving the demo running but the screen black.
+        // Capturing then yields a screenshot of the lockscreen, not the demo.
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
 
         // Launch the demo with qa_mode = true so spin loops, scene rotation, and
         // cinematic camera scripts freeze at deterministic values
