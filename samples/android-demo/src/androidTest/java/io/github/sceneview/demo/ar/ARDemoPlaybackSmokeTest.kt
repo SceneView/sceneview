@@ -163,9 +163,13 @@ class ARDemoPlaybackSmokeTest {
     }
 
     private fun saveToDeviceForReview(bitmap: Bitmap, name: String): File {
-        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
-        val dir = ctx.getExternalFilesDir("ar-render-output")!!.also { it.mkdirs() }
-        val file = File(dir, "$name.png")
+        // Write to a path that survives AGP's post-test uninstall: the public
+        // Downloads/SceneView/test-captures directory. The target app's
+        // `getExternalFilesDir(...)` would be wiped along with the app data when
+        // `connectedDebugAndroidTest` cleans up, leaving the contributor with no way
+        // to pull the first-run capture or the diff image.
+        device.executeShellCommand("mkdir -p /sdcard/Download/SceneView/test-captures")
+        val file = File("/sdcard/Download/SceneView/test-captures/$name.png")
         FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         return file
     }
