@@ -1,0 +1,13 @@
+{
+  "name": "realestate-3d",
+  "version": "2.2.0",
+  "description": "MCP for real estate agents — AI-generated property descriptions (EN/FR), pricing analysis, floor plans, virtual tours, and 3D listings. Powered by realestate-mcp.",
+  "author": {
+    "name": "SceneView",
+    "url": "https://github.com/sceneview-tools"
+  },
+  "homepage": "https://www.npmjs.com/package/realestate-mcp",
+  "repository": "https://github.com/sceneview-tools/realestate-mcp",
+  "license": "MIT",
+  "keywords": ["realestate", "property", "tours", "floorplans", "3d", "ar", "mcp"]
+}

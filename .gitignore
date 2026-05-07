@@ -12,6 +12,7 @@ Desktop.ini
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .mcp.json
+!plugins/*/.mcp.json
 
 # ── Gradle ────────────────────────────────────────────────
 /local.properties

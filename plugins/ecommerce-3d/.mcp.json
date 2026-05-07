@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ecommerce-3d": {
+      "command": "npx",
+      "args": ["-y", "ecommerce-3d-mcp"]
+    }
+  }
+}

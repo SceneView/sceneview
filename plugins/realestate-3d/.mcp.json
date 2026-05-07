@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "realestate": {
+      "command": "npx",
+      "args": ["-y", "realestate-mcp"]
+    }
+  }
+}

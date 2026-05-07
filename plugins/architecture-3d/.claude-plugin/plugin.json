@@ -1,0 +1,13 @@
+{
+  "name": "architecture-3d",
+  "version": "2.1.0",
+  "description": "MCP for architects and interior designers — 3D concepts, floor plans, material palettes, lighting studies, AR site previews. Powered by architecture-mcp.",
+  "author": {
+    "name": "SceneView",
+    "url": "https://github.com/sceneview-tools"
+  },
+  "homepage": "https://www.npmjs.com/package/architecture-mcp",
+  "repository": "https://github.com/sceneview-tools/architecture-mcp",
+  "license": "MIT",
+  "keywords": ["architecture", "interior", "design", "3d", "ar", "floorplans", "lighting", "materials", "mcp"]
+}

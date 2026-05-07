@@ -1,0 +1,53 @@
+{
+  "name": "sceneview",
+  "owner": {
+    "name": "SceneView",
+    "url": "https://github.com/sceneview"
+  },
+  "metadata": {
+    "description": "AI-first plugins for building 3D, AR, and vertical apps. SceneView SDK toolkit plus high-traffic API-bridge MCPs (real-estate, french admin, e-commerce 3D, architecture).",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "sceneview",
+      "source": "./plugins/sceneview",
+      "description": "AI-first toolkit for building 3D and AR apps with SceneView (Android, iOS, Web). Bundles the sceneview-mcp server + 11 contributor commands.",
+      "version": "4.0.9",
+      "category": "development",
+      "tags": ["3d", "ar", "android", "ios", "web", "filament", "realitykit", "jetpack-compose", "swiftui"]
+    },
+    {
+      "name": "realestate-3d",
+      "source": "./plugins/realestate-3d",
+      "description": "MCP for AI-generated 3D real-estate listings, virtual tours, and floorplans. Connects Claude to the realestate-mcp toolkit.",
+      "version": "2.2.0",
+      "category": "vertical",
+      "tags": ["realestate", "3d", "tours", "floorplans", "mcp"]
+    },
+    {
+      "name": "french-admin",
+      "source": "./plugins/french-admin",
+      "description": "MCP for French administrative paperwork — Service-Public.fr lookups, RIB/SIRET/IBAN validation, CAF/Pôle Emploi/Impôts workflows.",
+      "version": "2.2.1",
+      "category": "vertical",
+      "tags": ["france", "admin", "service-public", "caf", "impots", "mcp"]
+    },
+    {
+      "name": "ecommerce-3d",
+      "source": "./plugins/ecommerce-3d",
+      "description": "MCP for AI-generated 3D product viewers and AR try-on for e-commerce. Connects Claude to the ecommerce-3d-mcp toolkit.",
+      "version": "2.1.0",
+      "category": "vertical",
+      "tags": ["ecommerce", "3d", "ar", "product-viewer", "shopify", "mcp"]
+    },
+    {
+      "name": "architecture-3d",
+      "source": "./plugins/architecture-3d",
+      "description": "MCP for architectural visualization — building models, lighting studies, AR site previews. Connects Claude to the architecture-mcp toolkit.",
+      "version": "2.1.0",
+      "category": "vertical",
+      "tags": ["architecture", "3d", "ar", "visualization", "buildings", "mcp"]
+    }
+  ]
+}
