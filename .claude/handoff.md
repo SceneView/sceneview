@@ -4,12 +4,52 @@
 
 ---
 
-## SESSION 2026-05-07 — exciting-napier-1c8c70 — v4.0.8 cut + 3 demos rebuilt + #863 closed
+## SESSION 2026-05-07 — exciting-napier-1c8c70 — v4.0.8 SHIPPED end-to-end + 5-agent review + Play Store fix + RN/Flutter parity
 
 ### TL;DR
 
-User asked for "go, fais tout" — chained 7 work items in one session, all green.
-**v4.0.8 tagged + pushed** ([commit `13f8e0a4`](https://github.com/sceneview/sceneview/commit/13f8e0a4), [tag `v4.0.8`](https://github.com/sceneview/sceneview/releases/tag/v4.0.8)). `release.yml` workflow [25485621888](https://github.com/sceneview/sceneview/actions/runs/25485621888) running at session close.
+Marathon session: v4.0.8 cut + fully published + 5 parallel Opus agent reviews + 13 findings triaged + all BLOCKING/MAJOR/MINOR fixed + Play Store race fixed + cross-platform unlit parity for RN/Flutter. **6 commits sur main**, **all stores deployed and verified**, **0 BLOCKING ouvert** au close.
+
+### What's actually published (verified)
+
+- **Maven Central** `sceneview / arsceneview / sceneview-core 4.0.8` — `<latest>4.0.8</latest>` confirmed via repo1.maven.org
+- **npm** `sceneview-mcp@4.0.10` on `@latest`
+- **npm** `sceneview-web@4.0.8`
+- **GitHub Release** [v4.0.8](https://github.com/sceneview/sceneview/releases/tag/v4.0.8) — body now contains the full CHANGELOG narrative (was empty initially, fixed mid-session)
+- **API Docs** Dokka deployed
+- **App Store iOS** v4.0.8 build uploaded → Apple review in progress
+- **Play Store Android** v4.0.8 production track deployed → Google review in progress
+- **Play Store internal track** ✅ on the second push (the `max-parallel: 1` fix worked first try)
+
+### 6 commits on main
+
+```
+13f8e0a4 chore(release): v4.0.8 — unlit material + 3 demo refresh + GLB no-TANGENTS test
+829faeb5 chore(handoff): document v4.0.8 cut session — exciting-napier-1c8c70
+f2829214 chore: Play Store race fix + cross-platform unlit parity (Flutter / RN)
+04e75ad5 review: apply 5-agent independent review fixes — 2 BLOCKING + 4 follow-ups
++ this handoff update
+```
+
+### Multi-agent review pattern (5 Opus agents in parallel — worth reusing)
+
+Launched 5 `general-purpose` agents with `model: opus`, each with a self-contained prompt + explicit file pointers + 4-bucket triage instructions. Round trip ~100 seconds total (vs ~10 min sequential). 13 findings returned, triaged as:
+
+| Bucket | Count | Source |
+|---|---|---|
+| 🔴 BLOCKING | 2 | iOS pbxproj MARKETING_VERSION still 4.0.7 (sync-versions blind spot); ARFaceDemo opaque overlay hides user's face |
+| 🟡 MAJOR | 4 | GitHub Release body empty; NoTangents brittle substring; AnimationDemo freeManipulator re-anchor (deferred OK); 1 false alarm (mcp llms-txt count miscount) |
+| 🟢 MINOR | 5 | RN Pair alloc + getBoolean type-safety; ARFaceDemo KDoc drift × 2; AnimationDemo main-thread comment |
+| ⚪ NIT | 4 | wrap drift, comment wording, etc. — all skipped |
+
+**All BLOCKING + MAJOR + MINOR rentables shipped in [`04e75ad5`](https://github.com/sceneview/sceneview/commit/04e75ad5)**. `samples/ios-demo/SceneViewDemo.xcodeproj/project.pbxproj` MARKETING_VERSION is now covered by `sync-versions.sh` (29 checks, was 28).
+
+### Open issues at session close (4)
+
+- [#876](https://github.com/sceneview/sceneview/issues/876) — ARRecorder stateless `logFrame()` API + `onPlaybackFailed` callback (breaks public API → bundle in v4.1)
+- [#874](https://github.com/sceneview/sceneview/issues/874) — Frame-deferred destroy queue for ImageNode/ViewNode textures (perf, not urgent)
+- [#873](https://github.com/sceneview/sceneview/issues/873) — Cache SurfaceOrientation in AugmentedFaceNode.computeTangents (verdict comment posted: low priority without device profiling)
+- [#878](https://github.com/sceneview/sceneview/issues/878) — **NEW this session** — perf: skip `computeTangents()` when AugmentedFaceNode material is unlit. Filed from Agent 2's "future work" suggestion. Could close #873 as won't-fix if #878 lands and unlit becomes the dominant path.
 
 ### What landed on main
 
@@ -38,17 +78,16 @@ User asked for "go, fais tout" — chained 7 work items in one session, all gree
 
 ### Pending / passive monitoring
 
-- **release.yml [25485621888](https://github.com/sceneview/sceneview/actions/runs/25485621888)** — running at session close. 4 jobs (Publish MCP to npm, Maven Central, API docs, sceneview-web). Maven Central typical 5–7 min. Verify with `npm view sceneview-mcp version` (expect 4.0.10), `npm view sceneview-web version` (expect 4.0.8), Maven `<latest>4.0.8</latest>`.
-- **Stores** — Play Store + App Store deploys triggered by tag push. Typical 1-6 h Play, 1-3 days Apple.
-- **Live website** — github.io repo CDN cache propagating; will show 4.0.8 within ~10 min.
+- **App Store iOS** v4.0.8 build 364 — Apple review typical 1-3 days
+- **Play Store Android** v4.0.8 production — Google review typical 1-6 h
+- **Live website** — github.io CDN propagated to 4.0.8
 
-### Open issues at session close (3)
+### Quality wins from this session
 
-- [#876](https://github.com/sceneview/sceneview/issues/876) — ARRecorder stateless `logFrame()` API + `onPlaybackFailed` callback (breaks public API → bundle in v4.1)
-- [#874](https://github.com/sceneview/sceneview/issues/874) — Frame-deferred destroy queue for ImageNode/ViewNode textures (perf / leak fix, not urgent)
-- [#873](https://github.com/sceneview/sceneview/issues/873) — Cache SurfaceOrientation in AugmentedFaceNode.computeTangents (perf, ~30 Hz JNI alloc)
-
-[#863](https://github.com/sceneview/sceneview/issues/863) auto-closed by commit message.
+- **Play Store internal-track race** (`max-parallel: 1` in matrix) — fixed in `f2829214`, **proven on the next push** (commit `04e75ad5` deploy succeeded both internal AND production tracks for the first time since v4.0.5).
+- **iOS pbxproj added to sync-versions.sh** — was a blind spot for 8+ releases; can never silently regress again.
+- **NoTangents test hardened** — substring match → regex anchored to attributes block + new BIN length test (5 → 6 tests).
+- **sceneview-mcp@4.0.10 published with v4.0.8 llms.txt** — closes the gap from v4.0.7 where `npx sceneview-mcp` users were getting stale ARCore Cloud key docs.
 
 ### What I would NOT do next session
 

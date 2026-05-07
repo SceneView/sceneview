@@ -164,14 +164,23 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.8 cut)
+### Current state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.8 SHIPPED + 5-agent review + Play Store fix)
 
-- 🚀 **v4.0.8 tagged + pushed** ([commit `13f8e0a4`](https://github.com/sceneview/sceneview/commit/13f8e0a4)). `release.yml` [run 25485621888](https://github.com/sceneview/sceneview/actions/runs/25485621888) running at session close — Maven Central + npm `sceneview-web@4.0.8` + npm `sceneview-mcp@4.0.10` + Dokka + GitHub Release.
-- ✅ **3 demos reconstructed** (lost in previous session's worktree deletion): AnimationDemo (IBL slider + HERO eyes-level), GeometryDemo (scrollable + spin + Metallic/Roughness sliders), MultiModelDemo (refonte → tabletop living-room with `studio_warm_2k.hdr`).
-- ✅ **ARFaceDemo migrated to `createUnlitColorInstance`** — eliminates the long-standing front-camera invisible-mesh risk (no more ENVIRONMENTAL_HDR dependency).
-- ✅ **Issue [#863](https://github.com/sceneview/sceneview/issues/863) closed** — `NoTangentsGlbContractTest` (5 JVM tests, pure JUnit + ByteBuffer, no JSON lib dep) pins the bug-input GLB shape that gltfio's auto-tangent path must continue to handle.
-- ✅ **All quality gates green**: 2 lib + 1 demo compile, 5 new + existing JVM tests, assembleDebug, MCP 2646 tests, sync-versions clean.
-- 🟡 **3 issues open** (all enhancements, no urgency): #876 (ARRecorder stateless API → v4.1 breaking), #874 (ImageNode/ViewNode frame-deferred destroy queue), #873 (cache SurfaceOrientation perf).
+- 🚀 **v4.0.8 fully published end-to-end** (verified):
+  - Maven Central `sceneview/arsceneview/sceneview-core 4.0.8` ✅ (`<latest>4.0.8</latest>`)
+  - npm `sceneview-mcp@4.0.10` ✅ on `@latest`
+  - npm `sceneview-web@4.0.8` ✅
+  - GitHub Release [v4.0.8](https://github.com/sceneview/sceneview/releases/tag/v4.0.8) ✅ — body contains the full CHANGELOG narrative
+  - Dokka API docs ✅
+  - App Store iOS v4.0.8 build 364 ✅ (Apple review in progress)
+  - Play Store Android v4.0.8 production track ✅ (Google review in progress)
+- ✅ **3 demos reconstructed** + ARFaceDemo migrated to `createUnlitColorInstance(PrimaryOverlay)` (translucent overlay, fixed by Agent 2 review)
+- ✅ **Issue [#863](https://github.com/sceneview/sceneview/issues/863) closed** — `NoTangentsGlbContractTest` (6 JVM tests, regex-anchored after review hardening)
+- ✅ **5-agent independent review** (Opus, parallel) → 13 findings → all BLOCKING + MAJOR + MINOR shipped in [`04e75ad5`](https://github.com/sceneview/sceneview/commit/04e75ad5)
+- ✅ **Play Store race fix** (`max-parallel: 1`) — proven on next push, both internal + production tracks succeed for first time since v4.0.5
+- ✅ **iOS pbxproj added to sync-versions.sh** — sync-versions now 29 checks, prevents the regression that hit this session
+- ✅ **Cross-platform unlit parity** — Flutter / React Native bridges now expose `unlit: bool` (RN with type-safe ReadableType.Boolean check)
+- 🟡 **4 issues open** (all enhancements): #876 (ARRecorder stateless API → v4.1 breaking), #874 (ImageNode/ViewNode destroy queue), #873 (cache SurfaceOrientation perf — verdict comment posted), **NEW [#878](https://github.com/sceneview/sceneview/issues/878)** (skip computeTangents when AugmentedFaceNode material is unlit — could close #873 as won't-fix if landed)
 
 ### Previous state (last updated: 2026-05-06, session wizardly-elbakyan — ARCore feature coverage sprint)
 
