@@ -4,6 +4,42 @@
 
 ---
 
+## SESSION 2026-05-07 — objective-proskuriakova-ca1b73 — Rescue d'une session tuée par image >2000px
+
+### TL;DR
+Session précédente `b518a6bd` ("Test Android 3D samples on emulator", branch `claude/nostalgic-solomon-91f7e5`) **tuée à mi-parcours** par l'erreur API `image dimension exceeds 2000px` (5/24 demos validées). Worktree **supprimé entre temps** par une autre session de cleanup avant qu'on ait pu git stash → tout le travail non-commité a failli être perdu.
+
+**Récupéré et pushé sur main** : commit [`cbf01d3b`](https://github.com/sceneview/sceneview/commit/cbf01d3b) `fix(sceneview): cameraManipulator swap reactivity + LightingDemo wall + source marker`. 2 fichiers reconstruits depuis les diffs visibles dans la rescue session.
+
+### Ce qui est sauvé sur main
+1. **`sceneview/Scene.kt`** — wrap `cameraManipulator` dans `rememberUpdatedState` pour que la frame loop lise via state ref. Permet aux callers de swap manipulators à runtime (AnimationDemo scripted ↔ Free hand-off, mode pickers custom) sans que `getTransform()` reste figé sur l'ancien manipulator. Diff complet visible → reconstruction à 100%.
+2. **`samples/android-demo/.../LightingDemo.kt`** — backdrop wall 3×2.4 m + sphere marker au point de lumière + position de lumière fixée à (0, 1.4, 1.0) + cône spot resserré `(0.05, 0.2)` falloff 4 m + point falloff 2.5 m. Permet de différencier visuellement directional/point/spot. Diff complet visible → reconstruction à ~100%.
+
+### ⚠️ Ce qui est PERDU (worktree supprimé avant stash)
+3. **`samples/android-demo/.../AnimationDemo.kt`** — diff partiel uniquement : ajout de `iblIntensity` slider (0–10 000 lux) en remplacement du hard-coded 5_000f, HERO orbit passé de yHeight 0.15 → 0.55 (eyes-level vs monument low-angle), Spacer + Slider UI avant la fin. **Le reste du diff était tronqué (head -60).**
+4. **`samples/android-demo/.../GeometryDemo.kt`** — diff partiel : import `horizontalScroll`, `rememberScrollState`, `LaunchedEffect`, `mutableFloatStateOf`, `withFrameNanos`, `Rotation`, `setMetallic`, `setRoughness`. Suggère scrollable shape row + animated rotation + per-shape metallic/roughness sliders. **Diff coupé à head -40.**
+5. **`samples/android-demo/.../MultiModelDemo.kt`** — diff partiel : suppression Slider/mutableFloatStateOf, ajout `rememberHDREnvironment`, `rememberEnvironment`. Suggère refonte vers une scène living-room avec 4 models + dusk HDR (au lieu d'un layout générique multi-models). **Diff coupé à head -40.**
+
+À refaire from scratch. Commit msg `cbf01d3b` documente clairement.
+
+### Bug Anthropic reporté
+Pas créé une 11e issue (anti-burst). Comment posté sur l'issue la plus actionnable : [claude-code#55040 commentaire](https://github.com/anthropics/claude-code/issues/55040#issuecomment-4392325792) avec scénario QA Android, HiDPI Pixel 9, et l'argument clé "le vrai problème c'est la perte du contexte conversationnel, pas l'API error en elle-même". Compte `thomas-gorisse` (pas le profil empire suspendu).
+
+### Règle dure ajoutée (MEMORY)
+[`feedback_no_oversized_screenshots.md`](../../.claude/projects/-Users-thomasgorisse-Projects-sceneview/memory/feedback_no_oversized_screenshots.md) — ⛔⛔⛔ JAMAIS d'image >1800px en session, plafond max 5 images/session, downscale via `sips -Z 1800` ou `screenrecord --size 1280x720` obligatoire. Indexée dans MEMORY.md.
+
+### Verifications passed
+- `./gradlew :sceneview:compileReleaseKotlin` ✅
+- `./gradlew :samples:android-demo:compileDebugKotlin` ✅
+- Push fast-forward `8b768fe1..cbf01d3b` sur main ✅
+
+### Cleanup post-session
+- Worktree temp `/tmp/sceneview-recover-2000px` à supprimer (`git worktree remove /tmp/sceneview-recover-2000px`)
+- Branche locale `claude/recover-2000px-loss` à effacer
+- Branche orpheline `claude/nostalgic-solomon-91f7e5` (HEAD `d632d75c`, plus de worktree, jamais commité) → suppression safe puisque le travail est récupéré dans `cbf01d3b`
+
+---
+
 ## SESSION 2026-05-07 — nice-chaum-95b7ea — `createUnlitColorInstance` + cross-platform parity
 
 ### TL;DR
