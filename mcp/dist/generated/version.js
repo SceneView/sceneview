@@ -2,4 +2,4 @@
 // Snapshots the package.json "version" field at build time so that
 // the MCP server and telemetry report the actual published version
 // instead of a stale hardcoded constant.
-export const PACKAGE_VERSION = "4.0.10";
+export const PACKAGE_VERSION = "4.0.11";

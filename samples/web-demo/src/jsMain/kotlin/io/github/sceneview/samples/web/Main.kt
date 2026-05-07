@@ -26,7 +26,7 @@ import org.w3c.dom.HTMLInputElement
  * Uses Filament.js (WASM) — same rendering engine as SceneView Android.
  */
 
-private const val SDK_VERSION = "4.0.8"
+private const val SDK_VERSION = "4.0.9"
 
 /** Sketchfab public API endpoint for searching downloadable models. */
 private const val SKETCHFAB_API =

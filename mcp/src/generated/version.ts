@@ -3,4 +3,4 @@
 // the MCP server and telemetry report the actual published version
 // instead of a stale hardcoded constant.
 
-export const PACKAGE_VERSION = "4.0.10" as const;
+export const PACKAGE_VERSION = "4.0.11" as const;

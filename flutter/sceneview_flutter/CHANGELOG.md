@@ -1,4 +1,4 @@
-## 4.0.8
+## 4.0.9
 
 - Version alignment with SceneView v4.0.7 (Rerun Save & Share, scan-to-open deep-links, Play Store canary CI).
 

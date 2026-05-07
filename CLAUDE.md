@@ -60,8 +60,8 @@ To set up: `npm install @google/stitch-sdk`, then add the Stitch MCP server in C
 
 ## When writing any SceneView code
 
-- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.0.8`)
-- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.0.8`)
+- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.0.9`)
+- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.0.9`)
 - Declare nodes as composables inside the trailing content block — not imperatively
 - Load models with `rememberModelInstance(modelLoader, "models/file.glb")` — returns `null`
   while loading, always handle the null case
@@ -164,16 +164,16 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.8 SHIPPED + 5-agent review + Play Store fix)
+### Current state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.9 SHIPPED + 5-agent review + Play Store fix)
 
-- 🚀 **v4.0.8 fully published end-to-end** (verified):
+- 🚀 **v4.0.9 fully published end-to-end** (verified):
   - Maven Central `sceneview/arsceneview/sceneview-core 4.0.8` ✅ (`<latest>4.0.8</latest>`)
   - npm `sceneview-mcp@4.0.10` ✅ on `@latest`
   - npm `sceneview-web@4.0.8` ✅
-  - GitHub Release [v4.0.8](https://github.com/sceneview/sceneview/releases/tag/v4.0.8) ✅ — body contains the full CHANGELOG narrative
+  - GitHub Release [v4.0.9](https://github.com/sceneview/sceneview/releases/tag/v4.0.9) ✅ — body contains the full CHANGELOG narrative
   - Dokka API docs ✅
-  - App Store iOS v4.0.8 build 364 ✅ (Apple review in progress)
-  - Play Store Android v4.0.8 production track ✅ (Google review in progress)
+  - App Store iOS v4.0.9 build 364 ✅ (Apple review in progress)
+  - Play Store Android v4.0.9 production track ✅ (Google review in progress)
 - ✅ **3 demos reconstructed** + ARFaceDemo migrated to `createUnlitColorInstance(PrimaryOverlay)` (translucent overlay, fixed by Agent 2 review)
 - ✅ **Issue [#863](https://github.com/sceneview/sceneview/issues/863) closed** — `NoTangentsGlbContractTest` (6 JVM tests, regex-anchored after review hardening)
 - ✅ **5-agent independent review** (Opus, parallel) → 13 findings → all BLOCKING + MAJOR + MINOR shipped in [`04e75ad5`](https://github.com/sceneview/sceneview/commit/04e75ad5)

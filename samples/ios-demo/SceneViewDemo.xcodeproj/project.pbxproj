@@ -539,7 +539,7 @@
 				CODE_SIGN_ENTITLEMENTS = SceneViewDemo/SceneViewDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 364;
+				CURRENT_PROJECT_VERSION = 365;
 				DEVELOPMENT_TEAM = 5G3DZ3TH45;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SceneViewDemo/Info.plist;
@@ -551,7 +551,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 4.0.8;
+				MARKETING_VERSION = 4.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -572,7 +572,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Automatic;
 				"CODE_SIGN_STYLE[sdk=iphoneos*]" = Manual;
-				CURRENT_PROJECT_VERSION = 364;
+				CURRENT_PROJECT_VERSION = 365;
 				DEVELOPMENT_TEAM = 5G3DZ3TH45;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SceneViewDemo/Info.plist;
@@ -584,7 +584,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 4.0.8;
+				MARKETING_VERSION = 4.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "SceneView Demo App Store";
