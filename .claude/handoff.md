@@ -4,6 +4,42 @@
 
 ---
 
+## SESSION 2026-05-07 (cont.) — `/rerun/` QR landing + cross-platform Save & Share copy fix (elegant-wright-b9cd6f)
+
+### TL;DR
+
+Two commits on main: the [website-static/rerun/](website-static/rerun/index.html) empty state (when the user lands without `?url=` / `?r=`) was a confusing dead-end ("Drop your .rrd recording here" with no working drop handler). Replaced with a two-panel layout: **QR code → `sceneview.github.io/open?demo=ar-rerun`** (reuses the existing scan-to-open flow with Play/App Store fallback) on the left, **functional drop-zone + URL field** on the right. Mobile breakpoint at 720 px swaps the QR for a primary CTA button. Then synced the Save & Share dialogs (Android + iOS) and 5 doc surfaces so users no longer have to "re-host on R2/GitHub release/gist" before viewing — for local inspection they can drop the `.rrd` directly onto the page.
+
+### Commits pushed to main
+
+- [`347693ae`](https://github.com/sceneview/sceneview/commit/347693ae) `feat(rerun): QR code + scan-to-open deep-link on /rerun/ landing`
+  - 2-panel empty state, primary "Try it live" panel with `js/qrcode-min.js` (helper's docstring already anticipated this consumer)
+  - Drop-zone now actually wired — boots the viewer in-place via `URL.createObjectURL` (a `location.href` redirect would invalidate the blob URL before fetch)
+  - URL field redirects to `?url=…` (so the share/embed toolbar buttons work afterward)
+  - Visually verified at 1280×800 dark + light, 800×700 compact desktop, 375×812 mobile — QR renders, no console errors, no overflow
+
+- [`56aacb1c`](https://github.com/sceneview/sceneview/commit/56aacb1c) `docs(rerun): point Save & Share users at the new /rerun/ drop-zone`
+  - Android `ShareResultBody` + iOS `confirmationDialog` body — primary path now "drop on `/rerun/`", re-host kept for the actual remote-share case
+  - `RerunBridge.kt` / `RerunBridge.swift` `ShareResult` KDoc / docstring rewritten in lockstep
+  - `llms.txt`, `mcp/llms.txt`, `mcp/src/generated/llms-txt.ts` (regenerated), `docs/docs/cheatsheet.md` — same flow update everywhere
+  - 8 files, +24/-18
+
+### Why this matters for the option-A backlog
+
+`memory/project_rerun_extended_data_types.md` gates option C (extended `RerunBridge` data types — Augmented Faces / Images / Depth) on **option A live + ~50 unique users/mo on telemetry**. Option A is the self-serve `/rerun/` page. Before this session, option A was technically shipped but UX-broken — a user landing without a session URL had no actionable path. Now they do (QR or drop-zone). Telemetry from `/rerun/` is the next signal to watch before unlocking option C.
+
+### What I deliberately did NOT do
+
+- **Hosted upload + `?r=<hash>`** — the page still has `const R2_BASE = ''` placeholder. Provisioning R2 + an upload endpoint to the existing `mcp-gateway` is the right architecture but spans days, and `memory/project_rerun_hosted_idea.md` explicitly says "Ne PAS attaquer tant que pivot free-first n'a pas montré ses limites".
+- **Option C extended data types** — gated on the 50-users metric per memory.
+- **Refactoring the share dialog into a separate component** — kept the inline `ShareResultBody` to minimise diff risk on a UX-critical screen.
+
+### Pre-existing impact-check finding (unchanged)
+
+`bash .claude/scripts/impact-check.sh` flags `SPM version refs stale (16 file(s))` — verified pre-existing on `origin/main` before my work, not introduced. Filed mentally for a separate clean-up pass.
+
+---
+
 ## SESSION 2026-05-07 (cont.) — landing alignment + Play Store screenshot refresh (agitated-meitner-a66271)
 
 ### TL;DR
