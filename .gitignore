@@ -91,6 +91,21 @@ site/
 .env.local
 .secrets/
 
+# ── Signing & keystore artefacts (defense in depth) ───────
+# The Play Store keystore is decoded transiently in CI (.github/workflows/play-store.yml)
+# and rm'd in `if: always()`, but a workflow interrupted between decode and rm could
+# leak it via failure artifacts. These patterns also block accidental `git add -A`
+# after running release tooling locally.
+**/*.keystore
+**/*.jks
+**/google-services.json
+**/Secrets.xcconfig
+**/*.p12
+**/*.mobileprovision
+# Exception: React Native debug keystore is the well-known shared dev key,
+# safe to track and required for RN Android dev builds.
+!samples/react-native-demo/android/app/debug.keystore
+
 # ── Private / strategy ────────────────────────────────────
 pro/
 marketing/
