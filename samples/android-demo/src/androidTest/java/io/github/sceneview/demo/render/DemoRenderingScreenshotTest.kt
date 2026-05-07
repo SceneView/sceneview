@@ -85,10 +85,10 @@ class DemoRenderingScreenshotTest {
 
     @Test
     fun lightingDemo_default_state() {
-        // TODO(qaMode): LightingDemo has a directional light spin that qaMode doesn't pin —
-        // shadows + bright spots shift between captures (~20 % diff).
+        // No auto-animation in this demo — the 5 % residual is TAA convergence + helmet
+        // glb async-load timing.
         captureAndCompare(demoSlug = "lighting", goldenName = "lighting_default", settleSeconds = 3,
-            pixelDiffTolerancePercent = 30.0f, maxChannelDiff = 24)
+            pixelDiffTolerancePercent = 8.0f, maxChannelDiff = 16)
     }
 
     @Test
@@ -98,18 +98,18 @@ class DemoRenderingScreenshotTest {
 
     @Test
     fun textDemo_default_state() {
-        // TextDemo cycles through samples — even with qaMode, the static letterforms differ
-        // in subpixel anti-aliasing across runs (~14 % diff). Wider tolerance until we mask
-        // the cycling text region.
+        // No cycling animation in this demo — letter anti-aliasing converges within a
+        // few frames after capture, residual diff is TAA jitter.
         captureAndCompare(demoSlug = "text", goldenName = "text_default", settleSeconds = 3,
-            pixelDiffTolerancePercent = 20.0f, maxChannelDiff = 24)
+            pixelDiffTolerancePercent = 8.0f, maxChannelDiff = 16)
     }
 
     @Test
     fun imageDemo_default_state() {
-        // ImageDemo: texture swap on a billboard — ~9 % pixel diff between runs.
+        // No texture swap in this demo — billboard holds the first texture. Residual is
+        // TAA jitter.
         captureAndCompare(demoSlug = "image", goldenName = "image_default", settleSeconds = 3,
-            pixelDiffTolerancePercent = 15.0f, maxChannelDiff = 24)
+            pixelDiffTolerancePercent = 8.0f, maxChannelDiff = 16)
     }
 
     @Test
@@ -170,11 +170,11 @@ class DemoRenderingScreenshotTest {
 
     @Test
     fun dynamicSkyDemo_default_state() {
-        // TODO(qaMode): the procedural sky's sun azimuth/elevation animation isn't pinned
-        // by qaMode — across runs the sun drifts ~10–15 % of pixels (different solar
-        // disk position + horizon glow). Loosen until the sky controller respects qaMode.
+        // Sun position is bound to a slider (`timeOfDay = 12f` default), no auto-animation.
+        // Residual diff is TAA convergence + the procedural sky shader's high gradient
+        // sensitivity around the horizon — bump channel tolerance for the sky band only.
         captureAndCompare(demoSlug = "dynamic-sky", goldenName = "dynamicsky_default", settleSeconds = 4,
-            pixelDiffTolerancePercent = 18.0f, maxChannelDiff = 32)
+            pixelDiffTolerancePercent = 10.0f, maxChannelDiff = 20)
     }
 
     @Test
