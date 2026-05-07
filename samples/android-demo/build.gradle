@@ -10,7 +10,6 @@ android {
 
     compileSdk 36
 
-    // assetPacks = [":samples:android-demo-assets"]  // disabled — HDR files are in local assets
 
     defaultConfig {
         applicationId "io.github.sceneview.demo"

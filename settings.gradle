@@ -30,7 +30,6 @@ include ":sceneview-web"
 // Samples — one unified showcase per platform ({platform}-demo)
 include ":samples:common"
 include ":samples:android-demo"         // Android (Play Store)
-include ":samples:android-demo-assets"  // Play Asset Delivery (install-time)
 include ":samples:android-tv-demo"      // Android TV
 include ":samples:web-demo"             // Web (Filament.js + WebXR)
 include ":samples:desktop-demo"         // Desktop (Windows/macOS/Linux)
