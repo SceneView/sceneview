@@ -2367,6 +2367,22 @@ MCP server: `sceneview-mcp`. Add to `.claude/mcp.json`:
 { "mcpServers": { "sceneview": { "command": "npx", "args": ["-y", "sceneview-mcp"] } } }
 ```
 
+### Claude Code plugin (one-command install)
+
+For Claude Code users, install the dedicated plugin to get the MCP **plus** 11 namespaced contributor commands and cross-platform reminder hooks in a single step:
+
+```
+/plugin marketplace add sceneview/claude-marketplace
+/plugin install sceneview@sceneview
+```
+
+Plugin contents:
+- `sceneview-mcp` server starts automatically
+- `/sceneview:contribute`, `/sceneview:release`, `/sceneview:review`, `/sceneview:test`, `/sceneview:document`, `/sceneview:quality-gate`, `/sceneview:publish-check`, `/sceneview:sync-check`, `/sceneview:version-bump`, `/sceneview:evaluate`, `/sceneview:maintain`
+- Hooks that fire on edits to remind you to keep API parity across Android (Filament), iOS (RealityKit), Web (Filament.js), Flutter, and React Native
+
+Marketplace repo: [github.com/sceneview/claude-marketplace](https://github.com/sceneview/claude-marketplace).
+
 ### Complete nodes reference
 
 For an exhaustive, AI-first reference covering every node composable — signatures, copy-paste examples, gotchas, lifecycle behaviour, nesting & coordinate spaces, and common mistakes — see **[docs/docs/nodes.md](https://github.com/sceneview/sceneview/blob/main/docs/docs/nodes.md)**. This file is the authoritative walkthrough for:

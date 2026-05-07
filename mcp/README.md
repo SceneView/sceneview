@@ -45,6 +45,17 @@ Restart Claude Desktop after saving.
 
 ### Claude Code
 
+Two options.
+
+**Recommended — install the [SceneView Claude Code plugin](https://github.com/sceneview/claude-marketplace)** to get this MCP server **plus** 11 namespaced contributor commands and cross-platform reminder hooks in one shot:
+
+```bash
+/plugin marketplace add sceneview/claude-marketplace
+/plugin install sceneview@sceneview
+```
+
+**Or — just the MCP server** (lighter, no commands or hooks):
+
 ```bash
 claude mcp add sceneview -- npx -y sceneview-mcp
 ```

@@ -20,10 +20,16 @@ SceneView solves this with three layers:
 
 ### Use with Claude Code
 
-Install [Claude Code](https://claude.ai/code), then in your project:
+Install [Claude Code](https://claude.ai/code), then **either** install the official plugin (recommended — bundles MCP + 11 contributor commands + cross-platform reminder hooks):
 
 ```bash
-# Add SceneView MCP server to your project
+/plugin marketplace add sceneview/claude-marketplace
+/plugin install sceneview@sceneview
+```
+
+**Or** add just the MCP server directly:
+
+```bash
 echo '{
   "mcpServers": {
     "sceneview": { "command": "npx", "args": ["-y", "sceneview-mcp"] }
@@ -54,7 +60,7 @@ Paste the contents of [`llms.txt`](https://github.com/sceneview/sceneview/blob/m
 
 ### Slash commands
 
-Inside the SceneView repo with Claude Code:
+Inside the SceneView repo with Claude Code (commands shown unprefixed work locally; once you install the [SceneView plugin](https://github.com/sceneview/claude-marketplace), they're available everywhere as `/sceneview:*`):
 
 | Command | What it does |
 |---|---|
@@ -62,6 +68,9 @@ Inside the SceneView repo with Claude Code:
 | `/review` | Check threading rules, Compose API patterns, Kotlin style, module boundaries |
 | `/document` | Generate/update KDoc for changed public APIs, update `llms.txt` |
 | `/test` | Audit test coverage and generate missing tests |
+| `/release`, `/quality-gate`, `/publish-check`, `/sync-check`, `/version-bump`, `/evaluate`, `/maintain` | Pre-PR + release lifecycle |
+
+> **Tip — namespace conflict:** the bare `/review` and `/test` commands shadow Claude Code built-ins. With the plugin installed, prefer the prefixed forms `/sceneview:review` and `/sceneview:test` to disambiguate.
 
 ### Example workflow
 
