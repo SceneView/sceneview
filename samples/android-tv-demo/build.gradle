@@ -34,6 +34,13 @@ android {
     androidResources {
         noCompress 'filamat', 'ktx'
     }
+    // Asset folders: TV demo's own assets (src/main/assets) hold the TV-only
+    // models (nike_air_jordan, sheen_chair, etc.). The shared models +
+    // environments live in the phone demo's folder and are picked up at
+    // build time via sourceSets so the TV demo can reference them by their
+    // existing `models/...` paths without copying or symlinking. This split
+    // keeps the phone APK from carrying the TV-only models — see issue #879.
+    sourceSets.main.assets.srcDirs += '../android-demo/src/main/assets'
     // Allow TvModelListTest to read src/main/assets/ from its test source set
     // via a relative path (test working dir is this module's root).
     testOptions {
