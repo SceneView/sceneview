@@ -24,6 +24,16 @@ Two commits on main: the [website-static/rerun/](website-static/rerun/index.html
   - `llms.txt`, `mcp/llms.txt`, `mcp/src/generated/llms-txt.ts` (regenerated), `docs/docs/cheatsheet.md` — same flow update everywhere
   - 8 files, +24/-18
 
+- [`b6e8f3e2`](https://github.com/sceneview/sceneview/commit/b6e8f3e2) `fix(open): authoritative demo titles + 6 missing demos in /open/?demo=`
+  - Caught while live-testing the QR chain: scanning `/open/?demo=ar-rerun` showed **"AR Rerun"** instead of "Rerun Debug" (the slug-derived `humanReadable()` was wrong for almost every AR demo — `ar-cloud-anchor` → "AR Cloud Anchor" vs the app's "Cloud Anchors", etc.)
+  - The `ALLOWED_DEMOS` set was also stale — missing the 6 demos from the ARCore coverage sprint (`ar-record-playback`, `ar-depth-occlusion`, `ar-instant-placement`, `ar-terrain`, `ar-rooftop`, `ar-image-stabilization`) so visiting them returned **"Missing or unknown demo id"**
+  - Replaced both with a single `DEMO_TITLES` map mirroring `DemoRegistry.kt`. `ALLOWED_DEMOS = new Set(Object.keys(DEMO_TITLES))` so they can't drift again.
+  - Verified live on prod: `/open/?demo=ar-rerun` → "Rerun Debug", `/open/?demo=ar-record-playback` → "Record & Playback", `/open/?demo=ar-foo-unknown` → invalid panel.
+
+### GitHub Pages quirk to remember
+
+`Deploy Website` workflow ([peaceiris/actions-gh-pages](https://github.com/peaceiris/actions-gh-pages)) successfully pushes the new files to `sceneview/sceneview.github.io@main` — but **GitHub Pages legacy auto-build does NOT trigger** on those pushes. Last successful auto-build before this session was 2026-05-06; today's 2 deploys (commits `aac5134a` + `2e16035c` on the sister repo) only built after a manual `gh api -X POST repos/sceneview/sceneview.github.io/pages/builds`. Filed mentally as a Pages config issue to chase. Workaround: add the manual trigger as the `Deploy Website` workflow's last step.
+
 ### Why this matters for the option-A backlog
 
 `memory/project_rerun_extended_data_types.md` gates option C (extended `RerunBridge` data types — Augmented Faces / Images / Depth) on **option A live + ~50 unique users/mo on telemetry**. Option A is the self-serve `/rerun/` page. Before this session, option A was technically shipped but UX-broken — a user landing without a session URL had no actionable path. Now they do (QR or drop-zone). Telemetry from `/rerun/` is the next signal to watch before unlocking option C.
