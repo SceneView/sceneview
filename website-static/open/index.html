@@ -253,20 +253,54 @@
     // the app, safe to commit. Cf. project_demo_apps_publication.md.
     const APP_STORE_URL = 'https://apps.apple.com/us/app/sceneview/id6761329763';
 
-    // Allowed demo ids — keep in sync with the Android `DemoRegistry`.
-    // We don't try to fetch this list at runtime to avoid an extra
-    // request on a redirect path; the cost of a stale entry is "the user
-    // sees the demo list on cold start" which is the safe fallback.
-    const ALLOWED_DEMOS = new Set([
-      'model-viewer', 'geometry', 'animation', 'multi-model',
-      'lighting', 'fog', 'environment', 'dynamic-sky',
-      'text', 'lines-paths', 'image', 'billboard', 'video', 'view-node',
-      'shape', 'custom-mesh', 'physics', 'reflection-probes',
-      'post-processing', 'secondary-camera', 'debug-overlay',
-      'camera-controls', 'gesture-editing', 'collision',
-      'ar-placement', 'ar-image', 'ar-face', 'ar-cloud-anchor',
-      'ar-streetscape', 'ar-pose', 'ar-rerun',
-    ]);
+    // Allowed demo ids + their human-readable titles — keep in sync with
+    // `samples/android-demo/.../DemoRegistry.kt`. We don't fetch this at
+    // runtime to avoid an extra request on a redirect path; the cost of a
+    // stale entry is "the user sees the demo list on cold start" which is
+    // the safe fallback. The title is what the panel + share-sheet shows;
+    // the auto-derived fallback (id.split('-')) gets cases like
+    // "ar-cloud-anchor" wrong (→ "AR Cloud Anchor" vs the app's "Cloud
+    // Anchors"), so we just hardcode the truth.
+    const DEMO_TITLES = {
+      'model-viewer': 'Model Viewer',
+      'geometry': 'Geometry Primitives',
+      'animation': 'Animation',
+      'multi-model': 'Multi Model',
+      'lighting': 'Lighting',
+      'dynamic-sky': 'Dynamic Sky',
+      'fog': 'Fog',
+      'environment': 'Environment Gallery',
+      'text': 'Text Labels',
+      'lines-paths': 'Lines & Paths',
+      'image': 'Image',
+      'billboard': 'Billboard',
+      'video': 'Video',
+      'camera-controls': 'Camera Controls',
+      'gesture-editing': 'Gesture Editing',
+      'collision': 'Collision',
+      'view-node': 'ViewNode',
+      'physics': 'Physics',
+      'post-processing': 'Post Processing',
+      'custom-mesh': 'Custom Mesh',
+      'shape': 'Shape',
+      'reflection-probes': 'Reflection Probes',
+      'secondary-camera': 'Secondary Camera',
+      'debug-overlay': 'Debug Overlay',
+      'ar-placement': 'Tap to Place',
+      'ar-image': 'Image Detection',
+      'ar-face': 'Face Tracking',
+      'ar-cloud-anchor': 'Cloud Anchors',
+      'ar-streetscape': 'Streetscape',
+      'ar-pose': 'Pose Tracking',
+      'ar-rerun': 'Rerun Debug',
+      'ar-record-playback': 'Record & Playback',
+      'ar-depth-occlusion': 'Depth Occlusion',
+      'ar-instant-placement': 'Instant Placement',
+      'ar-terrain': 'Terrain Anchors',
+      'ar-rooftop': 'Rooftop Anchors',
+      'ar-image-stabilization': 'Image Stabilization (EIS)',
+    };
+    const ALLOWED_DEMOS = new Set(Object.keys(DEMO_TITLES));
 
     // ─── Resolve demo id ─────────────────────────────────────────────────
     const params = new URLSearchParams(location.search);
@@ -357,8 +391,12 @@
 
     // ─── Helpers ─────────────────────────────────────────────────────────
     function humanReadable(id) {
-      // "ar-rerun" → "AR Rerun"
-      return id.split('-').map(w =>
+      // Authoritative titles come from DEMO_TITLES (mirrors DemoRegistry.kt).
+      // For ids not in the map we fall back to slug-derived as a last
+      // resort, but that path is only hit when the registry is stale —
+      // ALLOWED_DEMOS already filters anything we don't know about, so in
+      // practice the lookup always wins.
+      return DEMO_TITLES[id] || id.split('-').map(w =>
         w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w.toUpperCase()
       ).join(' ');
     }

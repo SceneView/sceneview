@@ -1192,7 +1192,7 @@ Stream an ARCore or ARKit session to the [Rerun](https://rerun.io) viewer for sc
 ### Two modes
 
 - **Live (default)** — sidecar spawns the Rerun viewer, you debug interactively.
-- **Save & share** — sidecar writes a `.rrd` file you can re-host (R2, GitHub release, gist) and open in any browser via `https://sceneview.github.io/rerun/?url=<encoded>`. Lets you attach a fully-replayable session to a bug report.
+- **Save & share** — sidecar writes a `.rrd` file. Drop it onto https://sceneview.github.io/rerun/ to view in-place, or re-host (R2, GitHub release, gist) and open `https://sceneview.github.io/rerun/?url=<encoded>` to share with remote teammates. Lets you attach a fully-replayable session to a bug report.
 
 ### Architecture
 
@@ -1213,7 +1213,7 @@ Same wire format on Android and iOS. A single sidecar handles both platforms.
 
 1. Run sidecar in save mode: `python rerun-bridge.py --save`
 2. In the app, tap **Save & Share** while streaming. The bridge sends a `{"type":"control","cmd":"save_now"}` line; the sidecar flushes a `.rrd` and replies with `{"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}`.
-3. Open https://sceneview.github.io/rerun/ — the landing page detects no session and shows a drop-zone. Drag the saved `.rrd` onto it and the AR Session Viewer renders it in-place. The page also has a QR code that opens the **AR Rerun demo** in the SceneView app on a phone, so anyone can capture a session without writing any code first.
+3. Open https://sceneview.github.io/rerun/ — when no session is loaded the page shows a drop-zone (drag the `.rrd` onto it to render in-place) and a QR code that opens the AR Rerun demo on a phone for users who don't have one to start from.
 4. To share with a remote teammate, re-host the `.rrd` on a public URL (Cloudflare R2, GitHub release asset, S3, gist) and send them `https://sceneview.github.io/rerun/?url=<encoded-public-url>`.
 
 The Kotlin API surface for step 2:
