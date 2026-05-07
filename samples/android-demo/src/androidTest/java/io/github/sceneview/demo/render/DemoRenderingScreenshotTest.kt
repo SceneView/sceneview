@@ -140,6 +140,31 @@ class DemoRenderingScreenshotTest {
         captureAndCompare(demoSlug = "gesture-editing", goldenName = "gestureediting_default", settleSeconds = 3)
     }
 
+    @Test
+    fun dynamicSkyDemo_default_state() {
+        captureAndCompare(demoSlug = "dynamic-sky", goldenName = "dynamicsky_default", settleSeconds = 4)
+    }
+
+    @Test
+    fun postProcessingDemo_default_state() {
+        captureAndCompare(demoSlug = "post-processing", goldenName = "postprocessing_default", settleSeconds = 4)
+    }
+
+    @Test
+    fun cameraControlsDemo_default_state() {
+        captureAndCompare(demoSlug = "camera-controls", goldenName = "cameracontrols_default", settleSeconds = 4)
+    }
+
+    @Test
+    fun secondaryCameraDemo_default_state() {
+        captureAndCompare(demoSlug = "secondary-camera", goldenName = "secondarycamera_default", settleSeconds = 4)
+    }
+
+    @Test
+    fun customMeshDemo_default_state() {
+        captureAndCompare(demoSlug = "custom-mesh", goldenName = "custommesh_default", settleSeconds = 3)
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     /**
