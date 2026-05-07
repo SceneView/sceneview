@@ -254,14 +254,14 @@
           project_demo_apps_publication.md for the iOS track id details.
         -->
         <div class="hero__store-badges">
-          <span class="hero__store-badges-label">Try it on your phone:</span>
+          <span class="hero__store-badges-label">Try the demo:</span>
           <a href="https://play.google.com/store/apps/details?id=io.github.sceneview.demo"
              class="hero__store-badge"
              target="_blank" rel="noopener"
              aria-label="Get SceneView Demo on Google Play">
             <img src="assets/brand/stores/google-play-badge.png"
                  alt="Get it on Google Play"
-                 width="140" height="54" loading="lazy">
+                 width="155" height="60" loading="lazy">
           </a>
           <a href="https://apps.apple.com/us/app/sceneview/id6761329763"
              class="hero__store-badge"
@@ -269,7 +269,12 @@
              aria-label="Download SceneView on the App Store">
             <img src="assets/brand/stores/app-store-badge.svg"
                  alt="Download on the App Store"
-                 width="140" height="48" loading="lazy">
+                 width="120" height="40" loading="lazy">
+          </a>
+          <a href="/playground.html"
+             class="hero__store-badge hero__store-badge--web"
+             aria-label="Open the SceneView Web Playground">
+            Web Playground
           </a>
         </div>
         <div class="hero__platforms">
@@ -920,14 +925,26 @@
             <span class="devtools__card-icon material-symbols-outlined">analytics</span>
           </div>
           <h3 class="devtools__card-title">Anonymous telemetry</h3>
-          <p class="devtools__card-text">Usage analytics for MCP tool calls. No PII &mdash; just tool names, versions, and timestamps. Fully opt-out.</p>
+          <p class="devtools__card-text">Usage analytics for MCP tool calls. No PII &mdash; just tool names, versions, and timestamps. Fully opt-out via <code>SCENEVIEW_TELEMETRY=off</code>.</p>
+          <div class="devtools__card-platforms">
+            <span class="devtools__card-platform">MCP server</span>
+            <span class="devtools__card-platform">Cloudflare Workers</span>
+            <span class="devtools__card-platform">D1 + KV</span>
+          </div>
+          <a href="https://sceneview-telemetry.mcp-tools-lab.workers.dev/health" class="devtools__card-link" target="_blank" rel="noopener">View live worker health &rarr;</a>
         </div>
         <div class="devtools__card reveal">
           <div class="devtools__card-header">
             <span class="devtools__card-icon material-symbols-outlined">visibility</span>
           </div>
           <h3 class="devtools__card-title">Render tests</h3>
-          <p class="devtools__card-text">Automated visual regression testing with SwiftShader. Catch rendering bugs before they reach users.</p>
+          <p class="devtools__card-text">Pixel-perfect golden-image regression suite. Filament render goldens plus Compose snapshot tests catch UI and rendering drift on every PR.</p>
+          <div class="devtools__card-platforms">
+            <span class="devtools__card-platform">Android</span>
+            <span class="devtools__card-platform">iOS</span>
+            <span class="devtools__card-platform">Web (Playwright)</span>
+          </div>
+          <a href="https://github.com/sceneview/sceneview/tree/main/samples/android-demo/src/androidTest/assets/render-goldens" class="devtools__card-link" target="_blank" rel="noopener">Browse golden suite &rarr;</a>
         </div>
       </div>
     </div>

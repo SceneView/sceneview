@@ -27,8 +27,13 @@ Same concepts, same simplicity — Android, iOS, Web, Desktop, TV, Flutter, Reac
 
 See SceneView capabilities in action — install the live demos in one tap:
 
-[<img src="website-static/assets/brand/stores/google-play-badge.png" alt="Get it on Google Play" height="54">](https://play.google.com/store/apps/details?id=io.github.sceneview.demo)
-[<img src="website-static/assets/brand/stores/app-store-badge.svg" alt="Download on the App Store" height="48">](https://apps.apple.com/us/app/sceneview/id6761329763)
+<p>
+  <a href="https://play.google.com/store/apps/details?id=io.github.sceneview.demo"><img src="website-static/assets/brand/stores/google-play-badge.png" alt="Get it on Google Play" height="60"></a>&nbsp;
+  <a href="https://apps.apple.com/us/app/sceneview/id6761329763"><img src="website-static/assets/brand/stores/app-store-badge.svg" alt="Download on the App Store" height="40"></a>&nbsp;
+  <a href="https://sceneview.github.io/playground.html"><img src="https://img.shields.io/badge/Open-Web%20Playground-1a73e8?style=for-the-badge&logo=javascript&logoColor=white" alt="Open the Web Playground" height="40"></a>
+</p>
+
+**No phone?** Open the [Web Playground](https://sceneview.github.io/playground.html) (sceneview.js — runs entirely in the browser) or browse all sample sources in [`samples/`](samples/) — Android · iOS · Web · Desktop · TV · Flutter · React Native.
 
 > **Tip** — every demo opens directly via `https://sceneview.github.io/open?demo=<id>`. For example, `…/open?demo=ar-rerun` lands straight on the AR Rerun debug screen with a single tap from any QR code or link.
 
