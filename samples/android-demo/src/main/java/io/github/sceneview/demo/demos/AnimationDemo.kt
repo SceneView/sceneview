@@ -134,11 +134,16 @@ fun AnimationDemo(onBack: () -> Unit) {
 
     // Reactive animation control: re-runs whenever any of the four controls change.
     // Relies on a stable node ref plus the modelInstance being loaded.
-    LaunchedEffect(modelNodeRef.value, isPlaying, speed, loop, selectedAnim) {
+    // In qaMode the underlying glTF skeleton must hold a deterministic pose for golden
+    // screenshots — we stop every track so the bind pose renders the same pixels every
+    // run. Without this, captures land at random skeletal-animation phases and the
+    // golden test needs ~60 % pixel tolerance to stay green.
+    LaunchedEffect(modelNodeRef.value, isPlaying, speed, loop, selectedAnim, DemoSettings.qaMode) {
         val node = modelNodeRef.value ?: return@LaunchedEffect
         if (node.animationCount <= 0) return@LaunchedEffect
         // Stop any currently-playing animations before applying new settings.
         for (i in 0 until node.animationCount) node.stopAnimation(i)
+        if (DemoSettings.qaMode) return@LaunchedEffect
         if (isPlaying && selectedAnim < node.animationCount) {
             // TODO(audit-2026-05-04): SDK playAnimation may ignore loop= param — verify.
             node.playAnimation(selectedAnim, speed = speed, loop = loop)

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.demo.rememberHeroYaw
@@ -170,6 +171,10 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     val (rx, rz) = DemoMath.rotateAroundCentre(d.x, d.z - centerZ, sceneYaw)
                     ModelNode(
                         modelInstance = d.instance,
+                        // The animated dragon glb auto-plays its skeletal animation; in
+                        // qaMode we need the bind pose to render every frame so golden
+                        // screenshots stay deterministic.
+                        autoAnimate = !DemoSettings.qaMode,
                         scaleToUnits = d.scale,
                         centerOrigin = Position(0f, 0.5f, 0f),
                         position = Position(x = rx, y = 0f, z = rz + centerZ),

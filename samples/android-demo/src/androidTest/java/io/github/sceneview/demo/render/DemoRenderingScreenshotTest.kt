@@ -66,21 +66,21 @@ class DemoRenderingScreenshotTest {
 
     @Test
     fun multiModelDemo_default_state() {
-        // TODO(qaMode): MultiModelDemo runs a model swap animation that qaMode does not
-        // currently freeze. With strict 2 % tolerance the test fails at ~50 % pixel diff
-        // depending on which model is on screen at capture time. Loosen until qaMode is
-        // wired through the swap timer in MultiModelDemo.
+        // qaMode now passes `autoAnimate = !qaMode` to the dragon's ModelNode so its
+        // skeletal animation freezes at the bind pose. A small jitter (≤6 %) remains
+        // from TAA convergence — tighten further once Filament exposes a "wait for TAA
+        // to settle" hook.
         captureAndCompare(demoSlug = "multi-model", goldenName = "multimodel_default", settleSeconds = 4,
-            pixelDiffTolerancePercent = 60.0f, maxChannelDiff = 32)
+            pixelDiffTolerancePercent = 8.0f, maxChannelDiff = 16)
     }
 
     @Test
     fun animationDemo_default_state() {
-        // TODO(qaMode): AnimationDemo's `if (DemoSettings.qaMode) return@LaunchedEffect`
-        // freezes the per-frame property update but the underlying glTF skeletal
-        // animation continues — captures land at random animation phases (49 % diff).
+        // qaMode now stops every animation track in the soldier glb (the LaunchedEffect
+        // in AnimationDemo early-returns after `node.stopAnimation(...)`), so the model
+        // sits in its bind pose. Residual diff is TAA jitter only.
         captureAndCompare(demoSlug = "animation", goldenName = "animation_default", settleSeconds = 4,
-            pixelDiffTolerancePercent = 60.0f, maxChannelDiff = 32)
+            pixelDiffTolerancePercent = 8.0f, maxChannelDiff = 16)
     }
 
     @Test
