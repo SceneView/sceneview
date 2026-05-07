@@ -26,7 +26,7 @@ import org.w3c.dom.HTMLInputElement
  * Uses Filament.js (WASM) — same rendering engine as SceneView Android.
  */
 
-private const val SDK_VERSION = "3.6.1"
+private const val SDK_VERSION = "4.0.8"
 
 /** Sketchfab public API endpoint for searching downloadable models. */
 private const val SKETCHFAB_API =
@@ -390,6 +390,10 @@ private fun addGeometryToScene(geoType: String) {
     val sizeSlider = document.querySelector("[data-geo-size='$geoType']") as? HTMLInputElement
     val sizeVal = sizeSlider?.value?.toDoubleOrNull() ?: 1.0
 
+    // Read the per-shape unlit checkbox — opt-in to flat colour via KHR_materials_unlit.
+    val unlitCheckbox = document.querySelector("[data-geo-unlit='$geoType']") as? HTMLInputElement
+    val unlitEnabled = unlitCheckbox?.checked ?: false
+
     // Offset each new geometry so they don't stack
     val offsetX = (geometryCount % 5 - 2) * 2.0
     val offsetZ = (geometryCount / 5) * -2.0
@@ -408,6 +412,7 @@ private fun addGeometryToScene(geoType: String) {
                 geometry {
                     type(geoType)
                     color(r, g, b)
+                    if (unlitEnabled) unlit()
                     position(offsetX, 0.5, offsetZ)
                     when (geoType) {
                         "cube" -> size(sizeVal)
@@ -423,7 +428,7 @@ private fun addGeometryToScene(geoType: String) {
                 sv.startRendering()
                 setupXRButtons(canvas)
                 setupAutoRotateToggle(sv)
-                console.log("Scene created with $geoType geometry")
+                console.log("Scene created with $geoType geometry (unlit=$unlitEnabled)")
             }
         )
     } else {
@@ -432,6 +437,7 @@ private fun addGeometryToScene(geoType: String) {
             io.github.sceneview.web.nodes.GeometryConfig().apply {
                 type(geoType)
                 color(r, g, b)
+                if (unlitEnabled) unlit()
                 position(offsetX, 0.5, offsetZ)
                 when (geoType) {
                     "cube" -> size(sizeVal)
@@ -441,7 +447,7 @@ private fun addGeometryToScene(geoType: String) {
                 }
             }
         )
-        console.log("Added $geoType geometry (color=$colorHex, size=$sizeVal)")
+        console.log("Added $geoType geometry (color=$colorHex, size=$sizeVal, unlit=$unlitEnabled)")
     }
 }
 
