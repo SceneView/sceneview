@@ -38,9 +38,6 @@ samples, model search (Sketchfab), and the complete API reference.
 | Healthcare | `npx healthcare-3d-mcp` | Anatomy, imaging, surgical planning |
 | Gaming | `npx gaming-3d-mcp` | Game scenes, characters, terrain |
 | Interior Design | `npx interior-design-3d-mcp` | Room planners, furniture, lighting |
-| E-commerce | `npx ecommerce-3d-mcp` | Product viewers, AR try-on |
-| Real Estate | `npx realestate-mcp` | Virtual tours, floor plans |
-| Architecture | `npx architecture-mcp` | 3D concepts, materials, specs |
 
 ## IDE Integration
 

@@ -267,7 +267,7 @@ The store-published v4.0.3 APK shipped without the live-review fixes. v4.0.4 bri
 
 ### Security
 
-- `hono` bumped to 4.12.17 across `mcp-gateway`, `telemetry-worker`, `hub-gateway` and the bundled MCP packages — resolves the `hono/jsx` SSR XSS via JSX attribute names (9 alerts) (#862).
+- `hono` bumped to 4.12.17 across `mcp-gateway`, `telemetry-worker` and the bundled MCP packages — resolves the `hono/jsx` SSR XSS via JSX attribute names (9 alerts) (#862).
 - `postcss` bumped to 8.5.14 in the same set — resolves XSS via unescaped `</style>` in CSS Stringify Output (4 alerts).
 - 0 open Dependabot alerts at the time of this entry.
 
@@ -350,10 +350,6 @@ Production-grade monetization layer for `sceneview-mcp`:
 - Dashboard-less by design: billing managed entirely through the Stripe Customer Portal.
 - 168 tests passing across gateway + hub packages.
 - Live in production at `https://sceneview-mcp.mcp-tools-lab.workers.dev`.
-
-### New — hub-mcp: 52 tools across 11 libraries (0.2.0)
-
-`mcp/packages/hub-mcp` is a unified MCP server dispatching to 11 SceneView-ecosystem libraries (automotive, gaming, healthcare, interior, realestate, architecture, ecommerce-3d, education, finance, legal-docs, french-admin). Anonymous telemetry on every tool call. Stripe billing layer + quota enforcement shared with the gateway.
 
 ### New — Anonymous telemetry worker
 

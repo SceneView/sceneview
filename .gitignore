@@ -32,6 +32,16 @@ RERUN-CHECK.md
 # ── Flutter tooling artefacts ─────────────────────────────
 flutter/**/.dart_tool/
 
+# ── Off-topic personal-portfolio code (NEVER in sceneview org) ──
+hub-gateway/
+hub-mcp/
+mcp/docs/registry-submission-guide.md
+mcp/docs/strategy-report.md
+marketing/mcp-registry-submissions.md
+marketing/articles/article-2-mcp-servers-3d.md
+mcp-gaming/
+mcp-interior/
+
 # ── Gradle ────────────────────────────────────────────────
 /local.properties
 /.gradle

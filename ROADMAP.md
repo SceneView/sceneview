@@ -17,7 +17,6 @@
 | React Native bridge | Alpha |
 | MCP on npm | **4.0.1 @latest** |
 | MCP Gateway (Stripe billing) | **Live** (first paying customer) |
-| Hub MCP (11 libs, 52 tools) | **Live** (hub-mcp@0.1.0) |
 | Telemetry Worker | **Live** |
 | Rerun.io debug integration | **Shipped** (Android + iOS + Python) |
 | Play Store demo app | Deployed |
