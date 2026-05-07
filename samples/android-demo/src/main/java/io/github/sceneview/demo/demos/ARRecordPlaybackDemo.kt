@@ -416,6 +416,14 @@ private fun ModeContent(
         RecordOverlay(
             recorder = recorder,
             elapsedSeconds = elapsedSeconds,
+            // Disable the shutter until ARCore is actually tracking — without
+            // a tracked frame, recorder.start() returns false and transitions
+            // to ERROR with the dev-flavoured "call attach(session) first"
+            // message, which is confusing for casual users (the QR-scanned
+            // path). Keep the disable logic generous: we allow ERROR-state
+            // re-tries (user can retry after a transient hiccup) but block
+            // the very first tap when nothing is tracked yet.
+            startEnabled = isTracking || recorder.state == ARRecorder.State.ERROR,
             onStart = {
                 val name = "ar-session-${TIMESTAMP_FORMAT.format(Date())}.mp4"
                 val file = File(recordingsDir, name)
@@ -448,6 +456,7 @@ private fun ModeContent(
 private fun RecordOverlay(
     recorder: ARRecorder,
     elapsedSeconds: Long,
+    startEnabled: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
@@ -487,12 +496,22 @@ private fun RecordOverlay(
                 .padding(bottom = 32.dp)
         ) {
             val isRecording = recorder.state == ARRecorder.State.RECORDING
+            // Greyed-out + non-clickable when AR isn't tracking yet — saves the
+            // user from a confusing ERROR state and the disc visually fades
+            // so the affordance "wait, it's not ready" is unambiguous.
+            val isTappable = isRecording || startEnabled
             Surface(
-                onClick = if (isRecording) onStop else onStart,
+                onClick = {
+                    if (!isTappable) return@Surface
+                    if (isRecording) onStop() else onStart()
+                },
                 shape = androidx.compose.foundation.shape.CircleShape,
-                color = Color.White.copy(alpha = 0.18f),
+                color = Color.White.copy(alpha = if (isTappable) 0.18f else 0.08f),
                 contentColor = Color.White,
-                border = androidx.compose.foundation.BorderStroke(3.dp, Color.White),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 3.dp,
+                    color = Color.White.copy(alpha = if (isTappable) 1f else 0.4f),
+                ),
                 modifier = Modifier.size(72.dp)
             ) {
                 Box(
@@ -503,7 +522,7 @@ private fun RecordOverlay(
                         modifier = Modifier
                             .size(if (isRecording) 30.dp else 56.dp)
                             .background(
-                                color = Color.Red,
+                                color = Color.Red.copy(alpha = if (isTappable) 1f else 0.45f),
                                 shape = if (isRecording) RoundedCornerShape(6.dp)
                                         else androidx.compose.foundation.shape.CircleShape
                             )
