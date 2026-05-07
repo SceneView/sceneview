@@ -33,7 +33,7 @@ See SceneView capabilities in action — install the live demos in one tap:
   <a href="https://sceneview.github.io/playground.html"><img src="website-static/assets/brand/stores/web-playground-badge.svg" alt="Open the Web Playground" height="56"></a>
 </p>
 
-**No phone?** Open the [Web Playground](https://sceneview.github.io/playground.html) (sceneview.js — runs entirely in the browser) or browse all sample sources in [`samples/`](samples/) — Android · iOS · Web · Desktop · TV · Flutter · React Native.
+Browse all sample sources in [`samples/`](samples/) — Android · iOS · Web · Desktop · TV · Flutter · React Native.
 
 > **Tip** — every demo opens directly via `https://sceneview.github.io/open?demo=<id>`. For example, `…/open?demo=ar-rerun` lands straight on the AR Rerun debug screen with a single tap from any QR code or link.
 
