@@ -231,12 +231,20 @@
 
     /* ── Empty state (no session loaded) ─────────────────────────── */
     .empty {
-      max-width: 540px;
+      max-width: 920px;
+      width: 100%;
+      padding: 32px 24px;
+      box-sizing: border-box;
+      max-height: calc(100vh - var(--header-height));
+      overflow-y: auto;
+    }
+    .empty-head {
       text-align: center;
-      padding: 0 24px;
+      max-width: 560px;
+      margin: 0 auto 28px;
     }
     .empty h1 {
-      margin: 0 0 12px;
+      margin: 0 0 10px;
       font-size: 28px;
       font-weight: 700;
       letter-spacing: -0.02em;
@@ -245,11 +253,11 @@
       background-clip: text;
       color: transparent;
     }
-    .empty p {
-      margin: 0 0 20px;
+    .empty-head p {
+      margin: 0;
       color: var(--color-on-surface-variant);
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 15px;
+      line-height: 1.55;
     }
     .empty code {
       font-family: var(--font-mono);
@@ -258,10 +266,216 @@
       padding: 2px 6px;
       border-radius: 4px;
     }
-    .empty .cta {
+
+    .empty-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+    .panel {
+      background: var(--color-surface-container);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: 14px;
+      padding: 22px 22px 20px;
+      display: flex; flex-direction: column;
+      gap: 14px;
+      text-align: center;
+      box-shadow: var(--shadow-card);
+    }
+    .panel.primary {
+      border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+      background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface-container));
+    }
+    .panel-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-on-surface-variant);
+    }
+    .panel.primary .panel-eyebrow {
+      color: var(--color-primary);
+    }
+    .panel-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--color-on-surface);
+      letter-spacing: -0.01em;
+    }
+    .panel-body {
+      font-size: 13px;
+      color: var(--color-on-surface-variant);
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    /* QR */
+    .qr-wrap {
+      display: flex; align-items: center; justify-content: center;
+      width: 168px; height: 168px;
+      margin: 4px auto 0;
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .qr-wrap svg, .qr-wrap img { width: 100%; height: 100%; display: block; }
+    .qr-skeleton {
+      width: 100%; height: 100%;
+      background: var(--color-surface-container-high);
+      border-radius: 4px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 50% { opacity: 0.5; } }
+    .qr-caption {
+      font-size: 12px;
+      color: var(--color-on-surface-variant);
+      margin: 0;
+    }
+    .store-row {
       display: flex; gap: 8px; justify-content: center;
-      margin-top: 16px;
       flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .store-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 8px;
+      background: var(--color-on-surface);
+      color: var(--color-surface);
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: opacity 150ms;
+    }
+    .store-badge:hover { opacity: 0.85; }
+    .store-badge svg { width: 18px; height: 18px; }
+    .store-badge .store-line1 {
+      font-size: 9px;
+      opacity: 0.75;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      line-height: 1;
+    }
+    .store-badge .store-line2 {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+      display: block;
+    }
+    .cta-mobile {
+      display: none;
+      width: 100%;
+      height: 44px;
+      align-items: center; justify-content: center;
+      gap: 8px;
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 150ms;
+    }
+    .cta-mobile:hover { background: var(--color-primary-dim); }
+    .cta-mobile svg { width: 18px; height: 18px; }
+
+    /* Drop zone */
+    .dropzone {
+      position: relative;
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px;
+      padding: 22px 16px;
+      background: var(--color-surface);
+      border: 2px dashed var(--color-outline-variant);
+      border-radius: 10px;
+      color: var(--color-on-surface-variant);
+      font-size: 13px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 150ms, background 150ms, color 150ms;
+      min-height: 140px;
+    }
+    .dropzone:hover, .dropzone.hover {
+      border-color: var(--color-primary);
+      background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+      color: var(--color-on-surface);
+    }
+    .dropzone svg {
+      width: 28px; height: 28px;
+      color: var(--color-on-surface-variant);
+    }
+    .dropzone strong { color: var(--color-on-surface); font-weight: 600; }
+    .dropzone input[type=file] {
+      position: absolute; inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .url-row {
+      display: flex; gap: 6px;
+      margin-top: 4px;
+    }
+    .url-row input {
+      flex: 1;
+      min-width: 0;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--color-outline-variant);
+      background: var(--color-surface);
+      color: var(--color-on-surface);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .url-row input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+    .url-row button {
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border: 1px solid var(--color-outline-variant);
+      background: var(--color-surface-container);
+      color: var(--color-on-surface);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .url-row button:hover { background: var(--color-surface-container-high); }
+
+    .empty-foot {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--color-on-surface-variant);
+    }
+    .empty-foot a {
+      color: var(--color-on-surface-variant);
+      text-decoration: none;
+      border-bottom: 1px dotted var(--color-outline-variant);
+    }
+    .empty-foot a:hover { color: var(--color-primary); border-color: var(--color-primary); }
+    .empty-foot .sep { opacity: 0.5; margin: 0 8px; }
+
+    /* Mobile: stack panels, swap QR for CTA button */
+    @media (max-width: 720px) {
+      .empty { padding: 20px 16px; }
+      .empty-grid { grid-template-columns: 1fr; gap: 12px; }
+      .empty h1 { font-size: 24px; }
+      .qr-wrap { display: none; }
+      .qr-caption { display: none; }
+      .cta-mobile { display: inline-flex; }
     }
 
     /* ── Toast (copy feedback) ────────────────────────────────────── */
@@ -422,24 +636,7 @@
 
     // ─── Empty state ───────────────────────────────────────────────────────
     if (!rrdUrl) {
-      $('splash').innerHTML = `
-        <div class="empty">
-          <h1>AR Session Viewer</h1>
-          <p>
-            Drop your <code>.rrd</code> recording here, or share a session URL.<br>
-            This page renders AR debug sessions captured with
-            <a href="https://sceneview.github.io/" style="color: var(--color-primary); text-decoration: none;">SceneView</a>
-            via the Rerun web viewer.
-          </p>
-          <p style="font-size: 12px;">
-            Open with <code>?url=https://example.com/session.rrd</code>
-          </p>
-          <div class="cta">
-            <a class="btn btn-primary" href="https://sceneview.github.io/playground/">Get SceneView</a>
-            <a class="btn" href="https://www.npmjs.com/package/rerun-3d-mcp">rerun-3d-mcp</a>
-          </div>
-        </div>
-      `;
+      renderEmptyState();
       // Wire share to copy current URL anyway
       $('btn-share').addEventListener('click', () => copyToClipboard(location.href, 'Page URL copied'));
     } else {
@@ -447,6 +644,150 @@
         console.error(err);
         showSplash({ title: 'Failed to load session', detail: err.message || String(err) }, true);
       });
+    }
+
+    function renderEmptyState() {
+      // Slug must match `DemoRegistry.kt` and the `ALLOWED_DEMOS` set in
+      // `/open/index.html` — that page handles `sceneview://demo/<id>` →
+      // store fallback. We point the QR at it (rather than the custom
+      // scheme directly) so the chain works for users who haven't
+      // installed the app yet.
+      const OPEN_URL = 'https://sceneview.github.io/open?demo=ar-rerun';
+      const PLAY_URL = 'https://play.google.com/store/apps/details?id=io.github.sceneview.demo';
+      const APP_STORE_URL = 'https://apps.apple.com/us/app/sceneview/id6761329763';
+
+      $('splash').innerHTML = `
+        <div class="empty">
+          <div class="empty-head">
+            <h1>AR Session Viewer</h1>
+            <p>Replay AR sessions captured with <a href="https://sceneview.github.io/" style="color: var(--color-primary); text-decoration: none;">SceneView</a>, or capture a fresh one from your phone — powered by the Rerun web viewer.</p>
+          </div>
+          <div class="empty-grid">
+
+            <div class="panel primary">
+              <div class="panel-eyebrow">Try it live</div>
+              <h2 class="panel-title">Capture a session on your phone</h2>
+              <p class="panel-body">Open the AR Rerun demo in the SceneView app, record an AR session, then save &amp; share it.</p>
+
+              <div class="qr-wrap" id="qr"><div class="qr-skeleton"></div></div>
+              <p class="qr-caption">Scan with your phone camera</p>
+
+              <a class="cta-mobile" id="cta-mobile" href="${escapeHtml(OPEN_URL)}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                  <line x1="12" y1="18" x2="12.01" y2="18"/>
+                </svg>
+                Open AR Rerun demo
+              </a>
+
+              <div class="store-row">
+                <a class="store-badge" href="${escapeHtml(PLAY_URL)}" target="_blank" rel="noopener">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.6 1.5a1.5 1.5 0 00-.6 1.2v18.6a1.5 1.5 0 00.6 1.2l10.7-10.5L3.6 1.5zm12 11.4l3.5 2-3.5 2L5.5 12l10.1-4.9 3.5 2-3.5 2v1.8zM4.6 22.7l10.4-10.2 2.6 1.5-13 8.7zM4.6 1.3l13 8.7-2.6 1.5L4.6 1.3z"/></svg>
+                  <span>
+                    <span class="store-line1">Get it on</span>
+                    <span class="store-line2">Google Play</span>
+                  </span>
+                </a>
+                <a class="store-badge" href="${escapeHtml(APP_STORE_URL)}" target="_blank" rel="noopener">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.04c-.03-2.71 2.21-4.01 2.31-4.07-1.26-1.84-3.22-2.09-3.91-2.12-1.66-.17-3.24.98-4.09.98-.85 0-2.15-.95-3.54-.92-1.82.03-3.5 1.06-4.43 2.69-1.89 3.28-.48 8.13 1.36 10.79.9 1.3 1.97 2.76 3.36 2.71 1.35-.05 1.86-.87 3.49-.87 1.63 0 2.09.87 3.51.84 1.45-.03 2.37-1.32 3.26-2.63 1.03-1.51 1.45-2.97 1.47-3.05-.03-.01-2.82-1.08-2.85-4.27zM14.4 4.13c.74-.9 1.24-2.16 1.1-3.42-1.07.04-2.36.71-3.13 1.6-.69.79-1.29 2.07-1.13 3.3 1.19.09 2.41-.6 3.16-1.48z"/></svg>
+                  <span>
+                    <span class="store-line1">Download on the</span>
+                    <span class="store-line2">App Store</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-eyebrow">Already have a recording?</div>
+              <h2 class="panel-title">Drop a <code>.rrd</code> file</h2>
+              <p class="panel-body">Or paste a hosted URL — anything reachable with CORS works.</p>
+
+              <label class="dropzone" id="dropzone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div><strong>Drop file</strong> or click to choose</div>
+                <input type="file" id="file-input" accept=".rrd,application/octet-stream" />
+              </label>
+
+              <div class="url-row">
+                <input type="url" id="url-input" placeholder="https://example.com/session.rrd" autocomplete="off" spellcheck="false" />
+                <button type="button" id="url-load">Load</button>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="empty-foot">
+            <a href="https://www.npmjs.com/package/rerun-3d-mcp">rerun-3d-mcp</a>
+            <span class="sep">·</span>
+            <a href="https://github.com/sceneview/sceneview/tree/main/arsceneview/src/main/java/io/github/sceneview/ar/rerun">RerunBridge source</a>
+            <span class="sep">·</span>
+            <a href="https://rerun.io/" target="_blank" rel="noopener">Powered by Rerun.io</a>
+          </div>
+        </div>
+      `;
+
+      // ── QR (desktop only — CSS hides .qr-wrap on mobile but we still
+      //    avoid the network/CPU cost of rendering it on small viewports)
+      const isSmall = window.matchMedia('(max-width: 720px)').matches;
+      if (!isSmall) {
+        import('../js/qrcode-min.js')
+          .then((mod) => mod.renderQrSvg(OPEN_URL, { size: 168, padding: 0 }))
+          .then((svg) => { $('qr').innerHTML = svg; })
+          .catch((e) => {
+            console.error('QR render failed', e);
+            $('qr').innerHTML = '<p style="font-size:11px;color:var(--color-on-surface-variant);padding:8px;text-align:center">QR unavailable — use the install buttons below.</p>';
+          });
+      }
+
+      // ── File / drop / URL handlers
+      const dz = $('dropzone');
+      const fileInput = $('file-input');
+      const loadLocally = (urlOrFile, fileName) => {
+        // Bootstrap the viewer in-place. We can't redirect via
+        // `location.href = ?url=blob:…` because blob URLs are scoped to
+        // the document that created them — a navigation invalidates them
+        // before the new page can fetch.
+        const url = typeof urlOrFile === 'string'
+          ? urlOrFile
+          : URL.createObjectURL(urlOrFile);
+        const titleHint = typeof urlOrFile === 'string'
+          ? null
+          : (fileName || urlOrFile.name || 'Local recording');
+        showSplash('Loading session…');
+        bootViewer(url, null).then(() => {
+          if (titleHint) {
+            $('session-title').textContent = titleHint.replace(/\.rrd$/i, '');
+            $('session-sub').textContent = 'Local file · powered by Rerun.io';
+          }
+        }).catch((err) => {
+          console.error(err);
+          showSplash({ title: 'Failed to load session', detail: err.message || String(err) }, true);
+        });
+      };
+      const loadFile = (file) => { if (file) loadLocally(file); };
+      fileInput.addEventListener('change', (e) => loadFile(e.target.files[0]));
+      ['dragenter', 'dragover'].forEach((ev) =>
+        dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('hover'); }));
+      ['dragleave', 'drop'].forEach((ev) =>
+        dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('hover'); }));
+      dz.addEventListener('drop', (e) => loadFile(e.dataTransfer.files[0]));
+
+      const urlInput = $('url-input');
+      const submitUrl = () => {
+        const v = urlInput.value.trim();
+        if (!v) return;
+        // For shareable hosted URLs we DO redirect — that way the page
+        // URL reflects the loaded session and Share / Embed work as
+        // expected.
+        location.href = `${location.pathname}?url=${encodeURIComponent(v)}`;
+      };
+      $('url-load').addEventListener('click', submitUrl);
+      urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitUrl(); });
     }
 
     // ─── Boot ──────────────────────────────────────────────────────────────
