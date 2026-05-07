@@ -113,6 +113,12 @@ branding/SECRETS.md
 branding/SPONSOR_TIERS.md
 .claude/handoff.md
 .claude/branding.md
+# Business positioning / partnership pitches must NOT ship via public mkdocs
+# (reachable by direct URL even when not in nav). Originals live in
+# ~/Projects/profile-private/sceneview-strategy/.
+docs/docs/anthropic-*.md
+docs/docs/*-pitch.md
+docs/docs/*-contribution.md
 
 # ── Large media (binaries, not source) ────────────────────
 /video/
