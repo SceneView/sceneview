@@ -96,6 +96,11 @@ class MainActivity : ComponentActivity() {
         // so screenshot tests get a deterministic frame. Same setting reachable via the
         // long-press gesture on the demo title bar (see DemoScaffold). Off by default.
         if (intent?.getBooleanExtra("qa_mode", false) == true) DemoSettings.qaMode = true
+        // Optional path to an ARCore playback fixture (.mp4). When set, the AR Record &
+        // Playback demo auto-loads this file in Mode.PLAYBACK on first composition, used by
+        // `ARDemoPlaybackSmokeTest` to drive a deterministic replay without UiAutomator
+        // having to click the mode chips and recording row.
+        intent?.getStringExtra("ar_playback_file")?.let { DemoSettings.arPendingPlaybackFile = it }
         setContent {
             SceneViewDemoTheme {
                 SceneViewDemoApp(activity = this)
@@ -112,6 +117,7 @@ class MainActivity : ComponentActivity() {
         pendingDemoId.value = intent.getStringExtra("demo")
             ?: DeepLinkRouter.parse(intent.data)
         if (intent.getBooleanExtra("qa_mode", false)) DemoSettings.qaMode = true
+        intent.getStringExtra("ar_playback_file")?.let { DemoSettings.arPendingPlaybackFile = it }
     }
 
     fun consumePendingDemo() {
@@ -145,7 +151,14 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
     val initialDemo = remember { activity?.pendingDemoIdFlow?.value }
     LaunchedEffect(pendingId) {
         val id = pendingId ?: return@LaunchedEffect
-        navController.navigate("demo/$id")
+        // If the cold-start `initialDemo` already matches `pendingId`, NavHost picked the
+        // demo as its start destination — navigating here would push a SECOND instance,
+        // destroying the first one's remember{} state (and any one-shot flags like
+        // `DemoSettings.arPendingPlaybackFile` that were already consumed). Just clear
+        // the pending id so config changes don't replay it.
+        if (id != initialDemo) {
+            navController.navigate("demo/$id")
+        }
         activity?.consumePendingDemo()
     }
 

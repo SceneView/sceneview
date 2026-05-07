@@ -47,6 +47,14 @@ class ARDemoPlaybackSmokeTest {
     fun setUp() {
         context = InstrumentationRegistry.getInstrumentation().targetContext
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        // Pre-grant runtime permissions: AGP reinstalls the demo APK before each test
+        // class, so any prior `pm grant` is wiped. Without these, the AR demo blocks at
+        // the camera-permission prompt and we capture the system dialog instead of the
+        // ARSceneView playback.
+        device.executeShellCommand("pm grant io.github.sceneview.demo android.permission.CAMERA")
+        device.executeShellCommand("pm grant io.github.sceneview.demo android.permission.RECORD_AUDIO")
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
     }
 
     @Test
@@ -61,7 +69,10 @@ class ARDemoPlaybackSmokeTest {
         for (fixture in fixtures) {
             val deployed = deployFixtureToAppPrivateDir(fixture)
             try {
-                launchDemo("ar-record-playback")
+                // Pass the deployed fixture's path through the launch intent so the demo
+                // auto-starts in Mode.PLAYBACK with this file pre-loaded — no UiAutomator
+                // clicking through mode chips. See `DemoSettings.arPendingPlaybackFile`.
+                launchDemo("ar-record-playback", playbackFile = deployed.absolutePath)
                 // Give the activity time to boot, the AR session to initialize, and
                 // ARCore to consume at least the first few frames of the dataset.
                 Thread.sleep(MIN_PLAYBACK_MILLIS)
@@ -213,9 +224,12 @@ class ARDemoPlaybackSmokeTest {
      * in `androidTestImplementation`) instead of pulling in `androidx.test:core` for
      * `ActivityScenario` — saves a dep and matches the existing test infrastructure.
      */
-    private fun launchDemo(demoSlug: String) {
+    private fun launchDemo(demoSlug: String, playbackFile: String? = null) {
+        val playbackArg = playbackFile?.let { " --es ar_playback_file $it" } ?: ""
         device.executeShellCommand(
-            "am start -n io.github.sceneview.demo/.MainActivity --es demo $demoSlug"
+            "am start -n io.github.sceneview.demo/.MainActivity " +
+                "-f 0x14000000 " + // CLEAR_TOP | NEW_TASK so onNewIntent fires for the second-and-onward fixture
+                "--es demo $demoSlug$playbackArg"
         )
     }
 

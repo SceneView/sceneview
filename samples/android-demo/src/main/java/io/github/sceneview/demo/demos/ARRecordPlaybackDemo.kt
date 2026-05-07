@@ -102,8 +102,17 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
 
-    var currentMode by remember { mutableStateOf(Mode.LIVE) }
-    var currentPlaybackFile by remember { mutableStateOf<File?>(null) }
+    // Honour `DemoSettings.arPendingPlaybackFile` (set via `--es ar_playback_file <path>` on
+     // the launch intent) so instrumentation tests can drive a deterministic replay without
+     // having to UiAutomator-click through Mode.PLAYBACK and the recording list.
+    val pendingFile = io.github.sceneview.demo.DemoSettings.arPendingPlaybackFile
+        ?.let(::File)?.takeIf { it.exists() }
+    var currentMode by remember { mutableStateOf(if (pendingFile != null) Mode.PLAYBACK else Mode.LIVE) }
+    var currentPlaybackFile by remember { mutableStateOf<File?>(pendingFile) }
+    LaunchedEffect(Unit) {
+        // Consume so a config change / process recreation doesn't re-trigger.
+        io.github.sceneview.demo.DemoSettings.arPendingPlaybackFile = null
+    }
     var exportToast by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(exportToast) {
         if (exportToast != null) {

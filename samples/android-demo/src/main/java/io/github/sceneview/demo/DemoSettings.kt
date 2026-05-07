@@ -29,4 +29,15 @@ object DemoSettings {
      * motion). `false` = full "wow" showcase mode. Default `false`.
      */
     var qaMode: Boolean by mutableStateOf(false)
+
+    /**
+     * Optional ARCore playback file the AR Record & Playback demo should auto-load when it
+     * starts. When non-null, the demo skips Mode.LIVE and enters Mode.PLAYBACK with this
+     * file pre-selected — the same path a tester would take by tapping "Playback" then
+     * picking the recording. Wired via the `--es ar_playback_file <path>` intent extra so
+     * `ARDemoPlaybackSmokeTest` can drive deterministic replay without UiAutomator clicking
+     * through the mode chips. Reset to `null` after consumption so a config change doesn't
+     * re-trigger the auto-load.
+     */
+    var arPendingPlaybackFile: String? by mutableStateOf(null)
 }
