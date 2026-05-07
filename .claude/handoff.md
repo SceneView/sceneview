@@ -4,6 +4,60 @@
 
 ---
 
+## SESSION 2026-05-07 — exciting-napier-1c8c70 — v4.0.8 cut + 3 demos rebuilt + #863 closed
+
+### TL;DR
+
+User asked for "go, fais tout" — chained 7 work items in one session, all green.
+**v4.0.8 tagged + pushed** ([commit `13f8e0a4`](https://github.com/sceneview/sceneview/commit/13f8e0a4), [tag `v4.0.8`](https://github.com/sceneview/sceneview/releases/tag/v4.0.8)). `release.yml` workflow [25485621888](https://github.com/sceneview/sceneview/actions/runs/25485621888) running at session close.
+
+### What landed on main
+
+1. **3 demos reconstructed** (lost when previous session's worktree was deleted before stash, only diffs visible in commit `cbf01d3b` message):
+   - [`AnimationDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/AnimationDemo.kt) — IBL intensity slider (0–10 000 lux) replaces hard-coded 5 000 lux. HERO orbit `yHeight 0.15 → 0.55` (eyes-level instead of cropping low-angle on portrait phones).
+   - [`GeometryDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/GeometryDemo.kt) — `horizontalScroll` on chip row, continuous Y-axis spin via `withFrameNanos` shared by all primitives, Metallic + Roughness sliders covering 0–1 PBR range applied to all 4 materials.
+   - [`MultiModelDemo`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/MultiModelDemo.kt) — refonte from generic spread-slider carousel to tabletop living-room display lit by `studio_warm_2k.hdr`. Front row z=-1.3, back row z=-1.7. Spread slider removed.
+
+2. **`ARFaceDemo` migrated to unlit** — replaced custom PBR material (metallic=0, roughness=1, reflectance=0) + explicit 100 000 lux fill light with single `materialLoader.createUnlitColorInstance(SceneViewColors.Primary)` call. Long-standing "invisible mesh" risk eliminated (no more dependency on ENVIRONMENTAL_HDR which front camera disables).
+
+3. **Issue [#863](https://github.com/sceneview/sceneview/issues/863) closed** — [`NoTangentsGlbContractTest`](sceneview/src/test/java/io/github/sceneview/loaders/NoTangentsGlbContractTest.kt) (5 JVM tests) authors a minimal lit-primitive GLB binary in pure code (no test resource fixture file), pins POSITION + NORMAL + TEXCOORD_0 with NO TANGENT. Pure JUnit + ByteBuffer (no JSON lib dep — `org.json` doesn't work in pure JVM tests). The fixture is the regression target gltfio's auto-tangent synthesis path must continue to handle.
+
+4. **Version bump 4.0.7 → 4.0.8** across 28 critical locations (`sync-versions.sh` clean). `mcp/package.json`: `4.0.9 → 4.0.10` (4.0.9 was already published by v4.0.7).
+
+5. **CHANGELOG.md** — converted `## Unreleased` to `## v4.0.8` + added 4 new sections (Unlit colour material, 3D demo refresh, Fixed cameraManipulator swap, Tested NoTangentsGlbContractTest).
+
+### Verifications passed
+
+- `:sceneview:compileReleaseKotlin` ✅
+- `:arsceneview:compileReleaseKotlin` ✅
+- `:samples:android-demo:compileDebugKotlin` ✅
+- `:samples:android-demo:assembleDebug` ✅ (16-26 s)
+- `:sceneview:test` + `:arsceneview:testDebugUnitTest` ✅ (NoTangentsGlbContractTest 5/5 passing)
+- MCP `npm test` ✅ (2646 / 2646)
+- `bash .claude/scripts/sync-versions.sh` ✅ (28 OK, 0 mismatches, 1 SKIP for CHANGELOG which is intentional)
+
+### Pending / passive monitoring
+
+- **release.yml [25485621888](https://github.com/sceneview/sceneview/actions/runs/25485621888)** — running at session close. 4 jobs (Publish MCP to npm, Maven Central, API docs, sceneview-web). Maven Central typical 5–7 min. Verify with `npm view sceneview-mcp version` (expect 4.0.10), `npm view sceneview-web version` (expect 4.0.8), Maven `<latest>4.0.8</latest>`.
+- **Stores** — Play Store + App Store deploys triggered by tag push. Typical 1-6 h Play, 1-3 days Apple.
+- **Live website** — github.io repo CDN cache propagating; will show 4.0.8 within ~10 min.
+
+### Open issues at session close (3)
+
+- [#876](https://github.com/sceneview/sceneview/issues/876) — ARRecorder stateless `logFrame()` API + `onPlaybackFailed` callback (breaks public API → bundle in v4.1)
+- [#874](https://github.com/sceneview/sceneview/issues/874) — Frame-deferred destroy queue for ImageNode/ViewNode textures (perf / leak fix, not urgent)
+- [#873](https://github.com/sceneview/sceneview/issues/873) — Cache SurfaceOrientation in AugmentedFaceNode.computeTangents (perf, ~30 Hz JNI alloc)
+
+[#863](https://github.com/sceneview/sceneview/issues/863) auto-closed by commit message.
+
+### What I would NOT do next session
+
+- Run the FULL `:samples:android-demo:connectedDebugAndroidTest` UI suite for any small commit — it's 8-9 min/run and the rule from MEMORY says "JAMAIS" for trivial commits. `:samples:android-demo:assembleDebug` (16 s) is the quality-gate default.
+- Trust emulator alone for AR demos. The 6 new AR demos from session `wizardly-elbakyan` (Record/Playback, Depth Occlusion, Instant Placement, Terrain/Rooftop Anchors, EIS) still have NOT been on-device-validated — Pixel 9 wireless debug session is the unblocker.
+- Accidentally delete other sessions' worktrees. Sister sessions may have non-stashed work. Always check before `git worktree remove`.
+
+---
+
 ## TRIAGE AUTOMATIQUE — 2026-05-07 — Daily GitHub triage (no-op sweep)
 
 **Type:** Scheduled task `daily-github-triage`

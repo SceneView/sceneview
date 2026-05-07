@@ -164,7 +164,16 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-06, session wizardly-elbakyan — ARCore feature coverage sprint)
+### Current state (last updated: 2026-05-07, session exciting-napier-1c8c70 — v4.0.8 cut)
+
+- 🚀 **v4.0.8 tagged + pushed** ([commit `13f8e0a4`](https://github.com/sceneview/sceneview/commit/13f8e0a4)). `release.yml` [run 25485621888](https://github.com/sceneview/sceneview/actions/runs/25485621888) running at session close — Maven Central + npm `sceneview-web@4.0.8` + npm `sceneview-mcp@4.0.10` + Dokka + GitHub Release.
+- ✅ **3 demos reconstructed** (lost in previous session's worktree deletion): AnimationDemo (IBL slider + HERO eyes-level), GeometryDemo (scrollable + spin + Metallic/Roughness sliders), MultiModelDemo (refonte → tabletop living-room with `studio_warm_2k.hdr`).
+- ✅ **ARFaceDemo migrated to `createUnlitColorInstance`** — eliminates the long-standing front-camera invisible-mesh risk (no more ENVIRONMENTAL_HDR dependency).
+- ✅ **Issue [#863](https://github.com/sceneview/sceneview/issues/863) closed** — `NoTangentsGlbContractTest` (5 JVM tests, pure JUnit + ByteBuffer, no JSON lib dep) pins the bug-input GLB shape that gltfio's auto-tangent path must continue to handle.
+- ✅ **All quality gates green**: 2 lib + 1 demo compile, 5 new + existing JVM tests, assembleDebug, MCP 2646 tests, sync-versions clean.
+- 🟡 **3 issues open** (all enhancements, no urgency): #876 (ARRecorder stateless API → v4.1 breaking), #874 (ImageNode/ViewNode frame-deferred destroy queue), #873 (cache SurfaceOrientation perf).
+
+### Previous state (last updated: 2026-05-06, session wizardly-elbakyan — ARCore feature coverage sprint)
 
 - 🚀 **6 commits shipped on main** — first-class ARCore Recording / Playback in `arsceneview/` (`ARRecorder` + `ARSceneView(playbackDataset = file)`), 6 new AR demos in `samples/android-demo/` (Record & Playback, Depth Occlusion, Instant Placement, Terrain Anchors, Rooftop Anchors, Image Stabilization EIS), 21 JVM unit tests for `ARRecorder` (Robolectric-backed), docs on 5 surfaces (`llms.txt`, mkdocs page, sample-app guide, README, CLAUDE.md). AR demo count went **7 → 13**.
 - ✅ **14 reviews indépendantes Opus** across 3 feature commits (6 + 5 + 3) → 23 fixes applied → 0 BLOCKING dur at the end. 4-bucket triage works.
