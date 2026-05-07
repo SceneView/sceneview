@@ -147,6 +147,86 @@ class RerunBridgeTest {
     }
 
     @Test
+    fun `eventsSent increments per successful write and isConnected tracks the socket`() {
+        val bridge = RerunBridge(host = "127.0.0.1", port = port, rateHz = 0)
+        try {
+            // Both states start at their disconnected defaults.
+            assertEquals(false, bridge.isConnected)
+            assertEquals(0L, bridge.eventsSent)
+
+            bridge.connect()
+            // Wait for the writer loop to actually open the socket — connect()
+            // is fire-and-forget on a coroutine so isConnected only flips after
+            // the socket is established.
+            val client = serverSocket.accept()
+            acceptedSocket = client
+            val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.UTF_8))
+
+            // Poll briefly for the state flip (the writer assignment is async).
+            val connectedWithin = waitFor(timeoutMillis = 2000L) { bridge.isConnected }
+            assertTrue("isConnected didn't flip true after socket open", connectedWithin)
+
+            // Send three events and confirm eventsSent reaches 3.
+            for (i in 1..3) {
+                bridge.testOnlyEnqueue(
+                    RerunWireFormat.cameraPoseJson(
+                        timestampNanos = i.toLong(),
+                        tx = i.toFloat(), ty = 0f, tz = 0f,
+                        qx = 0f, qy = 0f, qz = 0f, qw = 1f,
+                    ),
+                )
+                // Drain so the conflated channel doesn't drop the next push.
+                assertNotNull(reader.readLine())
+            }
+            val sentReached3 = waitFor(timeoutMillis = 2000L) { bridge.eventsSent >= 3L }
+            assertTrue(
+                "eventsSent never reached 3 (got ${bridge.eventsSent})",
+                sentReached3,
+            )
+        } finally {
+            bridge.close()
+        }
+        // After close: state should reflect disconnected.
+        assertEquals(false, bridge.isConnected)
+    }
+
+    @Test
+    fun `isConnected stays false when no sidecar is listening`() {
+        // Use a port we explicitly close, so connect() always fails.
+        val deadServer = ServerSocket(0)
+        val deadPort = deadServer.localPort
+        deadServer.close()
+
+        val bridge = RerunBridge(host = "127.0.0.1", port = deadPort, rateHz = 0)
+        try {
+            bridge.connect()
+            // connect() races a 2s timeout on Socket.connect — give it room.
+            Thread.sleep(2200)
+            assertEquals(
+                "isConnected should remain false when the sidecar is offline",
+                false,
+                bridge.isConnected,
+            )
+            assertEquals(
+                "eventsSent should remain 0 when nothing was ever shipped",
+                0L,
+                bridge.eventsSent,
+            )
+        } finally {
+            bridge.close()
+        }
+    }
+
+    private fun waitFor(timeoutMillis: Long, predicate: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (System.currentTimeMillis() < deadline) {
+            if (predicate()) return true
+            Thread.sleep(20)
+        }
+        return predicate()
+    }
+
+    @Test
     fun `bridge can be disconnected and reconnected`() {
         val bridge = RerunBridge(host = "127.0.0.1", port = port, rateHz = 0)
         try {

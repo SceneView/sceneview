@@ -131,12 +131,18 @@ struct RerunDebugDemo: View {
 
     private var statusPill: some View {
         HStack(spacing: 8) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
-                .foregroundStyle(.purple)
-            Text("Recording · \(bridge.eventCount) events")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.white)
+            Image(systemName: bridge.isConnected
+                ? "antenna.radiowaves.left.and.right"
+                : "antenna.radiowaves.left.and.right.slash"
+            )
+            .foregroundStyle(bridge.isConnected ? .purple : .red)
+            Text(bridge.isConnected
+                 ? "Recording · \(bridge.eventCount) events"
+                 : "Sidecar offline — start rerun-bridge.py"
+            )
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(.white)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

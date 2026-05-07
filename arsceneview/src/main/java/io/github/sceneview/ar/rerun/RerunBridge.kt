@@ -1,6 +1,9 @@
 package io.github.sceneview.ar.rerun
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.google.ar.core.Anchor
 import com.google.ar.core.Frame
 import com.google.ar.core.HitResult
@@ -114,6 +117,25 @@ public constructor(
     @Volatile private var readerJob: Job? = null
     @Volatile private var lastEmitNanos: Long = 0L
 
+    // ── Compose-observable state ──────────────────────────────────────────
+    // Mirrors the iOS bridge's `@Published var eventCount: Int` so callers can
+    // bind a "Captured: N events" indicator to actually-shipped events instead
+    // of speculative frame counts. Reads from any thread are safe (Compose's
+    // mutableStateOf is thread-safe for reads); writes happen on the writer
+    // coroutine after each successful flush.
+    private var _isConnected by mutableStateOf(false)
+    /** True iff the TCP socket is open AND the writer loop is running. */
+    public val isConnected: Boolean
+        get() = _isConnected
+
+    private var _eventsSent by mutableStateOf(0L)
+    /**
+     * Cumulative count of JSON-line events successfully written to the socket
+     * (not just enqueued). Resets to 0 on a fresh [connect] call.
+     */
+    public val eventsSent: Long
+        get() = _eventsSent
+
     // Listeners for sidecar control acknowledgments (e.g. save_now -> saved).
     // CopyOnWriteArrayList lets us iterate from the reader thread while
     // [requestSaveAndShare] mutates from any caller thread.
@@ -138,6 +160,9 @@ public constructor(
      */
     public fun connect() {
         if (writerJob?.isActive == true) return
+        // Reset counters on every fresh connect so a flickering link doesn't
+        // accumulate misleading totals across attempts.
+        _eventsSent = 0L
         writerJob = scope.launch {
             try {
                 val s = Socket()
@@ -145,6 +170,7 @@ public constructor(
                 val w = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
                 socket = s
                 writer = w
+                _isConnected = true
 
                 // Start the reader for sidecar acks AFTER the socket is live.
                 readerJob = scope.launch { readSidecarAcks(s) }
@@ -153,6 +179,7 @@ public constructor(
                     try {
                         w.write(line)
                         w.flush()
+                        _eventsSent++
                     } catch (e: Exception) {
                         logWarning("write failed: ${e.message}")
                         break
@@ -161,6 +188,7 @@ public constructor(
             } catch (e: Exception) {
                 logWarning("connect to $host:$port failed: ${e.message}")
             } finally {
+                _isConnected = false
                 closeQuietly()
                 readerJob?.cancel()
                 readerJob = null

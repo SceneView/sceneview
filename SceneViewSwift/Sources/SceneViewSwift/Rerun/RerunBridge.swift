@@ -94,6 +94,11 @@ public final class RerunBridge: ObservableObject {
     /// so a SwiftUI view can bind an overlay to it.
     @Published public private(set) var eventCount: Int = 0
 
+    /// `true` while the underlying `NWConnection` reports `.ready`. Bind to
+    /// surface a "Sidecar offline" indicator when no Python sidecar is
+    /// listening — a `0` ``eventCount`` would otherwise look like a bug.
+    @Published public private(set) var isConnected: Bool = false
+
     public init(
         host: String = RerunBridge.defaultHost,
         port: UInt16 = RerunBridge.defaultPort,
@@ -123,10 +128,13 @@ public final class RerunBridge: ObservableObject {
                 switch state {
                 case .ready:
                     self?.startReadLoop()
+                    DispatchQueue.main.async { self?.isConnected = true }
                 case .failed(let err):
                     NSLog("[RerunBridge] failed: \(err.localizedDescription)")
+                    DispatchQueue.main.async { self?.isConnected = false }
                 case .cancelled:
                     NSLog("[RerunBridge] cancelled")
+                    DispatchQueue.main.async { self?.isConnected = false }
                 default:
                     break
                 }

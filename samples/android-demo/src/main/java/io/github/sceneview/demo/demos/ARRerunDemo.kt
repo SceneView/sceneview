@@ -86,7 +86,6 @@ fun ARRerunDemo(onBack: () -> Unit) {
     var isTracking by remember { mutableStateOf(false) }
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var frameCount by remember { mutableStateOf(0L) }
-    var eventCount by remember { mutableStateOf(0L) }
     var eventsPerSec by remember { mutableStateOf(0f) }
     var lastCameraPose by remember { mutableStateOf<Pose?>(null) }
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
@@ -101,6 +100,11 @@ fun ARRerunDemo(onBack: () -> Unit) {
     // dispose — no Connect/Disconnect UI to confuse first-time users who
     // came in from the QR code on /rerun/.
     val bridge = rememberRerunBridge(rateHz = 10, enabled = true)
+    // Read the bridge's actually-shipped count, not a local frame counter — a
+    // local counter ticks even when the sidecar is unreachable, which would
+    // mislead the user into thinking events are being sent.
+    val eventCount = bridge.eventsSent
+    val isConnected = bridge.isConnected
 
     // Sample events/sec once per second.
     LaunchedEffect(Unit) {
@@ -153,7 +157,8 @@ fun ARRerunDemo(onBack: () -> Unit) {
                 eventCount = eventCount,
                 eventsPerSec = eventsPerSec,
                 frameCount = frameCount,
-                lastPose = lastCameraPose
+                lastPose = lastCameraPose,
+                isConnected = isConnected
             )
         }
     ) {
@@ -171,14 +176,10 @@ fun ARRerunDemo(onBack: () -> Unit) {
                 onSessionUpdated = { session: Session, frame: Frame ->
                     latestFrame = frame
                     isTracking = frame.camera.trackingState == TrackingState.TRACKING
+                    // Bridge gates on its own enabled + connection state, so this
+                    // is safe whether or not the sidecar is reachable.
                     bridge.logFrame(session, frame)
                     frameCount++
-                    // Mirror what the bridge actually emits (rate-limited to ~10 Hz):
-                    // every Nth frame becomes one camera-pose event + N plane events
-                    // + 1 point-cloud event. We approximate by counting one event per
-                    // frame at the bridge's effective rate — close enough for a
-                    // live indicator.
-                    eventCount++
                     if (frame.camera.trackingState == TrackingState.TRACKING) {
                         lastCameraPose = frame.camera.pose
                     }
@@ -283,7 +284,8 @@ private fun StreamStatsCard(
     eventCount: Long,
     eventsPerSec: Float,
     frameCount: Long,
-    lastPose: Pose?
+    lastPose: Pose?,
+    isConnected: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -292,15 +294,36 @@ private fun StreamStatsCard(
         )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "Recording",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Recording",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                // Connection pill — surfaces the failure mode for users without
+                // a Python sidecar running. Without this, "Events captured: 0"
+                // looks like a bug; with it, the cause is unambiguous.
+                val (label, color) = if (isConnected)
+                    "Live" to MaterialTheme.colorScheme.primary
+                else
+                    "Sidecar offline" to MaterialTheme.colorScheme.error
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = color,
+                    modifier = Modifier
+                        .background(
+                            color = color.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
-            StatRow(label = "Events captured", value = eventCount.toString())
+            StatRow(label = "Events sent", value = eventCount.toString())
             StatRow(
                 label = "Rate",
                 value = if (eventsPerSec > 0f) "%.0f events/s".format(eventsPerSec) else "—"
