@@ -3035,7 +3035,7 @@ public struct AnchorNode: Sendable {
 }
 ```
 
-#### AugmentedImageNode — image tracking (iOS only)
+#### AugmentedImageNode — image tracking
 
 ```swift
 public struct AugmentedImageNode: Sendable {
@@ -3261,7 +3261,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.0.0
+  sceneview_flutter: ^4.0.9
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).
