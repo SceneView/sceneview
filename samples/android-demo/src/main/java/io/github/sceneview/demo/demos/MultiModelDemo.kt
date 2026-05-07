@@ -3,19 +3,15 @@ package io.github.sceneview.demo.demos
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,25 +22,33 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.rememberHeroYaw
+import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
- * Loads several glTF models and lays them out so the demo actually showcases what
- * "multi model" means: multiple independent assets, each at its own scale + position +
- * rotation, all reactive to user controls.
+ * Loads four glTF assets and arranges them as a tabletop living-room display so the
+ * demo actually showcases what "multi model" means: multiple independent assets, each
+ * at its own scale + position + rotation, all under the same warm dusk lighting.
+ *
+ * Lighting comes from `studio_warm_2k.hdr` — a soft golden-hour interior wash that
+ * makes the four very different materials (avocado skin, lantern brass, helmet metal
+ * paint, dragon scales) read distinctly while feeling like one cohesive scene.
  *
  * Controls:
  * - Visibility chips per model (toggle individual nodes off / on)
- * - "Spin scene" toggle — circular auto-rotation around the formation
- * - Spread slider — pull the formation apart / together in real time
+ * - "Spin scene" toggle — slow circular auto-rotation of the whole formation, lets
+ *   the viewer walk around the display without touching the screen
+ *
+ * The previous "spread slider" was removed: the new fixed layout is hand-tuned for the
+ * dusk-lit display (front row at z=-1.3, back row at z=-1.7) so user adjustment would
+ * pull pieces out of the lighting sweet spot rather than improve the framing.
  */
 @Composable
 fun MultiModelDemo(onBack: () -> Unit) {
@@ -53,7 +57,6 @@ fun MultiModelDemo(onBack: () -> Unit) {
     var showHelmet by remember { mutableStateOf(true) }
     var showDragon by remember { mutableStateOf(true) }
     var spinScene by remember { mutableStateOf(true) }
-    var spread by remember { mutableFloatStateOf(0.7f) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -64,9 +67,21 @@ fun MultiModelDemo(onBack: () -> Unit) {
     val helmet = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
     val dragon = rememberModelInstance(modelLoader, "models/animated_dragon.glb")
 
+    // Warm dusk HDR — `studio_warm_2k.hdr` gives a golden-hour interior wash that
+    // unifies the four very different materials. Skybox enabled so the warm tint is
+    // visible behind the display, not just rim-lighting the models on a black void.
+    // Falls back to the default neutral environment while the HDR is still loading.
+    val hdrEnvironment = rememberHDREnvironment(
+        environmentLoader,
+        "environments/studio_warm_2k.hdr",
+        createSkybox = true,
+    )
+    val fallbackEnvironment = rememberEnvironment(environmentLoader)
+    val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
+
     val allLoaded = avocado != null && lantern != null && helmet != null && dragon != null
-    // Yaw drives both the parent-scene rotation (when "Spin scene" is on) and the
-    // per-model self-spin so each asset shows all sides as it sweeps past the camera.
+    // Yaw drives the parent-scene rotation when "Spin scene" is on. Slow 30 s sweep
+    // so the viewer can take in each face of the display before it cycles round.
     val sceneYaw = rememberHeroYaw(
         trigger = allLoaded && spinScene, durationMillis = 30_000, staticYaw = 0f,
     )
@@ -101,7 +116,6 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     label = { Text("Dragon") },
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
 
             // Spin toggle — wrap the row in toggleable so taps anywhere flip the state
             Row(
@@ -117,17 +131,6 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 Text("Spin scene", style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = spinScene, onCheckedChange = null)
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Spread: ${"%.1f".format(spread)} m",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Slider(
-                value = spread,
-                onValueChange = { spread = it },
-                valueRange = 0.3f..1.4f,
-            )
         },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -136,31 +139,45 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
-                cameraManipulator = rememberCameraManipulator(),
+                environment = activeEnvironment,
+                cameraManipulator = rememberCameraManipulator(
+                    orbitHomePosition = Position(0f, 0.4f, 0.5f),
+                    targetPosition = Position(0f, 0f, -1.5f),
+                ),
             ) {
-                // Place each visible model on a 90° arc, rotated by `sceneYaw` so the
-                // whole formation sweeps the camera. Per-model `rotation = Rotation(y =
-                // -sceneYaw)` cancels the orbit so each asset still faces the camera as
-                // the formation rotates — gives a "carousel" feel without hiding any
-                // model's silhouette behind itself.
-                val models = listOf(
-                    Triple(showAvocado, avocado, ModelSpec("Avocado", 0.5f, 0f)),
-                    Triple(showLantern, lantern, ModelSpec("Lantern", 0.5f, 90f)),
-                    Triple(showHelmet, helmet, ModelSpec("Helmet", 0.5f, 180f)),
-                    Triple(showDragon, dragon, ModelSpec("Dragon", 0.4f, 270f)),
+                // Tabletop arrangement: helmet at front-center as the hero, lantern
+                // at back-right as the warm light source, dragon at back-left where
+                // its tail sweep doesn't intersect the helmet, avocado as a small
+                // front-left accent. Front row z=-1.3, back row z=-1.7 so the
+                // depth difference reads even on a portrait phone viewport.
+                //
+                // sceneYaw rotates each model AROUND the formation centre by treating
+                // its (x, z) as polar coords offset from (0, -1.5). Per-model rotation
+                // cancels the yaw on its own Y so each piece stays facing the camera
+                // as the formation sweeps — gives a "turntable display" feel.
+                val centerZ = -1.5f
+                val displays = listOf(
+                    Display(showAvocado, avocado, x = -0.55f, z = -1.3f, scale = 0.4f),
+                    Display(showHelmet, helmet, x = 0.0f, z = -1.3f, scale = 0.5f),
+                    Display(showDragon, dragon, x = -0.45f, z = -1.7f, scale = 0.4f),
+                    Display(showLantern, lantern, x = 0.55f, z = -1.7f, scale = 0.5f),
                 )
-                for ((show, instance, spec) in models) {
-                    if (!show || instance == null) continue
-                    val angleRad = Math.toRadians((spec.angleDeg + sceneYaw).toDouble())
+                val yawRad = Math.toRadians(sceneYaw.toDouble())
+                val cosYaw = kotlin.math.cos(yawRad).toFloat()
+                val sinYaw = kotlin.math.sin(yawRad).toFloat()
+                for (d in displays) {
+                    if (!d.show || d.instance == null) continue
+                    // Rotate (x, z - centerZ) by sceneYaw around centre, then translate
+                    // back. Equivalent to wrapping all models in a parent rotated node.
+                    val dx = d.x
+                    val dz = d.z - centerZ
+                    val rx = dx * cosYaw + dz * sinYaw
+                    val rz = -dx * sinYaw + dz * cosYaw
                     ModelNode(
-                        modelInstance = instance,
-                        scaleToUnits = spec.scale,
+                        modelInstance = d.instance,
+                        scaleToUnits = d.scale,
                         centerOrigin = Position(0f, 0.5f, 0f),
-                        position = Position(
-                            x = sin(angleRad).toFloat() * spread,
-                            y = 0f,
-                            z = (cos(angleRad).toFloat() * spread) - 1.5f,
-                        ),
+                        position = Position(x = rx, y = 0f, z = rz + centerZ),
                         rotation = Rotation(y = -sceneYaw),
                     )
                 }
@@ -170,4 +187,10 @@ fun MultiModelDemo(onBack: () -> Unit) {
     }
 }
 
-private data class ModelSpec(val name: String, val scale: Float, val angleDeg: Float)
+private data class Display(
+    val show: Boolean,
+    val instance: io.github.sceneview.model.ModelInstance?,
+    val x: Float,
+    val z: Float,
+    val scale: Float,
+)

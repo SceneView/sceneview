@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.google.android.filament.LightManager
 import com.google.ar.core.AugmentedFace
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
@@ -27,7 +26,6 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
-import io.github.sceneview.node.LightNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
@@ -50,33 +48,18 @@ fun ARFaceDemo(onBack: () -> Unit) {
     var detectedFaces by remember { mutableStateOf<List<AugmentedFace>>(emptyList()) }
     var faceCount by remember { mutableStateOf(0) }
 
-    // Strongly visible material for the face mesh overlay.
+    // Unlit colour overlay for the face mesh. ARCore disables `ENVIRONMENTAL_HDR`
+    // light estimation when the front camera is in use, so any lit material falls
+    // back to whatever neutral IBL is in scope — which historically rendered the
+    // mesh near-invisible even after the tangent-quaternion fix in `35e5990d`.
     //
-    // History: the demo previously used `transparent_colored` at alpha 0.4, then 0.85 —
-    // both rendered as effectively invisible on Pixel 9 even though tracking reported
-    // "Tracking 1 face(s)" and `35e5990d` fixed the underlying tangent-buffer bug. Two
-    // factors compounded:
-    //   1. ARCore disables `ENVIRONMENTAL_HDR` light estimation when the front camera
-    //      is in use, so the lit-PBR shading falls back to the AR scene's neutral IBL,
-    //      which is dim. With low alpha + lit + dim IBL the final rgba ≈ near-zero.
-    //   2. The transparent_colored material draws back-to-front order alpha-blended
-    //      with the camera feed; a face mesh is dense enough that self-occluded
-    //      transparent fragments collapse to the same pixel and look uniform.
-    //
-    // Switch to fully **opaque** alpha (1.0) — that routes through
-    // `opaque_colored.mat` which writes depth, blends additively over the camera
-    // feed, and removes the alpha-stacking failure mode entirely. Pure-diffuse PBR
-    // (metallic 0, roughness 1, reflectance 0) keeps the colour readable even under
-    // a dim IBL because there's no specular path to drown it out. Combined with the
-    // explicit fill light declared inside the scene, the mesh now reads as a solid
-    // SceneView-blue overlay tracking the user's face.
+    // `createUnlitColorInstance` ships a flat colour straight to the framebuffer
+    // (no PBR shading, no IBL dependency, no self-blend stacking), so the overlay
+    // reads as a clean SceneView-blue tone regardless of front-camera lighting.
+    // No fill light needed — the previous explicit 100 000 lux directional was
+    // a workaround for the lit material that's now obsolete.
     val faceMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = SceneViewColors.Primary.copy(alpha = 1.0f),
-            metallic = 0.0f,
-            roughness = 1.0f,
-            reflectance = 0.0f
-        )
+        materialLoader.createUnlitColorInstance(SceneViewColors.Primary)
     }
 
     DemoScaffold(
@@ -106,18 +89,10 @@ fun ARFaceDemo(onBack: () -> Unit) {
                     faceCount = detectedFaces.size
                 }
             ) {
-                // Explicit directional fill light. ARCore disables `ENVIRONMENTAL_HDR`
-                // light estimation when the front camera is in use, leaving the AR
-                // scene with only its dim neutral IBL — which is what made the face
-                // mesh look invisible in earlier review rounds even after the
-                // tangent-quaternion fix in `35e5990d`. A 100 000-lux key light
-                // pointing slightly down-and-forward from above the user lights the
-                // mesh against the camera feed without blowing out highlights.
-                LightNode(
-                    type = LightManager.Type.DIRECTIONAL,
-                    intensity = 100_000f,
-                    direction = io.github.sceneview.math.Direction(x = 0f, y = -1f, z = -0.5f),
-                )
+                // Unlit material — no fill light needed. The previous 100 000-lux
+                // directional was a workaround for the lit-PBR material's IBL
+                // dependency; the unlit path renders the mesh's flat colour
+                // straight to the framebuffer regardless of scene lighting.
                 detectedFaces.forEach { face ->
                     AugmentedFaceNode(
                         augmentedFace = face,

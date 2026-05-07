@@ -3,8 +3,8 @@
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
 **Android — Maven artifacts (version 4.0.2):**
-- 3D only: `io.github.sceneview:sceneview:4.0.7`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.7`
+- 3D only: `io.github.sceneview:sceneview:4.0.8`
+- AR + 3D: `io.github.sceneview:arsceneview:4.0.8`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.2")
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.7")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.7") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.0.8")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.0.8") // AR (includes sceneview)
 }
 ```
 
@@ -106,6 +106,7 @@ fun ARSceneView(
     materialLoader: MaterialLoader = rememberMaterialLoader(engine),
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     sessionFeatures: Set<Session.Feature> = setOf(),
+    playbackDataset: File? = null,                 // Replay an MP4 recorded via ARRecorder. See "AR Recording & Playback".
     sessionCameraConfig: ((Session) -> CameraConfig)? = null,
     sessionConfiguration: ((session: Session, Config) -> Unit)? = null,
     planeRenderer: Boolean = true,
@@ -1347,6 +1348,125 @@ The MCP exposes 5 tools: `setup_rerun_project`, `generate_ar_logger`, `generate_
 - **Dev-time only.** Gate with `BuildConfig.DEBUG` / `#if DEBUG`. The bridge is safe to leave wired in release (`setEnabled(false)` short-circuits the hot path), but the socket attempt alone wastes battery.
 - **No Rerun on visionOS yet.** `RerunBridge` is iOS-only because it reads from `ARFrame`, which isn't part of the visionOS API surface.
 - **10 Hz default.** Higher rates are possible but the sidecar becomes a bottleneck beyond ~30 Hz on a typical laptop.
+
+---
+
+## AR Recording & Playback — debug without a phone
+
+ARCore captures the **entire** AR session (camera frames, IMU, planes, depth, anchors, light estimation) into an MP4. SceneView wraps this with [`ARRecorder`](arsceneview/src/main/java/io/github/sceneview/ar/recording/ARRecorder.kt) for recording and a `playbackDataset` parameter on `ARSceneView` for replay. The replayed session re-runs as if you were there: hit-tests return the same results, planes appear at the same moment, anchors track at the same poses.
+
+### Why this matters
+
+- **Iterate at the desk.** Record an outdoor session once; replay it any time without holding a phone in front of the laptop.
+- **Reproduce bugs deterministically.** Share the MP4 with a teammate — they replay your exact session, including the lighting, motion, and surfaces you saw.
+- **CI tests.** Bundle a recording as a test fixture; assert that `onSessionUpdated` reports the expected planes/anchors.
+- **Pair with Rerun.** Record → replay with the [Rerun bridge](#ar-debug--rerunio-integration) attached → inspect every frame in 3D.
+
+### Record a session
+
+```kotlin
+import io.github.sceneview.ar.recording.rememberARRecorder
+import io.github.sceneview.ar.ARSceneView
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+
+@Composable
+fun ARRecord() {
+    val recorder = rememberARRecorder()
+    val context = LocalContext.current
+    val outputDir = remember { context.getExternalFilesDir("ar-recordings")!! }
+
+    Column {
+        Button(onClick = {
+            val name = "ar-${SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())}.mp4"
+            recorder.start(File(outputDir, name))
+        }) { Text("Record") }
+        Button(onClick = { recorder.stop() }) { Text("Stop") }
+        Text("State: ${recorder.state}")
+    }
+
+    ARSceneView(
+        modifier = Modifier.fillMaxSize(),
+        // Wire attach() ONLY through onSessionUpdated. The recorder publishes the
+        // latest Session via an AtomicReference (cheap), and the same Session
+        // instance survives Activity pause/resume — the swap only happens on full
+        // composable disposal (e.g. key() remount or navigating away and back),
+        // and onSessionUpdated re-fires on the new Session naturally. No need to
+        // also wire onSessionCreated.
+        onSessionUpdated = { session, _ -> recorder.attach(session) }
+    )
+}
+```
+
+`ARRecorder.state`, `recorder.errorMessage`, and `recorder.recordingFile` are all `MutableState`-backed under the hood — read them from a `@Composable` and Compose recomposes / `LaunchedEffect` re-keys when they change. The composable auto-stops on dispose. After `stop()`, `recorder.recordingFile` keeps pointing at the last MP4 so the caller can list / share / replay it.
+
+### Auto-stop after N seconds
+
+Drive `stop()` from a `LaunchedEffect` keyed on `recorder.state` so you don't block the UI thread:
+
+```kotlin
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+
+LaunchedEffect(recorder.state) {
+    if (recorder.state == ARRecorder.State.RECORDING) {
+        delay(30_000L)
+        recorder.stop()
+    }
+}
+// after the LaunchedEffect fires, the file is at recorder.recordingFile
+```
+
+### Replay a session
+
+```kotlin
+@Composable
+fun ARReplay(file: File) {
+    // playbackDataset MUST be set before the session resumes — switching at runtime
+    // requires a full ARSceneView remount, hence the key().
+    key(file) {
+        ARSceneView(
+            modifier = Modifier.fillMaxSize(),
+            playbackDataset = file
+        )
+    }
+}
+```
+
+ARCore replays at the original capture rate. The session looks **identical** to live: planes appear, anchors lock, depth occlusion works, gestures still hit-test correctly. The playback param is a plain `java.io.File` — no FileProvider, no scoped-storage gymnastics.
+
+### Limits
+
+- **Camera permission still required for playback.** ARCore opens the camera even when replaying a dataset; users see no live preview but the permission gate fires regardless. Run your normal permission flow.
+- **Emulator: playback works, recording does not.** ARCore Recording requires a real camera + IMU. Use `getExternalFilesDir("ar-recordings")` to store recordings made on a device, then replay them anywhere.
+- **Same device class.** Playback works best on the device that recorded it, or a similar one. Heavily different sensor sets (e.g. phone → tablet) may degrade tracking.
+- **MP4 file size.** A few tens of MB per minute depending on resolution. Store under `getExternalFilesDir("ar-recordings")` (no permission required, app-private).
+- **Switching live ↔ playback** requires a full `ARSceneView` recreation — wrap in `key(playbackDataset) { ARSceneView(...) }` so Compose discards and rebuilds the session. Mutating the param after first composition is silently ignored (the value is snapshotted at session creation).
+- **Recording while in playback mode is rejected.** `ARRecorder.start()` returns `false` and surfaces an error message if the session is currently bound to a playback dataset.
+- **`attach(newSession)` mid-RECORDING is a pointer swap, not a graceful handoff.** If the underlying `Session` instance changes while a recording is in flight (e.g. the user navigates away and back, or `key(...)` triggers a full ARSceneView teardown), the old session never receives `stopRecording()` — the in-flight MP4 is left dangling. `stop()` on the new session is a no-op for the orphaned recording. Mitigation: call `stop()` BEFORE any UI action that might dispose the ARSceneView; or hook `onSessionCreated` to detect the new-session event and stop+restart deliberately. Note that ARCore keeps the same `Session` instance across plain Activity pause/resume — you only need to worry about swap on composable disposal.
+
+---
+
+## AR Image Stabilization (EIS)
+
+ARCore 1.37+ exposes **Electronic Image Stabilization** as a single `Config` flag. When enabled, ARCore smooths the camera background image so handheld micro-shake doesn't translate into perceived judder. The virtual content stays anchored at the same world pose either way — only the camera image is stabilized. Useful for handheld AR, panoramic captures, and any video-style recording where jitter is distracting.
+
+```kotlin
+ARSceneView(
+    sessionConfiguration = { session, config ->
+        if (session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)) {
+            config.imageStabilizationMode = Config.ImageStabilizationMode.EIS
+        }
+        // ... your other config flags
+    }
+)
+```
+
+- **Not all devices support EIS.** Always gate with `session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)` — calling `setImageStabilizationMode(EIS)` on an unsupported device throws.
+- **Back-camera only.** EIS is not supported with `Session.Feature.FRONT_CAMERA`. The `isImageStabilizationModeSupported` check returns `false` for front-camera sessions, so the gate above already covers selfie configurations — but be aware that toggling EIS in a front-camera demo will be a no-op.
+- **Toggling at runtime works** via `session.configure {}`, but the camera background can briefly stutter while the stabilization buffers re-prime. If you expose an in-app toggle, prefer remounting via `key(eisEnabled) { ARSceneView(...) }` for a clean swap.
+- **Interactive demo** at [`samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageStabilizationDemo.kt).
 
 ---
 

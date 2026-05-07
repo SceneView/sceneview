@@ -98,6 +98,10 @@ fun AnimationDemo(onBack: () -> Unit) {
     // Default cinematic shot is REVEAL — close-up to wide pull-back is the most
     // dramatic intro and pairs naturally with the Walk animation.
     var cameraMode by remember { mutableStateOf(CameraMode.REVEAL) }
+    // IBL intensity — exposed as a slider so users can dial atmospheric vs neutral.
+    // Default 5_000 lux balances the rooftop_night HDR's warm tint without bleeding
+    // into the soldier's albedo. Range 0–10_000 covers pitch-black to over-exposed.
+    var iblIntensity by remember { mutableFloatStateOf(5_000f) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -116,10 +120,12 @@ fun AnimationDemo(onBack: () -> Unit) {
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
     // The rooftop_night HDR is over-bright and saturates the soldier's albedo with the
-    // dusk's warm/violet tint. Halve the IBL intensity (default ~30k lux from cmgen)
-    // so the lighting feels atmospheric without bleeding the color tint into the model.
-    LaunchedEffect(activeEnvironment) {
-        activeEnvironment.indirectLight?.intensity = 5_000f
+    // dusk's warm/violet tint. The default ~30k lux from cmgen is far too hot — we
+    // expose the IBL intensity as a slider so users can dial atmospheric (low values)
+    // vs neutral (high values). Re-runs whenever the active environment OR the slider
+    // value change, so dragging the slider updates the lighting in real time.
+    LaunchedEffect(activeEnvironment, iblIntensity) {
+        activeEnvironment.indirectLight?.intensity = iblIntensity
     }
 
     // Captured ref to the ModelNode once it's created — used by the LaunchedEffect
@@ -199,12 +205,16 @@ fun AnimationDemo(onBack: () -> Unit) {
 
         when (cameraMode) {
             CameraMode.HERO -> {
-                // Heroic low-angle orbit. The camera sits slightly below the soldier
-                // (yHeight 0.15 m) so we look UP at him — classic monument framing.
+                // Heroic eyes-level orbit. Previously sat at yHeight 0.15 m which gave a
+                // monument low-angle shot — visually striking but cropped the soldier's
+                // head on portrait phones because we were looking sharply UP. Bumped to
+                // 0.55 m so the camera sits ~10 cm above the soldier's chest target
+                // (target.y=0.5), placing the lens roughly at his eyes — natural framing
+                // that keeps head-and-feet in frame across all viewport aspect ratios.
                 // We rotate slowly (25 s nominal) but break the loop into 4 segments
                 // with a 2 s hold at the front-3/4 angle (≈45°) for a cinematic beat.
                 radiusAnim.snapTo(baseRadius + 0.2f)
-                yHeightAnim.snapTo(0.15f)
+                yHeightAnim.snapTo(0.55f)
                 while (true) {
                     yawAnim.snapTo(0f)
                     // Quarter 1: 0° → 45° (front-3/4) over 5 s, ease-in-out
@@ -532,6 +542,21 @@ fun AnimationDemo(onBack: () -> Unit) {
                     label = { Text("Once") }
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // IBL intensity — the rooftop_night HDR is over-bright from cmgen's defaults.
+            // 0 lux gives a pitch-black scene (only the directional sun left), 5 000 lux
+            // is the atmospheric default, 10 000 lux pushes into over-exposed neutral.
+            Text(
+                "IBL Intensity: ${iblIntensity.toInt()} lux",
+                style = MaterialTheme.typography.labelLarge
+            )
+            Slider(
+                value = iblIntensity,
+                onValueChange = { iblIntensity = it },
+                valueRange = 0f..10_000f,
+            )
         }
     ) {
         SceneView(
