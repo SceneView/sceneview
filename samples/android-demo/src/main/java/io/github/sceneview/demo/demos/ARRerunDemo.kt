@@ -636,8 +636,10 @@ private fun ShareResultBody(
         }
         result.viewerUrl?.let { url ->
             Text(
-                "Re-host this .rrd on a public URL (R2, GitHub release, gist) and " +
-                    "open the viewer at:",
+                "Drag-and-drop the .rrd file onto " +
+                    "https://sceneview.github.io/rerun/ — the AR Session Viewer renders " +
+                    "it in-place. Or re-host on a public URL (R2, GitHub release, gist) " +
+                    "and open this link:",
                 style = MaterialTheme.typography.labelSmall,
             )
             Text(

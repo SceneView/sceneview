@@ -91,7 +91,7 @@ struct RerunDebugDemo: View {
             }
         } message: { result in
             if result.success {
-                Text("\(result.events) events recorded. Re-host the .rrd on a public URL and share the link to view in any browser.")
+                Text("\(result.events) events recorded. Drop the .rrd onto https://sceneview.github.io/rerun/ to render it in-place, or re-host on a public URL (R2, GitHub release, gist) and open the share link in any browser.")
             } else {
                 Text(result.reason ?? "The sidecar didn't acknowledge the save command.")
             }

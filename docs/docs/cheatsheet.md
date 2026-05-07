@@ -256,9 +256,11 @@ bridge.requestSaveAndShare { result ->
 }
 ```
 
-Re-host the `.rrd` and open
-**`https://sceneview.github.io/rerun/?url=<encoded-public-url>`** in any
-browser to scrub the AR session frame-by-frame. No install required.
+Drop the saved `.rrd` onto **<https://sceneview.github.io/rerun/>** to scrub
+the AR session frame-by-frame in any browser — no install required, no
+re-hosting needed for local inspection. To share with a remote teammate,
+re-host the file (R2, GitHub release, gist) and send them
+**`https://sceneview.github.io/rerun/?url=<encoded-public-url>`**.
 
 ---
 

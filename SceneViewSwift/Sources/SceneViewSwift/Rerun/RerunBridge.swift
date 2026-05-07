@@ -56,9 +56,10 @@ public final class RerunBridge: ObservableObject {
     /// it couldn't (`success = false` with a human-readable ``reason``).
     ///
     /// `viewerUrl` is the SceneView Rerun page pre-filled with the recording
-    /// location. It is most useful as a copy-paste hint — the underlying
-    /// URL usually points at a `file://` path on the dev machine which most
-    /// browsers won't fetch from an HTTPS page. Re-host the `.rrd` first.
+    /// location. The underlying URL usually points at a `file://` path on the
+    /// dev machine which most browsers won't fetch from an HTTPS page — drop
+    /// the `.rrd` onto https://sceneview.github.io/rerun/ to render it
+    /// in-place, or re-host the file on a public URL first.
     public struct ShareResult: Equatable {
         public let success: Bool
         public let path: String?

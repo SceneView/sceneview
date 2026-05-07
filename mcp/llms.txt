@@ -1213,8 +1213,8 @@ Same wire format on Android and iOS. A single sidecar handles both platforms.
 
 1. Run sidecar in save mode: `python rerun-bridge.py --save`
 2. In the app, tap **Save & Share** while streaming. The bridge sends a `{"type":"control","cmd":"save_now"}` line; the sidecar flushes a `.rrd` and replies with `{"type":"control","ack":"saved","path":"…","viewerUrl":"…","events":N}`.
-3. Re-host the `.rrd` on a public URL (Cloudflare R2, GitHub release asset, S3, gist).
-4. Open `https://sceneview.github.io/rerun/?url=<encoded-public-url>` in any browser to view + scrub the recording.
+3. Open https://sceneview.github.io/rerun/ — the landing page detects no session and shows a drop-zone. Drag the saved `.rrd` onto it and the AR Session Viewer renders it in-place. The page also has a QR code that opens the **AR Rerun demo** in the SceneView app on a phone, so anyone can capture a session without writing any code first.
+4. To share with a remote teammate, re-host the `.rrd` on a public URL (Cloudflare R2, GitHub release asset, S3, gist) and send them `https://sceneview.github.io/rerun/?url=<encoded-public-url>`.
 
 The Kotlin API surface for step 2:
 
