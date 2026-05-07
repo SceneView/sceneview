@@ -8,7 +8,7 @@
  * and handler logic now live in `./tools/`, so this file is a thin
  * adapter that wires the library into the MCP stdio server plus the
  * two MCP resources (`sceneview://api`, `sceneview://known-issues`) and
- * the pro-tier access / billing checks.
+ * the proxy dispatch for Pro-tier tools (`./proxy.ts`).
  *
  * IMPORTANT: the runtime behaviour must stay identical to v4.0.0 for
  * existing npm consumers. Do not reorder checks, do not change content
