@@ -197,9 +197,19 @@ class RenderTestHarness(
 
     /**
      * Runs [block] on the main (instrumentation) thread and waits for completion.
+     *
+     * `Instrumentation.runOnMainSync` rejects calls that are already on the main thread
+     * (it would deadlock waiting for itself). AGP 8 instrumentation tests on emulator run
+     * on the main thread by default, while older orchestrations ran on the worker thread,
+     * so this helper handles both: if we're already on main, run inline; otherwise
+     * dispatch synchronously.
      */
     fun runOnMain(block: () -> Unit) {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            block()
+        } else {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
+        }
     }
 
     companion object {
