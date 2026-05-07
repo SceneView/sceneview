@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.LightManager
+import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
@@ -38,6 +39,7 @@ import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
@@ -77,8 +79,36 @@ fun LightingDemo(onBack: () -> Unit) {
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
+    val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+
+    // Light position is fixed so swapping types reveals the *type's* signature, not a
+    // moving source. Y=1.4, Z=1.0 puts it up-and-forward of the helmet (origin) — close
+    // enough that the point falloff visibly fades on the backdrop, far enough that the
+    // spot cone projects a clean disc rather than a blown-out wash.
+    val lightPosition = remember { Position(0f, 1.4f, 1.0f) }
+    // Backdrop wall behind helmet — without this, directional / point / spot all read
+    // the same way because the helmet alone gets fully lit by any of them. The wall
+    // makes the light's *shape in space* visible: directional = uniform wash, point
+    // = radial gradient (1/r²), spot = sharp circular disc with cone edge.
+    val backdropMaterial = remember(materialLoader) {
+        materialLoader.createColorInstance(
+            color = Color(0xFF424448),
+            metallic = 0.0f,
+            roughness = 0.85f,
+        )
+    }
+    val sourceMaterial = remember(materialLoader, selectedColor) {
+        // Bright unlit-looking ball to mark the light position. PBR can't be true
+        // self-emissive without an emissive material, but a low-roughness saturated
+        // colour with the IBL fallback reads convincingly as a glowing source.
+        materialLoader.createColorInstance(
+            color = selectedColor.color,
+            metallic = 0.0f,
+            roughness = 0.0f,
+        )
+    }
 
     // Camera orbits the helmet; the model itself stays fixed so the directional /
     // point / spot light hits the exact same surface every frame — otherwise the
@@ -170,6 +200,29 @@ fun LightingDemo(onBack: () -> Unit) {
                         scaleToUnits = 0.5f,
                     )
                 }
+
+                // Backdrop wall — see [backdropMaterial] for the rationale. Sized 3 ×
+                // 2.4 m so the helmet appears against a continuous surface from any
+                // orbit angle the hero camera reaches; offset back so it never clips
+                // into the model.
+                PlaneNode(
+                    materialInstance = backdropMaterial,
+                    size = Float3(3f, 2.4f, 0f),
+                    normal = Direction(z = 1f),
+                    position = Position(0f, 0.4f, -1.3f),
+                )
+
+                // Tiny ball at the light source position — only for Point/Spot since
+                // a directional light has no localized origin. The colour of the
+                // marker tracks the light colour so users tie source ↔ light visually.
+                if (selectedType.type != LightManager.Type.DIRECTIONAL) {
+                    SphereNode(
+                        materialInstance = sourceMaterial,
+                        radius = 0.05f,
+                        position = lightPosition,
+                    )
+                }
+
             LightNode(
                 type = selectedType.type,
                 intensity = intensity,
@@ -178,17 +231,22 @@ fun LightingDemo(onBack: () -> Unit) {
                     g = selectedColor.g,
                     b = selectedColor.b
                 ),
-                direction = Direction(0f, -1f, -1f),
-                position = Position(0f, 2f, 2f),
+                // Direction points from lightPosition toward the helmet at origin so
+                // the spot cone hits the helmet front and the wall behind, making the
+                // disc clearly visible. Used for Directional + Spot.
+                direction = Direction(0f, -1.4f, -1.0f),
+                position = lightPosition,
                 apply = {
-                    // Fixed-at-creation shape settings — only spot/point-specific values.
-                    // intensity / direction / colour go through the reactive parameters
-                    // above so the user controls actually drive the rendered scene.
+                    // Spot: very narrow cone (≈11° outer) so the disc on the wall
+                    // reads as a sharp circle, not a wide wash. Falloff 4 m keeps
+                    // the cone visible against the 1.3 m-deep wall.
+                    // Point: aggressive 2 m falloff so the wall shows the radial
+                    // gradient (helmet front bright, wall corners dark).
                     if (selectedType.type == LightManager.Type.FOCUSED_SPOT) {
-                        spotLightCone(0.1f, 0.5f)
-                        falloff(10f)
+                        spotLightCone(0.05f, 0.2f)
+                        falloff(4f)
                     } else if (selectedType.type == LightManager.Type.POINT) {
-                        falloff(10f)
+                        falloff(2.5f)
                     }
                 }
             )

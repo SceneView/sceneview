@@ -398,6 +398,15 @@ fun SceneView(
     // else 0`) would see only the initial null state, forever. rememberUpdatedState solves this by
     // reading the ref inside the loop.
     val currentOnFrame = rememberUpdatedState(onFrame)
+    // The frame loop captures `cameraManipulator` in its lambda. Without
+    // [rememberUpdatedState] the closure freezes on the manipulator that was active
+    // at LaunchedEffect launch time, so callers that swap manipulators at runtime
+    // (e.g. AnimationDemo's scripted → Free hand-off, or any custom mode picker)
+    // see grabBegin/grabUpdate land on the new manipulator via the gesture detector
+    // SideEffect above, but `getTransform()` keeps reading the old one and the camera
+    // never moves. Reading through a state ref here makes the frame loop pick up
+    // every recomposition without restarting.
+    val currentCameraManipulator = rememberUpdatedState(cameraManipulator)
 
     LaunchedEffect(engine, renderer, view, scene) {
         while (true) {
@@ -410,7 +419,7 @@ fun SceneView(
                     modelLoader.updateLoad()
                     childNodesRef.get().forEach { it.onFrame(frameTimeNanos) }
 
-                    cameraManipulator?.let { manipulator ->
+                    currentCameraManipulator.value?.let { manipulator ->
                         val lastTime = lastFrameTimeNanosRef.get().takeIf { it != 0L }
                         manipulator.update(frameTimeNanos.intervalSeconds(lastTime).toFloat())
                         cameraNode.transform = manipulator.getTransform()
