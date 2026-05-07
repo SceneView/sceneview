@@ -92,6 +92,10 @@ class MainActivity : ComponentActivity() {
         // running app can deterministically navigate without competing with a stale URL intent.
         pendingDemoId.value = intent?.getStringExtra("demo")
             ?: DeepLinkRouter.parse(intent?.data)
+        // QA mode ingress: `--ez qa_mode true` freezes auto-rotation / orbit / animations
+        // so screenshot tests get a deterministic frame. Same setting reachable via the
+        // long-press gesture on the demo title bar (see DemoScaffold). Off by default.
+        if (intent?.getBooleanExtra("qa_mode", false) == true) DemoSettings.qaMode = true
         setContent {
             SceneViewDemoTheme {
                 SceneViewDemoApp(activity = this)
@@ -107,6 +111,7 @@ class MainActivity : ComponentActivity() {
         // Same dual-ingress policy as onCreate — `--es demo` first, URL second.
         pendingDemoId.value = intent.getStringExtra("demo")
             ?: DeepLinkRouter.parse(intent.data)
+        if (intent.getBooleanExtra("qa_mode", false)) DemoSettings.qaMode = true
     }
 
     fun consumePendingDemo() {

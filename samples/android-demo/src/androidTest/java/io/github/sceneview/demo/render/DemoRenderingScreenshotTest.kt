@@ -87,9 +87,20 @@ class DemoRenderingScreenshotTest {
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
 
-        // Launch the demo activity.
+        // Launch the demo with qa_mode = true so spin loops, scene rotation, and
+        // cinematic camera scripts freeze at deterministic values
+        // (DemoMath.nextSpinDegrees pinned, rememberHeroYaw → staticYaw, AnimationDemo
+        // `if (DemoSettings.qaMode)` early-return). Without qa_mode the captured frame
+        // would differ on every run because the scene is in continuous motion.
+        //
+        // We use FLAG_ACTIVITY_CLEAR_TOP + FLAG_ACTIVITY_NEW_TASK so the second-and-onward
+        // launches get a fresh demo activity (the slug + qa_mode flag take effect via
+        // onNewIntent). `am force-stop` is rejected from instrumentation context with
+        // "Calling from not trusted UID!" so we don't use it.
         device.executeShellCommand(
-            "am start -n io.github.sceneview.demo/.MainActivity --es demo $demoSlug"
+            "am start -n io.github.sceneview.demo/.MainActivity " +
+                "-f 0x14000000 " + // CLEAR_TOP | NEW_TASK
+                "--es demo $demoSlug --ez qa_mode true"
         )
         // Wait for first frame + animation settle. Demos that load models or HDR need more.
         Thread.sleep(settleSeconds * 1000L)

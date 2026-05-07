@@ -30,6 +30,7 @@ import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoPreviewPlaceholder
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
@@ -92,8 +93,16 @@ fun GeometryDemo(onBack: () -> Unit) {
     // a separate Animatable per shape — one frame loop, four nodes share the value.
     // The math (advance + 360° wrap) is in DemoMath.nextSpinDegrees so it can be JVM-
     // unit-tested without firing up Compose / the Choreographer.
+    //
+    // QA mode (DemoSettings.qaMode = true, set via long-press on the title or
+    // `--ez qa_mode true` from adb) freezes the spin at a recognisable 30° angle so
+    // screenshot tests get a deterministic frame.
     var spinDegrees by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(DemoSettings.qaMode) {
+        if (DemoSettings.qaMode) {
+            spinDegrees = 30f // ~front-3/4 view, all shapes show their depth
+            return@LaunchedEffect
+        }
         var lastNanos = 0L
         while (true) {
             withFrameNanos { nanos ->
