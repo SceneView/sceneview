@@ -164,6 +164,26 @@ workflow records the baselines and updates this line].
 
 ---
 
+## Running on emulator (Apple Silicon / arm64)
+
+ARCore service must be installed before the smoke test runs. Play Store gates
+ARCore install on a device-certification list and rejects standard AVDs as
+"incompatible". Workaround — sideload the official APK from Google's ARCore SDK
+GitHub releases:
+
+```bash
+# Pick the latest release: https://github.com/google-ar/arcore-android-sdk/releases
+ARCORE_VERSION=1.54.0
+curl -L -o /tmp/arcore.apk \
+  "https://github.com/google-ar/arcore-android-sdk/releases/download/${ARCORE_VERSION}/Google_Play_Services_for_AR_${ARCORE_VERSION}.apk"
+adb install -r /tmp/arcore.apk
+```
+
+**Use the multi-arch `Google_Play_Services_for_AR_X.Y.Z.apk`, NOT the
+`_x86_for_emulator.apk` variant** — the x86 build crashes on Apple Silicon AVDs
+(arm64-v8a host) per [google-ar/arcore-android-sdk#1571](https://github.com/google-ar/arcore-android-sdk/issues/1571). The standard release APK contains both
+`arm64-v8a` and `armeabi-v7a` libs and works on Apple Silicon emulators.
+
 ## Limitations (known)
 
 - **Recordings cannot be created at unit-test time.** Only on a real device with ARCore
