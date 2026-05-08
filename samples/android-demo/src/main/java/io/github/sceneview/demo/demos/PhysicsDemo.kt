@@ -112,13 +112,6 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     position = Position(y = -0.5f),
                 )
 
-                // Diagnostic static sphere (no physics) — if even this is not visible, the bug
-                // is in the rendering pipeline, not the physics simulation.
-                SphereNode(
-                    radius = 0.1f,
-                    materialInstance = sphereMaterials[0],  // red
-                    position = Position(x = -0.5f, y = 0.2f, z = 0f)
-                )
 
                 for (i in 0 until sphereCount) {
                     // Spread spheres across the floor plane in a 5×N grid so a "Drop 10"
@@ -153,3 +146,4 @@ fun PhysicsDemo(onBack: () -> Unit) {
         }
     }
 }
+
