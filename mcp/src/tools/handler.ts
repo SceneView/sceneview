@@ -164,7 +164,7 @@ export async function dispatchTool(
         ? [
             `**SPM dependency:**`,
             `\`\`\`swift`,
-            `.package(url: "${sample.spmDependency ?? sample.dependency}", from: "4.0.0")`,
+            `.package(url: "${sample.spmDependency ?? sample.dependency}", from: "4.0.9")`,
             `\`\`\``,
           ]
         : [
@@ -248,7 +248,7 @@ export async function dispatchTool(
                 `### build.gradle.kts`,
                 `\`\`\`kotlin`,
                 `dependencies {`,
-                `    implementation("io.github.sceneview:sceneview:4.0.0")`,
+                `    implementation("io.github.sceneview:sceneview:4.0.9")`,
                 `}`,
                 `\`\`\``,
                 ``,
@@ -269,7 +269,7 @@ export async function dispatchTool(
                 `### build.gradle.kts`,
                 `\`\`\`kotlin`,
                 `dependencies {`,
-                `    implementation("io.github.sceneview:arsceneview:4.0.0")`,
+                `    implementation("io.github.sceneview:arsceneview:4.0.9")`,
                 `}`,
                 `\`\`\``,
                 ``,
@@ -404,7 +404,7 @@ export async function dispatchTool(
                 `    name: "MyApp",`,
                 `    platforms: [.iOS(.v17), .macOS(.v14), .visionOS(.v1)],`,
                 `    dependencies: [`,
-                `        .package(url: "https://github.com/sceneview/sceneview", from: "4.0.0")`,
+                `        .package(url: "https://github.com/sceneview/sceneview", from: "4.0.9")`,
                 `    ],`,
                 `    targets: [`,
                 `        .executableTarget(`,
@@ -475,7 +475,7 @@ export async function dispatchTool(
                 `### 1. Add SPM Dependency`,
                 ``,
                 `\`\`\`swift`,
-                `.package(url: "https://github.com/sceneview/sceneview", from: "4.0.0")`,
+                `.package(url: "https://github.com/sceneview/sceneview", from: "4.0.9")`,
                 `\`\`\``,
                 ``,
                 `### 2. Minimum Platform`,
@@ -770,15 +770,15 @@ export async function dispatchTool(
     // ── list_platforms ────────────────────────────────────────────────────────
     case "list_platforms": {
       const platforms = [
-        { platform: "Android", renderer: "Filament", framework: "Jetpack Compose", status: "Stable", version: "4.0.0", dependency: "io.github.sceneview:sceneview:4.0.0", features: ["3D", "AR (ARCore)", "Model loading (GLB/glTF)", "Geometry nodes", "Physics", "Gestures"] },
-        { platform: "Android TV", renderer: "Filament", framework: "Compose TV", status: "Alpha", version: "4.0.0", dependency: "io.github.sceneview:sceneview:4.0.0", features: ["3D", "D-pad controls", "Auto-rotation", "Model loading"] },
+        { platform: "Android", renderer: "Filament", framework: "Jetpack Compose", status: "Stable", version: "4.0.9", dependency: "io.github.sceneview:sceneview:4.0.9", features: ["3D", "AR (ARCore)", "Model loading (GLB/glTF)", "Geometry nodes", "Physics", "Gestures"] },
+        { platform: "Android TV", renderer: "Filament", framework: "Compose TV", status: "Alpha", version: "4.0.9", dependency: "io.github.sceneview:sceneview:4.0.9", features: ["3D", "D-pad controls", "Auto-rotation", "Model loading"] },
         { platform: "Android XR", renderer: "Jetpack XR SceneCore", framework: "Compose XR", status: "Planned", version: "-", dependency: "-", features: ["Spatial computing", "Hand tracking", "Passthrough"] },
-        { platform: "iOS", renderer: "RealityKit", framework: "SwiftUI", status: "Alpha", version: "4.0.0", dependency: "SceneViewSwift (SPM)", features: ["3D", "AR (ARKit)", "16 node types", "USDZ models"] },
-        { platform: "macOS", renderer: "RealityKit", framework: "SwiftUI", status: "Alpha", version: "4.0.0", dependency: "SceneViewSwift (SPM)", features: ["3D", "Orbit camera", "USDZ models"] },
-        { platform: "visionOS", renderer: "RealityKit", framework: "SwiftUI", status: "Alpha", version: "4.0.0", dependency: "SceneViewSwift (SPM)", features: ["3D", "Immersive spaces", "Hand tracking (planned)"] },
-        { platform: "Web", renderer: "Filament.js (WASM)", framework: "Kotlin/JS", status: "Alpha", version: "4.0.0", dependency: "@sceneview/sceneview-web", features: ["3D", "WebXR AR/VR", "GLB models", "WebGL2"] },
-        { platform: "Desktop", renderer: "Software / Filament JNI", framework: "Compose Desktop", status: "Alpha", version: "4.0.0", dependency: "sceneview-desktop (local)", features: ["3D", "Software renderer", "Wireframe"] },
-        { platform: "Flutter", renderer: "Filament / RealityKit", framework: "PlatformView", status: "Alpha", version: "4.0.0", dependency: "flutter pub: sceneview", features: ["3D", "AR", "Android + iOS bridge"] },
+        { platform: "iOS", renderer: "RealityKit", framework: "SwiftUI", status: "Alpha", version: "4.0.9", dependency: "SceneViewSwift (SPM)", features: ["3D", "AR (ARKit)", "16 node types", "USDZ models"] },
+        { platform: "macOS", renderer: "RealityKit", framework: "SwiftUI", status: "Alpha", version: "4.0.9", dependency: "SceneViewSwift (SPM)", features: ["3D", "Orbit camera", "USDZ models"] },
+        { platform: "visionOS", renderer: "RealityKit", framework: "SwiftUI", status: "Alpha", version: "4.0.9", dependency: "SceneViewSwift (SPM)", features: ["3D", "Immersive spaces", "Hand tracking (planned)"] },
+        { platform: "Web", renderer: "Filament.js (WASM)", framework: "Kotlin/JS", status: "Alpha", version: "4.0.9", dependency: "@sceneview/sceneview-web", features: ["3D", "WebXR AR/VR", "GLB models", "WebGL2"] },
+        { platform: "Desktop", renderer: "Software / Filament JNI", framework: "Compose Desktop", status: "Alpha", version: "4.0.9", dependency: "sceneview-desktop (local)", features: ["3D", "Software renderer", "Wireframe"] },
+        { platform: "Flutter", renderer: "Filament / RealityKit", framework: "PlatformView", status: "Alpha", version: "4.0.9", dependency: "flutter pub: sceneview", features: ["3D", "AR", "Android + iOS bridge"] },
       ];
 
       const lines = [
