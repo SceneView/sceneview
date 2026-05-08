@@ -225,6 +225,8 @@ const RULES: Rule[] = [
       const issues: ValidationIssue[] = [];
       const renames: Array<[RegExp, string]> = [
         [/\bArSceneView\s*\(/, "`ArSceneView(…)` → renamed to `ARSceneView(…)` in 3.0"],
+
+    { pattern: /\bScene\s*\{/, replacement: 'SceneView {', reason: 'Renamed class (Scene -> SceneView per CLAUDE.md)' }
         [/\bPlacementNode\b/, "`PlacementNode` removed → use `AnchorNode` + `HitResultNode` in 3.0"],
         [/\bTransformableNode\b/, "`TransformableNode` removed → set `isEditable = true` on `ModelNode` in 3.0"],
         [/\bViewRenderable\b/, "`ViewRenderable` removed → use `ViewNode` with a `@Composable` content lambda in 3.0"],
