@@ -26,7 +26,7 @@ import path from "node:path";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** The latest SceneView release known to this build of the MCP. */
-export const LATEST_SCENEVIEW_VERSION = "4.0.0";
+export const LATEST_SCENEVIEW_VERSION = "4.0.9";
 
 /** Hard cap on the number of source files inspected per call. */
 export const MAX_FILES_SCANNED = 30;
