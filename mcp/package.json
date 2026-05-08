@@ -43,8 +43,8 @@
   "files": [
     "dist/**/*.js",
     "!dist/**/*.test.js",
-    "!dist/**/__fixtures__/**",
-    "llms.txt",
+    "!dist/{auth,billing,convert-platform,optimize-scene,explain-api}.js",
+    "!dist/generate-{animation,environment,gesture,physics}.js",
     "README.md"
   ],
   "engines": {
