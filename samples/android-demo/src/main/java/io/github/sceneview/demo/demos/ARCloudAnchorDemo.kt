@@ -126,7 +126,12 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                             }
                         }
                     },
-                    enabled = localAnchor != null && hostedId == null
+                    // Without an ARCore Cloud API key the SDK returns
+                    // ERROR_NOT_AUTHORIZED silently \u2014 disable the action so the
+                    // status text is the single source of truth, mirroring how
+                    // ARTerrainAnchorDemo / ARRooftopAnchorDemo already gate the
+                    // "Drop" button on `hasArcoreApiKey`.
+                    enabled = hasArcoreApiKey && localAnchor != null && hostedId == null
                 ) {
                     Text("Host")
                 }
@@ -152,7 +157,9 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                             }
                         }
                     },
-                    enabled = resolveId.isNotBlank()
+                    // Same API-key gate as Host \u2014 Resolve also needs the Cloud
+                    // backend.
+                    enabled = hasArcoreApiKey && resolveId.isNotBlank()
                 ) {
                     Text("Resolve")
                 }
