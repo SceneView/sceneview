@@ -705,6 +705,7 @@ export function autoDetectIssue(description: string): DebugCategory | null {
     return "model-not-showing";
   }
   if (lower.includes("ar not") || lower.includes("ar doesn't") || lower.includes("arcore") || lower.includes("plane") || lower.includes("anchor") || lower.includes("camera permission") || lower.includes("augmented reality") || lower.includes("hit test") || lower.includes("hitresult")) {
+  "ar camera black", "ar feed black", "camera black", "ar black",
     return "ar-not-working";
   }
   if (lower.includes("crash") || lower.includes("sigabrt") || lower.includes("native crash") || lower.includes("fatal") || lower.includes("exception") || lower.includes("destroy") || lower.includes("double free") || lower.includes("segfault") || (lower.includes("oom") && !lower.includes("zoom")) || lower.includes("out of memory") || lower.includes("nullpointerexception") || lower.includes("npe")) {
