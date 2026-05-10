@@ -115,6 +115,8 @@ import io.github.sceneview.node.findActivity
  * @param environmentLoader     Loader for HDR/KTX environments. Use [rememberEnvironmentLoader].
  * @param view                  Filament [View] (one per window). Use [rememberView].
  * @param isOpaque              Whether the render target is opaque. Default `true`.
+ * @param renderQuality         One-line preset applied to `view` ([RenderQuality.Default],
+ *                              [RenderQuality.Cinematic], or [RenderQuality.Performance]).
  * @param renderer              Filament [Renderer]. Use [rememberRenderer].
  * @param scene                 Filament [Scene] graph, shareable across views. Use [rememberScene].
  * @param environment           IBL + skybox environment. Use [rememberEnvironment].
@@ -170,6 +172,14 @@ fun SceneView(
      * Controls whether the render target is opaque or not. Default `true`.
      */
     isOpaque: Boolean = true,
+    /**
+     * One-line rendering quality preset applied to [view]. Default [RenderQuality.Default] matches
+     * the out-of-the-box `SceneView` settings. Use [RenderQuality.Cinematic] for hero shots on
+     * capable devices, or [RenderQuality.Performance] on low-end Android or AR backgrounds where
+     * the GPU budget is constrained. Individual [view] settings can still be tweaked after the
+     * preset is applied.
+     */
+    renderQuality: RenderQuality = RenderQuality.Default,
     /**
      * A [Renderer] instance represents an operating system's window.
      * Typically, applications create a [Renderer] per window.
@@ -252,6 +262,7 @@ fun SceneView(
         view.camera = cameraNode.camera
         cameraNode.collisionSystem = collisionSystem
         cameraNode.setView(view)
+        view.applyRenderQuality(renderQuality)
     }
 
     // ── Camera node — registered so children (HUD nodes) are tracked by the scene manager ─────────
@@ -1287,6 +1298,7 @@ fun Scene(
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     view: View = rememberView(engine),
     isOpaque: Boolean = true,
+    renderQuality: RenderQuality = RenderQuality.Default,
     renderer: Renderer = rememberRenderer(engine),
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberEnvironment(environmentLoader, isOpaque = isOpaque),
@@ -1313,6 +1325,7 @@ fun Scene(
     environmentLoader = environmentLoader,
     view = view,
     isOpaque = isOpaque,
+    renderQuality = renderQuality,
     renderer = renderer,
     scene = scene,
     environment = environment,
