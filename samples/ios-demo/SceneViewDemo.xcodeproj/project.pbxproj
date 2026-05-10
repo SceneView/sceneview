@@ -73,6 +73,7 @@
 		E10000000000000000000004 /* rooftop_night.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* rooftop_night.hdr */; };
 		E10000000000000000000005 /* studio_warm.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* studio_warm.hdr */; };
 		E10000000000000000000006 /* autumn_field.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* autumn_field.hdr */; };
+		ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -144,6 +145,7 @@
 		E20000000000000000000004 /* rooftop_night.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = rooftop_night.hdr; sourceTree = "<group>"; };
 		E20000000000000000000005 /* studio_warm.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = studio_warm.hdr; sourceTree = "<group>"; };
 		E20000000000000000000006 /* autumn_field.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = autumn_field.hdr; sourceTree = "<group>"; };
+		E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MovableLightDemo.swift; path = SceneViewDemo/Views/Demos/MovableLightDemo.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +168,7 @@
 				D77142EC848C995EDE06546D /* SketchfabConfig.swift */,
 				6C214F8F9A1B35560E551895 /* SketchfabModels.swift */,
 				8FFA4BE9A50A8347603AA10E /* SketchfabService.swift */,
+				E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -435,6 +438,7 @@
 				593E4FADBA93AF1190A3A67E /* SketchfabModels.swift in Sources */,
 				B4A94ABD8B5DA5F4E4CE4834 /* SketchfabService.swift in Sources */,
 				C10000000000000000000025 /* OrbitalARDemo.swift in Sources */,
+				ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
