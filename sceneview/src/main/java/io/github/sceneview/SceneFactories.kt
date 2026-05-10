@@ -88,9 +88,21 @@ fun createView(engine: Engine): View = engine.createView().apply {
         enabled = false
     }
     antiAliasing = AntiAliasing.FXAA
+    // SSAO on by default — adds visible grounding under geometry crevices (toy_car, helmet)
+    // without artifacts on diffuse-only models. Validated 2026-05-11 on Pixel_7a GPU host.
     ambientOcclusionOptions = ambientOcclusionOptions.apply {
-        enabled = false
+        enabled = true
     }
+    // Subtle bloom on by default — strength 0.10 lifts metallic/emissive highlights
+    // (satin chrome, light filaments) but is invisible on diffuse-only assets, so it costs
+    // nothing on plain models. Push higher only for cinematic scenes.
+    bloomOptions = bloomOptions.apply {
+        enabled = true
+        strength = 0.1f
+    }
+    // Keep Filmic tone mapper as default. ACES was tested on 2026-05-11 and shifts PBR
+    // hero shots (DamagedHelmet) toward a cooler/desaturated film grade — fine for cinema
+    // but not the SDK's job to impose. Users can opt into ACES via `view.colorGrading`.
     colorGrading = ColorGrading.Builder()
         .toneMapper(ToneMapper.Filmic())
         .build(engine)

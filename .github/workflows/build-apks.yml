@@ -47,6 +47,10 @@ jobs:
           # Optional. When unset (forks, PRs from forks), the demo's runtime
           # check disables Streetscape / Geospatial / Cloud Anchors gracefully.
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
+          # Optional. When unset, the demo's Sketchfab gallery falls back to
+          # the bundled featured models and disables search. See
+          # samples/android-demo/.../sketchfab/ for the BuildConfig wiring.
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           ./gradlew \
             :samples:android-demo:assembleDebug \
