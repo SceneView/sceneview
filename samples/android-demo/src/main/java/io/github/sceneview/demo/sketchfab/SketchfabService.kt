@@ -1,0 +1,250 @@
+package io.github.sceneview.demo.sketchfab
+
+import android.content.Context
+import androidx.annotation.VisibleForTesting
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.io.IOException
+
+/**
+ * Thread-safe client for the Sketchfab Data API v3.
+ *
+ * Responsibilities:
+ *  - Build authenticated requests against [SketchfabConfig.BASE_URL].
+ *  - Decode JSON via the data classes in `SketchfabModels.kt`.
+ *  - Stream binary downloads to an on-disk LRU cache under
+ *    `Context.cacheDir/sketchfab/`.
+ *
+ * Mirrors the iOS scaffold (`SketchfabService.swift`) — keep both in sync when
+ * adding endpoints.
+ *
+ * All public methods are `suspend` and dispatch work to [Dispatchers.IO].
+ */
+class SketchfabService private constructor(
+    private val context: Context,
+) {
+    companion object {
+        @Volatile private var INSTANCE: SketchfabService? = null
+
+        /** Obtain the process-wide singleton. Pass any [Context] — the application
+         *  context is held internally so this is safe to call from activities. */
+        fun getInstance(context: Context): SketchfabService =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: SketchfabService(context.applicationContext).also { INSTANCE = it }
+            }
+    }
+
+    @VisibleForTesting
+    internal val client: OkHttpClient = OkHttpClient.Builder().build()
+
+    @VisibleForTesting
+    internal val json: Json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+    }
+
+    /**
+     * Search models by free-text query.
+     *
+     * @param query Search text forwarded to `q=`.
+     * @param categories Optional Sketchfab category slugs (e.g. `cars-vehicles`).
+     * @param downloadable Restrict to models the API can serve as GLB/glTF.
+     * @param limit Page size — Sketchfab caps this at 24.
+     */
+    suspend fun search(
+        query: String,
+        categories: List<String>? = null,
+        downloadable: Boolean = true,
+        limit: Int = 24,
+    ): List<SketchfabModel> = withContext(Dispatchers.IO) {
+        val url = buildUrl("search") {
+            addQueryParameter("type", "models")
+            addQueryParameter("q", query)
+            addQueryParameter("downloadable", downloadable.toString())
+            addQueryParameter("count", limit.toString())
+            if (!categories.isNullOrEmpty()) {
+                addQueryParameter("categories", categories.joinToString(","))
+            }
+        }
+        val body = authenticatedGet(url)
+        json.decodeFromString(SketchfabSearchResponse.serializer(), body).results
+    }
+
+    /**
+     * Featured / popular models, optionally filtered by category.
+     *
+     * Uses `sort_by=-likeCount` since Sketchfab does not expose a dedicated
+     * "featured" endpoint.
+     */
+    suspend fun featured(
+        category: String? = null,
+        limit: Int = 6,
+    ): List<SketchfabModel> = withContext(Dispatchers.IO) {
+        val url = buildUrl("models") {
+            addQueryParameter("type", "models")
+            addQueryParameter("sort_by", "-likeCount")
+            addQueryParameter("downloadable", "true")
+            addQueryParameter("count", limit.toString())
+            if (!category.isNullOrBlank()) {
+                addQueryParameter("categories", category)
+            }
+        }
+        val body = authenticatedGet(url)
+        json.decodeFromString(SketchfabSearchResponse.serializer(), body).results
+    }
+
+    /**
+     * Resolve the signed CDN URL for a model's preferred format (GLB > glTF > USDZ).
+     *
+     * The returned URL is short-lived (see [SketchfabDownloadUrl.expires]) and
+     * must be fetched WITHOUT the Sketchfab `Authorization` header — the CDN
+     * rejects authenticated requests with HTTP 403.
+     */
+    suspend fun downloadUrl(uid: String): String = withContext(Dispatchers.IO) {
+        val url = buildUrl("models/$uid/download") {}
+        val body = authenticatedGet(url)
+        val response = json.decodeFromString(SketchfabDownloadResponse.serializer(), body)
+        response.preferred?.url ?: throw SketchfabError.ModelNotFound
+    }
+
+    /**
+     * Download a model to the on-disk cache and return the local file.
+     *
+     * If the file is already cached its modification date is touched (LRU
+     * marker) and the cached path is returned without hitting the network.
+     *
+     * @param uid Sketchfab model uid.
+     * @param progress Optional 0..1 progress callback. Fired once with `1.0`
+     *   when the binary finishes — richer progress hooks will arrive in V1.1.
+     */
+    suspend fun downloadModel(
+        uid: String,
+        progress: ((Float) -> Unit)? = null,
+    ): File = withContext(Dispatchers.IO) {
+        val cacheFile = cacheFileFor(uid)
+        if (cacheFile.exists()) {
+            cacheFile.setLastModified(System.currentTimeMillis())
+            return@withContext cacheFile
+        }
+
+        val remoteUrl = downloadUrl(uid)
+        downloadBinary(remoteUrl, cacheFile)
+        progress?.invoke(1f)
+        pruneCacheIfNeeded()
+        cacheFile
+    }
+
+    // ── Internal helpers ──────────────────────────────────────────────────
+
+    /**
+     * Build the absolute URL for a given API path. Exposed `internal` so unit
+     * tests can verify path construction without making network calls.
+     */
+    @VisibleForTesting
+    internal fun buildUrl(
+        path: String,
+        block: HttpUrl.Builder.() -> Unit,
+    ): HttpUrl {
+        val base = SketchfabConfig.BASE_URL.toHttpUrl()
+        return base.newBuilder()
+            .addPathSegments(path)
+            .apply(block)
+            .build()
+    }
+
+    private fun authenticatedGet(url: HttpUrl): String {
+        val apiKey = SketchfabConfig.apiKey ?: throw SketchfabError.MissingApiKey
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Token $apiKey")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw SketchfabError.RequestFailed(response.code)
+            }
+            return response.body.string()
+        }
+    }
+
+    private fun downloadBinary(remoteUrl: String, destination: File) {
+        // The signed CDN URL must NOT carry the Sketchfab auth header.
+        val request = Request.Builder().url(remoteUrl).get().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw SketchfabError.DownloadFailed("HTTP ${response.code}")
+            }
+            val body = response.body
+            destination.parentFile?.mkdirs()
+            if (destination.exists()) destination.delete()
+            try {
+                destination.outputStream().use { out ->
+                    body.byteStream().use { input -> input.copyTo(out) }
+                }
+            } catch (io: IOException) {
+                throw SketchfabError.DownloadFailed(io.message ?: "io error")
+            }
+        }
+    }
+
+    // ── Cache management ──────────────────────────────────────────────────
+
+    @VisibleForTesting
+    internal fun cacheRoot(): File {
+        val root = File(context.cacheDir, SketchfabConfig.CACHE_DIR_NAME)
+        if (!root.exists()) root.mkdirs()
+        return root
+    }
+
+    private fun cacheFileFor(uid: String): File = File(cacheRoot(), "$uid.glb")
+
+    /** Evict oldest files when total size exceeds [SketchfabConfig.CACHE_MAX_BYTES]. */
+    @VisibleForTesting
+    internal fun pruneCacheIfNeeded() {
+        val root = cacheRoot()
+        val entries = root.listFiles()?.filter { it.isFile } ?: return
+        var total = entries.sumOf { it.length() }
+        if (total <= SketchfabConfig.CACHE_MAX_BYTES) return
+
+        // Oldest first.
+        val sorted = entries.sortedBy { it.lastModified() }
+        for (file in sorted) {
+            if (total <= SketchfabConfig.CACHE_MAX_BYTES) break
+            val size = file.length()
+            if (file.delete()) total -= size
+        }
+    }
+
+    /** Errors surfaced by [SketchfabService]. */
+    sealed class SketchfabError : Exception() {
+        /** [SketchfabConfig.apiKey] returned `null` — no key was injected. */
+        object MissingApiKey : SketchfabError() {
+            private fun readResolve(): Any = MissingApiKey
+            override val message: String get() = "SKETCHFAB_API_KEY is not configured."
+        }
+
+        /** The Sketchfab API returned a non-2xx status. */
+        class RequestFailed(val statusCode: Int) : SketchfabError() {
+            override val message: String get() = "Sketchfab request failed with HTTP $statusCode."
+        }
+
+        /** Failure while streaming the GLB from the signed CDN URL. */
+        class DownloadFailed(val reason: String) : SketchfabError() {
+            override val message: String get() = "Sketchfab download failed: $reason."
+        }
+
+        /** `GET /v3/models/<uid>/download` returned no supported format. */
+        object ModelNotFound : SketchfabError() {
+            private fun readResolve(): Any = ModelNotFound
+            override val message: String get() = "No downloadable format available for the requested model."
+        }
+    }
+}
