@@ -73,28 +73,29 @@ actor SketchfabService {
     }
 
     /// Most-liked downloadable models (alias `popular`), optionally filtered by category.
-    func featured(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
-        try await list(sortBy: "-likeCount", category: category, limit: limit)
+    func featured(animated: Bool? = nil, category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(sortBy: "-likeCount", animated: animated, category: category, limit: limit)
     }
 
     /// Sketchfab "Staff Picks" — hand-curated by Sketchfab's editorial team.
-    func staffPicks(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+    func staffPicks(animated: Bool? = nil, category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
         try await list(
             sortBy: "-staffPickedAt",
             staffPicked: true,
+            animated: animated,
             category: category,
             limit: limit
         )
     }
 
     /// Most-viewed downloadable models — trending right now.
-    func mostPopular(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
-        try await list(sortBy: "-viewCount", category: category, limit: limit)
+    func mostPopular(animated: Bool? = nil, category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(sortBy: "-viewCount", animated: animated, category: category, limit: limit)
     }
 
     /// Recently published downloadable models, optionally filtered by category.
-    func recentlyAdded(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
-        try await list(sortBy: "-publishedAt", category: category, limit: limit)
+    func recentlyAdded(animated: Bool? = nil, category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(sortBy: "-publishedAt", animated: animated, category: category, limit: limit)
     }
 
     /// Internal helper used by the curated-feed methods.

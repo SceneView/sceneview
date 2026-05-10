@@ -219,6 +219,8 @@ struct ExploreTab: View {
     @State private var sketchfabRecent: [SketchfabModel] = []
     @State private var isLoadingFeeds = false
     @State private var feedsError: String?
+    /// When `true`, all three carousels filter to `animated=true` (skeletal rigs).
+    @State private var animatedOnly = false
     private let favoritesManager = FavoritesManager.shared
 
     /// Curated featured set — first 6 bundled models, picked for visual variety.
@@ -233,6 +235,9 @@ struct ExploreTab: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 28) {
+                    if !sketchfabStaffPicks.isEmpty || !sketchfabMostLiked.isEmpty || !sketchfabRecent.isEmpty {
+                        filtersBar
+                    }
                     if sketchfabStaffPicks.isEmpty && sketchfabMostLiked.isEmpty && sketchfabRecent.isEmpty {
                         // No live data yet (loading, missing key, or offline) — single
                         // bundled "Featured" carousel as fallback.
@@ -301,9 +306,9 @@ struct ExploreTab: View {
         isLoadingFeeds = true
         defer { isLoadingFeeds = false }
 
-        async let staff = SketchfabService.shared.staffPicks(limit: 10)
-        async let liked = SketchfabService.shared.featured(limit: 10)
-        async let recent = SketchfabService.shared.recentlyAdded(limit: 10)
+        async let staff = SketchfabService.shared.staffPicks(animated: animatedOnly ? true : nil, limit: 10)
+        async let liked = SketchfabService.shared.featured(animated: animatedOnly ? true : nil, limit: 10)
+        async let recent = SketchfabService.shared.recentlyAdded(animated: animatedOnly ? true : nil, limit: 10)
 
         do {
             let (s, l, r) = try await (staff, liked, recent)
@@ -314,6 +319,32 @@ struct ExploreTab: View {
         } catch {
             feedsError = "Couldn't reach Sketchfab — showing offline picks"
         }
+    }
+
+    /// Triggered when the user toggles a filter chip. Clears the current feeds
+    /// (so the loading state shows again) then re-runs the parallel fetch.
+    private func reloadWithFilters() {
+        sketchfabStaffPicks = []
+        sketchfabMostLiked = []
+        sketchfabRecent = []
+        Task { await loadSketchfabFeeds() }
+    }
+
+    /// Horizontal row of filter chips above the feed carousels.
+    private var filtersBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                FilterChip(label: "Animated", systemImage: "wand.and.stars", isOn: animatedOnly) {
+                    animatedOnly.toggle()
+                    #if os(iOS)
+                    HapticManager.selectionChanged()
+                    #endif
+                    reloadWithFilters()
+                }
+                // Future chips (V1.1): License, Min poly count, Author.
+            }
+        }
+        .scrollClipDisabled()
     }
 
     // MARK: - Feed section helpers (Staff Picks / Most Liked / Recently Added)
@@ -756,6 +787,42 @@ private struct SketchfabModelSheet: View {
         .frame(maxHeight: 280)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
+}
+
+// MARK: - Filter chip (toggleable Animated / etc.)
+
+private struct FilterChip: View {
+    let label: String
+    let systemImage: String
+    let isOn: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.caption.weight(.semibold))
+                Text(label)
+                    .font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.tint.opacity(0.12)),
+                in: Capsule()
+            )
+            .foregroundStyle(isOn ? .white : .tint)
+            .overlay(
+                Capsule().strokeBorder(isOn ? Color.clear : Color.tint.opacity(0.0))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(label) filter, \(isOn ? "on" : "off")")
+    }
+}
+
+extension Color {
+    static var tint: Color { .blue }
 }
 
 // MARK: - Category chip
