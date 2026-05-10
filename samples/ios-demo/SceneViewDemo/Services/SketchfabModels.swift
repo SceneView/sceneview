@@ -9,6 +9,13 @@ struct SketchfabModel: Codable, Identifiable, Hashable {
     let viewerUrl: String
     let downloadable: Bool
     let tags: [SketchfabTag]?
+    /// Number of GPU triangles. Useful for surfacing "12k polys" badges.
+    let faceCount: Int
+    /// Number of skeletal animations. `> 0` means we can show an "Animated" pill.
+    let animationCount: Int
+    /// Number of likes / views on the Sketchfab page.
+    let likeCount: Int
+    let viewCount: Int
 
     var id: String { uid }
 
@@ -16,6 +23,7 @@ struct SketchfabModel: Codable, Identifiable, Hashable {
         case uid, name, description, thumbnails, tags
         case viewerUrl
         case downloadable = "isDownloadable"
+        case faceCount, animationCount, likeCount, viewCount
     }
 }
 

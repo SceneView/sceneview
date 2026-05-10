@@ -3,6 +3,7 @@ import RealityKit
 import SceneViewSwift
 #if os(iOS)
 import QuickLook
+import WebKit
 #endif
 
 /// Model data for the gallery.
@@ -492,42 +493,61 @@ private struct FeaturedSketchfabCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 0) {
-                AsyncImage(url: thumbnailURL) { phase in
-                    switch phase {
-                    case .empty:
-                        ZStack {
+                ZStack(alignment: .topLeading) {
+                    AsyncImage(url: thumbnailURL) { phase in
+                        switch phase {
+                        case .empty:
+                            ZStack {
+                                Color(.tertiarySystemBackground)
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            ZStack {
+                                Color(.tertiarySystemBackground)
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        @unknown default:
                             Color(.tertiarySystemBackground)
-                            ProgressView()
-                                .controlSize(.small)
                         }
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure:
-                        ZStack {
-                            Color(.tertiarySystemBackground)
-                            Image(systemName: "photo")
-                                .font(.title2)
-                                .foregroundStyle(.secondary)
-                        }
-                    @unknown default:
-                        Color(.tertiarySystemBackground)
+                    }
+                    .frame(width: 200, height: 160)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    // Top-left "Animated" pill (when applicable)
+                    if model.isAnimated {
+                        Label("Animated", systemImage: "wand.and.stars")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.thinMaterial, in: Capsule())
+                            .padding(8)
                     }
                 }
-                .frame(width: 200, height: 160)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(model.name)
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text(model.tags?.first?.name.capitalized ?? "3D Model")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(model.primaryTagDisplay)
+                            .lineLimit(1)
+                        if model.faceCount > 0 {
+                            Text("•")
+                            Text(model.formattedFaceCount + " polys")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 }
                 .frame(maxWidth: 200, alignment: .leading)
                 .padding(.top, 8)
@@ -539,11 +559,82 @@ private struct FeaturedSketchfabCard: View {
     }
 }
 
+// MARK: - Helpers on SketchfabModel for card / sheet display
+
+private extension SketchfabModel {
+    /// True when the Sketchfab model carries one or more skeletal animations.
+    var isAnimated: Bool { animationCount > 0 }
+
+    var formattedFaceCount: String {
+        if faceCount >= 1_000_000 { return String(format: "%.1fM", Double(faceCount) / 1_000_000) }
+        if faceCount >= 1_000 { return String(format: "%.1fk", Double(faceCount) / 1_000) }
+        return "\(faceCount)"
+    }
+
+    var formattedLikeCount: String {
+        if likeCount >= 1_000 { return String(format: "%.1fk", Double(likeCount) / 1_000) }
+        return "\(likeCount)"
+    }
+
+    /// First tag in Title Case, or a generic fallback.
+    var primaryTagDisplay: String {
+        tags?.first?.name.capitalized ?? "3D Model"
+    }
+}
+
+// MARK: - Live 3D embed view (WKWebView wrapping the Sketchfab iframe viewer)
+
+#if os(iOS)
+private struct SketchfabEmbedView: UIViewRepresentable {
+    let modelUid: String
+
+    /// Sketchfab's iframe viewer URL with the chrome stripped down so the embed
+    /// feels native: autostart, no UI panels, transparent background, no preload
+    /// overlay. The full set of params is documented at
+    /// https://sketchfab.com/developers/embedding.
+    private var embedURL: URL? {
+        var components = URLComponents(string: "https://sketchfab.com/models/\(modelUid)/embed")
+        components?.queryItems = [
+            URLQueryItem(name: "autostart", value: "1"),
+            URLQueryItem(name: "ui_infos", value: "0"),
+            URLQueryItem(name: "ui_controls", value: "0"),
+            URLQueryItem(name: "ui_help", value: "0"),
+            URLQueryItem(name: "ui_settings", value: "0"),
+            URLQueryItem(name: "ui_inspector", value: "0"),
+            URLQueryItem(name: "ui_watermark", value: "0"),
+            URLQueryItem(name: "ui_stop", value: "0"),
+            URLQueryItem(name: "ui_annotations", value: "1"),
+            URLQueryItem(name: "transparent", value: "1"),
+        ]
+        return components?.url
+    }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.scrollView.isScrollEnabled = false
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        guard let url = embedURL,
+              webView.url?.absoluteString != url.absoluteString else { return }
+        webView.load(URLRequest(url: url))
+    }
+}
+#endif
+
 // MARK: - Sketchfab model detail sheet
 
 private struct SketchfabModelSheet: View {
     let model: SketchfabModel
     @Environment(\.dismiss) private var dismiss
+    @State private var show3D = false
 
     private var largeThumbnailURL: URL? {
         let images = model.thumbnails.images
@@ -555,18 +646,35 @@ private struct SketchfabModelSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    AsyncImage(url: largeThumbnailURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fit)
-                        default:
-                            Rectangle().fill(.tint.opacity(0.08))
-                                .aspectRatio(16/9, contentMode: .fit)
-                                .overlay { ProgressView() }
+                    // Hero: thumbnail by default, swap to a live Sketchfab iframe viewer
+                    // when the user taps "Play in 3D". Using a manual toggle (vs always
+                    // autoloading the iframe) keeps the sheet snappy and saves cellular
+                    // data on metered connections.
+                    ZStack(alignment: .topTrailing) {
+                        if show3D {
+                            #if os(iOS)
+                            SketchfabEmbedView(modelUid: model.uid)
+                                .aspectRatio(16/10, contentMode: .fit)
+                                .frame(maxHeight: 320)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            #else
+                            thumbnailHero
+                            #endif
+                        } else {
+                            thumbnailHero
+                            Button {
+                                show3D = true
+                            } label: {
+                                Label("Play in 3D", systemImage: "play.circle.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(.thinMaterial, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(12)
                         }
                     }
-                    .frame(maxHeight: 280)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(model.name)
@@ -631,6 +739,22 @@ private struct SketchfabModelSheet: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var thumbnailHero: some View {
+        AsyncImage(url: largeThumbnailURL) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().aspectRatio(contentMode: .fit)
+            default:
+                Rectangle().fill(.tint.opacity(0.08))
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .overlay { ProgressView() }
+            }
+        }
+        .frame(maxHeight: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
