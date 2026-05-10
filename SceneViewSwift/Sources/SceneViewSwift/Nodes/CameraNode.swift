@@ -136,14 +136,16 @@ public struct CameraNode: Sendable {
 
     /// Configures depth-of-field blur.
     ///
-    /// When applied, objects outside the focus distance will appear blurred based on aperture size.
-    /// Currently a no-op — RealityKit's `PerspectiveCameraComponent` does not expose
-    /// focus/depth-of-field settings as of Xcode 16.x. Reserved for future API availability.
+    /// - Important: **This method is a no-op on iOS.** RealityKit's `PerspectiveCameraComponent`
+    ///   does not expose focus/depth-of-field settings as of Xcode 26.x. The method is kept for
+    ///   Android API parity but performs no operation. Use post-processing effects in your
+    ///   custom render pipeline if depth of field is required.
     ///
     /// - Parameters:
-    ///   - focusDistance: Distance in meters to the in-focus plane.
-    ///   - aperture: Aperture diameter in f-stops. Lower values produce more blur.
+    ///   - focusDistance: Distance in meters to the in-focus plane (ignored).
+    ///   - aperture: Aperture diameter in f-stops (ignored).
     /// - Returns: Self for chaining.
+    @available(*, deprecated, message: "No-op on iOS — RealityKit's PerspectiveCameraComponent does not support depth of field. Kept for Android API parity.")
     @discardableResult
     public func depthOfField(focusDistance: Float, aperture: Float) -> CameraNode {
         // PerspectiveCameraComponent does not have a `focus` property in current RealityKit.
@@ -155,13 +157,14 @@ public struct CameraNode: Sendable {
 
     /// Sets the exposure compensation value.
     ///
-    /// Positive values brighten the image, negative values darken it. One stop equals a
-    /// doubling/halving of brightness.
-    /// Currently a no-op — RealityKit's `PerspectiveCameraComponent` does not expose
-    /// exposure settings as of Xcode 16.x. Reserved for future API availability.
+    /// - Important: **This method is a no-op on iOS.** RealityKit's `PerspectiveCameraComponent`
+    ///   does not expose exposure settings as of Xcode 26.x. The method is kept for Android API
+    ///   parity but performs no operation. Use `ARSceneView(cameraExposure:)` for AR scenes, or
+    ///   adjust scene lighting intensity to control overall brightness.
     ///
-    /// - Parameter value: Exposure compensation in EV (exposure value) stops.
+    /// - Parameter value: Exposure compensation in EV stops (ignored).
     /// - Returns: Self for chaining.
+    @available(*, deprecated, message: "No-op on iOS — RealityKit's PerspectiveCameraComponent does not support exposure. Use ARSceneView(cameraExposure:) for AR, or adjust lighting intensity for 3D scenes.")
     @discardableResult
     public func exposure(_ value: Float) -> CameraNode {
         // PerspectiveCameraComponent does not have an `exposure` property in current RealityKit.

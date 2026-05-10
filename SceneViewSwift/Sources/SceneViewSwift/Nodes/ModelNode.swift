@@ -238,11 +238,13 @@ public struct ModelNode: @unchecked Sendable {
     ///   - speed: Playback speed multiplier. Default 1.0.
     public func playAllAnimations(loop: Bool = true, speed: Float = 1.0) {
         for animation in entity.availableAnimations {
+            let controller: AnimationPlaybackController
             if loop {
-                entity.playAnimation(animation.repeat(), transitionDuration: 0.0, startsPaused: false)
+                controller = entity.playAnimation(animation.repeat(), transitionDuration: 0.0, startsPaused: false)
             } else {
-                entity.playAnimation(animation, transitionDuration: 0.0, startsPaused: false)
+                controller = entity.playAnimation(animation, transitionDuration: 0.0, startsPaused: false)
             }
+            controller.speed = speed
         }
     }
 
@@ -261,17 +263,19 @@ public struct ModelNode: @unchecked Sendable {
     ) {
         guard index < entity.availableAnimations.count else { return }
         let animation = entity.availableAnimations[index]
+        let controller: AnimationPlaybackController
         if loop {
-            entity.playAnimation(
+            controller = entity.playAnimation(
                 animation.repeat(),
                 transitionDuration: transitionDuration
             )
         } else {
-            entity.playAnimation(
+            controller = entity.playAnimation(
                 animation,
                 transitionDuration: transitionDuration
             )
         }
+        controller.speed = speed
     }
 
     /// Names of all available animations on this model.
@@ -301,17 +305,19 @@ public struct ModelNode: @unchecked Sendable {
         guard let animation = entity.availableAnimations.first(where: {
             $0.name == name
         }) else { return }
+        let controller: AnimationPlaybackController
         if loop {
-            entity.playAnimation(
+            controller = entity.playAnimation(
                 animation.repeat(),
                 transitionDuration: transitionDuration
             )
         } else {
-            entity.playAnimation(
+            controller = entity.playAnimation(
                 animation,
                 transitionDuration: transitionDuration
             )
         }
+        controller.speed = speed
     }
 
     /// Stops all animations on the model.
