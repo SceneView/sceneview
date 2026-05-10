@@ -37,6 +37,7 @@
 		C10000000000000000000022 /* RerunDebugDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000022 /* RerunDebugDemo.swift */; };
 		C10000000000000000000023 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000023 /* DeepLinkRouter.swift */; };
 		C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000024 /* DemoDeepLinkRegistry.swift */; };
+		C10000000000000000000025 /* OrbitalARDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000025 /* OrbitalARDemo.swift */; };
 		C10000000000000000000030 /* FavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000030 /* FavoritesManager.swift */; };
 		D10000000000000000000001 /* game_boy_classic.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* game_boy_classic.usdz */; };
 		D10000000000000000000002 /* tree_scene.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* tree_scene.usdz */; };
@@ -106,6 +107,7 @@
 		C20000000000000000000022 /* RerunDebugDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RerunDebugDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000023 /* DeepLinkRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkRouter.swift; sourceTree = "<group>"; };
 		C20000000000000000000024 /* DemoDeepLinkRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDeepLinkRegistry.swift; sourceTree = "<group>"; };
+		C20000000000000000000025 /* OrbitalARDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalARDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000030 /* FavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManager.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* game_boy_classic.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = game_boy_classic.usdz; sourceTree = "<group>"; };
 		D20000000000000000000002 /* tree_scene.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = tree_scene.usdz; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 				C20000000000000000000019 /* AutoRotateDemo.swift */,
 				C20000000000000000000020 /* SceneGalleryDemo.swift */,
 				C20000000000000000000022 /* RerunDebugDemo.swift */,
+				C20000000000000000000025 /* OrbitalARDemo.swift */,
 			);
 			path = Demos;
 			sourceTree = "<group>";
@@ -431,6 +434,7 @@
 				95BE47B4B9B828745697FB4B /* SketchfabConfig.swift in Sources */,
 				593E4FADBA93AF1190A3A67E /* SketchfabModels.swift in Sources */,
 				B4A94ABD8B5DA5F4E4CE4834 /* SketchfabService.swift in Sources */,
+				C10000000000000000000025 /* OrbitalARDemo.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

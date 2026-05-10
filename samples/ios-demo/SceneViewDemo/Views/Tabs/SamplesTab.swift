@@ -103,6 +103,9 @@ struct SamplesTab: View {
             DemoItem(title: "Light Types", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
                 LightTypesDemo()
             },
+            DemoItem(title: "Movable Light", icon: "sun.dust.fill", subtitle: "Drag to orbit the light around the model", category: .lighting) {
+                MovableLightDemo()
+            },
             DemoItem(title: "Dynamic Sky", icon: "sun.horizon.fill", subtitle: "Time-of-day sun simulation", category: .lighting) {
                 DynamicSkyDemo()
             },
@@ -179,6 +182,9 @@ struct SamplesTab: View {
         items.append(contentsOf: [
             DemoItem(title: "AR Debug (Rerun)", icon: "antenna.radiowaves.left.and.right", subtitle: "Stream camera pose & planes to the Rerun viewer", category: .ar) {
                 RerunDebugDemo()
+            },
+            DemoItem(title: "Orbital AR", icon: "circle.dotted", subtitle: "Models orbit around you in AR", category: .ar) {
+                OrbitalARDemo()
             },
             DemoItem(
                 comingSoonTitle: "AR Plane Placement",

@@ -29,6 +29,7 @@ val ALL_DEMOS = listOf(
     DemoEntry("multi-model", "Multi Model", "Multiple models in one scene", "3D Basics"),
     // Lighting & Environment
     DemoEntry("lighting", "Lighting", "Directional, point, and spot lights", "Lighting & Environment"),
+    DemoEntry("movable-light", "Movable Light", "Drag to orbit the light around the model", "Lighting & Environment"),
     DemoEntry("dynamic-sky", "Dynamic Sky", "Time-of-day sun simulation", "Lighting & Environment"),
     DemoEntry("fog", "Fog", "Atmospheric fog effects", "Lighting & Environment"),
     DemoEntry("environment", "Environment Gallery", "HDR environment switching", "Lighting & Environment"),
@@ -65,4 +66,5 @@ val ALL_DEMOS = listOf(
     DemoEntry("ar-terrain", "Terrain Anchors", "Geospatial anchor that snaps to outdoor terrain", "Augmented Reality"),
     DemoEntry("ar-rooftop", "Rooftop Anchors", "Geospatial anchor that snaps to building rooftops", "Augmented Reality"),
     DemoEntry("ar-image-stabilization", "Image Stabilization (EIS)", "Smooth shaky camera with one config flag", "Augmented Reality"),
+    DemoEntry("ar-orbital", "Orbital AR", "Models orbit around you in a personal solar system", "Augmented Reality"),
 )

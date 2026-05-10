@@ -27,6 +27,7 @@ import io.github.sceneview.demo.demos.EnvironmentDemo
 import io.github.sceneview.demo.demos.FogDemo
 import io.github.sceneview.demo.demos.GeometryDemo
 import io.github.sceneview.demo.demos.LightingDemo
+import io.github.sceneview.demo.demos.MovableLightDemo
 import io.github.sceneview.demo.demos.ModelViewerDemo
 import io.github.sceneview.demo.demos.TextDemo
 import io.github.sceneview.demo.demos.LinesPathsDemo
@@ -57,6 +58,7 @@ import io.github.sceneview.demo.demos.ARInstantPlacementDemo
 import io.github.sceneview.demo.demos.ARTerrainAnchorDemo
 import io.github.sceneview.demo.demos.ARRooftopAnchorDemo
 import io.github.sceneview.demo.demos.ARImageStabilizationDemo
+import io.github.sceneview.demo.demos.OrbitalARDemo
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
 import io.github.sceneview.demo.ui.RootScreen
 import io.github.sceneview.demo.update.InAppUpdateManager
@@ -219,6 +221,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "animation" -> AnimationDemo(onBack)
         // Lighting & Environment
         "lighting" -> LightingDemo(onBack)
+        "movable-light" -> MovableLightDemo(onBack)
         "fog" -> FogDemo(onBack)
         "environment" -> EnvironmentDemo(onBack)
         // Interaction
@@ -257,6 +260,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "ar-terrain" -> ARTerrainAnchorDemo(onBack)
         "ar-rooftop" -> ARRooftopAnchorDemo(onBack)
         "ar-image-stabilization" -> ARImageStabilizationDemo(onBack)
+        "ar-orbital" -> OrbitalARDemo(onBack)
         // Fallback
         else -> PlaceholderDemo(id = id, onBack = onBack)
     }
