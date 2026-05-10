@@ -13,8 +13,9 @@ struct SketchfabModel: Codable, Identifiable, Hashable {
     var id: String { uid }
 
     enum CodingKeys: String, CodingKey {
-        case uid, name, description, thumbnails, downloadable, tags
+        case uid, name, description, thumbnails, tags
         case viewerUrl
+        case downloadable = "isDownloadable"
     }
 }
 

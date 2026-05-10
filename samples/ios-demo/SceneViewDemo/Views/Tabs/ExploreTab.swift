@@ -1,6 +1,9 @@
 import SwiftUI
 import RealityKit
 import SceneViewSwift
+#if os(iOS)
+import QuickLook
+#endif
 
 /// Model data for the gallery.
 struct ModelItem: Identifiable, Hashable {
@@ -180,11 +183,16 @@ final class RecentSearches {
 struct ExploreTab: View {
     @State private var searchText = ""
     @State private var selectedModel: ModelItem?
+    @State private var selectedSketchfabModel: SketchfabModel?
     @State private var selectedCategory: SketchfabCategory?
     @State private var recentSearches = RecentSearches()
+    @State private var sketchfabFeatured: [SketchfabModel] = []
+    @State private var isLoadingFeatured = false
+    @State private var featuredError: String?
     private let favoritesManager = FavoritesManager.shared
 
     /// Curated featured set — first 6 bundled models, picked for visual variety.
+    /// Used as fallback when no Sketchfab API key is configured.
     private var featuredModels: [ModelItem] {
         let ids = ["ferrari_f40", "animated_dragon", "cyberpunk_character",
                    "game_boy_classic", "fantasy_book", "tree_scene"]
@@ -216,8 +224,17 @@ struct ExploreTab: View {
                     #endif
                 }
             }
+            .task { await loadSketchfabFeatured() }
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
+            }
+            .sheet(item: $selectedSketchfabModel) { model in
+                SketchfabModelSheet(model: model)
+                    .presentationDetents([.medium, .large])
+                    #if os(iOS)
+                    .presentationBackground(.regularMaterial)
+                    .presentationCornerRadius(28)
+                    #endif
             }
             .sheet(item: $selectedCategory) { category in
                 CategorySheet(category: category) { query in
@@ -233,6 +250,22 @@ struct ExploreTab: View {
         }
     }
 
+    // MARK: - Sketchfab data loading
+
+    private func loadSketchfabFeatured() async {
+        // Only attempt when an API key is wired (env var, Info.plist, or BuildConfig
+        // equivalent). Falls back to local featured models silently if missing.
+        guard SketchfabConfig.apiKey != nil, sketchfabFeatured.isEmpty else { return }
+        isLoadingFeatured = true
+        defer { isLoadingFeatured = false }
+        do {
+            sketchfabFeatured = try await SketchfabService.shared.featured(limit: 6)
+            featuredError = nil
+        } catch {
+            featuredError = "Couldn't reach Sketchfab — showing offline picks"
+        }
+    }
+
     // MARK: - Featured section (horizontal carousel)
 
     private var featuredSection: some View {
@@ -241,20 +274,41 @@ struct ExploreTab: View {
                 Text("Featured")
                     .font(.title2.weight(.bold))
                 Spacer()
+                if isLoadingFeatured {
+                    ProgressView()
+                        .controlSize(.small)
+                }
                 Button("See all") {
                     // V1.1: navigate to a paged listing of featured Sketchfab models
                 }
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.tint)
             }
+            if let featuredError {
+                Text(featuredError)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 4)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    ForEach(featuredModels) { model in
-                        FeaturedCard(model: model) {
-                            selectedModel = model
-                            #if os(iOS)
-                            HapticManager.lightTap()
-                            #endif
+                    if sketchfabFeatured.isEmpty {
+                        ForEach(featuredModels) { model in
+                            FeaturedCard(model: model) {
+                                selectedModel = model
+                                #if os(iOS)
+                                HapticManager.lightTap()
+                                #endif
+                            }
+                        }
+                    } else {
+                        ForEach(sketchfabFeatured) { model in
+                            FeaturedSketchfabCard(model: model) {
+                                selectedSketchfabModel = model
+                                #if os(iOS)
+                                HapticManager.lightTap()
+                                #endif
+                            }
                         }
                     }
                 }
@@ -351,6 +405,167 @@ private struct FeaturedCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(model.name), \(model.category.rawValue), featured")
+    }
+}
+
+// MARK: - Featured Sketchfab card (live image from sketchfab.com CDN)
+
+private struct FeaturedSketchfabCard: View {
+    let model: SketchfabModel
+    let onTap: () -> Void
+
+    /// Pick a thumbnail close to the card's render size (≥320 wide, ≤640) to avoid
+    /// downloading the 2k-pixel original for a 200×160 view.
+    private var thumbnailURL: URL? {
+        let images = model.thumbnails.images
+        let preferred = images.first(where: { $0.width >= 320 && $0.width <= 640 })
+            ?? images.max(by: { $0.width < $1.width })
+            ?? images.first
+        return preferred.flatMap { URL(string: $0.url) }
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                AsyncImage(url: thumbnailURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ZStack {
+                            Color(.tertiarySystemBackground)
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        ZStack {
+                            Color(.tertiarySystemBackground)
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
+                        }
+                    @unknown default:
+                        Color(.tertiarySystemBackground)
+                    }
+                }
+                .frame(width: 200, height: 160)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(model.tags?.first?.name.capitalized ?? "3D Model")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: 200, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(model.name), Sketchfab model")
+    }
+}
+
+// MARK: - Sketchfab model detail sheet
+
+private struct SketchfabModelSheet: View {
+    let model: SketchfabModel
+    @Environment(\.dismiss) private var dismiss
+
+    private var largeThumbnailURL: URL? {
+        let images = model.thumbnails.images
+        let preferred = images.max(by: { $0.width < $1.width }) ?? images.first
+        return preferred.flatMap { URL(string: $0.url) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    AsyncImage(url: largeThumbnailURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fit)
+                        default:
+                            Rectangle().fill(.tint.opacity(0.08))
+                                .aspectRatio(16/9, contentMode: .fit)
+                                .overlay { ProgressView() }
+                        }
+                    }
+                    .frame(maxHeight: 280)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(model.name)
+                            .font(.title2.weight(.bold))
+                        if let desc = model.description, !desc.isEmpty {
+                            Text(desc.trimmingCharacters(in: .whitespacesAndNewlines))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(8)
+                        }
+                    }
+
+                    if let tags = model.tags, !tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(tags.prefix(10), id: \.name) { tag in
+                                    Text(tag.name)
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(.tint.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(.tint)
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    if let viewerURL = URL(string: model.viewerUrl) {
+                        Link(destination: viewerURL) {
+                            Label("View on Sketchfab", systemImage: "arrow.up.right.square.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(.tint, in: Capsule())
+                                .foregroundStyle(.white)
+                        }
+                    }
+
+                    if model.downloadable {
+                        Text("Download & view in 3D — coming in V1.1")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        Text("This model is not available for download on the free tier.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle(model.name)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
@@ -538,6 +753,9 @@ struct ModelViewerScreen: View {
     @State private var errorMessage: String?
     @State private var selectedEnvironment: SceneEnvironment = .studio
     @State private var showShareSheet = false
+    /// URL to a USDZ file bundled with the app. When set, iOS Quick Look opens
+    /// over the scene with its built-in AR button (top-right in the QL viewer).
+    @State private var arPreviewURL: URL?
     private let favoritesManager = FavoritesManager.shared
 
     init(model: ModelItem) {
@@ -634,6 +852,9 @@ struct ModelViewerScreen: View {
         .task {
             await loadModel()
         }
+        #if os(iOS)
+        .quickLookPreview($arPreviewURL)
+        #endif
     }
 
     // MARK: - Model Loading
@@ -683,6 +904,27 @@ struct ModelViewerScreen: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 12) {
+            #if os(iOS)
+            // Prominent AR entry point — opens Apple Quick Look AR over the scene with the
+            // bundled USDZ asset. Quick Look's built-in AR button (top-right of the QL
+            // viewer) then drops the model into the user's real environment.
+            if Bundle.main.url(forResource: model.asset, withExtension: "usdz") != nil {
+                Button {
+                    arPreviewURL = Bundle.main.url(forResource: model.asset, withExtension: "usdz")
+                    HapticManager.lightTap()
+                } label: {
+                    Label("View in AR", systemImage: "arkit")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.tint, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View this model in AR")
+            }
+            #endif
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(SceneEnvironment.allPresets, id: \.name) { env in
