@@ -3,7 +3,6 @@ import RealityKit
 import SceneViewSwift
 #if os(iOS)
 import QuickLook
-import WebKit
 #endif
 
 /// Model data for the gallery.
@@ -212,6 +211,7 @@ struct ExploreTab: View {
     @State private var searchText = ""
     @State private var selectedModel: ModelItem?
     @State private var selectedSketchfabModel: SketchfabModel?
+    @State private var viewingSketchfabModel: SketchfabModel?
     @State private var selectedCategory: SketchfabCategory?
     @State private var recentSearches = RecentSearches()
     @State private var sketchfabStaffPicks: [SketchfabModel] = []
@@ -235,12 +235,14 @@ struct ExploreTab: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 28) {
+                    // Home feed mix — samples first (always available), then live Sketchfab
+                    // feeds when an API key is configured. Each row shows SceneView SDK
+                    // content (bundled or streamed) — never the Sketchfab web viewer.
+                    trySampleSection
                     if !sketchfabStaffPicks.isEmpty || !sketchfabMostLiked.isEmpty || !sketchfabRecent.isEmpty {
                         filtersBar
                     }
                     if sketchfabStaffPicks.isEmpty && sketchfabMostLiked.isEmpty && sketchfabRecent.isEmpty {
-                        // No live data yet (loading, missing key, or offline) — single
-                        // bundled "Featured" carousel as fallback.
                         bundledFeaturedSection
                     } else {
                         feedSection(title: "Staff Picks",   models: sketchfabStaffPicks)
@@ -272,13 +274,22 @@ struct ExploreTab: View {
                 ModelViewerScreen(model: model)
             }
             .sheet(item: $selectedSketchfabModel) { model in
-                SketchfabModelSheet(model: model)
-                    .presentationDetents([.medium, .large])
-                    #if os(iOS)
-                    .presentationBackground(.regularMaterial)
-                    .presentationCornerRadius(28)
-                    #endif
+                SketchfabModelSheet(model: model) { picked in
+                    viewingSketchfabModel = picked
+                }
+                .presentationDetents([.medium, .large])
+                #if os(iOS)
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(28)
+                #endif
             }
+            #if os(iOS)
+            .fullScreenCover(item: $viewingSketchfabModel) { model in
+                NavigationStack {
+                    SketchfabModelViewerScreen(model: model)
+                }
+            }
+            #endif
             .sheet(item: $selectedCategory) { category in
                 CategorySheet(category: category) { query in
                     searchText = query
@@ -328,6 +339,50 @@ struct ExploreTab: View {
         sketchfabMostLiked = []
         sketchfabRecent = []
         Task { await loadSketchfabFeeds() }
+    }
+
+    // MARK: - "Try a sample" section (home-feed mix — samples + models)
+
+    /// 6 curated sample demos surfaced on Explore so the home feed shows what
+    /// SceneView can do beyond just downloaded models. Tap navigates to the demo's
+    /// own screen, which renders through SceneView (same path as the Scenes tab).
+    private var trySampleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Try a sample")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("All samples") {
+                    // V1.1: deep-link to the Samples tab
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    SamplePromoCard(title: "PBR Materials", subtitle: "Metallic + roughness spectrum", icon: "paintpalette.fill", gradient: [.purple.opacity(0.35), .pink.opacity(0.18)]) {
+                        AnyView(MaterialsDemo())
+                    }
+                    SamplePromoCard(title: "Light Types", subtitle: "Directional · point · spot", icon: "lightbulb.fill", gradient: [.yellow.opacity(0.30), .orange.opacity(0.18)]) {
+                        AnyView(LightTypesDemo())
+                    }
+                    SamplePromoCard(title: "Physics", subtitle: "Dynamic · static · kinematic", icon: "figure.walk", gradient: [.green.opacity(0.30), .teal.opacity(0.18)]) {
+                        AnyView(PhysicsDemo())
+                    }
+                    SamplePromoCard(title: "Dynamic Sky", subtitle: "Time-of-day sun simulation", icon: "sun.horizon.fill", gradient: [.blue.opacity(0.30), .cyan.opacity(0.18)]) {
+                        AnyView(DynamicSkyDemo())
+                    }
+                    SamplePromoCard(title: "3D Text", subtitle: "Extruded fonts with style", icon: "textformat", gradient: [.indigo.opacity(0.30), .purple.opacity(0.18)]) {
+                        AnyView(TextDemo())
+                    }
+                    SamplePromoCard(title: "Scene Gallery", subtitle: "Multiple shapes in one scene", icon: "square.grid.3x3.fill", gradient: [.red.opacity(0.28), .orange.opacity(0.15)]) {
+                        AnyView(SceneGalleryDemo())
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
     }
 
     /// Horizontal row of filter chips above the feed carousels.
@@ -613,59 +668,16 @@ private extension SketchfabModel {
     }
 }
 
-// MARK: - Live 3D embed view (WKWebView wrapping the Sketchfab iframe viewer)
-
-#if os(iOS)
-private struct SketchfabEmbedView: UIViewRepresentable {
-    let modelUid: String
-
-    /// Sketchfab's iframe viewer URL with the chrome stripped down so the embed
-    /// feels native: autostart, no UI panels, transparent background, no preload
-    /// overlay. The full set of params is documented at
-    /// https://sketchfab.com/developers/embedding.
-    private var embedURL: URL? {
-        var components = URLComponents(string: "https://sketchfab.com/models/\(modelUid)/embed")
-        components?.queryItems = [
-            URLQueryItem(name: "autostart", value: "1"),
-            URLQueryItem(name: "ui_infos", value: "0"),
-            URLQueryItem(name: "ui_controls", value: "0"),
-            URLQueryItem(name: "ui_help", value: "0"),
-            URLQueryItem(name: "ui_settings", value: "0"),
-            URLQueryItem(name: "ui_inspector", value: "0"),
-            URLQueryItem(name: "ui_watermark", value: "0"),
-            URLQueryItem(name: "ui_stop", value: "0"),
-            URLQueryItem(name: "ui_annotations", value: "1"),
-            URLQueryItem(name: "transparent", value: "1"),
-        ]
-        return components?.url
-    }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.scrollView.isScrollEnabled = false
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        guard let url = embedURL,
-              webView.url?.absoluteString != url.absoluteString else { return }
-        webView.load(URLRequest(url: url))
-    }
-}
-#endif
+// Sketchfab models render through `SketchfabModelViewerScreen` (SceneView SDK),
+// not via Sketchfab's web iframe viewer. The whole point of this demo app is to
+// showcase SceneView's renderer.
 
 // MARK: - Sketchfab model detail sheet
 
 private struct SketchfabModelSheet: View {
     let model: SketchfabModel
+    let onOpenInSceneView: (SketchfabModel) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var show3D = false
 
     private var largeThumbnailURL: URL? {
         let images = model.thumbnails.images
@@ -677,35 +689,7 @@ private struct SketchfabModelSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    // Hero: thumbnail by default, swap to a live Sketchfab iframe viewer
-                    // when the user taps "Play in 3D". Using a manual toggle (vs always
-                    // autoloading the iframe) keeps the sheet snappy and saves cellular
-                    // data on metered connections.
-                    ZStack(alignment: .topTrailing) {
-                        if show3D {
-                            #if os(iOS)
-                            SketchfabEmbedView(modelUid: model.uid)
-                                .aspectRatio(16/10, contentMode: .fit)
-                                .frame(maxHeight: 320)
-                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            #else
-                            thumbnailHero
-                            #endif
-                        } else {
-                            thumbnailHero
-                            Button {
-                                show3D = true
-                            } label: {
-                                Label("Play in 3D", systemImage: "play.circle.fill")
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(.thinMaterial, in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(12)
-                        }
-                    }
+                    thumbnailHero
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(model.name)
@@ -735,24 +719,34 @@ private struct SketchfabModelSheet: View {
 
                     Divider()
 
-                    if let viewerURL = URL(string: model.viewerUrl) {
-                        Link(destination: viewerURL) {
-                            Label("View on Sketchfab", systemImage: "arrow.up.right.square.fill")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(.tint, in: Capsule())
-                                .foregroundStyle(.white)
+                    // Primary CTA — open the model in SceneView. This downloads the GLB
+                    // via SketchfabService and renders it through SceneViewSwift's native
+                    // renderer (RealityKit). The Sketchfab web viewer is intentionally
+                    // NOT used — this demo app exists to showcase SceneView.
+                    Button {
+                        let captured = model
+                        dismiss()
+                        // Small delay so the sheet finishes dismissing before the
+                        // fullScreenCover presents — avoids "trying to present X on Y
+                        // while another presentation is in progress" warnings.
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(250))
+                            onOpenInSceneView(captured)
                         }
+                    } label: {
+                        Label(model.downloadable ? "Open in SceneView" : "Preview in SceneView",
+                              systemImage: "cube.transparent.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(.tint, in: Capsule())
+                            .foregroundStyle(.white)
                     }
+                    .disabled(!model.downloadable)
+                    .opacity(model.downloadable ? 1.0 : 0.5)
 
-                    if model.downloadable {
-                        Text("Download & view in 3D — coming in V1.1")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    } else {
-                        Text("This model is not available for download on the free tier.")
+                    if !model.downloadable {
+                        Text("This model is not downloadable on the Sketchfab free tier and can't be rendered in SceneView yet.")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -786,6 +780,57 @@ private struct SketchfabModelSheet: View {
         }
         .frame(maxHeight: 280)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+// MARK: - Sample promo card (compact entry-point to a Scenes tab demo)
+
+/// Compact card surfaced in the Explore home feed's "Try a sample" carousel.
+/// Tapping pushes the demo destination onto the local NavigationStack — exactly
+/// what the Samples tab would do, so the demo renders through SceneView.
+private struct SamplePromoCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let gradient: [Color]
+    let destination: () -> AnyView
+
+    var body: some View {
+        NavigationLink {
+            destination()
+                .navigationTitle(title)
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+                        .frame(width: 200, height: 130)
+                    Image(systemName: icon)
+                        .font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(.tint)
+                        .padding(14)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: 200, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title), sample demo. \(subtitle)")
     }
 }
 
@@ -1243,4 +1288,196 @@ struct ModelViewerScreen: View {
         }
     }
     #endif
+}
+
+// MARK: - Sketchfab model viewer (downloads GLB via SketchfabService, renders in SceneView)
+
+/// Full-screen viewer for a model coming from the Sketchfab API.
+///
+/// Downloads the GLB through `SketchfabService.downloadModel(uid:progress:)`, caches it under
+/// `Caches/sketchfab/`, then loads it into `SceneView` via `ModelNode.load(contentsOf: URL)`.
+///
+/// This is the showcase path for the demo: every model the user touches — bundled or
+/// streamed — flows through SceneView's renderer (RealityKit on iOS). The Sketchfab web
+/// viewer / iframe / embed is intentionally never used.
+struct SketchfabModelViewerScreen: View {
+    let model: SketchfabModel
+    @State private var loadedNode: ModelNode?
+    @State private var isLoading = false
+    @State private var downloadProgress: Double = 0
+    @State private var errorMessage: String?
+    @State private var selectedEnvironment: SceneEnvironment = .studio
+    @State private var autoRotate = true
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.08, green: 0.08, blue: 0.12),
+                    Color(red: 0.15, green: 0.15, blue: 0.22),
+                    Color(red: 0.10, green: 0.10, blue: 0.18),
+                ]),
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            sceneView
+                .ignoresSafeArea()
+
+            if isLoading {
+                VStack(spacing: 14) {
+                    ProgressView(value: max(0.05, downloadProgress))
+                        .progressViewStyle(.linear)
+                        .tint(.white)
+                        .frame(width: 220)
+                    Text("Loading \(model.name)\u{2026}")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                    Text("Streaming from Sketchfab \u{00B7} rendering in SceneView")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .padding(20)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+
+            if let errorMessage {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title)
+                        .foregroundStyle(.yellow)
+                    Text("Failed to load model").font(.headline).foregroundStyle(.white)
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding()
+            }
+
+            VStack {
+                Spacer()
+                controlsOverlay
+            }
+        }
+        .navigationTitle(model.name)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    autoRotate.toggle()
+                    #if os(iOS)
+                    HapticManager.selectionChanged()
+                    #endif
+                } label: {
+                    Image(systemName: autoRotate ? "rotate.3d.fill" : "rotate.3d")
+                }
+                .accessibilityLabel(autoRotate ? "Stop rotation" : "Start rotation")
+            }
+        }
+        .task { await loadFromSketchfab() }
+    }
+
+    private func loadFromSketchfab() async {
+        guard loadedNode == nil else { return }
+        isLoading = true
+        errorMessage = nil
+        downloadProgress = 0
+        do {
+            let localURL = try await SketchfabService.shared.downloadModel(
+                uid: model.uid,
+                progress: { p in
+                    Task { @MainActor in
+                        self.downloadProgress = p
+                    }
+                }
+            )
+            let node = try await ModelNode.load(contentsOf: localURL)
+            _ = node.scaleToUnits(1.0)
+            loadedNode = node
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    @ViewBuilder
+    private var sceneView: some View {
+        if autoRotate {
+            SceneView { root in
+                if let loadedNode {
+                    loadedNode.entity.position = .zero
+                    root.addChild(loadedNode.entity)
+                }
+            }
+            .environment(selectedEnvironment)
+            .cameraControls(.orbit)
+            .autoRotate(speed: 0.4)
+            .id("sketchfab-auto-\(loadedNode != nil)-\(selectedEnvironment.name)")
+        } else {
+            SceneView { root in
+                if let loadedNode {
+                    loadedNode.entity.position = .zero
+                    root.addChild(loadedNode.entity)
+                }
+            }
+            .environment(selectedEnvironment)
+            .cameraControls(.orbit)
+            .id("sketchfab-manual-\(loadedNode != nil)-\(selectedEnvironment.name)")
+        }
+    }
+
+    private var controlsOverlay: some View {
+        VStack(spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(SceneEnvironment.allPresets, id: \.name) { env in
+                        Button {
+                            selectedEnvironment = env
+                            #if os(iOS)
+                            HapticManager.lightTap()
+                            #endif
+                        } label: {
+                            Text(env.name)
+                                .font(.caption2)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    selectedEnvironment.name == env.name
+                                        ? AnyShapeStyle(.blue)
+                                        : AnyShapeStyle(.white.opacity(0.15))
+                                )
+                                .clipShape(Capsule())
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                if model.faceCount > 0 {
+                    Label(model.formattedFaceCount + " polys", systemImage: "square.grid.3x3")
+                }
+                if model.isAnimated {
+                    Label("Animated", systemImage: "wand.and.stars")
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.7))
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding()
+    }
 }
