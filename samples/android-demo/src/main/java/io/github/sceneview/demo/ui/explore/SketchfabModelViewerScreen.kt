@@ -1,0 +1,370 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package io.github.sceneview.demo.ui.explore
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import io.github.sceneview.SceneView
+import io.github.sceneview.demo.sketchfab.SketchfabModel
+import io.github.sceneview.demo.sketchfab.SketchfabService
+import io.github.sceneview.demo.ui.explore.components.AsyncNetworkImage
+import io.github.sceneview.demo.ui.explore.components.formattedFaceCount
+import io.github.sceneview.demo.ui.explore.components.preferredThumbnailUrl
+import io.github.sceneview.demo.ui.explore.components.primaryTagDisplay
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberModelInstance
+import io.github.sceneview.rememberModelLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+
+/**
+ * Detail sheet for a Sketchfab [model]. Two-state UI:
+ *
+ *  1. **Preview**  : large thumbnail + stats + "Open in SceneView" CTA.
+ *  2. **Rendering**: SceneView composable renders the downloaded GLB.
+ *
+ * Constraints from the product brief:
+ *  - All models render through the **SceneView SDK** — never the Sketchfab
+ *    iframe / web viewer / external app. The whole point of the demo app is
+ *    to showcase the SDK; falling back to Sketchfab's player undermines it.
+ *  - No "View on Sketchfab" external link.
+ *
+ * The bottom sheet uses M3 [ModalBottomSheet] with the `fillMaxSize` skip-partially-expanded
+ * state for a near-full-height experience (we want enough room for the live
+ * SceneView surface).
+ */
+@Composable
+fun SketchfabModelViewerScreen(
+    model: SketchfabModel,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var stage by remember(model.uid) { mutableStateOf<Stage>(Stage.Preview) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        when (val s = stage) {
+            Stage.Preview -> PreviewContent(
+                model = model,
+                onOpenInSceneView = { stage = Stage.Downloading },
+            )
+            Stage.Downloading -> DownloadingContent(
+                model = model,
+                onReady = { file -> stage = Stage.Rendering(file) },
+                onError = { stage = Stage.Error(it) },
+            )
+            is Stage.Rendering -> RenderContent(file = s.file, model = model)
+            is Stage.Error -> ErrorContent(message = s.message, onRetry = { stage = Stage.Preview })
+        }
+    }
+}
+
+private sealed interface Stage {
+    data object Preview : Stage
+    data object Downloading : Stage
+    data class Rendering(val file: File) : Stage
+    data class Error(val message: String) : Stage
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .clip(RoundedCornerShape(24.dp)),
+        ) {
+            AsyncNetworkImage(
+                url = model.preferredThumbnailUrl(minWidth = 640, maxWidth = 1280),
+                contentDescription = model.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            if (model.isAnimated) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.92f),
+                            shape = RoundedCornerShape(50),
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Animated",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = model.name,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = model.primaryTagDisplay(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        StatsRow(model)
+        Spacer(Modifier.height(20.dp))
+        Button(
+            onClick = onOpenInSceneView,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiary,
+                contentColor = MaterialTheme.colorScheme.onTertiary,
+            ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PlayArrow,
+                contentDescription = null,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Open in SceneView",
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Rendered locally by Filament — no external viewer.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+@Composable
+private fun StatsRow(model: SketchfabModel) {
+    val scroll = rememberScrollState()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.horizontalScroll(scroll),
+    ) {
+        if (model.faceCount > 0) StatChip(label = "${model.formattedFaceCount()} polys")
+        if (model.animationCount > 0) StatChip(label = "${model.animationCount} anim")
+        if (model.likeCount > 0) StatChip(label = "${model.likeCount} likes")
+        model.tags.orEmpty().take(3).forEach { tag -> StatChip(label = tag.name) }
+    }
+}
+
+@Composable
+private fun StatChip(label: String) {
+    Box(
+        modifier = Modifier
+            .background(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = RoundedCornerShape(50),
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+// ── Downloading ───────────────────────────────────────────────────────────
+
+@Composable
+private fun DownloadingContent(
+    model: SketchfabModel,
+    onReady: (File) -> Unit,
+    onError: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    LaunchedEffect(model.uid) {
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                SketchfabService.getInstance(context).downloadModel(model.uid)
+            }
+        }
+        result.fold(
+            onSuccess = onReady,
+            onFailure = { onError(it.message ?: "Download failed") },
+        )
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(360.dp)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Downloading ${model.name}…",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Streaming GLB from Sketchfab CDN",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// ── Rendering (SceneView Compose) ─────────────────────────────────────────
+
+@Composable
+private fun RenderContent(file: File, model: SketchfabModel) {
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
+    // `rememberModelInstance` accepts asset paths or URIs; we pass a `file://`
+    // URI so Filament reads from the local on-disk cache without re-decoding
+    // through the asset pipeline.
+    val instance = rememberModelInstance(
+        modelLoader = modelLoader,
+        fileLocation = "file://${file.absolutePath}",
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(520.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(440.dp),
+        ) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+            ) {
+                instance?.let { ModelNode(modelInstance = it, scaleToUnits = 1f) }
+            }
+            if (instance == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = model.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        Text(
+            text = "Rendered by SceneView · ${model.formattedFaceCount()} polys",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+    }
+}
+
+// ── Error ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ErrorContent(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Couldn't open this model",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry) { Text("Try again") }
+    }
+}

@@ -16,9 +16,25 @@ data class SketchfabModel(
     val description: String? = null,
     val thumbnails: SketchfabThumbnails,
     @SerialName("viewerUrl") val viewerUrl: String,
-    val downloadable: Boolean = false,
+    /**
+     * Sketchfab returns this field as `isDownloadable` (camelCase, leading `is`) in
+     * `/v3/models` and `/v3/search` responses. Without the explicit `@SerialName`
+     * the value silently decodes to `false` — discovered while wiring the iOS demo.
+     */
+    @SerialName("isDownloadable") val downloadable: Boolean = false,
     val tags: List<SketchfabTag>? = null,
-)
+    /** Number of GPU triangles. Surfaces the "12k polys" badge on cards. */
+    val faceCount: Int = 0,
+    /** Number of skeletal animations. `> 0` means we show an "Animated" pill. */
+    val animationCount: Int = 0,
+    /** Likes on the Sketchfab page (mirrors `-likeCount` sort key). */
+    val likeCount: Int = 0,
+    /** Views on the Sketchfab page (mirrors `-viewCount` sort key). */
+    val viewCount: Int = 0,
+) {
+    /** True when the Sketchfab model carries one or more skeletal animations. */
+    val isAnimated: Boolean get() = animationCount > 0
+}
 
 /** Wrapper around the `images` array returned by Sketchfab for each model. */
 @Serializable

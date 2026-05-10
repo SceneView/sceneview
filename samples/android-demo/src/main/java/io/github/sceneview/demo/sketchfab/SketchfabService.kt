@@ -78,23 +78,79 @@ class SketchfabService private constructor(
     }
 
     /**
-     * Featured / popular models, optionally filtered by category.
+     * Featured / "most liked" models, optionally filtered by category.
      *
      * Uses `sort_by=-likeCount` since Sketchfab does not expose a dedicated
      * "featured" endpoint.
      */
     suspend fun featured(
         category: String? = null,
-        limit: Int = 6,
+        animated: Boolean? = null,
+        limit: Int = 10,
+    ): List<SketchfabModel> = list(
+        sortBy = "-likeCount",
+        animated = animated,
+        category = category,
+        limit = limit,
+    )
+
+    /**
+     * "Staff Picks" — hand-curated by Sketchfab's editorial team. Mirrors the
+     * iOS [`staffPicks`](SketchfabService.swift) helper so both demos hit the
+     * same wire format.
+     */
+    suspend fun staffPicks(
+        category: String? = null,
+        animated: Boolean? = null,
+        limit: Int = 10,
+    ): List<SketchfabModel> = list(
+        sortBy = "-staffPickedAt",
+        staffPicked = true,
+        animated = animated,
+        category = category,
+        limit = limit,
+    )
+
+    /** Trending right now (sorted by `-viewCount`). */
+    suspend fun mostPopular(
+        category: String? = null,
+        animated: Boolean? = null,
+        limit: Int = 10,
+    ): List<SketchfabModel> = list(
+        sortBy = "-viewCount",
+        animated = animated,
+        category = category,
+        limit = limit,
+    )
+
+    /** Recently published downloadable models. */
+    suspend fun recentlyAdded(
+        category: String? = null,
+        animated: Boolean? = null,
+        limit: Int = 10,
+    ): List<SketchfabModel> = list(
+        sortBy = "-publishedAt",
+        animated = animated,
+        category = category,
+        limit = limit,
+    )
+
+    /** Internal helper used by the curated-feed methods. */
+    private suspend fun list(
+        sortBy: String,
+        staffPicked: Boolean = false,
+        animated: Boolean? = null,
+        category: String? = null,
+        limit: Int,
     ): List<SketchfabModel> = withContext(Dispatchers.IO) {
         val url = buildUrl("models") {
             addQueryParameter("type", "models")
-            addQueryParameter("sort_by", "-likeCount")
+            addQueryParameter("sort_by", sortBy)
             addQueryParameter("downloadable", "true")
             addQueryParameter("count", limit.toString())
-            if (!category.isNullOrBlank()) {
-                addQueryParameter("categories", category)
-            }
+            if (staffPicked) addQueryParameter("staffpicked", "true")
+            if (animated != null) addQueryParameter("animated", animated.toString())
+            if (!category.isNullOrBlank()) addQueryParameter("categories", category)
         }
         val body = authenticatedGet(url)
         json.decodeFromString(SketchfabSearchResponse.serializer(), body).results

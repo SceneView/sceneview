@@ -58,6 +58,7 @@ import io.github.sceneview.demo.demos.ARTerrainAnchorDemo
 import io.github.sceneview.demo.demos.ARRooftopAnchorDemo
 import io.github.sceneview.demo.demos.ARImageStabilizationDemo
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
+import io.github.sceneview.demo.ui.RootScreen
 import io.github.sceneview.demo.update.InAppUpdateManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -191,7 +192,11 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
         popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
     ) {
         composable("list") {
-            DemoListScreen(onDemoClick = { id -> navController.navigate("demo/$id") })
+            // New 4-tab root (Explore / AR View / Samples / About). The legacy
+            // category-grouped DemoListScreen lives untouched inside the
+            // "Samples" tab so existing deep-link flows (`adb am start ... --es
+            // demo <id>`) and the in-app update banner remain wired up.
+            RootScreen(onDemoClick = { id -> navController.navigate("demo/$id") })
         }
         composable("demo/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: return@composable
