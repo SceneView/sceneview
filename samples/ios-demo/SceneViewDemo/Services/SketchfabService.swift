@@ -72,14 +72,51 @@ actor SketchfabService {
         return response.results
     }
 
-    /// Featured / popular models, optionally filtered by category.
+    /// Most-liked downloadable models (alias `popular`), optionally filtered by category.
     func featured(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(sortBy: "-likeCount", category: category, limit: limit)
+    }
+
+    /// Sketchfab "Staff Picks" — hand-curated by Sketchfab's editorial team.
+    func staffPicks(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(
+            sortBy: "-staffPickedAt",
+            staffPicked: true,
+            category: category,
+            limit: limit
+        )
+    }
+
+    /// Most-viewed downloadable models — trending right now.
+    func mostPopular(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(sortBy: "-viewCount", category: category, limit: limit)
+    }
+
+    /// Recently published downloadable models, optionally filtered by category.
+    func recentlyAdded(category: String? = nil, limit: Int = 6) async throws -> [SketchfabModel] {
+        try await list(sortBy: "-publishedAt", category: category, limit: limit)
+    }
+
+    /// Internal helper used by the curated-feed methods.
+    private func list(
+        sortBy: String,
+        staffPicked: Bool = false,
+        animated: Bool? = nil,
+        category: String? = nil,
+        limit: Int
+    ) async throws -> [SketchfabModel] {
         var items: [URLQueryItem] = [
             URLQueryItem(name: "type", value: "models"),
-            URLQueryItem(name: "sort_by", value: "-likeCount"),
+            URLQueryItem(name: "sort_by", value: sortBy),
             URLQueryItem(name: "downloadable", value: "true"),
             URLQueryItem(name: "count", value: String(limit))
         ]
+        if staffPicked {
+            items.append(URLQueryItem(name: "staffpicked", value: "true"))
+        }
+        if let animated {
+            items.append(URLQueryItem(name: "animated", value: animated ? "true" : "false"))
+        }
         if let category {
             items.append(URLQueryItem(name: "categories", value: category))
         }

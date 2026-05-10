@@ -84,51 +84,78 @@ enum ModelCategory: String, CaseIterable {
     }
 }
 
-/// Sketchfab-style discovery categories shown as chips on the Explore tab.
+/// The 18 official Sketchfab categories returned by `GET /v3/categories`.
 ///
-/// The display name is what the user sees on the chip; `searchQuery` is the term sent to
-/// `SketchfabService.search(query:)` when the user taps the category.
+/// The `slug` is exactly what the Sketchfab Data API expects in `?categories=`; the
+/// `displayName` is what users see on the chip. SF Symbol `icon` is picked per category.
+///
+/// Source: live `https://api.sketchfab.com/v3/categories` (snapshot 2026-05-11).
 enum SketchfabCategory: String, CaseIterable, Identifiable {
-    case vehicles, characters, architecture, nature, sciFi, abstract, furniture, weapons
+    case animalsPets             = "animals-pets"
+    case architecture            = "architecture"
+    case artAbstract             = "art-abstract"
+    case carsVehicles            = "cars-vehicles"
+    case charactersCreatures     = "characters-creatures"
+    case culturalHeritageHistory = "cultural-heritage-history"
+    case electronicsGadgets      = "electronics-gadgets"
+    case fashionStyle            = "fashion-style"
+    case foodDrink               = "food-drink"
+    case furnitureHome           = "furniture-home"
+    case music                   = "music"
+    case naturePlants            = "nature-plants"
+    case newsPolitics            = "news-politics"
+    case people                  = "people"
+    case placesTravel            = "places-travel"
+    case scienceTechnology       = "science-technology"
+    case sportsFitness           = "sports-fitness"
+    case weaponsMilitary         = "weapons-military"
 
     var id: String { rawValue }
+    var slug: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .vehicles:     return "Vehicles"
-        case .characters:   return "Characters"
-        case .architecture: return "Architecture"
-        case .nature:       return "Nature"
-        case .sciFi:        return "Sci-Fi"
-        case .abstract:     return "Abstract"
-        case .furniture:    return "Furniture"
-        case .weapons:      return "Weapons"
-        }
-    }
-
-    var searchQuery: String {
-        switch self {
-        case .vehicles:     return "vehicle car"
-        case .characters:   return "character"
-        case .architecture: return "architecture building"
-        case .nature:       return "nature plant"
-        case .sciFi:        return "sci-fi spaceship"
-        case .abstract:     return "abstract"
-        case .furniture:    return "furniture"
-        case .weapons:      return "weapon"
+        case .animalsPets:             return "Animals & Pets"
+        case .architecture:            return "Architecture"
+        case .artAbstract:             return "Art & Abstract"
+        case .carsVehicles:            return "Cars & Vehicles"
+        case .charactersCreatures:     return "Characters & Creatures"
+        case .culturalHeritageHistory: return "Cultural Heritage"
+        case .electronicsGadgets:      return "Electronics"
+        case .fashionStyle:            return "Fashion & Style"
+        case .foodDrink:               return "Food & Drink"
+        case .furnitureHome:           return "Furniture & Home"
+        case .music:                   return "Music"
+        case .naturePlants:            return "Nature & Plants"
+        case .newsPolitics:            return "News & Politics"
+        case .people:                  return "People"
+        case .placesTravel:            return "Places & Travel"
+        case .scienceTechnology:       return "Science & Tech"
+        case .sportsFitness:           return "Sports & Fitness"
+        case .weaponsMilitary:         return "Weapons & Military"
         }
     }
 
     var icon: String {
         switch self {
-        case .vehicles:     return "car.side.fill"
-        case .characters:   return "figure.stand"
-        case .architecture: return "building.2.fill"
-        case .nature:       return "leaf.fill"
-        case .sciFi:        return "sparkles"
-        case .abstract:     return "scribble.variable"
-        case .furniture:    return "sofa.fill"
-        case .weapons:      return "shield.fill"
+        case .animalsPets:             return "pawprint.fill"
+        case .architecture:            return "building.2.fill"
+        case .artAbstract:             return "paintpalette.fill"
+        case .carsVehicles:            return "car.side.fill"
+        case .charactersCreatures:     return "figure.stand"
+        case .culturalHeritageHistory: return "building.columns.fill"
+        case .electronicsGadgets:      return "cpu.fill"
+        case .fashionStyle:            return "tshirt.fill"
+        case .foodDrink:               return "fork.knife"
+        case .furnitureHome:           return "sofa.fill"
+        case .music:                   return "music.note"
+        case .naturePlants:            return "leaf.fill"
+        case .newsPolitics:            return "newspaper.fill"
+        case .people:                  return "person.2.fill"
+        case .placesTravel:            return "globe.americas.fill"
+        case .scienceTechnology:       return "atom"
+        case .sportsFitness:           return "figure.run"
+        case .weaponsMilitary:         return "shield.lefthalf.filled"
         }
     }
 }
@@ -186,9 +213,11 @@ struct ExploreTab: View {
     @State private var selectedSketchfabModel: SketchfabModel?
     @State private var selectedCategory: SketchfabCategory?
     @State private var recentSearches = RecentSearches()
-    @State private var sketchfabFeatured: [SketchfabModel] = []
-    @State private var isLoadingFeatured = false
-    @State private var featuredError: String?
+    @State private var sketchfabStaffPicks: [SketchfabModel] = []
+    @State private var sketchfabMostLiked: [SketchfabModel] = []
+    @State private var sketchfabRecent: [SketchfabModel] = []
+    @State private var isLoadingFeeds = false
+    @State private var feedsError: String?
     private let favoritesManager = FavoritesManager.shared
 
     /// Curated featured set — first 6 bundled models, picked for visual variety.
@@ -202,8 +231,16 @@ struct ExploreTab: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    featuredSection
+                LazyVStack(alignment: .leading, spacing: 28) {
+                    if sketchfabStaffPicks.isEmpty && sketchfabMostLiked.isEmpty && sketchfabRecent.isEmpty {
+                        // No live data yet (loading, missing key, or offline) — single
+                        // bundled "Featured" carousel as fallback.
+                        bundledFeaturedSection
+                    } else {
+                        feedSection(title: "Staff Picks",   models: sketchfabStaffPicks)
+                        feedSection(title: "Most Liked",    models: sketchfabMostLiked)
+                        feedSection(title: "Recently Added", models: sketchfabRecent)
+                    }
                     categoriesSection
                     if !recentSearches.items.isEmpty {
                         recentSearchesSection
@@ -224,7 +261,7 @@ struct ExploreTab: View {
                     #endif
                 }
             }
-            .task { await loadSketchfabFeatured() }
+            .task { await loadSketchfabFeeds() }
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
             }
@@ -252,63 +289,91 @@ struct ExploreTab: View {
 
     // MARK: - Sketchfab data loading
 
-    private func loadSketchfabFeatured() async {
-        // Only attempt when an API key is wired (env var, Info.plist, or BuildConfig
-        // equivalent). Falls back to local featured models silently if missing.
-        guard SketchfabConfig.apiKey != nil, sketchfabFeatured.isEmpty else { return }
-        isLoadingFeatured = true
-        defer { isLoadingFeatured = false }
+    /// Loads the three curated feeds in parallel. Falls back silently to the bundled
+    /// `featuredModels` carousel when no API key is configured or the network call fails.
+    private func loadSketchfabFeeds() async {
+        guard SketchfabConfig.apiKey != nil,
+              sketchfabStaffPicks.isEmpty,
+              sketchfabMostLiked.isEmpty,
+              sketchfabRecent.isEmpty
+        else { return }
+        isLoadingFeeds = true
+        defer { isLoadingFeeds = false }
+
+        async let staff = SketchfabService.shared.staffPicks(limit: 10)
+        async let liked = SketchfabService.shared.featured(limit: 10)
+        async let recent = SketchfabService.shared.recentlyAdded(limit: 10)
+
         do {
-            sketchfabFeatured = try await SketchfabService.shared.featured(limit: 6)
-            featuredError = nil
+            let (s, l, r) = try await (staff, liked, recent)
+            sketchfabStaffPicks = s
+            sketchfabMostLiked = l
+            sketchfabRecent = r
+            feedsError = nil
         } catch {
-            featuredError = "Couldn't reach Sketchfab — showing offline picks"
+            feedsError = "Couldn't reach Sketchfab — showing offline picks"
         }
     }
 
-    // MARK: - Featured section (horizontal carousel)
+    // MARK: - Feed section helpers (Staff Picks / Most Liked / Recently Added)
 
-    private var featuredSection: some View {
+    /// One horizontal carousel of Sketchfab models, used three times in the body.
+    private func feedSection(title: String, models: [SketchfabModel]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("See all") {
+                    // V1.1: navigate to a paged listing for this feed
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(models) { model in
+                        FeaturedSketchfabCard(model: model) {
+                            selectedSketchfabModel = model
+                            #if os(iOS)
+                            HapticManager.lightTap()
+                            #endif
+                        }
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    /// Fallback single-row carousel of bundled local models, shown when no Sketchfab
+    /// API key is configured (or while the live data is still loading).
+    private var bundledFeaturedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Featured")
                     .font(.title2.weight(.bold))
                 Spacer()
-                if isLoadingFeatured {
+                if isLoadingFeeds {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Button("See all") {
-                    // V1.1: navigate to a paged listing of featured Sketchfab models
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.tint)
             }
-            if let featuredError {
-                Text(featuredError)
+            if let feedsError {
+                Text(feedsError)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    if sketchfabFeatured.isEmpty {
-                        ForEach(featuredModels) { model in
-                            FeaturedCard(model: model) {
-                                selectedModel = model
-                                #if os(iOS)
-                                HapticManager.lightTap()
-                                #endif
-                            }
-                        }
-                    } else {
-                        ForEach(sketchfabFeatured) { model in
-                            FeaturedSketchfabCard(model: model) {
-                                selectedSketchfabModel = model
-                                #if os(iOS)
-                                HapticManager.lightTap()
-                                #endif
-                            }
+                    ForEach(featuredModels) { model in
+                        FeaturedCard(model: model) {
+                            selectedModel = model
+                            #if os(iOS)
+                            HapticManager.lightTap()
+                            #endif
                         }
                     }
                 }
@@ -656,7 +721,7 @@ private struct CategorySheet: View {
                     .padding(.horizontal, 24)
 
                 Button {
-                    onSearchTriggered(category.searchQuery)
+                    onSearchTriggered(category.displayName)
                     dismiss()
                 } label: {
                     Label("Search \(category.displayName)", systemImage: "magnifyingglass")
