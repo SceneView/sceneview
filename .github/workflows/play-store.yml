@@ -159,6 +159,10 @@ jobs:
           # Required for Streetscape Geometry / Geospatial / Cloud Anchors demos.
           # See samples/android-demo/build.gradle manifestPlaceholders.
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
+          # Optional. When unset, the Explore tab's Sketchfab gallery silently
+          # falls back to bundled featured models. See
+          # samples/android-demo/.../sketchfab/ for the BuildConfig wiring.
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           ./gradlew :samples:android-demo:bundleRelease \
             -PversionCode=${{ steps.version.outputs.code }} \

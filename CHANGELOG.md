@@ -2,6 +2,32 @@
 
 ## Unreleased — iOS V1 honest + Android rendering uplift + Sketchfab streaming scaffolds
 
+### ⚠️ BREAKING — Android render defaults change visual look out-of-the-box
+
+The `SceneView` composable now ships with `RealityKit-equivalent` defaults to close the
+"iOS looks better than Android" gap reviewers consistently flagged in 2026-05-10 QA:
+
+- **Main directional light intensity**: `100_000` → `10_000` lux (×10 drop). Existing
+  apps will render **noticeably darker** unless they override `mainLightNode.intensity`
+  explicitly or load a brighter IBL. Combined with shadows-now-on and a new fill light
+  at 30% intensity, the overall scene exposure is much closer to RealityKit's defaults.
+- **Shadows**: now on by default (`setShadowingEnabled(true)`). Existing apps that don't
+  use casters will see no change; apps with floor planes will now display contact shadows.
+- **Fill light**: new `fillLightNode: LightNode?` param on `SceneView`, defaulted to
+  `rememberFillLightNode(engine)`. Pass `null` to disable for a single-light setup.
+- **SSAO + bloom + Filmic tone mapper**: now on by default on `View`. SSAO has no visible
+  cost on models without crevices; bloom strength is 0.10 (subtle, no "cheap mobile
+  game" look). Override via `view.ambientOcclusionOptions.enabled = false` if needed.
+- **Exposure**: `setExposure(16, 1/125, 100)` (sunny-16, EV~15) → `(12, 1/200, 200)`
+  (neutral, EV~11.6). The previous defaults required cranking IBL intensity to see
+  anything; the new defaults look right out of the box.
+
+**Migration**: bump consumers to v4.1.0+ and review the visual delta. To restore v4.0.x
+look exactly, set `mainLightNode = rememberMainLightNode(engine) { intensity = 100_000f }`,
+`fillLightNode = null`, and `view.ambientOcclusionOptions.enabled = false`.
+
+
+
 ### Fixed — Android demo polish (QA pass 2026-05-11)
 
 A QA agent walked the demo screens and reported user-visible papercut issues.
