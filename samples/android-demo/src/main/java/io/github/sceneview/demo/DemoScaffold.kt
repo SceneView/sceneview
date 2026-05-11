@@ -2,6 +2,7 @@
 
 package io.github.sceneview.demo
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -79,8 +80,13 @@ fun DemoScaffold(
                     ) {
                         Text(title)
                         if (DemoSettings.qaMode) {
+                            // Tappable QA pill: tap to disable, so a user who
+                            // long-pressed the title by accident has a
+                            // single-tap escape hatch instead of having to
+                            // guess that another long-press toggles it back
+                            // off. See #951.
                             Text(
-                                text = " QA",
+                                text = " QA ×",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier
@@ -88,6 +94,15 @@ fun DemoScaffold(
                                     .wrapContentSize()
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) {
+                                        haptic.performHapticFeedback(
+                                            HapticFeedbackType.LongPress
+                                        )
+                                        DemoSettings.qaMode = false
+                                    }
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
