@@ -33,7 +33,34 @@ jobs:
 
       - run: chmod +x ./gradlew
 
+      - name: Check if version already published
+        id: check-maven
+        run: |
+          # Maven Central artifacts are immutable — re-publishing the same
+          # version always fails with `Component … already exists`. The npm
+          # publish jobs below skip-if-published; mirror that here so a
+          # workflow_dispatch retry after a partial failure (e.g. an npm
+          # job blew up but Maven succeeded) doesn't leave Create GitHub
+          # Release stuck. Closes FU10 (#1003 follow-up).
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION=$(grep '^VERSION_NAME=' gradle.properties | cut -d= -f2)
+          else
+            VERSION=${GITHUB_REF_NAME#v}
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # HEAD against the published .pom — 200 means already on Central.
+          STATUS=$(curl -sI -o /dev/null -w "%{http_code}" \
+            "https://repo1.maven.org/maven2/io/github/sceneview/sceneview/${VERSION}/sceneview-${VERSION}.pom")
+          if [ "$STATUS" = "200" ]; then
+            echo "::notice::sceneview ${VERSION} already on Maven Central — skipping publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Publishing sceneview ${VERSION} (HTTP ${STATUS} on Central probe)"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish
+        if: steps.check-maven.outputs.skip != 'true'
         run: ./gradlew publishAndReleaseToMavenCentral --no-daemon --no-parallel --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_NEXUS_USERNAME }}
@@ -288,7 +315,10 @@ jobs:
     name: Validate SceneViewSwift SPM tag
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Runs on both tag pushes AND workflow_dispatch — previously gated on
+    # `startsWith(github.ref, 'refs/tags/v')` which made it SKIP on dispatch,
+    # which then blocked `create-release` (whose gate required
+    # `validate-spm.result == 'success'` strictly). Closes FU11 (#1003 follow-up).
     permissions:
       contents: read
     steps:
@@ -344,16 +374,24 @@ jobs:
     # version was missing from the registry. Skipped (because the version
     # is already on the registry) is OK — only an outright failure blocks.
     # See #962.
+    # Skipped is OK (e.g. version already on the registry) — only outright
+    # failure blocks. Previously `publish-library` and `validate-spm` were
+    # checked with strict `== 'success'`, which made the GitHub Release
+    # unreachable on workflow_dispatch retries (publish-library would
+    # already-exists fail or validate-spm would skip). Now harmonised with
+    # the npm jobs' `!= 'failure' && != 'cancelled'` pattern. Closes FU13.
     if: |
       always()
-      && needs.publish-library.result == 'success'
+      && needs.publish-library.result != 'failure'
+      && needs.publish-library.result != 'cancelled'
       && needs.publish-mcp.result != 'failure'
       && needs.publish-mcp.result != 'cancelled'
       && needs.publish-web.result != 'failure'
       && needs.publish-web.result != 'cancelled'
       && needs.publish-rn.result != 'failure'
       && needs.publish-rn.result != 'cancelled'
-      && needs.validate-spm.result == 'success'
+      && needs.validate-spm.result != 'failure'
+      && needs.validate-spm.result != 'cancelled'
       && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
