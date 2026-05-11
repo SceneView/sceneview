@@ -7,6 +7,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +39,7 @@ import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.DemoSettings
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
@@ -564,37 +566,40 @@ fun AnimationDemo(onBack: () -> Unit) {
             )
         }
     ) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            modelLoader = modelLoader,
-            environmentLoader = environmentLoader,
-            environment = activeEnvironment,
-            cameraNode = cameraNode,
-            cameraManipulator = activeManipulator,
-        ) {
-            modelInstance?.let { instance ->
-                ModelNode(
-                    modelInstance = instance,
-                    scaleToUnits = 1.0f,
-                    // Center the model on its bounding-box origin so it stays inside the
-                    // viewport on small screens (Pixel_7a was cropping the previous model).
-                    centerOrigin = Position(0f, 0f, 0f),
-                    // Lift the model so its feet rest on y=0 (ground plane) instead of
-                    // floating with bbox-center at origin. With scaleToUnits=1 the bbox
-                    // half-height is 0.5 m → translate up by +0.5 m to put feet at y=0.
-                    position = Position(0f, 0.5f, 0f),
-                    // autoAnimate = false so the ModelNode init doesn't fire-and-forget
-                    // all animations — we drive them from the LaunchedEffect above so
-                    // the speed / loop / play-pause controls have real effect.
-                    autoAnimate = false,
-                    apply = { modelNodeRef.value = this },
-                )
-                // Clean up the ref when the node leaves composition.
-                DisposableEffect(instance) {
-                    onDispose { modelNodeRef.value = null }
+        Box(modifier = Modifier.fillMaxSize()) {
+            SceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                environmentLoader = environmentLoader,
+                environment = activeEnvironment,
+                cameraNode = cameraNode,
+                cameraManipulator = activeManipulator,
+            ) {
+                modelInstance?.let { instance ->
+                    ModelNode(
+                        modelInstance = instance,
+                        scaleToUnits = 1.0f,
+                        // Center the model on its bounding-box origin so it stays inside the
+                        // viewport on small screens (Pixel_7a was cropping the previous model).
+                        centerOrigin = Position(0f, 0f, 0f),
+                        // Lift the model so its feet rest on y=0 (ground plane) instead of
+                        // floating with bbox-center at origin. With scaleToUnits=1 the bbox
+                        // half-height is 0.5 m → translate up by +0.5 m to put feet at y=0.
+                        position = Position(0f, 0.5f, 0f),
+                        // autoAnimate = false so the ModelNode init doesn't fire-and-forget
+                        // all animations — we drive them from the LaunchedEffect above so
+                        // the speed / loop / play-pause controls have real effect.
+                        autoAnimate = false,
+                        apply = { modelNodeRef.value = this },
+                    )
+                    // Clean up the ref when the node leaves composition.
+                    DisposableEffect(instance) {
+                        onDispose { modelNodeRef.value = null }
+                    }
                 }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading soldier…")
         }
     }
 }

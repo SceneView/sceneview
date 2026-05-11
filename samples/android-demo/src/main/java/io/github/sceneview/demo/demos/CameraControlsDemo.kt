@@ -1,6 +1,7 @@
 package io.github.sceneview.demo.demos
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.google.android.filament.utils.Manipulator
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.gesture.orbitHomePosition
 import io.github.sceneview.gesture.targetPosition
@@ -97,37 +99,40 @@ fun CameraControlsDemo(onBack: () -> Unit) {
         // a mode change or a reset tap — the creator lambda captures the current mode and
         // rebuilds the Manipulator from its home position. This is the only reliable way
         // to swap Manipulator.Mode mid-session since Manipulator itself has no setMode API.
-        androidx.compose.runtime.key(selectedMode, resetKey) {
-            val cameraManipulator = rememberCameraManipulator(
-                orbitHomePosition = homePosition,
-                targetPosition = target,
-                creator = {
-                    CameraGestureDetector.DefaultCameraManipulator(
-                        Manipulator.Builder()
-                            .orbitHomePosition(homePosition)
-                            .targetPosition(target)
-                            .orbitSpeed(0.005f, 0.005f)
-                            .zoomSpeed(0.05f)
-                            .build(selectedMode.second)
-                    )
-                }
-            )
-            SceneView(
-                modifier = Modifier.fillMaxSize(),
-                engine = engine,
-                modelLoader = modelLoader,
-                environmentLoader = environmentLoader,
-                cameraNode = cameraNode,
-                cameraManipulator = cameraManipulator
-            ) {
-                modelInstance?.let { instance ->
-                    ModelNode(
-                        modelInstance = instance,
-                        scaleToUnits = 0.5f,
-                        centerOrigin = Position(0.0f, 0.0f, 0.0f)
-                    )
+        Box(modifier = Modifier.fillMaxSize()) {
+            androidx.compose.runtime.key(selectedMode, resetKey) {
+                val cameraManipulator = rememberCameraManipulator(
+                    orbitHomePosition = homePosition,
+                    targetPosition = target,
+                    creator = {
+                        CameraGestureDetector.DefaultCameraManipulator(
+                            Manipulator.Builder()
+                                .orbitHomePosition(homePosition)
+                                .targetPosition(target)
+                                .orbitSpeed(0.005f, 0.005f)
+                                .zoomSpeed(0.05f)
+                                .build(selectedMode.second)
+                        )
+                    }
+                )
+                SceneView(
+                    modifier = Modifier.fillMaxSize(),
+                    engine = engine,
+                    modelLoader = modelLoader,
+                    environmentLoader = environmentLoader,
+                    cameraNode = cameraNode,
+                    cameraManipulator = cameraManipulator
+                ) {
+                    modelInstance?.let { instance ->
+                        ModelNode(
+                            modelInstance = instance,
+                            scaleToUnits = 0.5f,
+                            centerOrigin = Position(0.0f, 0.0f, 0.0f)
+                        )
+                    }
                 }
             }
+            LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
     }
 }
