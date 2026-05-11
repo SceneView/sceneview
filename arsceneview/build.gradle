@@ -8,6 +8,7 @@ plugins {
     id 'filament-tools-plugin'
     alias(libs.plugins.dokka)
     alias(libs.plugins.compose.compiler)
+    id 'jacoco'
 }
 
 // *************************************************************************************************
@@ -62,6 +63,9 @@ android {
         debug {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Enable JaCoCo bytecode coverage on debug unit tests so the
+            // `jacocoTestReport` task below can pull an exec file. See #964.
+            testCoverageEnabled true
         }
     }
     compileOptions {
@@ -115,3 +119,31 @@ dependencies {
 }
 
 apply plugin: "com.vanniktech.maven.publish"
+
+// ── JaCoCo coverage report ────────────────────────────────────────────────
+// See `sceneview/build.gradle` for the rationale comment. Same task name
+// (`:arsceneview:jacocoTestReport`) so a top-level `./gradlew
+// jacocoTestReport` runs both modules in parallel.
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.register('jacocoTestReport', JacocoReport) {
+    dependsOn 'testDebugUnitTest'
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    def fileFilter = [
+        '**/R.class', '**/R$*.class', '**/BuildConfig.*',
+        '**/Manifest*.*', '**/*Test*.*',
+    ]
+    def debugTree = fileTree(dir: "${buildDir}/tmp/kotlin-classes/debug", excludes: fileFilter)
+    def mainSrc = "${projectDir}/src/main/java"
+    sourceDirectories.setFrom(files([mainSrc]))
+    classDirectories.setFrom(files([debugTree]))
+    executionData.setFrom(fileTree(dir: buildDir, includes: [
+        'outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec',
+        'jacoco/testDebugUnitTest.exec', // fallback for older AGP
+    ]))
+}

@@ -59,8 +59,57 @@ jobs:
             :samples:android-tv-demo:assembleDebug \
             --stacktrace
 
-      - name: Unit tests
-        run: ./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest --stacktrace
+      - name: Unit tests + JaCoCo coverage
+        # Single invocation: jacocoTestReport depends on testDebugUnitTest so
+        # Gradle runs the tests, drops the exec file under
+        # `outputs/unit_test_code_coverage/`, then generates XML + HTML
+        # reports. Replaces the previous `testDebugUnitTest`-only call so
+        # we don't run the test suite twice. See #964.
+        run: ./gradlew :sceneview:jacocoTestReport :arsceneview:jacocoTestReport --stacktrace
+
+      - name: Coverage summary
+        if: always()
+        # One-line headline per module (line coverage). Doesn't fail the
+        # build on low coverage — establishing a baseline is a follow-up.
+        run: |
+          python3 - <<'PY'
+          import os, sys, xml.etree.ElementTree as ET
+          rows = []
+          for mod in ("sceneview", "arsceneview"):
+              path = f"{mod}/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
+              if not os.path.exists(path):
+                  rows.append(f"{mod}: NO REPORT (jacocoTestReport failed?)")
+                  continue
+              root = ET.parse(path).getroot()
+              for c in root.findall("counter"):
+                  if c.get("type") == "LINE":
+                      covered = int(c.get("covered"))
+                      missed = int(c.get("missed"))
+                      total = covered + missed
+                      pct = 100 * covered / total if total else 0
+                      rows.append(f"{mod}: {pct:.1f}% line ({covered}/{total})")
+                      break
+          print("## JaCoCo coverage")
+          for r in rows:
+              print(f"- {r}")
+          # Also write a step summary so the CI run page surfaces it.
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a") as f:
+                  f.write("## JaCoCo coverage\n")
+                  for r in rows:
+                      f.write(f"- {r}\n")
+          PY
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-coverage
+          path: |
+            sceneview/build/reports/jacoco/jacocoTestReport/
+            arsceneview/build/reports/jacoco/jacocoTestReport/
+          if-no-files-found: warn
 
       - name: Lint
         run: ./gradlew :sceneview:lintDebug :arsceneview:lintDebug --stacktrace
