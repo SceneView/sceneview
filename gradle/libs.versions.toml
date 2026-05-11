@@ -33,6 +33,8 @@ arCore = "1.53.0"
 
 # Networking
 fuel = "2.3.1"
+okhttp = "5.0.0"
+kotlinxSerialization = "1.8.0"
 
 # UI
 googleMaterial = "1.13.0"
@@ -101,6 +103,12 @@ fuel = { group = "com.github.kittinunf.fuel", name = "fuel", version.ref = "fuel
 fuel-android = { group = "com.github.kittinunf.fuel", name = "fuel-android", version.ref = "fuel" }
 fuel-coroutines = { group = "com.github.kittinunf.fuel", name = "fuel-coroutines", version.ref = "fuel" }
 
+# OkHttp (HTTP client used by Sketchfab service in android-demo)
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
+# Kotlinx Serialization (JSON parsing for Sketchfab API responses)
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+
 # Material
 google-material = { group = "com.google.android.material", name = "material", version.ref = "googleMaterial" }
 
@@ -142,6 +150,7 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

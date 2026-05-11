@@ -7,8 +7,38 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C0448E495F77BF795D1C647 /* ComingSoonScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FA64989921B8BD7A9F30B31 /* ComingSoonScreen.swift */; };
+		593E4FADBA93AF1190A3A67E /* SketchfabModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C214F8F9A1B35560E551895 /* SketchfabModels.swift */; };
+		95BE47B4B9B828745697FB4B /* SketchfabConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77142EC848C995EDE06546D /* SketchfabConfig.swift */; };
 		A10000010000000000000001 /* SceneViewDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* SceneViewDemoApp.swift */; };
 		A10000010000000000000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* Assets.xcassets */; };
+		B4A94ABD8B5DA5F4E4CE4834 /* SketchfabService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFA4BE9A50A8347603AA10E /* SketchfabService.swift */; };
+		C10000000000000000000001 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* HapticManager.swift */; };
+		C10000000000000000000002 /* DemoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* DemoItem.swift */; };
+		C10000000000000000000003 /* ExploreTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* ExploreTab.swift */; };
+		C10000000000000000000004 /* ARTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* ARTab.swift */; };
+		C10000000000000000000005 /* SamplesTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* SamplesTab.swift */; };
+		C10000000000000000000006 /* AboutTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000006 /* AboutTab.swift */; };
+		C10000000000000000000007 /* AllShapesDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000007 /* AllShapesDemo.swift */; };
+		C10000000000000000000008 /* MaterialsDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000008 /* MaterialsDemo.swift */; };
+		C10000000000000000000009 /* CustomMeshDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000009 /* CustomMeshDemo.swift */; };
+		C10000000000000000000010 /* TextDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000010 /* TextDemo.swift */; };
+		C10000000000000000000011 /* BillboardDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000011 /* BillboardDemo.swift */; };
+		C10000000000000000000012 /* LinesPathsDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000012 /* LinesPathsDemo.swift */; };
+		C10000000000000000000013 /* ImagePlaneDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000013 /* ImagePlaneDemo.swift */; };
+		C10000000000000000000014 /* LightTypesDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000014 /* LightTypesDemo.swift */; };
+		C10000000000000000000015 /* DynamicSkyDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000015 /* DynamicSkyDemo.swift */; };
+		C10000000000000000000016 /* FogDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000016 /* FogDemo.swift */; };
+		C10000000000000000000017 /* PhysicsDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000017 /* PhysicsDemo.swift */; };
+		C10000000000000000000018 /* OrbitCameraDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000018 /* OrbitCameraDemo.swift */; };
+		C10000000000000000000019 /* AutoRotateDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000019 /* AutoRotateDemo.swift */; };
+		C10000000000000000000020 /* SceneGalleryDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000020 /* SceneGalleryDemo.swift */; };
+		C10000000000000000000021 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000021 /* Theme.swift */; };
+		C10000000000000000000022 /* RerunDebugDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000022 /* RerunDebugDemo.swift */; };
+		C10000000000000000000023 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000023 /* DeepLinkRouter.swift */; };
+		C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000024 /* DemoDeepLinkRegistry.swift */; };
+		C10000000000000000000025 /* OrbitalARDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000025 /* OrbitalARDemo.swift */; };
+		C10000000000000000000030 /* FavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000030 /* FavoritesManager.swift */; };
 		D10000000000000000000001 /* game_boy_classic.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* game_boy_classic.usdz */; };
 		D10000000000000000000002 /* tree_scene.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* tree_scene.usdz */; };
 		D10000000000000000000003 /* red_car.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* red_car.usdz */; };
@@ -37,48 +67,25 @@
 		D1000000000000000000001A /* mercedes_a45_amg.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000001A /* mercedes_a45_amg.usdz */; };
 		D1000000000000000000001B /* nintendo_switch.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000001B /* nintendo_switch.usdz */; };
 		D1000000000000000000001C /* bmw_m3_e30.usdz in Resources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000001C /* bmw_m3_e30.usdz */; };
-
 		E10000000000000000000001 /* studio.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* studio.hdr */; };
 		E10000000000000000000002 /* outdoor_cloudy.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* outdoor_cloudy.hdr */; };
 		E10000000000000000000003 /* sunset.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* sunset.hdr */; };
 		E10000000000000000000004 /* rooftop_night.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* rooftop_night.hdr */; };
 		E10000000000000000000005 /* studio_warm.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* studio_warm.hdr */; };
 		E10000000000000000000006 /* autumn_field.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* autumn_field.hdr */; };
-		C10000000000000000000001 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* HapticManager.swift */; };
-		C10000000000000000000002 /* DemoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* DemoItem.swift */; };
-		C10000000000000000000030 /* FavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000030 /* FavoritesManager.swift */; };
-		C10000000000000000000003 /* ExploreTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* ExploreTab.swift */; };
-		C10000000000000000000004 /* ARTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* ARTab.swift */; };
-		C10000000000000000000005 /* SamplesTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000005 /* SamplesTab.swift */; };
-		C10000000000000000000006 /* AboutTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000006 /* AboutTab.swift */; };
-		C10000000000000000000007 /* AllShapesDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000007 /* AllShapesDemo.swift */; };
-		C10000000000000000000008 /* MaterialsDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000008 /* MaterialsDemo.swift */; };
-		C10000000000000000000009 /* CustomMeshDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000009 /* CustomMeshDemo.swift */; };
-		C10000000000000000000010 /* TextDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000010 /* TextDemo.swift */; };
-		C10000000000000000000011 /* BillboardDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000011 /* BillboardDemo.swift */; };
-		C10000000000000000000012 /* LinesPathsDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000012 /* LinesPathsDemo.swift */; };
-		C10000000000000000000013 /* ImagePlaneDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000013 /* ImagePlaneDemo.swift */; };
-		C10000000000000000000014 /* LightTypesDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000014 /* LightTypesDemo.swift */; };
-		C10000000000000000000015 /* DynamicSkyDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000015 /* DynamicSkyDemo.swift */; };
-		C10000000000000000000016 /* FogDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000016 /* FogDemo.swift */; };
-		C10000000000000000000017 /* PhysicsDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000017 /* PhysicsDemo.swift */; };
-		C10000000000000000000018 /* OrbitCameraDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000018 /* OrbitCameraDemo.swift */; };
-		C10000000000000000000019 /* AutoRotateDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000019 /* AutoRotateDemo.swift */; };
-		C10000000000000000000020 /* SceneGalleryDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000020 /* SceneGalleryDemo.swift */; };
-		C10000000000000000000021 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000021 /* Theme.swift */; };
-		C10000000000000000000022 /* RerunDebugDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000022 /* RerunDebugDemo.swift */; };
-		C10000000000000000000023 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000023 /* DeepLinkRouter.swift */; };
-		C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000024 /* DemoDeepLinkRegistry.swift */; };
+		ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5FA64989921B8BD7A9F30B31 /* ComingSoonScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ComingSoonScreen.swift; path = SceneViewDemo/Views/ComingSoonScreen.swift; sourceTree = SOURCE_ROOT; };
+		6C214F8F9A1B35560E551895 /* SketchfabModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SketchfabModels.swift; path = SceneViewDemo/Services/SketchfabModels.swift; sourceTree = SOURCE_ROOT; };
+		8FFA4BE9A50A8347603AA10E /* SketchfabService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SketchfabService.swift; path = SceneViewDemo/Services/SketchfabService.swift; sourceTree = SOURCE_ROOT; };
 		A20000010000000000000001 /* SceneViewDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneViewDemoApp.swift; sourceTree = "<group>"; };
 		A20000010000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000010000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000010000000000000010 /* SceneViewDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SceneViewDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C20000000000000000000001 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		C20000000000000000000002 /* DemoItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoItem.swift; sourceTree = "<group>"; };
-		C20000000000000000000030 /* FavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManager.swift; sourceTree = "<group>"; };
 		C20000000000000000000003 /* ExploreTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreTab.swift; sourceTree = "<group>"; };
 		C20000000000000000000004 /* ARTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARTab.swift; sourceTree = "<group>"; };
 		C20000000000000000000005 /* SamplesTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SamplesTab.swift; sourceTree = "<group>"; };
@@ -101,6 +108,8 @@
 		C20000000000000000000022 /* RerunDebugDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RerunDebugDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000023 /* DeepLinkRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkRouter.swift; sourceTree = "<group>"; };
 		C20000000000000000000024 /* DemoDeepLinkRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDeepLinkRegistry.swift; sourceTree = "<group>"; };
+		C20000000000000000000025 /* OrbitalARDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalARDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000030 /* FavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManager.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* game_boy_classic.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = game_boy_classic.usdz; sourceTree = "<group>"; };
 		D20000000000000000000002 /* tree_scene.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = tree_scene.usdz; sourceTree = "<group>"; };
 		D20000000000000000000003 /* red_car.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = red_car.usdz; sourceTree = "<group>"; };
@@ -129,13 +138,14 @@
 		D2000000000000000000001A /* mercedes_a45_amg.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = mercedes_a45_amg.usdz; sourceTree = "<group>"; };
 		D2000000000000000000001B /* nintendo_switch.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = nintendo_switch.usdz; sourceTree = "<group>"; };
 		D2000000000000000000001C /* bmw_m3_e30.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = bmw_m3_e30.usdz; sourceTree = "<group>"; };
-
+		D77142EC848C995EDE06546D /* SketchfabConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SketchfabConfig.swift; path = SceneViewDemo/Services/SketchfabConfig.swift; sourceTree = SOURCE_ROOT; };
 		E20000000000000000000001 /* studio.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = studio.hdr; sourceTree = "<group>"; };
 		E20000000000000000000002 /* outdoor_cloudy.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = outdoor_cloudy.hdr; sourceTree = "<group>"; };
 		E20000000000000000000003 /* sunset.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = sunset.hdr; sourceTree = "<group>"; };
 		E20000000000000000000004 /* rooftop_night.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = rooftop_night.hdr; sourceTree = "<group>"; };
 		E20000000000000000000005 /* studio_warm.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = studio_warm.hdr; sourceTree = "<group>"; };
 		E20000000000000000000006 /* autumn_field.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = autumn_field.hdr; sourceTree = "<group>"; };
+		E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MovableLightDemo.swift; path = SceneViewDemo/Views/Demos/MovableLightDemo.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,11 +159,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A40000010000000000000001 /* = BEGIN of the tree root */ = {
+		A40000010000000000000001 = {
 			isa = PBXGroup;
 			children = (
 				A40000010000000000000002 /* SceneViewDemo */,
 				A40000010000000000000003 /* Products */,
+				5FA64989921B8BD7A9F30B31 /* ComingSoonScreen.swift */,
+				D77142EC848C995EDE06546D /* SketchfabConfig.swift */,
+				6C214F8F9A1B35560E551895 /* SketchfabModels.swift */,
+				8FFA4BE9A50A8347603AA10E /* SketchfabService.swift */,
+				E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -172,6 +187,67 @@
 				A20000010000000000000003 /* Info.plist */,
 			);
 			path = SceneViewDemo;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000010 /* SceneViewDemo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C40000000000000000000001 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				C40000000000000000000002 /* Tabs */,
+				C40000000000000000000003 /* Demos */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		C40000000000000000000002 /* Tabs */ = {
+			isa = PBXGroup;
+			children = (
+				C20000000000000000000003 /* ExploreTab.swift */,
+				C20000000000000000000004 /* ARTab.swift */,
+				C20000000000000000000005 /* SamplesTab.swift */,
+				C20000000000000000000006 /* AboutTab.swift */,
+			);
+			path = Tabs;
+			sourceTree = "<group>";
+		};
+		C40000000000000000000003 /* Demos */ = {
+			isa = PBXGroup;
+			children = (
+				C20000000000000000000007 /* AllShapesDemo.swift */,
+				C20000000000000000000008 /* MaterialsDemo.swift */,
+				C20000000000000000000009 /* CustomMeshDemo.swift */,
+				C20000000000000000000010 /* TextDemo.swift */,
+				C20000000000000000000011 /* BillboardDemo.swift */,
+				C20000000000000000000012 /* LinesPathsDemo.swift */,
+				C20000000000000000000013 /* ImagePlaneDemo.swift */,
+				C20000000000000000000014 /* LightTypesDemo.swift */,
+				C20000000000000000000015 /* DynamicSkyDemo.swift */,
+				C20000000000000000000016 /* FogDemo.swift */,
+				C20000000000000000000017 /* PhysicsDemo.swift */,
+				C20000000000000000000018 /* OrbitCameraDemo.swift */,
+				C20000000000000000000019 /* AutoRotateDemo.swift */,
+				C20000000000000000000020 /* SceneGalleryDemo.swift */,
+				C20000000000000000000022 /* RerunDebugDemo.swift */,
+				C20000000000000000000025 /* OrbitalARDemo.swift */,
+			);
+			path = Demos;
+			sourceTree = "<group>";
+		};
+		C40000000000000000000004 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				C20000000000000000000001 /* HapticManager.swift */,
+				C20000000000000000000002 /* DemoItem.swift */,
+				C20000000000000000000030 /* FavoritesManager.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		D40000000000000000000001 /* Models */ = {
@@ -222,66 +298,6 @@
 			path = Environments;
 			sourceTree = "<group>";
 		};
-		A40000010000000000000003 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A20000010000000000000010 /* SceneViewDemo.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		C40000000000000000000001 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				C40000000000000000000002 /* Tabs */,
-				C40000000000000000000003 /* Demos */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		C40000000000000000000002 /* Tabs */ = {
-			isa = PBXGroup;
-			children = (
-				C20000000000000000000003 /* ExploreTab.swift */,
-				C20000000000000000000004 /* ARTab.swift */,
-				C20000000000000000000005 /* SamplesTab.swift */,
-				C20000000000000000000006 /* AboutTab.swift */,
-			);
-			path = Tabs;
-			sourceTree = "<group>";
-		};
-		C40000000000000000000003 /* Demos */ = {
-			isa = PBXGroup;
-			children = (
-				C20000000000000000000007 /* AllShapesDemo.swift */,
-				C20000000000000000000008 /* MaterialsDemo.swift */,
-				C20000000000000000000009 /* CustomMeshDemo.swift */,
-				C20000000000000000000010 /* TextDemo.swift */,
-				C20000000000000000000011 /* BillboardDemo.swift */,
-				C20000000000000000000012 /* LinesPathsDemo.swift */,
-				C20000000000000000000013 /* ImagePlaneDemo.swift */,
-				C20000000000000000000014 /* LightTypesDemo.swift */,
-				C20000000000000000000015 /* DynamicSkyDemo.swift */,
-				C20000000000000000000016 /* FogDemo.swift */,
-				C20000000000000000000017 /* PhysicsDemo.swift */,
-				C20000000000000000000018 /* OrbitCameraDemo.swift */,
-				C20000000000000000000019 /* AutoRotateDemo.swift */,
-				C20000000000000000000020 /* SceneGalleryDemo.swift */,
-				C20000000000000000000022 /* RerunDebugDemo.swift */,
-			);
-			path = Demos;
-			sourceTree = "<group>";
-		};
-		C40000000000000000000004 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-				C20000000000000000000001 /* HapticManager.swift */,
-				C20000000000000000000002 /* DemoItem.swift */,
-				C20000000000000000000030 /* FavoritesManager.swift */,
-			);
-			path = Utilities;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -330,7 +346,7 @@
 			);
 			mainGroup = A40000010000000000000001;
 			packageReferences = (
-				A80000010000000000000002 /* XCLocalSwiftPackageReference "SceneViewSwift" */,
+				A80000010000000000000002 /* XCLocalSwiftPackageReference "../../SceneViewSwift" */,
 			);
 			productRefGroup = A40000010000000000000003 /* Products */;
 			projectDirPath = "";
@@ -417,6 +433,12 @@
 				C10000000000000000000022 /* RerunDebugDemo.swift in Sources */,
 				C10000000000000000000023 /* DeepLinkRouter.swift in Sources */,
 				C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */,
+				0C0448E495F77BF795D1C647 /* ComingSoonScreen.swift in Sources */,
+				95BE47B4B9B828745697FB4B /* SketchfabConfig.swift in Sources */,
+				593E4FADBA93AF1190A3A67E /* SketchfabModels.swift in Sources */,
+				B4A94ABD8B5DA5F4E4CE4834 /* SketchfabService.swift in Sources */,
+				C10000000000000000000025 /* OrbitalARDemo.swift in Sources */,
+				ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -551,7 +573,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 4.0.9;
+				MARKETING_VERSION = 4.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -584,7 +606,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 4.0.9;
+				MARKETING_VERSION = 4.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sceneview.demo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "SceneView Demo App Store";
@@ -620,7 +642,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A80000010000000000000002 /* XCLocalSwiftPackageReference "SceneViewSwift" */ = {
+		A80000010000000000000002 /* XCLocalSwiftPackageReference "../../SceneViewSwift" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../SceneViewSwift;
 		};
@@ -632,7 +654,6 @@
 			productName = SceneViewSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = A90000010000000000000001 /* Project object */;
 }

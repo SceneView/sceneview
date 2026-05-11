@@ -7,6 +7,7 @@ import android.graphics.PixelFormat
 import android.graphics.PorterDuff
 import android.graphics.SurfaceTexture
 import android.util.AttributeSet
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.Surface
@@ -311,27 +312,43 @@ class ViewNode(
             tryDetachingView()
         }
 
-        private fun tryAttachingView() = runCatching {
-            if (layout.parent == null) {
-                windowManager.addView(layout, LayoutParams(
-                    LayoutParams.WRAP_CONTENT,
-                    LayoutParams.WRAP_CONTENT,
-                    LayoutParams.TYPE_APPLICATION_PANEL,
-                    LayoutParams.FLAG_NOT_FOCUSABLE
-                            or LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                            or LayoutParams.FLAG_NOT_TOUCHABLE
-                            or LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                    PixelFormat.TRANSLUCENT
-                ).apply {
-                    title = "ViewNodeWindowManager"
-                })
+        private fun tryAttachingView() {
+            try {
+                if (layout.parent == null) {
+                    windowManager.addView(layout, LayoutParams(
+                        LayoutParams.WRAP_CONTENT,
+                        LayoutParams.WRAP_CONTENT,
+                        LayoutParams.TYPE_APPLICATION_PANEL,
+                        LayoutParams.FLAG_NOT_FOCUSABLE
+                                or LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                                or LayoutParams.FLAG_NOT_TOUCHABLE
+                                or LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                        PixelFormat.TRANSLUCENT
+                    ).apply {
+                        title = "ViewNodeWindowManager"
+                    })
+                }
+            } catch (t: Throwable) {
+                Log.e(
+                    "ViewNode",
+                    "Failed to attach ViewNode layout to system WindowManager — view will render as black rectangle",
+                    t
+                )
             }
         }
 
 
-        private fun tryDetachingView() = runCatching {
-            if (layout.parent != null) {
-                windowManager.removeView(layout)
+        private fun tryDetachingView() {
+            try {
+                if (layout.parent != null) {
+                    windowManager.removeView(layout)
+                }
+            } catch (t: Throwable) {
+                Log.e(
+                    "ViewNode",
+                    "Failed to detach ViewNode layout from system WindowManager — window may leak",
+                    t
+                )
             }
         }
     }

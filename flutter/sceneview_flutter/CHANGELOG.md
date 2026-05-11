@@ -1,3 +1,7 @@
+## 4.1.0
+
+- Version alignment with SceneView v4.1.0. ⚠️ Native Android renderer defaults changed: main light intensity 100k → 10k lux, shadows on, fill light, SSAO + bloom, neutral exposure. Existing apps embedding `sceneview_flutter` will render with the new RealityKit-equivalent look. See root `CHANGELOG.md`.
+
 ## 4.0.9
 
 - Version alignment with SceneView v4.0.7 (Rerun Save & Share, scan-to-open deep-links, Play Store canary CI).

@@ -37,7 +37,9 @@ import io.github.sceneview.rememberMaterialLoader
  */
 @Composable
 fun PhysicsDemo(onBack: () -> Unit) {
-    var sphereCount by remember { mutableIntStateOf(1) }
+    // Start with 5 spheres so the first frame already shows the demo's hook (a colorful
+    // rain on the floor) instead of a near-empty scene. QA finding 2026-05-11.
+    var sphereCount by remember { mutableIntStateOf(5) }
     var generation by remember { mutableIntStateOf(0) }
 
     val engine = rememberEngine()

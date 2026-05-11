@@ -1,6 +1,9 @@
 import SwiftUI
 import RealityKit
 import SceneViewSwift
+#if os(iOS)
+import QuickLook
+#endif
 
 /// Model data for the gallery.
 struct ModelItem: Identifiable, Hashable {
@@ -81,129 +84,899 @@ enum ModelCategory: String, CaseIterable {
     }
 }
 
-/// The main explore tab -- a model gallery for browsing, viewing, and favoriting 3D models.
+/// The 18 official Sketchfab categories returned by `GET /v3/categories`.
+///
+/// The `slug` is exactly what the Sketchfab Data API expects in `?categories=`; the
+/// `displayName` is what users see on the chip. SF Symbol `icon` is picked per category.
+///
+/// Source: live `https://api.sketchfab.com/v3/categories` (snapshot 2026-05-11).
+enum SketchfabCategory: String, CaseIterable, Identifiable {
+    case animalsPets             = "animals-pets"
+    case architecture            = "architecture"
+    case artAbstract             = "art-abstract"
+    case carsVehicles            = "cars-vehicles"
+    case charactersCreatures     = "characters-creatures"
+    case culturalHeritageHistory = "cultural-heritage-history"
+    case electronicsGadgets      = "electronics-gadgets"
+    case fashionStyle            = "fashion-style"
+    case foodDrink               = "food-drink"
+    case furnitureHome           = "furniture-home"
+    case music                   = "music"
+    case naturePlants            = "nature-plants"
+    case newsPolitics            = "news-politics"
+    case people                  = "people"
+    case placesTravel            = "places-travel"
+    case scienceTechnology       = "science-technology"
+    case sportsFitness           = "sports-fitness"
+    case weaponsMilitary         = "weapons-military"
+
+    var id: String { rawValue }
+    var slug: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .animalsPets:             return "Animals & Pets"
+        case .architecture:            return "Architecture"
+        case .artAbstract:             return "Art & Abstract"
+        case .carsVehicles:            return "Cars & Vehicles"
+        case .charactersCreatures:     return "Characters & Creatures"
+        case .culturalHeritageHistory: return "Cultural Heritage"
+        case .electronicsGadgets:      return "Electronics"
+        case .fashionStyle:            return "Fashion & Style"
+        case .foodDrink:               return "Food & Drink"
+        case .furnitureHome:           return "Furniture & Home"
+        case .music:                   return "Music"
+        case .naturePlants:            return "Nature & Plants"
+        case .newsPolitics:            return "News & Politics"
+        case .people:                  return "People"
+        case .placesTravel:            return "Places & Travel"
+        case .scienceTechnology:       return "Science & Tech"
+        case .sportsFitness:           return "Sports & Fitness"
+        case .weaponsMilitary:         return "Weapons & Military"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .animalsPets:             return "pawprint.fill"
+        case .architecture:            return "building.2.fill"
+        case .artAbstract:             return "paintpalette.fill"
+        case .carsVehicles:            return "car.side.fill"
+        case .charactersCreatures:     return "figure.stand"
+        case .culturalHeritageHistory: return "building.columns.fill"
+        case .electronicsGadgets:      return "cpu.fill"
+        case .fashionStyle:            return "tshirt.fill"
+        case .foodDrink:               return "fork.knife"
+        case .furnitureHome:           return "sofa.fill"
+        case .music:                   return "music.note"
+        case .naturePlants:            return "leaf.fill"
+        case .newsPolitics:            return "newspaper.fill"
+        case .people:                  return "person.2.fill"
+        case .placesTravel:            return "globe.americas.fill"
+        case .scienceTechnology:       return "atom"
+        case .sportsFitness:           return "figure.run"
+        case .weaponsMilitary:         return "shield.lefthalf.filled"
+        }
+    }
+}
+
+/// User defaults–backed list of the last 5 search queries, surfaced under "Recent searches".
+@MainActor
+@Observable
+final class RecentSearches {
+    private let storageKey = "io.github.sceneview.demo.recentSearches"
+    private let maxItems = 5
+
+    private(set) var items: [String] = []
+
+    init() { load() }
+
+    func push(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        items.removeAll { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+        items.insert(trimmed, at: 0)
+        if items.count > maxItems { items = Array(items.prefix(maxItems)) }
+        save()
+    }
+
+    func remove(_ query: String) {
+        items.removeAll { $0 == query }
+        save()
+    }
+
+    func clear() {
+        items.removeAll()
+        save()
+    }
+
+    private func load() {
+        items = UserDefaults.standard.stringArray(forKey: storageKey) ?? []
+    }
+
+    private func save() {
+        UserDefaults.standard.set(items, forKey: storageKey)
+    }
+}
+
+/// The main Explore tab — Liquid Glass discovery hub for 3D models.
+///
+/// Layout follows the Stitch mockup (iOS Liquid Glass design system):
+/// - Featured carousel of curated models (currently from the bundled `ModelItem.all` set;
+///   V1.1 will pull from `SketchfabService.featured()` when an API key is configured).
+/// - Categories chips that filter / search by topic.
+/// - Recent searches list, persisted across launches.
+/// - Native `.searchable` search bar that queries Sketchfab when an API key is set.
 struct ExploreTab: View {
-    @State private var selectedModel: ModelItem?
-    @State private var selectedCategory: ModelCategory = .vehicles
-    @State private var autoRotate = true
-    @State private var showViewer = false
     @State private var searchText = ""
+    @State private var selectedModel: ModelItem?
+    @State private var selectedSketchfabModel: SketchfabModel?
+    @State private var viewingSketchfabModel: SketchfabModel?
+    @State private var selectedCategory: SketchfabCategory?
+    @State private var recentSearches = RecentSearches()
+    @State private var sketchfabStaffPicks: [SketchfabModel] = []
+    @State private var sketchfabMostLiked: [SketchfabModel] = []
+    @State private var sketchfabRecent: [SketchfabModel] = []
+    @State private var isLoadingFeeds = false
+    @State private var feedsError: String?
+    /// When `true`, all three carousels filter to `animated=true` (skeletal rigs).
+    @State private var animatedOnly = false
     private let favoritesManager = FavoritesManager.shared
 
-    private var filteredModels: [ModelItem] {
-        var models: [ModelItem]
-        if selectedCategory == .favorites {
-            models = ModelItem.all.filter { favoritesManager.isFavorite($0.id) }
-        } else {
-            models = ModelItem.all.filter { $0.category == selectedCategory }
-        }
-        if !searchText.isEmpty {
-            models = models.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        }
-        return models
+    /// Curated featured set — first 6 bundled models, picked for visual variety.
+    /// Used as fallback when no Sketchfab API key is configured.
+    private var featuredModels: [ModelItem] {
+        let ids = ["ferrari_f40", "animated_dragon", "cyberpunk_character",
+                   "game_boy_classic", "fantasy_book", "tree_scene"]
+        return ids.compactMap { id in ModelItem.all.first { $0.id == id } }
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                categoryPicker
-                modelGallery
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 28) {
+                    // Home feed mix — samples first (always available), then live Sketchfab
+                    // feeds when an API key is configured. Each row shows SceneView SDK
+                    // content (bundled or streamed) — never the Sketchfab web viewer.
+                    trySampleSection
+                    if !sketchfabStaffPicks.isEmpty || !sketchfabMostLiked.isEmpty || !sketchfabRecent.isEmpty {
+                        filtersBar
+                    }
+                    if sketchfabStaffPicks.isEmpty && sketchfabMostLiked.isEmpty && sketchfabRecent.isEmpty {
+                        bundledFeaturedSection
+                    } else {
+                        feedSection(title: "Staff Picks",   models: sketchfabStaffPicks)
+                        feedSection(title: "Most Liked",    models: sketchfabMostLiked)
+                        feedSection(title: "Recently Added", models: sketchfabRecent)
+                    }
+                    categoriesSection
+                    if !recentSearches.items.isEmpty {
+                        recentSearchesSection
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
             .navigationTitle("Explore")
-            .searchable(text: $searchText, prompt: "Search models")
+            .searchable(text: $searchText, prompt: "Search 3D models on Sketchfab")
+            .onSubmit(of: .search) {
+                let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !q.isEmpty {
+                    recentSearches.push(q)
+                    #if os(iOS)
+                    HapticManager.lightTap()
+                    #endif
+                }
+            }
+            .task { await loadSketchfabFeeds() }
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
             }
-        }
-    }
-
-    // MARK: - Category picker
-
-    private var categoryPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(ModelCategory.allCases, id: \.self) { category in
-                    let count = category == .favorites
-                        ? ModelItem.all.filter { favoritesManager.isFavorite($0.id) }.count
-                        : ModelItem.all.filter { $0.category == category }.count
-                    Button {
-                        selectedCategory = category
-                        #if os(iOS)
-                        HapticManager.selectionChanged()
-                        #endif
-                    } label: {
-                        HStack(spacing: 4) {
-                            if category == .favorites {
-                                Image(systemName: "heart.fill")
-                                    .font(.caption)
-                            }
-                            Text(category.rawValue)
-                                .font(.subheadline.weight(.medium))
-                            if count > 0 {
-                                Text("\(count)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            selectedCategory == category
-                                ? Color.accentColor
-                                : Color(.secondarySystemBackground)
-                        )
-                        .foregroundStyle(selectedCategory == category ? .white : .primary)
-                        .clipShape(Capsule())
-                    }
+            .sheet(item: $selectedSketchfabModel) { model in
+                SketchfabModelSheet(model: model) { picked in
+                    viewingSketchfabModel = picked
+                }
+                .presentationDetents([.medium, .large])
+                #if os(iOS)
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(28)
+                #endif
+            }
+            #if os(iOS)
+            .fullScreenCover(item: $viewingSketchfabModel) { model in
+                NavigationStack {
+                    SketchfabModelViewerScreen(model: model)
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            #endif
+            .sheet(item: $selectedCategory) { category in
+                CategorySheet(category: category) { query in
+                    searchText = query
+                    recentSearches.push(query)
+                }
+                .presentationDetents([.medium, .large])
+                #if os(iOS)
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(28)
+                #endif
+            }
         }
     }
 
-    // MARK: - Model gallery grid
+    // MARK: - Sketchfab data loading
 
-    private var modelGallery: some View {
-        ScrollView {
-            if filteredModels.isEmpty {
-                emptyState
-            } else {
-                LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 12)
-                ], spacing: 12) {
-                    ForEach(filteredModels) { model in
-                        ModelCard(model: model, isFavorite: favoritesManager.isFavorite(model.id)) {
-                            selectedModel = model
-                        } onToggleFavorite: {
-                            favoritesManager.toggle(model.id)
+    /// Loads the three curated feeds in parallel. Falls back silently to the bundled
+    /// `featuredModels` carousel when no API key is configured or the network call fails.
+    private func loadSketchfabFeeds() async {
+        guard SketchfabConfig.apiKey != nil,
+              sketchfabStaffPicks.isEmpty,
+              sketchfabMostLiked.isEmpty,
+              sketchfabRecent.isEmpty
+        else { return }
+        isLoadingFeeds = true
+        defer { isLoadingFeeds = false }
+
+        async let staff = SketchfabService.shared.staffPicks(animated: animatedOnly ? true : nil, limit: 10)
+        async let liked = SketchfabService.shared.featured(animated: animatedOnly ? true : nil, limit: 10)
+        async let recent = SketchfabService.shared.recentlyAdded(animated: animatedOnly ? true : nil, limit: 10)
+
+        do {
+            let (s, l, r) = try await (staff, liked, recent)
+            sketchfabStaffPicks = s
+            sketchfabMostLiked = l
+            sketchfabRecent = r
+            feedsError = nil
+        } catch {
+            feedsError = "Couldn't reach Sketchfab — showing offline picks"
+        }
+    }
+
+    /// Triggered when the user toggles a filter chip. Clears the current feeds
+    /// (so the loading state shows again) then re-runs the parallel fetch.
+    private func reloadWithFilters() {
+        sketchfabStaffPicks = []
+        sketchfabMostLiked = []
+        sketchfabRecent = []
+        Task { await loadSketchfabFeeds() }
+    }
+
+    // MARK: - "Try a sample" section (home-feed mix — samples + models)
+
+    /// 6 curated sample demos surfaced on Explore so the home feed shows what
+    /// SceneView can do beyond just downloaded models. Tap navigates to the demo's
+    /// own screen, which renders through SceneView (same path as the Scenes tab).
+    private var trySampleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Try a sample")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("All samples") {
+                    // V1.1: deep-link to the Samples tab
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    SamplePromoCard(title: "PBR Materials", subtitle: "Metallic + roughness spectrum", icon: "paintpalette.fill", gradient: [.purple.opacity(0.35), .pink.opacity(0.18)]) {
+                        AnyView(MaterialsDemo())
+                    }
+                    SamplePromoCard(title: "Lighting", subtitle: "Directional · point · spot", icon: "lightbulb.fill", gradient: [.yellow.opacity(0.30), .orange.opacity(0.18)]) {
+                        AnyView(LightingDemo())
+                    }
+                    SamplePromoCard(title: "Physics", subtitle: "Dynamic · static · kinematic", icon: "figure.walk", gradient: [.green.opacity(0.30), .teal.opacity(0.18)]) {
+                        AnyView(PhysicsDemo())
+                    }
+                    SamplePromoCard(title: "Dynamic Sky", subtitle: "Time-of-day sun simulation", icon: "sun.horizon.fill", gradient: [.blue.opacity(0.30), .cyan.opacity(0.18)]) {
+                        AnyView(DynamicSkyDemo())
+                    }
+                    SamplePromoCard(title: "3D Text", subtitle: "Extruded fonts with style", icon: "textformat", gradient: [.indigo.opacity(0.30), .purple.opacity(0.18)]) {
+                        AnyView(TextDemo())
+                    }
+                    SamplePromoCard(title: "Scene Gallery", subtitle: "Multiple shapes in one scene", icon: "square.grid.3x3.fill", gradient: [.red.opacity(0.28), .orange.opacity(0.15)]) {
+                        AnyView(SceneGalleryDemo())
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    /// Horizontal row of filter chips above the feed carousels.
+    private var filtersBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                FilterChip(label: "Animated", systemImage: "wand.and.stars", isOn: animatedOnly) {
+                    animatedOnly.toggle()
+                    #if os(iOS)
+                    HapticManager.selectionChanged()
+                    #endif
+                    reloadWithFilters()
+                }
+                // Future chips (V1.1): License, Min poly count, Author.
+            }
+        }
+        .scrollClipDisabled()
+    }
+
+    // MARK: - Feed section helpers (Staff Picks / Most Liked / Recently Added)
+
+    /// One horizontal carousel of Sketchfab models, used three times in the body.
+    private func feedSection(title: String, models: [SketchfabModel]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("See all") {
+                    // V1.1: navigate to a paged listing for this feed
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(models) { model in
+                        FeaturedSketchfabCard(model: model) {
+                            selectedSketchfabModel = model
                             #if os(iOS)
                             HapticManager.lightTap()
                             #endif
                         }
                     }
                 }
-                .padding()
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    /// Fallback single-row carousel of bundled local models, shown when no Sketchfab
+    /// API key is configured (or while the live data is still loading).
+    private var bundledFeaturedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Featured")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                if isLoadingFeeds {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            if let feedsError {
+                Text(feedsError)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 4)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(featuredModels) { model in
+                        FeaturedCard(model: model) {
+                            selectedModel = model
+                            #if os(iOS)
+                            HapticManager.lightTap()
+                            #endif
+                        }
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    // MARK: - Categories section (chips grid)
+
+    private var categoriesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Categories")
+                .font(.title2.weight(.bold))
+            // FlowLayout-style category chips. Uses LazyVGrid for portable wrapping.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)],
+                      alignment: .leading, spacing: 8) {
+                ForEach(SketchfabCategory.allCases) { category in
+                    CategoryChip(category: category) {
+                        selectedCategory = category
+                        #if os(iOS)
+                        HapticManager.selectionChanged()
+                        #endif
+                    }
+                }
             }
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: selectedCategory == .favorites ? "heart.slash" : "magnifyingglass")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text(selectedCategory == .favorites ? "No favorites yet" : "No models found")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            if selectedCategory == .favorites {
-                Text("Tap the heart icon on any model to save it here.")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
+    // MARK: - Recent searches
+
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent searches")
+                    .font(.title2.weight(.bold))
+                Spacer()
+                Button("Clear") {
+                    recentSearches.clear()
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+            }
+            VStack(spacing: 6) {
+                ForEach(recentSearches.items, id: \.self) { query in
+                    RecentSearchRow(query: query) {
+                        searchText = query
+                    } onRemove: {
+                        recentSearches.remove(query)
+                    }
+                }
             }
         }
-        .padding(.top, 80)
+    }
+}
+
+// MARK: - Featured card (large image-tile in the horizontal carousel)
+
+private struct FeaturedCard: View {
+    let model: ModelItem
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack {
+                    LinearGradient(
+                        colors: model.category.gradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    Image(systemName: model.icon)
+                        .font(.system(size: 56, weight: .semibold))
+                        .foregroundStyle(model.category.iconColor)
+                        .shadow(color: model.category.iconColor.opacity(0.3), radius: 12)
+                }
+                .frame(width: 200, height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(model.category.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: 200, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(model.name), \(model.category.rawValue), featured")
+    }
+}
+
+// MARK: - Featured Sketchfab card (live image from sketchfab.com CDN)
+
+private struct FeaturedSketchfabCard: View {
+    let model: SketchfabModel
+    let onTap: () -> Void
+
+    /// Pick a thumbnail close to the card's render size (≥320 wide, ≤640) to avoid
+    /// downloading the 2k-pixel original for a 200×160 view.
+    private var thumbnailURL: URL? {
+        let images = model.thumbnails.images
+        let preferred = images.first(where: { $0.width >= 320 && $0.width <= 640 })
+            ?? images.max(by: { $0.width < $1.width })
+            ?? images.first
+        return preferred.flatMap { URL(string: $0.url) }
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    AsyncImage(url: thumbnailURL) { phase in
+                        switch phase {
+                        case .empty:
+                            ZStack {
+                                Color(.tertiarySystemBackground)
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            ZStack {
+                                Color(.tertiarySystemBackground)
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        @unknown default:
+                            Color(.tertiarySystemBackground)
+                        }
+                    }
+                    .frame(width: 200, height: 160)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    // Top-left "Animated" pill (when applicable)
+                    if model.isAnimated {
+                        Label("Animated", systemImage: "wand.and.stars")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.thinMaterial, in: Capsule())
+                            .padding(8)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(model.primaryTagDisplay)
+                            .lineLimit(1)
+                        if model.faceCount > 0 {
+                            Text("•")
+                            Text(model.formattedFaceCount + " polys")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                }
+                .frame(maxWidth: 200, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(model.name), Sketchfab model")
+    }
+}
+
+// MARK: - Helpers on SketchfabModel for card / sheet display
+
+private extension SketchfabModel {
+    /// True when the Sketchfab model carries one or more skeletal animations.
+    var isAnimated: Bool { animationCount > 0 }
+
+    var formattedFaceCount: String {
+        if faceCount >= 1_000_000 { return String(format: "%.1fM", Double(faceCount) / 1_000_000) }
+        if faceCount >= 1_000 { return String(format: "%.1fk", Double(faceCount) / 1_000) }
+        return "\(faceCount)"
+    }
+
+    var formattedLikeCount: String {
+        if likeCount >= 1_000 { return String(format: "%.1fk", Double(likeCount) / 1_000) }
+        return "\(likeCount)"
+    }
+
+    /// First tag in Title Case, or a generic fallback.
+    var primaryTagDisplay: String {
+        tags?.first?.name.capitalized ?? "3D Model"
+    }
+}
+
+// Sketchfab models render through `SketchfabModelViewerScreen` (SceneView SDK),
+// not via Sketchfab's web iframe viewer. The whole point of this demo app is to
+// showcase SceneView's renderer.
+
+// MARK: - Sketchfab model detail sheet
+
+private struct SketchfabModelSheet: View {
+    let model: SketchfabModel
+    let onOpenInSceneView: (SketchfabModel) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var largeThumbnailURL: URL? {
+        let images = model.thumbnails.images
+        let preferred = images.max(by: { $0.width < $1.width }) ?? images.first
+        return preferred.flatMap { URL(string: $0.url) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    thumbnailHero
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(model.name)
+                            .font(.title2.weight(.bold))
+                        if let desc = model.description, !desc.isEmpty {
+                            Text(desc.trimmingCharacters(in: .whitespacesAndNewlines))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(8)
+                        }
+                    }
+
+                    if let tags = model.tags, !tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(tags.prefix(10), id: \.name) { tag in
+                                    Text(tag.name)
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(.tint.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(.tint)
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // Primary CTA — open the model in SceneView. This downloads the GLB
+                    // via SketchfabService and renders it through SceneViewSwift's native
+                    // renderer (RealityKit). The Sketchfab web viewer is intentionally
+                    // NOT used — this demo app exists to showcase SceneView.
+                    Button {
+                        let captured = model
+                        dismiss()
+                        // Small delay so the sheet finishes dismissing before the
+                        // fullScreenCover presents — avoids "trying to present X on Y
+                        // while another presentation is in progress" warnings.
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(250))
+                            onOpenInSceneView(captured)
+                        }
+                    } label: {
+                        Label(model.downloadable ? "Open in SceneView" : "Preview in SceneView",
+                              systemImage: "cube.transparent.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(.tint, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                    .disabled(!model.downloadable)
+                    .opacity(model.downloadable ? 1.0 : 0.5)
+
+                    if !model.downloadable {
+                        Text("This model is not downloadable on the Sketchfab free tier and can't be rendered in SceneView yet.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle(model.name)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnailHero: some View {
+        AsyncImage(url: largeThumbnailURL) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().aspectRatio(contentMode: .fit)
+            default:
+                Rectangle().fill(.tint.opacity(0.08))
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .overlay { ProgressView() }
+            }
+        }
+        .frame(maxHeight: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+// MARK: - Sample promo card (compact entry-point to a Scenes tab demo)
+
+/// Compact card surfaced in the Explore home feed's "Try a sample" carousel.
+/// Tapping pushes the demo destination onto the local NavigationStack — exactly
+/// what the Samples tab would do, so the demo renders through SceneView.
+private struct SamplePromoCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let gradient: [Color]
+    let destination: () -> AnyView
+
+    var body: some View {
+        NavigationLink {
+            destination()
+                .navigationTitle(title)
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+                        .frame(width: 200, height: 130)
+                    Image(systemName: icon)
+                        .font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(.tint)
+                        .padding(14)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: 200, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title), sample demo. \(subtitle)")
+    }
+}
+
+// MARK: - Filter chip (toggleable Animated / etc.)
+
+private struct FilterChip: View {
+    let label: String
+    let systemImage: String
+    let isOn: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.caption.weight(.semibold))
+                Text(label)
+                    .font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.tint.opacity(0.12)),
+                in: Capsule()
+            )
+            .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.tint))
+            .overlay(
+                Capsule().strokeBorder(Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(label) filter, \(isOn ? "on" : "off")")
+    }
+}
+
+// MARK: - Category chip
+
+private struct CategoryChip: View {
+    let category: SketchfabCategory
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: category.icon)
+                    .font(.caption.weight(.semibold))
+                Text(category.displayName)
+                    .font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(.tint.opacity(0.12), in: Capsule())
+            .foregroundStyle(.tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(category.displayName) category")
+    }
+}
+
+// MARK: - Recent search row
+
+private struct RecentSearchRow: View {
+    let query: String
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button(action: onTap) {
+                Text(query)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(query) from recent searches")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+// MARK: - Category sheet (presented as a modal when a chip is tapped)
+
+private struct CategorySheet: View {
+    let category: SketchfabCategory
+    let onSearchTriggered: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Spacer(minLength: 16)
+                Image(systemName: category.icon)
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(.tint)
+                    .padding(20)
+                    .background(.tint.opacity(0.15), in: Circle())
+
+                Text(category.displayName)
+                    .font(.title.weight(.bold))
+
+                Text("Browse \(category.displayName.lowercased()) models from Sketchfab. Tap the search button to load results for this category.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                Button {
+                    onSearchTriggered(category.displayName)
+                    dismiss()
+                } label: {
+                    Label("Search \(category.displayName)", systemImage: "magnifyingglass")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(.tint, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 24)
+
+                Spacer()
+            }
+            .navigationTitle("Category")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
@@ -277,6 +1050,9 @@ struct ModelViewerScreen: View {
     @State private var errorMessage: String?
     @State private var selectedEnvironment: SceneEnvironment = .studio
     @State private var showShareSheet = false
+    /// URL to a USDZ file bundled with the app. When set, iOS Quick Look opens
+    /// over the scene with its built-in AR button (top-right in the QL viewer).
+    @State private var arPreviewURL: URL?
     private let favoritesManager = FavoritesManager.shared
 
     init(model: ModelItem) {
@@ -373,6 +1149,9 @@ struct ModelViewerScreen: View {
         .task {
             await loadModel()
         }
+        #if os(iOS)
+        .quickLookPreview($arPreviewURL)
+        #endif
     }
 
     // MARK: - Model Loading
@@ -383,6 +1162,11 @@ struct ModelViewerScreen: View {
         do {
             let node = try await ModelNode.load(model.asset)
             _ = node.scaleToUnits(model.scale)
+            // centerOrigin recenters the model's bounding box on world origin
+            // so the orbit camera (looking at 0,0,0) frames the body, not the
+            // asset's authored pivot point (often the floor of the bounding box).
+            // Mirrors the Android fix (commit 36156142, QA 2026-05-11).
+            _ = node.centerOrigin()
             loadedModel = node
         } catch {
             errorMessage = error.localizedDescription
@@ -422,6 +1206,27 @@ struct ModelViewerScreen: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 12) {
+            #if os(iOS)
+            // Prominent AR entry point — opens Apple Quick Look AR over the scene with the
+            // bundled USDZ asset. Quick Look's built-in AR button (top-right of the QL
+            // viewer) then drops the model into the user's real environment.
+            if Bundle.main.url(forResource: model.asset, withExtension: "usdz") != nil {
+                Button {
+                    arPreviewURL = Bundle.main.url(forResource: model.asset, withExtension: "usdz")
+                    HapticManager.lightTap()
+                } label: {
+                    Label("View in AR", systemImage: "arkit")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.tint, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View this model in AR")
+            }
+            #endif
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(SceneEnvironment.allPresets, id: \.name) { env in
@@ -484,4 +1289,289 @@ struct ModelViewerScreen: View {
         }
     }
     #endif
+}
+
+// MARK: - Sketchfab model viewer (downloads GLB via SketchfabService, renders in SceneView)
+
+/// Full-screen viewer for a model coming from the Sketchfab API.
+///
+/// Downloads the GLB through `SketchfabService.downloadModel(uid:progress:)`, caches it under
+/// `Caches/sketchfab/`, then loads it into `SceneView` via `ModelNode.load(contentsOf: URL)`.
+///
+/// This is the showcase path for the demo: every model the user touches — bundled or
+/// streamed — flows through SceneView's renderer (RealityKit on iOS). The Sketchfab web
+/// viewer / iframe / embed is intentionally never used.
+///
+/// Wow-factor polish (2026-05-11 session `wow-factor-sketchfab`):
+/// - Premium studio HDR environment by default (PBR-flattering reflections).
+/// - Cross-fade from the Sketchfab thumbnail (Ken-Burns zoom) to the live SceneView
+///   so the model "comes to life" instead of popping in.
+/// - Subtle radial vignette overlay for cinematic / Apple-Store framing.
+/// - Auto-rotate on by default — the model presents itself from every angle.
+struct SketchfabModelViewerScreen: View {
+    let model: SketchfabModel
+    @State private var loadedNode: ModelNode?
+    @State private var isLoading = false
+    @State private var downloadProgress: Double = 0
+    @State private var errorMessage: String?
+    @State private var selectedEnvironment: SceneEnvironment = .studio
+    @State private var autoRotate = true
+    /// Drives the thumbnail Ken-Burns zoom during download, and the post-reveal
+    /// cross-fade once the SceneView is ready.
+    @State private var thumbnailZoom: CGFloat = 1.0
+    @State private var sceneRevealed = false
+    @Environment(\.dismiss) private var dismiss
+
+    /// Largest Sketchfab thumbnail (for the during-download Ken-Burns hero).
+    private var heroThumbnailURL: URL? {
+        let images = model.thumbnails.images
+        let preferred = images.max(by: { $0.width < $1.width }) ?? images.first
+        return preferred.flatMap { URL(string: $0.url) }
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.08, green: 0.08, blue: 0.12),
+                    Color(red: 0.15, green: 0.15, blue: 0.22),
+                    Color(red: 0.10, green: 0.10, blue: 0.18),
+                ]),
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            sceneView
+                .ignoresSafeArea()
+                .opacity(sceneRevealed ? 1 : 0)
+
+            // Thumbnail cross-fade overlay — shows the Sketchfab image with a slow
+            // Ken-Burns zoom during download. Fades out (over 0.6 s) once the
+            // SceneView has had time to mount the loaded ModelNode, producing the
+            // "come to life" transition.
+            if !sceneRevealed {
+                thumbnailHero
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+
+            // Cinematic vignette — radial dark gradient at the corners, invisible
+            // in the centre. Costs nothing to render and gives the viewer the
+            // "Apple Store hero" framing without obscuring the model.
+            vignette
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+            if isLoading {
+                VStack(spacing: 14) {
+                    ProgressView(value: max(0.05, downloadProgress))
+                        .progressViewStyle(.linear)
+                        .tint(.white)
+                        .frame(width: 220)
+                    Text("Loading \(model.name)\u{2026}")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                    Text("Streaming from Sketchfab \u{00B7} rendering in SceneView")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .padding(20)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+
+            if let errorMessage {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title)
+                        .foregroundStyle(.yellow)
+                    Text("Failed to load model").font(.headline).foregroundStyle(.white)
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding()
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding()
+            }
+
+            VStack {
+                Spacer()
+                controlsOverlay
+            }
+        }
+        .navigationTitle(model.name)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    autoRotate.toggle()
+                    #if os(iOS)
+                    HapticManager.selectionChanged()
+                    #endif
+                } label: {
+                    Image(systemName: autoRotate ? "rotate.3d.fill" : "rotate.3d")
+                }
+                .accessibilityLabel(autoRotate ? "Stop rotation" : "Start rotation")
+            }
+        }
+        .task { await loadFromSketchfab() }
+        .onAppear {
+            // Start the Ken-Burns slow zoom on the thumbnail the moment the screen
+            // appears, so it's already animating when the user reads the title.
+            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
+                thumbnailZoom = 1.18
+            }
+        }
+        .onChange(of: loadedNode != nil) { _, ready in
+            guard ready else { return }
+            // Give the SceneView one frame to mount its content before fading
+            // the thumbnail out — avoids a brief black flash mid-transition.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(220))
+                withAnimation(.easeOut(duration: 0.6)) { sceneRevealed = true }
+                #if os(iOS)
+                HapticManager.lightTap()
+                #endif
+            }
+        }
+    }
+
+    private func loadFromSketchfab() async {
+        guard loadedNode == nil else { return }
+        isLoading = true
+        errorMessage = nil
+        downloadProgress = 0
+        do {
+            let localURL = try await SketchfabService.shared.downloadModel(
+                uid: model.uid,
+                progress: { p in
+                    Task { @MainActor in
+                        self.downloadProgress = p
+                    }
+                }
+            )
+            let node = try await ModelNode.load(contentsOf: localURL)
+            _ = node.scaleToUnits(1.0)
+            // centerOrigin recenters the bounding box on world origin so the orbit
+            // camera frames the model body, not the asset's authored pivot.
+            _ = node.centerOrigin()
+            loadedNode = node
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    @ViewBuilder
+    private var sceneView: some View {
+        if autoRotate {
+            SceneView { root in
+                if let loadedNode {
+                    loadedNode.entity.position = .zero
+                    root.addChild(loadedNode.entity)
+                }
+            }
+            .environment(selectedEnvironment)
+            .cameraControls(.orbit)
+            .autoRotate(speed: 0.4)
+            .id("sketchfab-auto-\(loadedNode != nil)-\(selectedEnvironment.name)")
+        } else {
+            SceneView { root in
+                if let loadedNode {
+                    loadedNode.entity.position = .zero
+                    root.addChild(loadedNode.entity)
+                }
+            }
+            .environment(selectedEnvironment)
+            .cameraControls(.orbit)
+            .id("sketchfab-manual-\(loadedNode != nil)-\(selectedEnvironment.name)")
+        }
+    }
+
+    /// Cinematic vignette — costs ~0 GPU and lifts the model in the centre
+    /// without obscuring it. Matches the "Apple Store" / Sketchfab hero look.
+    private var vignette: some View {
+        RadialGradient(
+            colors: [.black.opacity(0.0), .black.opacity(0.35)],
+            center: .center,
+            startRadius: 200,
+            endRadius: 800
+        )
+        .blendMode(.multiply)
+    }
+
+    /// Hero thumbnail shown during download with a slow Ken-Burns zoom; cross-fades
+    /// out once the SceneView has mounted the loaded ModelNode.
+    @ViewBuilder
+    private var thumbnailHero: some View {
+        ZStack {
+            AsyncImage(url: heroThumbnailURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                default:
+                    Color.clear
+                }
+            }
+            .scaleEffect(thumbnailZoom)
+            // Soft blur so the thumbnail feels like a "preview state" rather
+            // than the final render, and the transition to SceneView reads as
+            // "now it's real and live".
+            .blur(radius: 6)
+            // Slight darkening so the foreground progress card stays legible.
+            Color.black.opacity(0.30)
+        }
+    }
+
+    private var controlsOverlay: some View {
+        VStack(spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(SceneEnvironment.allPresets, id: \.name) { env in
+                        Button {
+                            selectedEnvironment = env
+                            #if os(iOS)
+                            HapticManager.lightTap()
+                            #endif
+                        } label: {
+                            Text(env.name)
+                                .font(.caption2)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    selectedEnvironment.name == env.name
+                                        ? AnyShapeStyle(.blue)
+                                        : AnyShapeStyle(.white.opacity(0.15))
+                                )
+                                .clipShape(Capsule())
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                if model.faceCount > 0 {
+                    Label(model.formattedFaceCount + " polys", systemImage: "square.grid.3x3")
+                }
+                if model.isAnimated {
+                    Label("Animated", systemImage: "wand.and.stars")
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.7))
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding()
+    }
 }

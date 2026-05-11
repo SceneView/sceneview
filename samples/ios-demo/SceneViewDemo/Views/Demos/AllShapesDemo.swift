@@ -3,7 +3,8 @@ import RealityKit
 import SceneViewSwift
 
 /// Showcases all 5 geometry types: cube, sphere, cylinder, cone, plane.
-struct AllShapesDemo: View {
+/// Named `GeometryDemo` to mirror the Android demo of the same name.
+struct GeometryDemo: View {
     var body: some View {
         ZStack {
             SceneView { root in

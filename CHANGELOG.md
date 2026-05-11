@@ -1,6 +1,126 @@
 # Changelog
 
-## Unreleased — Claude Code plugin marketplace (2026-05-08)
+## v4.1.0 — iOS V1 honest + Android rendering uplift + Sketchfab streaming + Claude Code plugin marketplace (2026-05-11)
+
+### ⚠️ BREAKING — Android render defaults change visual look out-of-the-box
+
+The `SceneView` composable now ships with `RealityKit-equivalent` defaults to close the
+"iOS looks better than Android" gap reviewers consistently flagged in 2026-05-10 QA:
+
+- **Main directional light intensity**: `100_000` → `10_000` lux (×10 drop). Existing
+  apps will render **noticeably darker** unless they override `mainLightNode.intensity`
+  explicitly or load a brighter IBL. Combined with shadows-now-on and a new fill light
+  at 30% intensity, the overall scene exposure is much closer to RealityKit's defaults.
+- **Shadows**: now on by default (`setShadowingEnabled(true)`). Existing apps that don't
+  use casters will see no change; apps with floor planes will now display contact shadows.
+- **Fill light**: new `fillLightNode: LightNode?` param on `SceneView`, defaulted to
+  `rememberFillLightNode(engine)`. Pass `null` to disable for a single-light setup.
+- **SSAO + bloom + Filmic tone mapper**: now on by default on `View`. SSAO has no visible
+  cost on models without crevices; bloom strength is 0.10 (subtle, no "cheap mobile
+  game" look). Override via `view.ambientOcclusionOptions.enabled = false` if needed.
+- **Exposure**: `setExposure(16, 1/125, 100)` (sunny-16, EV~15) → `(12, 1/200, 200)`
+  (neutral, EV~11.6). The previous defaults required cranking IBL intensity to see
+  anything; the new defaults look right out of the box.
+
+**Migration**: bump consumers to v4.1.0+ and review the visual delta. To restore v4.0.x
+look exactly, set `mainLightNode = rememberMainLightNode(engine) { intensity = 100_000f }`,
+`fillLightNode = null`, and `view.ambientOcclusionOptions.enabled = false`.
+
+
+
+### Fixed — Android demo polish (QA pass 2026-05-11)
+
+A QA agent walked the demo screens and reported user-visible papercut issues.
+Five low-effort high-impact fixes shipped (`65f6d8db`, `ea4c513e`, `15c8d254`, `15bcaf8c`):
+
+- **ModelViewerDemo**: helmet was pinned to the lower half of the viewport with a big
+  empty band at the top. `rememberHeroOrbitCameraManipulator(yHeight = 0.2f → 0f)`.
+- **CameraControlsDemo**: helmet rendered at ~10% of the viewport at the default home
+  camera distance. `homePosition = Position(0, 0, 4) → (0, 0, 1.5)`.
+- **PhysicsDemo**: first frame showed a single ball on an empty floor — the demo's hook
+  ("colourful rain on the floor") was invisible until the user pressed Drop. Initial
+  `sphereCount = 1 → 5` so the first frame is the actual demo content.
+- **ARStreetscapeDemo**: the permission gate showed only a "Denied" error message with
+  no escape — Back was the only way out. Now offers `Retry` (re-launches the system
+  prompt) and `Open Settings` (deep-links into the app's permission page) buttons.
+- **DynamicSkyDemo**: rendered as "fully black at noon" because `DynamicSkyNode`
+  positions a directional sun but doesn't paint a sky dome, and the default neutral
+  IBL had no skybox. Mitigation in the demo (not the library): swap the IBL based on
+  the time-of-day slider — `rooftop_night_2k` / `sunset_2k` / `outdoor_cloudy_2k`.
+  Three buckets is coarse but covers the obvious user expectations; a proper
+  procedural-atmosphere skybox is library-level work for a later sprint.
+
+### Added — `MovableLightDemo` + `OrbitalARDemo` (samples)
+
+Two new sample demos shipped on both iOS and Android (commits `c345404b`, `54233d56`).
+
+- **`MovableLightDemo`** — drag-anywhere-on-the-scene → spherical-orbit math (azimuth /
+  elevation, fixed radius 1.5 m) → light position updates live → specular highlights
+  track the cursor on a PBR model (Damaged Helmet on Android, Ferrari F40 on iOS).
+  Camera is locked so the only thing moving is the light; a yellow unlit marker sphere
+  shows where the light source is. Intensity slider 1k → 100k, "Show light source"
+  toggle hides/shows the marker.
+- **`OrbitalARDemo`** — solar-system-style AR scene: eight distinct bundled models orbit
+  around the user at radius 1.5 m, each with its own orbital speed (0.05 → 0.30 rad/s,
+  21 s to 125 s for a full lap) and a slow local spin. Heights are equipartitioned
+  across ±0.5 m so the formation reads as varied elevations as the user turns. Plane
+  detection is disabled — the formation lives in world space, anchored at the user's
+  starting position.
+
+### Added — Sketchfab model viewer cross-fade (iOS + Android parity)
+
+- **Wow-factor hero state on the Sketchfab download screen** ([`1e0f86ba`](https://github.com/sceneview/sceneview/commit/1e0f86ba)) — the previous bare-spinner loading state read as "loading something somewhere". Now both platforms show: (1) a Ken-Burns thumbnail (highest-res Sketchfab preview, slow 1.0→1.18 zoom, soft blur) while the GLB downloads — the screen always shows the *model itself*, never an empty container; (2) a ~500 ms cross-fade from thumbnail to live `SceneView` once the model loads — the "come to life" transition that reads as proof of native rendering; (3) premium `studio_2k.hdr` IBL by default (much more flattering on PBR than `neutral_ibl`, skybox kept off); (4) a 20 s hero auto-orbit so every angle is visible without touching the screen; (5) a cinematic radial vignette for the "Apple Store hero" framing. iOS uses SwiftUI `.onChange(of:)` + `withAnimation`; Android uses `Crossfade` from `androidx.compose.animation` keyed on the existing Stage state machine.
+
+### Fixed — LoadingScrim on CameraControls + Animation demos (Android)
+
+- **First-paint black screen** ([`5cae550a`](https://github.com/sceneview/sceneview/commit/5cae550a)) — QA pass on 2026-05-11 flagged "Demos noires sur first paint (Camera Controls, Lighting, Animation, Multi Model) — ~5-10s pendant lesquels l'écran est noir, user pense que l'app crash". `LightingDemo` + `MultiModelDemo` already had `LoadingScrim`; this completes the four-demo set by adding the same translucent spinner overlay to `CameraControlsDemo` and `AnimationDemo` (both load non-trivial GLBs — `khronos_damaged_helmet.glb` / `threejs_soldier.glb` — with a multi-second empty-black first-frame window). `GeometryDemo` deliberately skipped (procedural primitives, no model load).
+
+
+
+Branch [`claude/magical-lovelace-7176b1`](https://github.com/sceneview/sceneview/tree/claude/magical-lovelace-7176b1) — staged for the next minor cut.
+
+### Added — `RenderQuality` preset (Android)
+
+- **`io.github.sceneview.RenderQuality`** ([`2b04c667`](https://github.com/sceneview/sceneview/commit/2b04c667)) — one-line `Cinematic` / `Default` / `Performance` switch on `SceneView`. Wraps shadows, SSAO, bloom, MSAA, HDR color buffer, and dynamic resolution into three coherent presets so AI assistants generating SceneView code (or devs who don't want to learn what `ambientOcclusionOptions` is) can pick one preset and ship. Individual `view.*` settings still win when set after the preset.
+- **`rememberFillLightNode(engine)`** ([`ad81c52a`](https://github.com/sceneview/sceneview/commit/ad81c52a)) — composable factory for a secondary "fill" directional light, mirroring iOS RealityKit's default two-light setup. New `fillLightNode: LightNode?` parameter on `SceneView` defaults to this; pass `null` to keep the single-main-light look.
+
+### Added — Sketchfab streaming scaffold
+
+- **iOS** ([`918faacd`](https://github.com/sceneview/sceneview/commit/918faacd)) — `actor SketchfabService` under `samples/ios-demo/.../Services/`. URLSession + Codable models, on-disk LRU cache (500 MB cap), env-var-based API key (`SKETCHFAB_API_KEY`).
+- **Android** ([`72cff080`](https://github.com/sceneview/sceneview/commit/72cff080)) — mirror in `samples/android-demo/.../sketchfab/`. OkHttp + kotlinx-serialization, same 500 MB LRU cache, `BuildConfig.SKETCHFAB_API_KEY` populated from env or `local.properties` (gitignored).
+- **CI** ([`7858051f`](https://github.com/sceneview/sceneview/commit/7858051f)) — `build-apks.yml` forwards `secrets.SKETCHFAB_API_KEY` next to the existing `ARCORE_API_KEY` pattern. Forks / PRs from forks with an unset secret build cleanly — the gallery falls back to bundled featured models and disables Sketchfab search at runtime via `SketchfabError.MissingApiKey`.
+- **Security note** — V1 scaffold bakes the key into the APK / IPA at build time. V1.1 will route through the mcp-gateway Cloudflare Worker so the master key isn't shipped; demo apps would carry only a short-lived per-user token. `TODO V1.1` markers are in place in `SketchfabConfig.{swift,kt}` and the Gradle build script.
+
+### Changed — Android rendering defaults match iOS RealityKit
+
+Closes the visible quality gap between Android (Filament) and iOS (RealityKit) out of the box. Side-by-side comparison on a Metal-backed Pixel_7a (Apple M3, `-gpu host`) on 5 hero models showed Android looking "blown-out / harsh" because of single-light + shadows-off + sunny-16 exposure defaults.
+
+- **Shadows on** by default ([`ad81c52a`](https://github.com/sceneview/sceneview/commit/ad81c52a)) — `setShadowingEnabled(false → true)` in `SceneFactories.createView()`.
+- **Main light intensity 100 000 → 10 000** ([`ad81c52a`](https://github.com/sceneview/sceneview/commit/ad81c52a)) — `DEFAULT_MAIN_LIGHT_COLOR_INTENSITY`. Brings it in line with RealityKit's 1 000-unit directional + IBL contribution. Crank IBL or push intensity back up explicitly when you need outdoor noon punch.
+- **Fill light added** ([`ad81c52a`](https://github.com/sceneview/sceneview/commit/ad81c52a)) — secondary directional at 30% main intensity from `(0.5, -0.5, 0.5)`, no shadows. Softens contrast on the shadow side of models.
+- **Exposure neutralised** ([`ad81c52a`](https://github.com/sceneview/sceneview/commit/ad81c52a)) — `setExposure(16, 1/125, 100) → (12, 1/200, 200)` (~EV 15 sunny-16 → ~EV 11.6 neutral).
+- **SSAO + bloom on** ([`7858051f`](https://github.com/sceneview/sceneview/commit/7858051f)) — `view.ambientOcclusionOptions.enabled = true` and `view.bloomOptions.enabled = true; strength = 0.1f`. Visible grounding gain under metallic / cloth assets, invisible on plain diffuse models. Validated on toy_car / dragon / helmet / lantern / shiba.
+- **Filmic tone mapper kept** ([`7858051f`](https://github.com/sceneview/sceneview/commit/7858051f)) — ACES was tested and produces a "cool Hollywood" grade that shifts PBR hero shots away from ground truth. SDK doesn't impose tone preferences — users opt into ACES via `view.colorGrading`. (An earlier SwiftShader-based test had flagged ACES as a "PBR helmet crush" — that turned out to be a software-renderer artifact; the loss disappears on real GPU.)
+
+`ARScene.createARView()` was deliberately left untouched: AR sessions have their own real-world lighting estimation, and layering SSAO / bloom on top of a camera feed is a separate sprint.
+
+### Changed — iOS V1 honest: purge the 4 silent Pareto stubs
+
+Closes [#928](https://github.com/sceneview/sceneview/issues/928) (the 4 stubs in the Pareto-15 minimal API surface).
+
+- **`ModelNode.playAnimation(speed:)`** ([`141eda05`](https://github.com/sceneview/sceneview/commit/141eda05)) — the three `playAnimation(...)` overloads accepted a `speed: Float` parameter but never wired it through. Fixed by capturing the returned `AnimationPlaybackController` and setting `.speed = speed`.
+- **`CameraNode.depthOfField(focusDistance:aperture:)`** ([`141eda05`](https://github.com/sceneview/sceneview/commit/141eda05)) — annotated `@available(*, deprecated, message: "...")`. RealityKit's `PerspectiveCameraComponent` does not expose DOF; the method is kept for Android API parity but Xcode now surfaces a clear warning.
+- **`CameraNode.exposure(_:)`** ([`141eda05`](https://github.com/sceneview/sceneview/commit/141eda05)) — same treatment. The deprecation message redirects users to `ARSceneView(cameraExposure:)` for AR or to scene lighting intensity for 3D.
+- **`LightNode.shadowColor(_:)`** ([`141eda05`](https://github.com/sceneview/sceneview/commit/141eda05)) — `DirectionalLightComponent.Shadow` has no `color` property; the parameter is ignored. Deprecation message points users at `castsShadow(_:)` / `shadowMaximumDistance(_:)`.
+
+### Added — iOS demo: "Coming soon" badges for non-ported demos
+
+- **`DemoStatus` enum** + **`ComingSoonScreen`** ([`567d6476`](https://github.com/sceneview/sceneview/commit/567d6476)) — Android has 37 sample demos, iOS has 16. The other 21 used to be invisible on iOS. Now they appear in the `Scenes` tab list with a "Coming v1.1" badge; tapping routes to an elegant placeholder (sablier icon, version target, links to GitHub issues + the Android demo on Play Store).
+- **21 placeholder items added** to `SamplesTab.allScenes()` covering Interaction (Camera Controls / Gesture Editing / Collision / ViewNode), Advanced extras (Post Processing / 2D Shape Extrude / Reflection Probes), Animated Model, Video Texture, and the 12 AR demos that aren't yet on iOS.
+
+### Stitch design assets (UI refonte pending)
+
+Project `15993476369356042112` on Stitch contains the 8 mockup screens for the V1 UI refresh (4 iOS Liquid Glass + 4 Android M3 Expressive). Pending: actual SwiftUI / Compose implementation in `samples/{ios,android}-demo` based on those mockups.
 
 ### Added — `sceneview/claude-marketplace` Claude Code plugin
 

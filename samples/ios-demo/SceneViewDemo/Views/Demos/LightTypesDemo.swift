@@ -3,7 +3,8 @@ import RealityKit
 import SceneViewSwift
 
 /// All three light types: directional, point, and spot.
-struct LightTypesDemo: View {
+/// Named `LightingDemo` to mirror the Android demo of the same name.
+struct LightingDemo: View {
     @State private var selectedLight: Int = 0
 
     private let lightNames = ["Directional", "Point", "Spot"]

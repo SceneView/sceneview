@@ -1,5 +1,24 @@
 import SwiftUI
 
+/// Availability status for a demo on iOS.
+///
+/// Demos that are present on Android but not yet ported to iOS appear in the list with a
+/// "Coming soon" badge and route to ``ComingSoonScreen`` instead of crashing or hiding.
+enum DemoStatus: Equatable {
+    case available
+    case comingSoon(version: String)
+
+    var isAvailable: Bool {
+        if case .available = self { return true }
+        return false
+    }
+
+    var comingSoonVersion: String? {
+        if case let .comingSoon(version) = self { return version }
+        return nil
+    }
+}
+
 /// Represents a single scene entry in the Scenes tab.
 struct DemoItem: Identifiable {
     let id = UUID()
@@ -7,8 +26,10 @@ struct DemoItem: Identifiable {
     let icon: String
     let subtitle: String
     let category: DemoCategory
+    let status: DemoStatus
     let destination: AnyView
 
+    /// Available demo with a real destination view.
     init<V: View>(
         title: String,
         icon: String,
@@ -20,7 +41,27 @@ struct DemoItem: Identifiable {
         self.icon = icon
         self.subtitle = subtitle
         self.category = category
+        self.status = .available
         self.destination = AnyView(destination())
+    }
+
+    /// Coming-soon demo — tap routes to ``ComingSoonScreen`` instead of a real destination.
+    ///
+    /// Mirrors an Android demo that is not yet ported to iOS. The item stays visible in the list
+    /// (with a "Coming soon" badge) so users see the roadmap rather than discovering gaps.
+    init(
+        comingSoonTitle title: String,
+        icon: String,
+        subtitle: String,
+        category: DemoCategory,
+        version: String = "1.1"
+    ) {
+        self.title = title
+        self.icon = icon
+        self.subtitle = subtitle
+        self.category = category
+        self.status = .comingSoon(version: version)
+        self.destination = AnyView(EmptyView())
     }
 }
 
@@ -30,11 +71,12 @@ enum DemoCategory: String, CaseIterable, Comparable {
     case content = "Content"
     case lighting = "Lighting"
     case effects = "Effects"
+    case interaction = "Interaction"
     case advanced = "Advanced"
     case ar = "Augmented Reality"
 
     static func < (lhs: DemoCategory, rhs: DemoCategory) -> Bool {
-        let order: [DemoCategory] = [.geometry, .content, .lighting, .effects, .advanced, .ar]
+        let order: [DemoCategory] = [.geometry, .content, .lighting, .effects, .interaction, .advanced, .ar]
         let lhsIndex = order.firstIndex(of: lhs) ?? 0
         let rhsIndex = order.firstIndex(of: rhs) ?? 0
         return lhsIndex < rhsIndex

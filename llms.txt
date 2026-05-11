@@ -2,12 +2,12 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.0.9):**
-- 3D only: `io.github.sceneview:sceneview:4.0.9`
-- AR + 3D: `io.github.sceneview:arsceneview:4.0.9`
+**Android — Maven artifacts (version 4.1.0):**
+- 3D only: `io.github.sceneview:sceneview:4.1.0`
+- AR + 3D: `io.github.sceneview:arsceneview:4.1.0`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
-- `https://github.com/sceneview/sceneview-swift.git` (from: "4.0.9")
+- `https://github.com/sceneview/sceneview-swift.git` (from: "4.1.0")
 
 **Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.20 | **Compose BOM compatible**
 
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.9")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.0.9") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.1.0")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.1.0") // AR (includes sceneview)
 }
 ```
 
@@ -54,6 +54,7 @@ fun SceneView(
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberEnvironment(environmentLoader, isOpaque = isOpaque),
     mainLightNode: LightNode? = rememberMainLightNode(engine),
+    fillLightNode: LightNode? = rememberFillLightNode(engine),  // dual-light default — soft opposite fill
     cameraNode: CameraNode = rememberCameraNode(engine),
     collisionSystem: CollisionSystem = rememberCollisionSystem(view),
     cameraManipulator: CameraGestureDetector.CameraManipulator? = rememberCameraManipulator(cameraNode.worldPosition),
@@ -62,10 +63,13 @@ fun SceneView(
     onTouchEvent: ((e: MotionEvent, hitResult: HitResult?) -> Boolean)? = null,
     permissionHandler: ARPermissionHandler? = /* auto from ComponentActivity */,
     lifecycle: Lifecycle = LocalLifecycleOwner.current.lifecycle,
+    renderQuality: RenderQuality = RenderQuality.Default,   // Cinematic / Default / Performance — see "Render Quality"
     onFrame: ((frameTimeNanos: Long) -> Unit)? = null,
     content: (@Composable SceneScope.() -> Unit)? = null
 )
 ```
+
+**Defaults changed in v4.0.10+:** shadows ON (mainLight + fillLight), SSAO + bloom enabled, neutral exposure (~1.0), dual-light setup out-of-the-box. No more "flat-lit chrome look" — drop a model in and it renders cinematic by default.
 
 Minimal usage:
 ```kotlin
@@ -131,6 +135,7 @@ fun ARSceneView(
     onTouchEvent: ((e: MotionEvent, hitResult: HitResult?) -> Boolean)? = null,
     permissionHandler: ARPermissionHandler? = /* auto from ComponentActivity */,
     lifecycle: Lifecycle = LocalLifecycleOwner.current.lifecycle,
+    renderQuality: RenderQuality = RenderQuality.Default,   // Cinematic / Default / Performance — see "Render Quality"
     content: (@Composable ARSceneScope.() -> Unit)? = null
 )
 ```
@@ -1083,7 +1088,8 @@ Most are default parameter values in `SceneView`/`ARSceneView` — call them exp
 | `rememberEnvironment(environmentLoader, isOpaque)` | `Environment` | IBL + skybox environment |
 | `rememberEnvironment(environmentLoader) { ... }` | `Environment` | Custom environment from lambda |
 | `rememberCameraNode(engine) { ... }` | `CameraNode` | Custom camera with apply block |
-| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light with apply block |
+| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default |
+| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat |
 | `rememberCameraManipulator(orbitHomePosition?, targetPosition?)` | `CameraManipulator?` | Orbit/pan/zoom camera controller |
 | `rememberOnGestureListener(...)` | `OnGestureListener` | Gesture callbacks for tap/drag/pinch |
 | `rememberViewNodeManager()` | `ViewNode.WindowManager` | Required for ViewNode composables |
@@ -1129,7 +1135,39 @@ SceneView(cameraNode = rememberCameraNode(engine) {
 
 // Main light shortcut (apply block is LightNode.() -> Unit)
 SceneView(mainLightNode = rememberMainLightNode(engine) { intensity = 100_000f })
+
+// Dual-light default — fill light is added automatically; override or disable:
+SceneView(
+    mainLightNode = rememberMainLightNode(engine) { intensity = 100_000f },
+    fillLightNode = rememberFillLightNode(engine) { intensity = 30_000f }, // softer fill
+    // fillLightNode = null,  // disable fill light entirely
+)
 ```
+
+---
+
+## Render Quality
+
+```kotlin
+enum class RenderQuality { Cinematic, Default, Performance }
+```
+
+| Preset | Shadows | SSAO | Bloom | MSAA | DoF | Use case |
+|---|---|---|---|---|---|---|
+| `Cinematic` | high-res VSM | ON | ON | 4x | ON | hero product viewer, marketing demos |
+| `Default` | medium PCF | ON | ON | 2x | OFF | most apps — shipped as the SceneView default |
+| `Performance` | low PCF | OFF | OFF | 1x | OFF | low-end devices, AR overlays, battery-sensitive flows |
+
+```kotlin
+SceneView(renderQuality = RenderQuality.Cinematic) { /* … */ }
+ARSceneView(renderQuality = RenderQuality.Performance) { /* … */ }
+
+// Imperative — applies to any Filament View directly:
+import io.github.sceneview.applyRenderQuality
+view.applyRenderQuality(RenderQuality.Cinematic)
+```
+
+The extension `View.applyRenderQuality(RenderQuality)` configures `shadowOptions`, `ambientOcclusionOptions`, `bloomOptions`, `dynamicResolutionOptions`, `antiAliasing`, and `multiSampleAntiAliasingOptions` in one call — useful when you manage the `View` yourself.
 
 ---
 
@@ -2132,7 +2170,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.9")
+    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.1.0")
 ]
 ```
 
@@ -2202,8 +2240,9 @@ public struct ModelNode: @unchecked Sendable {
     public func scale(_ uniform: Float) -> ModelNode
     public func rotation(_ rotation: simd_quatf) -> ModelNode
     public func scaleToUnits(_ units: Float = 1.0) -> ModelNode
+    public func centerOrigin(_ target: SIMD3<Float> = .zero) -> ModelNode  // mirrors Android `centerOrigin`
 
-    // Animation
+    // Animation — `speed` is now wired through RealityKit (was no-op before v4.0.10)
     public var animationCount: Int
     public var animationNames: [String]
     public func playAllAnimations(loop: Bool = true, speed: Float = 1.0)
@@ -2221,6 +2260,8 @@ public struct ModelNode: @unchecked Sendable {
     public mutating func onTap(_ handler: @escaping () -> Void) -> ModelNode
 }
 ```
+
+`centerOrigin(_:)` recenters the model so the supplied target (in model-local space) sits at the origin. Pass `.zero` to center, `SIMD3(0, -1, 0)` to bottom-align (useful for grounded placement), etc. Mirrors Kotlin `ModelNode(centerOrigin = Position(0,-1,0))`.
 
 ### iOS: GeometryNode
 
@@ -2310,6 +2351,16 @@ video.play() / .pause() / .stop() / .seek(to: 30.0) / .volume(0.5)
 ```swift
 CameraNode().position(.init(x: 0, y: 1.5, z: 3)).lookAt(.zero).fieldOfView(60)
 ```
+
+**iOS deprecations (v4.0.10+ — RealityKit-incompatible, no-op):**
+
+| Deprecated | Replacement |
+|---|---|
+| `CameraNode.depthOfField(...)` | Use `.cameraControls(.cinematic)` or attach `DepthOfFieldEffect` via the underlying `ARView.cameraMode` — RealityKit lacks per-camera DoF. |
+| `CameraNode.exposure(_:)` | Use `ARSceneView(cameraExposure:)` (AR) or `.environment(...)` intensity (3D). |
+| `LightNode.shadowColor(_:)` | Removed — RealityKit shadow color is fixed. Tune ambient/IBL tint via `SceneEnvironment.custom(...)` instead. |
+
+These three modifiers compile with a `@available(*, deprecated)` warning and silently no-op at runtime. Migrate before the v4.1 hard removal.
 
 **PhysicsNode** — rigid body:
 ```swift
@@ -2521,7 +2572,7 @@ ferrari_f40.glb
 
 ## SceneView Web (Kotlin/JS + Filament.js)
 
-Package: `sceneview-web` v4.0.9 — npm `sceneview-web`
+Package: `sceneview-web` v4.1.0 — npm `sceneview-web`
 Renderer: **Filament.js (WebGL2/WASM)** — same Filament engine as SceneView Android, compiled to WebAssembly.
 Requires: Chrome 79+, Edge 79+, Firefox 78+ (WebGL2). Safari 15+ (WebGL2).
 
@@ -2533,7 +2584,7 @@ npm install sceneview-web filament
 Script-tag usage (no bundler):
 ```html
 <script src="https://sceneview.github.io/js/filament/filament.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.1.0/sceneview-web.js"></script>
 ```
 
 After loading, the library registers itself on `window.sceneview`.
@@ -2831,7 +2882,7 @@ Renderer: **RealityKit**. Requires iOS 17+ / macOS 14+ / visionOS 1+.
 
 SPM dependency (Package.swift or Xcode):
 ```swift
-.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.9")
+.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.1.0")
 ```
 
 Import: `import SceneViewSwift`
@@ -2987,8 +3038,9 @@ public struct ModelNode: @unchecked Sendable {
     public func rotation(_ rotation: simd_quatf) -> ModelNode
     public func rotation(angle: Float, axis: SIMD3<Float>) -> ModelNode
     public func scaleToUnits(_ units: Float = 1.0) -> ModelNode   // fits in cube of 'units' meters
+    public func centerOrigin(_ target: SIMD3<Float> = .zero) -> ModelNode  // recenters bounds; `.zero` = center, `[0,-1,0]` = bottom-aligned
 
-    // Animation
+    // Animation — `speed` is now actually applied to the RealityKit animation (was a no-op before v4.0.10)
     public var animationCount: Int
     public var animationNames: [String]
     public func playAllAnimations(loop: Bool = true, speed: Float = 1.0)
@@ -3327,7 +3379,7 @@ Backpressure is absorbed by `rateHz`. Wire format: JSON-lines consumed by
 | visionOS | RealityKit | SwiftUI | via SceneViewSwift | Alpha |
 | Web | Filament.js + WebXR | Kotlin/JS | `samples/web-demo` | Alpha |
 
-SceneView Web (sceneview-web v4.0.9) — see "## SceneView Web (Kotlin/JS + Filament.js)" section above for the full API reference.
+SceneView Web (sceneview-web v4.1.0) — see "## SceneView Web (Kotlin/JS + Filament.js)" section above for the full API reference.
 | Desktop | Software renderer | Compose Desktop | `samples/desktop-demo` | Alpha |
 | Flutter | Filament/RealityKit | PlatformView | `samples/flutter-demo` | Alpha |
 | React Native | Filament/RealityKit | Fabric | `samples/react-native-demo` | Alpha |
@@ -3339,7 +3391,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.0.9
+  sceneview_flutter: ^4.1.0
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).

@@ -27,6 +27,7 @@ import io.github.sceneview.demo.demos.EnvironmentDemo
 import io.github.sceneview.demo.demos.FogDemo
 import io.github.sceneview.demo.demos.GeometryDemo
 import io.github.sceneview.demo.demos.LightingDemo
+import io.github.sceneview.demo.demos.MovableLightDemo
 import io.github.sceneview.demo.demos.ModelViewerDemo
 import io.github.sceneview.demo.demos.TextDemo
 import io.github.sceneview.demo.demos.LinesPathsDemo
@@ -57,7 +58,9 @@ import io.github.sceneview.demo.demos.ARInstantPlacementDemo
 import io.github.sceneview.demo.demos.ARTerrainAnchorDemo
 import io.github.sceneview.demo.demos.ARRooftopAnchorDemo
 import io.github.sceneview.demo.demos.ARImageStabilizationDemo
+import io.github.sceneview.demo.demos.OrbitalARDemo
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
+import io.github.sceneview.demo.ui.RootScreen
 import io.github.sceneview.demo.update.InAppUpdateManager
 import io.github.sceneview.demo.update.UpdateBanner
 import androidx.compose.foundation.layout.Box
@@ -212,10 +215,11 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
         popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
     ) {
         composable("list") {
-            DemoListScreen(
-                onDemoClick = { id -> navController.navigate("demo/$id") },
-                onAboutClick = { navController.navigate("about") },
-            )
+            // New 4-tab root (Explore / AR View / Samples / About). The legacy
+            // category-grouped DemoListScreen lives untouched inside the
+            // "Samples" tab so existing deep-link flows (`adb am start ... --es
+            // demo <id>`) and the in-app update banner remain wired up.
+            RootScreen(onDemoClick = { id -> navController.navigate("demo/$id") })
         }
         composable("demo/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: return@composable
@@ -241,6 +245,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "animation" -> AnimationDemo(onBack)
         // Lighting & Environment
         "lighting" -> LightingDemo(onBack)
+        "movable-light" -> MovableLightDemo(onBack)
         "fog" -> FogDemo(onBack)
         "environment" -> EnvironmentDemo(onBack)
         // Interaction
@@ -279,6 +284,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "ar-terrain" -> ARTerrainAnchorDemo(onBack)
         "ar-rooftop" -> ARRooftopAnchorDemo(onBack)
         "ar-image-stabilization" -> ARImageStabilizationDemo(onBack)
+        "ar-orbital" -> OrbitalARDemo(onBack)
         // Fallback
         else -> PlaceholderDemo(id = id, onBack = onBack)
     }

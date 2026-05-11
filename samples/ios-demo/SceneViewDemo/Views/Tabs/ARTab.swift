@@ -6,14 +6,26 @@ import SceneViewSwift
 
 /// AR tab — place 3D models in your real-world space.
 ///
-/// Users can pick a model from the gallery, tap a surface to place it,
-/// then resize and rotate using gestures. Includes screenshot sharing.
+/// Liquid Glass overlay design (iOS 26+ Stitch spec):
+/// - Full-bleed AR camera underneath
+/// - Top-center: floating glass status pill ("Tap to place" / "N placed")
+/// - Top-right: glass exit button to dismiss the tab
+/// - Bottom: floating glass action bar with FAB "Pick model", Reset, Screenshot
 struct ARTab: View {
     @State private var placedCount = 0
     @State private var selectedModelIndex = 0
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showModelPicker = false
+    @State private var arViewID = UUID()
+
+    /// Increment to force-rebuild the ARSceneView, clearing every placed anchor.
+    /// We rebuild because there's no public `removeAllAnchors` on the wrapper.
+    private func resetScene() {
+        arViewID = UUID()
+        placedCount = 0
+        HapticManager.mediumTap()
+    }
 
     private let arModels: [(name: String, icon: String, asset: String, scale: Float)] = [
         ("Game Boy", "gamecontroller.fill", "game_boy_classic", 0.15),
@@ -28,39 +40,47 @@ struct ARTab: View {
         ("Tree Scene", "tree.fill", "tree_scene", 0.1),
     ]
 
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                #if !targetEnvironment(simulator)
-                arSceneView
-                    .ignoresSafeArea()
-                #else
-                simulatorPlaceholder
-                #endif
+    private var selectedModel: (name: String, icon: String, asset: String, scale: Float) {
+        arModels[selectedModelIndex]
+    }
 
-                VStack {
-                    statusPill
-                    Spacer()
-                    modelSelector
-                }
+    var body: some View {
+        ZStack {
+            #if !targetEnvironment(simulator)
+            arSceneView
+                .ignoresSafeArea()
+                .id(arViewID)
+            #else
+            simulatorPlaceholder
+                .ignoresSafeArea()
+            #endif
+
+            // Top status pill — centered horizontally, glass.
+            VStack {
+                statusPill
+                    .padding(.top, 8)
+                Spacer()
             }
-            .navigationTitle("AR View")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        shareARScreenshot()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .accessibilityLabel("Share AR screenshot")
-                }
+
+            // Bottom floating glass action bar.
+            VStack {
+                Spacer()
+                bottomActionBar
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
             }
-            .alert("AR Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "An unknown error occurred.")
-            }
+        }
+        .alert("AR Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        }
+        .sheet(isPresented: $showModelPicker) {
+            modelPickerSheet
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(28)
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -100,85 +120,192 @@ struct ARTab: View {
     // MARK: - Simulator placeholder
 
     private var simulatorPlaceholder: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "arkit")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text("AR requires a physical device")
-                .font(.headline)
-            Text("Run on iPhone or iPad to place 3D models in your space.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
-    }
-
-    // MARK: - Status pill
-
-    private var statusPill: some View {
-        Group {
-            if placedCount == 0 {
-                Text("Point at a surface, then tap to place \(arModels[selectedModelIndex].name)")
-            } else {
-                Text("\(placedCount) object\(placedCount == 1 ? "" : "s") placed \u{2014} tap to add more")
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.10, green: 0.10, blue: 0.18),
+                    Color(red: 0.18, green: 0.18, blue: 0.28),
+                ],
+                startPoint: .top, endPoint: .bottom
+            )
+            VStack(spacing: 16) {
+                Image(systemName: "arkit")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityHidden(true)
+                Text("AR requires a physical device")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("Run on iPhone or iPad to place 3D models in your space.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
             }
         }
-        .font(.caption)
-        .fontWeight(.medium)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .padding(.top, 8)
     }
 
-    // MARK: - Model selector
+    // MARK: - Glass status pill (top center)
 
-    private var modelSelector: some View {
-        VStack(spacing: 8) {
-            Text("Choose a model to place in your space")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.7))
+    private var statusPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: placedCount == 0 ? "hand.tap.fill" : "checkmark.circle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(placedCount == 0 ? .yellow : .green)
 
-            ScrollView(.horizontal, showsIndicators: false) {
+            Text(statusText)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(
+            Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+        .accessibilityLabel(statusText)
+    }
+
+    private var statusText: String {
+        if placedCount == 0 {
+            return "Tap a surface to place \(selectedModel.name)"
+        } else {
+            return "\(placedCount) placed \u{00B7} tap to add"
+        }
+    }
+
+    // MARK: - Bottom action bar
+
+    private var bottomActionBar: some View {
+        HStack(spacing: 10) {
+            // FAB "Pick model" — primary, takes most of the space.
+            Button {
+                showModelPicker = true
+                HapticManager.lightTap()
+            } label: {
                 HStack(spacing: 10) {
+                    Image(systemName: selectedModel.icon)
+                        .font(.title3)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Model")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(selectedModel.name)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
+            .accessibilityLabel("Pick model. Currently \(selectedModel.name)")
+
+            // Reset button (glass icon).
+            glassIconButton(systemImage: "arrow.counterclockwise", label: "Reset scene") {
+                resetScene()
+            }
+
+            // Screenshot button (glass icon).
+            glassIconButton(systemImage: "square.and.arrow.up", label: "Share AR screenshot") {
+                shareARScreenshot()
+                HapticManager.lightTap()
+            }
+        }
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 4)
+    }
+
+    private func glassIconButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .frame(width: 44, height: 44)
+                .foregroundStyle(.primary)
+        }
+        .buttonStyle(.plain)
+        .background(.regularMaterial, in: Circle())
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+        .accessibilityLabel(label)
+    }
+
+    // MARK: - Model picker sheet
+
+    private var modelPickerSheet: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 110), spacing: 12)],
+                    spacing: 12
+                ) {
                     ForEach(Array(arModels.enumerated()), id: \.offset) { index, model in
                         Button {
                             selectedModelIndex = index
                             HapticManager.selectionChanged()
+                            showModelPicker = false
                         } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: model.icon)
-                                    .font(.title3)
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.blue.opacity(0.28), Color.purple.opacity(0.15)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                    Image(systemName: model.icon)
+                                        .font(.system(size: 32, weight: .semibold))
+                                        .foregroundStyle(.tint)
+                                }
+                                .frame(height: 90)
+
                                 Text(model.name)
-                                    .font(.caption2)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.primary)
                                     .lineLimit(1)
                             }
-                            .frame(minWidth: 72)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 6)
+                            .padding(8)
                             .background(
-                                index == selectedModelIndex
-                                    ? AnyShapeStyle(.blue)
-                                    : AnyShapeStyle(.white.opacity(0.15))
+                                .regularMaterial,
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .foregroundStyle(.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .strokeBorder(
+                                        index == selectedModelIndex
+                                            ? Color.blue
+                                            : Color.primary.opacity(0.08),
+                                        lineWidth: index == selectedModelIndex ? 2 : 0.5
+                                    )
+                            )
                         }
-                        .accessibilityLabel("Place \(model.name)")
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Pick \(model.name)")
                         .accessibilityAddTraits(index == selectedModelIndex ? .isSelected : [])
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(16)
+            }
+            .navigationTitle("Pick a model")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { showModelPicker = false }
+                }
             }
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding()
     }
 
     // MARK: - Share

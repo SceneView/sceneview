@@ -9,10 +9,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -117,24 +125,69 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
         permissionLauncher.launch(toRequest.toTypedArray())
     }
 
-    // Permission gate — render a simple status UI until both permissions are
-    // resolved. ARSceneView is *not* composed in this branch, which keeps it
-    // from racing with our own permission request.
+    // Permission gate — render a status UI with Retry + Open Settings buttons.
+    // ARSceneView is *not* composed in this branch, which keeps it from racing
+    // with our own permission request. QA finding 2026-05-11: previously the gate
+    // showed only the error text → user was stuck with no way out except Back.
     if (!permissionsResolved || !cameraGranted || !fineLocationGranted) {
         DemoScaffold(title = "Streetscape Geometry", onBack = onBack) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = permissionDeniedReason ?: "Requesting permissions…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                Column(
                     modifier = Modifier
                         .padding(horizontal = 32.dp)
                         .background(
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                             shape = RoundedCornerShape(16.dp)
                         )
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                )
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = permissionDeniedReason ?: "Requesting permissions…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    if (permissionDeniedReason != null) {
+                        Spacer(
+                            modifier = Modifier.height(16.dp)
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(onClick = {
+                                // Retry: re-launch the system permission request. Useful when the user
+                                // hits "Don't allow" but later changes their mind without going to
+                                // Settings — Android will re-prompt up to twice before silent denial.
+                                val toRequest = buildList {
+                                    if (!cameraGranted) add(Manifest.permission.CAMERA)
+                                    if (!fineLocationGranted) add(Manifest.permission.ACCESS_FINE_LOCATION)
+                                }
+                                if (toRequest.isNotEmpty()) {
+                                    permissionDeniedReason = null
+                                    permissionsResolved = false
+                                    permissionLauncher.launch(toRequest.toTypedArray())
+                                }
+                            }) {
+                                Text("Retry")
+                            }
+                            Button(onClick = {
+                                // Open Settings: deep-link to the app's permission page so the
+                                // user can flip the toggle manually. Needed after a permanent
+                                // deny ("Don't ask again") since the launcher will be ignored.
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.fromParts("package", context.packageName, null)
+                                ).apply {
+                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            }) {
+                                Text("Open Settings")
+                            }
+                        }
+                    }
+                }
             }
         }
         return

@@ -25,21 +25,19 @@ val ALL_DEMOS = listOf(
     // 3D Basics
     DemoEntry("model-viewer", "Model Viewer", "Load and display 3D models", "3D Basics"),
     DemoEntry("geometry", "Geometry Primitives", "Cube, Sphere, Cylinder, Plane", "3D Basics"),
-    DemoEntry("animation", "Animation", "Play, pause, and control animations", "3D Basics"),
-    // Titles below match what each demo's DemoScaffold renders in the top bar —
-    // keeps the list label, navigation breadcrumbs and instrumentation tests
-    // aligned (#889).
-    DemoEntry("multi-model", "Multiple Models", "Multiple models in one scene", "3D Basics"),
+    DemoEntry("animation", "Auto Rotate", "Play, pause, and control animations", "3D Basics"),
+    DemoEntry("multi-model", "Multi Model", "Multiple models in one scene", "3D Basics"),
     // Lighting & Environment
-    DemoEntry("lighting", "Lighting", "Directional, point, and spot lights", "Lighting & Environment"),
+    DemoEntry("lighting", "Light Types", "Directional, point, and spot lights", "Lighting & Environment"),
+    DemoEntry("movable-light", "Movable Light", "Drag to orbit the light around the model", "Lighting & Environment"),
     DemoEntry("dynamic-sky", "Dynamic Sky", "Time-of-day sun simulation", "Lighting & Environment"),
     DemoEntry("fog", "Fog", "Atmospheric fog effects", "Lighting & Environment"),
     DemoEntry("environment", "Environment Gallery", "HDR environment switching", "Lighting & Environment"),
     // Content
     DemoEntry("text", "Text Nodes", "3D text in the scene", "Content"),
     DemoEntry("lines-paths", "Lines & Paths", "Line segments and polylines", "Content"),
-    DemoEntry("image", "Image Node", "Image planes in 3D space", "Content"),
-    DemoEntry("billboard", "Billboard Node", "Camera-facing quads", "Content"),
+    DemoEntry("image", "Image Planes", "Image planes in 3D space", "Content"),
+    DemoEntry("billboard", "Billboard", "Camera-facing quads", "Content"),
     DemoEntry("video", "Video", "Video playback on 3D surface", "Content"),
     // Interaction
     DemoEntry("camera-controls", "Camera Controls", "Orbit, fly, and free camera modes", "Interaction"),
@@ -50,7 +48,7 @@ val ALL_DEMOS = listOf(
     DemoEntry("physics", "Physics", "Gravity, collisions, rigid bodies", "Advanced"),
     DemoEntry("post-processing", "Post Processing", "SSAO, anti-aliasing, tone mapping", "Advanced"),
     DemoEntry("custom-mesh", "Custom Mesh", "Custom vertex and index buffers", "Advanced"),
-    DemoEntry("shape", "Shape Node", "Extruded 2D polygons", "Advanced"),
+    DemoEntry("shape", "All Shapes", "Extruded 2D polygons", "Advanced"),
     DemoEntry("reflection-probes", "Reflection Probes", "Local cubemap reflections", "Advanced"),
     DemoEntry("secondary-camera", "Camera Presets", "Picture-in-picture camera view", "Advanced"),
     DemoEntry("debug-overlay", "Debug Overlay", "Performance stats overlay", "Advanced"),
@@ -68,4 +66,5 @@ val ALL_DEMOS = listOf(
     DemoEntry("ar-terrain", "Terrain Anchors", "Geospatial anchor that snaps to outdoor terrain", "Augmented Reality"),
     DemoEntry("ar-rooftop", "Rooftop Anchors", "Geospatial anchor that snaps to building rooftops", "Augmented Reality"),
     DemoEntry("ar-image-stabilization", "Image Stabilization (EIS)", "Smooth shaky camera with one config flag", "Augmented Reality"),
+    DemoEntry("ar-orbital", "Orbital AR", "Models orbit around you in a personal solar system", "Augmented Reality"),
 )

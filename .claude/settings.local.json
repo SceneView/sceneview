@@ -27,6 +27,14 @@
       "mcp__stitch__create_project",
       "mcp__stitch__apply_design_system",
       "mcp__stitch__list_design_systems",
+      "mcp__stitch__list_projects",
+      "mcp__stitch__create_design_system",
+      "mcp__stitch__get_project",
+      "mcp__stitch__get_screen",
+      "mcp__stitch__update_design_system",
+      "mcp__stitch__create_design_system_from_design_md",
+      "mcp__stitch__edit_screens",
+      "mcp__stitch__upload_design_md",
       "mcp__claude-code__Bash",
       "mcp__claude-code__ToolSearch"
     ]

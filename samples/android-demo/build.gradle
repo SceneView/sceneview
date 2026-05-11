@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.roborazzi)
 }
 
@@ -16,7 +17,7 @@ android {
         minSdk 28
         targetSdk 36
         versionCode project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 350
-        versionName "4.0.9"
+        versionName "4.1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -37,6 +38,27 @@ android {
             }
         }
         manifestPlaceholders["arcoreApiKey"] = arcoreApiKey
+
+        // Inject the Sketchfab API key into BuildConfig so the demo's
+        // SketchfabService can authenticate against api.sketchfab.com without
+        // hard-coding a token in source. The key is read from one of:
+        //   1. SKETCHFAB_API_KEY environment variable (CI / store builds)
+        //   2. local.properties → sketchfab.api.key (developer machines)
+        //   3. fallback empty string (Sketchfab features stay disabled —
+        //      SketchfabConfig.apiKey returns null and the service throws
+        //      MissingApiKey).
+        // TODO V1.1: route requests via the mcp-gateway proxy so end-users
+        // never see the master key in the APK. See SketchfabConfig.kt.
+        def sketchfabApiKey = System.getenv("SKETCHFAB_API_KEY") ?: ""
+        if (sketchfabApiKey.isEmpty()) {
+            def localPropsFile = rootProject.file("local.properties")
+            if (localPropsFile.exists()) {
+                def localProps = new Properties()
+                localPropsFile.withInputStream { localProps.load(it) }
+                sketchfabApiKey = localProps.getProperty("sketchfab.api.key", "")
+            }
+        }
+        buildConfigField "String", "SKETCHFAB_API_KEY", "\"${sketchfabApiKey}\""
     }
 
     signingConfigs {
@@ -116,6 +138,12 @@ dependencies {
     // Google Play In-App Updates
     implementation libs.play.app.update
     implementation libs.play.app.update.ktx
+
+    // Sketchfab API client — OkHttp for network, kotlinx-serialization for JSON.
+    // Used by io.github.sceneview.demo.sketchfab.SketchfabService to stream
+    // models from api.sketchfab.com instead of bundling GLBs in the APK.
+    implementation libs.okhttp
+    implementation libs.kotlinx.serialization.json
 
     // Google Fused Location Provider — required by ARCore Geospatial mode
     // (Config.GeospatialMode.ENABLED) used by ARStreetscapeDemo. Without this

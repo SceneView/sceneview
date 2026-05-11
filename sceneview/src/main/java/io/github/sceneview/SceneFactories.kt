@@ -39,9 +39,31 @@ private val filamentInit: Unit = run {
 }
 
 const val DEFAULT_MAIN_LIGHT_COLOR_TEMPERATURE = 6_500.0f
-const val DEFAULT_MAIN_LIGHT_COLOR_INTENSITY = 100_000.0f
+
+/**
+ * Main directional light intensity (lux).
+ *
+ * Lowered from the previous photographic value of `100_000` (full noon sun) to `10_000` —
+ * closer to RealityKit's default sun on iOS — so default Filament renders no longer look
+ * washed out / blown out. Combined with the secondary fill light
+ * ([DEFAULT_FILL_LIGHT_COLOR_INTENSITY]), this yields a balanced 3-point–style key+fill
+ * setup out of the box. See audit `project_plan_v1_hybrid_2026-05-10`.
+ */
+const val DEFAULT_MAIN_LIGHT_COLOR_INTENSITY = 10_000.0f
 val DEFAULT_MAIN_LIGHT_COLOR = Colors.cct(DEFAULT_MAIN_LIGHT_COLOR_TEMPERATURE).toColor()
 val DEFAULT_MAIN_LIGHT_INTENSITY = DEFAULT_MAIN_LIGHT_COLOR_INTENSITY
+
+/**
+ * Secondary "fill" directional light — softens the shadows cast by the main light.
+ *
+ * Color temperature matches the main light (neutral 6500 K). Intensity is 30 % of the main
+ * light, matching the ratio used by RealityKit's default scene lighting (sun ~1000, fill ~300).
+ */
+const val DEFAULT_FILL_LIGHT_COLOR_TEMPERATURE = 6_500.0f
+const val DEFAULT_FILL_LIGHT_COLOR_INTENSITY = 3_000.0f
+val DEFAULT_FILL_LIGHT_COLOR = Colors.cct(DEFAULT_FILL_LIGHT_COLOR_TEMPERATURE).toColor()
+val DEFAULT_FILL_LIGHT_INTENSITY = DEFAULT_FILL_LIGHT_COLOR_INTENSITY
+
 val DEFAULT_OBJECT_POSITION = Position(0.0f, 0.0f, -4.0f)
 
 fun createEglContext(): EGLContext {
@@ -66,13 +88,27 @@ fun createView(engine: Engine): View = engine.createView().apply {
         enabled = false
     }
     antiAliasing = AntiAliasing.FXAA
+    // SSAO on by default — adds visible grounding under geometry crevices (toy_car, helmet)
+    // without artifacts on diffuse-only models. Validated 2026-05-11 on Pixel_7a GPU host.
     ambientOcclusionOptions = ambientOcclusionOptions.apply {
-        enabled = false
+        enabled = true
     }
+    // Subtle bloom on by default — strength 0.10 lifts metallic/emissive highlights
+    // (satin chrome, light filaments) but is invisible on diffuse-only assets, so it costs
+    // nothing on plain models. Push higher only for cinematic scenes.
+    bloomOptions = bloomOptions.apply {
+        enabled = true
+        strength = 0.1f
+    }
+    // Keep Filmic tone mapper as default. ACES was tested on 2026-05-11 and shifts PBR
+    // hero shots (DamagedHelmet) toward a cooler/desaturated film grade — fine for cinema
+    // but not the SDK's job to impose. Users can opt into ACES via `view.colorGrading`.
     colorGrading = ColorGrading.Builder()
         .toneMapper(ToneMapper.Filmic())
         .build(engine)
-    setShadowingEnabled(false)
+    // Shadows on by default — matches RealityKit on iOS and produces a more grounded look
+    // out of the box. Disable via `View.setShadowingEnabled(false)` when not needed.
+    setShadowingEnabled(true)
 }
 
 /**
@@ -130,6 +166,16 @@ fun createCameraNode(engine: Engine): CameraNode = DefaultCameraNode(engine)
 
 fun createMainLightNode(engine: Engine): LightNode = DefaultLightNode(engine)
 
+/**
+ * Creates the secondary "fill" directional light.
+ *
+ * Pairs with [createMainLightNode] to produce a soft key+fill setup similar to the default
+ * RealityKit lighting on iOS. The fill light is offset from the main light direction so it
+ * lifts the unlit side of objects without flattening them, and does not cast shadows
+ * (only the main light contributes shadows by default).
+ */
+fun createFillLightNode(engine: Engine): LightNode = DefaultFillLightNode(engine)
+
 fun createDefaultCameraManipulator(
     orbitHomePosition: Position? = null,
     targetPosition: Position? = null
@@ -167,7 +213,13 @@ fun createCollisionSystem(view: View) = CollisionSystem(view)
 class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     init {
         transform = io.github.sceneview.math.Transform(position = Position(0.0f, 0.0f, 1.0f))
-        setExposure(16.0f, 1.0f / 125.0f, 100.0f)
+        // Neutral, less photographic exposure (~EV 11.6).
+        // The previous setting (`f/16, 1/125 s, ISO 100` ≈ EV 15) is "sunny-16" — a real-world
+        // outdoor exposure that makes Filament renders look much darker than the iOS
+        // RealityKit defaults. Opening up the aperture, slowing the shutter and bumping
+        // the ISO produces a brighter, more predictable baseline that matches the
+        // RealityKit look out of the box.
+        setExposure(12.0f, 1.0f / 200.0f, 200.0f)
     }
 }
 
@@ -179,5 +231,26 @@ class DefaultLightNode(engine: Engine) : LightNode(
         intensity(DEFAULT_MAIN_LIGHT_COLOR_INTENSITY)
         direction(0.0f, -1.0f, 0.0f)
         castShadows(true)
+    }
+)
+
+/**
+ * Default secondary "fill" directional light.
+ *
+ * Direction is offset from the main light so the unlit side of objects gets a soft kick,
+ * matching the RealityKit-style key+fill look. Does not cast shadows (only the main light
+ * contributes shadows by default).
+ */
+class DefaultFillLightNode(engine: Engine) : LightNode(
+    engine = engine,
+    type = LightManager.Type.DIRECTIONAL,
+    apply = {
+        color(DEFAULT_FILL_LIGHT_COLOR)
+        intensity(DEFAULT_FILL_LIGHT_COLOR_INTENSITY)
+        // Offset direction: lights the side opposite to the main light from a slightly
+        // higher angle. The main light points straight down (0, -1, 0); this fill comes
+        // from upper-back-left to lift shadow-side faces without flattening the model.
+        direction(0.5f, -0.5f, 0.5f)
+        castShadows(false)
     }
 )

@@ -161,10 +161,14 @@ public struct LightNode: Sendable {
 
     /// Configures a shadow for directional lights.
     ///
-    /// Note: RealityKit's `DirectionalLightComponent.Shadow` does not expose a `color`
-    /// property. This method ensures a shadow is configured if not already present.
+    /// - Important: **The `color` parameter is ignored on iOS.** RealityKit's
+    ///   `DirectionalLightComponent.Shadow` does not expose a color property as of Xcode 26.x.
+    ///   This method ensures a shadow is configured if not already present, but the color value
+    ///   is discarded. Kept for Android API parity. Use `castsShadow(_:)` to enable/disable
+    ///   shadows; use `shadowMaximumDistance(_:)` to tune shadow range.
     ///
-    /// - Parameter color: Reserved for future use. Currently ignored.
+    /// - Parameter color: Reserved for future use. **Ignored.**
+    @available(*, deprecated, message: "Color parameter ignored on iOS — RealityKit's DirectionalLightComponent.Shadow does not support shadow color. Use castsShadow(_:) and shadowMaximumDistance(_:) instead.")
     @discardableResult
     public func shadowColor(_ color: LightNode.Color) -> LightNode {
         if let directional = entity as? DirectionalLight {

@@ -115,10 +115,15 @@ import io.github.sceneview.node.findActivity
  * @param environmentLoader     Loader for HDR/KTX environments. Use [rememberEnvironmentLoader].
  * @param view                  Filament [View] (one per window). Use [rememberView].
  * @param isOpaque              Whether the render target is opaque. Default `true`.
+ * @param renderQuality         One-line preset applied to `view` ([RenderQuality.Default],
+ *                              [RenderQuality.Cinematic], or [RenderQuality.Performance]).
  * @param renderer              Filament [Renderer]. Use [rememberRenderer].
  * @param scene                 Filament [Scene] graph, shareable across views. Use [rememberScene].
  * @param environment           IBL + skybox environment. Use [rememberEnvironment].
  * @param mainLightNode         Primary directional light (required for shadows).
+ * @param fillLightNode         Secondary fill light (softer ambient — opposite-side directional
+ *                              at ~30% main intensity). Use [rememberFillLightNode] or pass `null`
+ *                              for a single-light setup.
  * @param cameraNode            Active rendering camera. Use [rememberCameraNode].
  * @param collisionSystem       Hit-testing and collision system. Use [rememberCollisionSystem].
  * @param cameraManipulator     Orbit/pan/zoom camera controller. Use [rememberCameraManipulator].
@@ -168,6 +173,14 @@ fun SceneView(
      */
     isOpaque: Boolean = true,
     /**
+     * One-line rendering quality preset applied to [view]. Default [RenderQuality.Default] matches
+     * the out-of-the-box `SceneView` settings. Use [RenderQuality.Cinematic] for hero shots on
+     * capable devices, or [RenderQuality.Performance] on low-end Android or AR backgrounds where
+     * the GPU budget is constrained. Individual [view] settings can still be tweaked after the
+     * preset is applied.
+     */
+    renderQuality: RenderQuality = RenderQuality.Default,
+    /**
      * A [Renderer] instance represents an operating system's window.
      * Typically, applications create a [Renderer] per window.
      */
@@ -185,6 +198,12 @@ fun SceneView(
      * We highly recommend adding an [IndirectLight] as well.
      */
     mainLightNode: LightNode? = rememberMainLightNode(engine),
+    /**
+     * Optional secondary "fill" directional light that softens the shadows produced by
+     * [mainLightNode]. Default mirrors iOS RealityKit's two-light setup (main + fill at 30%).
+     * Pass `null` for a single-light scene.
+     */
+    fillLightNode: LightNode? = rememberFillLightNode(engine),
     /**
      * Represents a virtual camera, which determines the perspective through which the scene is
      * viewed.
@@ -243,6 +262,7 @@ fun SceneView(
         view.camera = cameraNode.camera
         cameraNode.collisionSystem = collisionSystem
         cameraNode.setView(view)
+        view.applyRenderQuality(renderQuality)
     }
 
     // ── Camera node — registered so children (HUD nodes) are tracked by the scene manager ─────────
@@ -271,6 +291,18 @@ fun SceneView(
             prev?.let { nodeManager.removeNode(it) }
             mainLightNode?.let { nodeManager.addNode(it) }
             prevMainLightRef.set(mainLightNode)
+        }
+    }
+
+    // ── Fill light node ───────────────────────────────────────────────────────────────────────────
+
+    val prevFillLightRef = remember { AtomicReference<LightNode?>(null) }
+    SideEffect {
+        val prev = prevFillLightRef.get()
+        if (prev != fillLightNode) {
+            prev?.let { nodeManager.removeNode(it) }
+            fillLightNode?.let { nodeManager.addNode(it) }
+            prevFillLightRef.set(fillLightNode)
         }
     }
 
@@ -906,6 +938,35 @@ fun rememberMainLightNode(
 }
 
 /**
+ * Creates and remembers a secondary "fill" [LightNode] that softens shadows produced by the
+ * main directional light.
+ *
+ * Mirrors iOS RealityKit's default two-light setup (one bright sun + one soft fill at ~30%
+ * intensity from the opposite side). Combine with [rememberMainLightNode] for a balanced look
+ * with less contrast on the shadow side of objects.
+ *
+ * ```kotlin
+ * SceneView(
+ *     mainLightNode = rememberMainLightNode(engine),
+ *     fillLightNode = rememberFillLightNode(engine) {
+ *         intensity = 5_000.0f  // brighter fill if scene needs it
+ *     }
+ * )
+ * ```
+ *
+ * @param engine The Filament [Engine] that owns the light.
+ * @param apply  Configuration block applied after creation (intensity, direction, color, etc.).
+ * @return A [LightNode] destroyed on disposal.
+ */
+@Composable
+fun rememberFillLightNode(
+    engine: Engine,
+    apply: LightNode.() -> Unit = {}
+) = rememberNode {
+    createFillLightNode(engine).apply(apply)
+}
+
+/**
  * Creates and remembers an [Environment] from an [EnvironmentLoader].
  *
  * An `Environment` bundles a Filament `IndirectLight` (image-based lighting) with an optional
@@ -1237,10 +1298,12 @@ fun Scene(
     environmentLoader: EnvironmentLoader = rememberEnvironmentLoader(engine),
     view: View = rememberView(engine),
     isOpaque: Boolean = true,
+    renderQuality: RenderQuality = RenderQuality.Default,
     renderer: Renderer = rememberRenderer(engine),
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberEnvironment(environmentLoader, isOpaque = isOpaque),
     mainLightNode: LightNode? = rememberMainLightNode(engine),
+    fillLightNode: LightNode? = rememberFillLightNode(engine),
     cameraNode: CameraNode = rememberCameraNode(engine),
     collisionSystem: CollisionSystem = rememberCollisionSystem(view),
     cameraManipulator: CameraGestureDetector.CameraManipulator? = rememberCameraManipulator(
@@ -1262,10 +1325,12 @@ fun Scene(
     environmentLoader = environmentLoader,
     view = view,
     isOpaque = isOpaque,
+    renderQuality = renderQuality,
     renderer = renderer,
     scene = scene,
     environment = environment,
     mainLightNode = mainLightNode,
+    fillLightNode = fillLightNode,
     cameraNode = cameraNode,
     collisionSystem = collisionSystem,
     cameraManipulator = cameraManipulator,

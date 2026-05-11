@@ -1,216 +1,252 @@
 import SwiftUI
 
-/// About tab -- app information, features, and links.
+/// About tab — Liquid Glass card layout (iOS 26+ Stitch spec).
+///
+/// Hero logo + version pill, then a series of `.regularMaterial` glass cards
+/// (Open Source, Docs, GitHub, Sponsor, Credits), a tinted "Star on GitHub"
+/// CTA, and a footer with attribution.
 struct AboutTab: View {
+    private static let version: String = {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }()
+
     var body: some View {
         NavigationStack {
-            List {
-                heroSection
-                featuresSection
-                capabilitiesSection
-                tipsSection
-                linksSection
-                creditsSection
+            ScrollView {
+                LazyVStack(spacing: 20) {
+                    heroCard
+                    aboutCards
+                    starCTA
+                    footer
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
             .navigationTitle("About")
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Hero
 
-    private var heroSection: some View {
-        Section {
-            VStack(spacing: 12) {
+    private var heroCard: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                LinearGradient(
+                    colors: [Color.blue.opacity(0.35), Color.purple.opacity(0.25)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 Image(systemName: "cube.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .accessibilityHidden(true)
+                    .font(.system(size: 56, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .blue.opacity(0.4), radius: 12)
+            }
+            .frame(width: 110, height: 110)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .accessibilityHidden(true)
 
-                Text("3D & AR Explorer")
-                    .font(.title).bold()
+            Text("SceneView")
+                .font(.largeTitle.weight(.bold))
 
-                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                    .background(.fill.tertiary)
-                    .clipShape(Capsule())
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+                Text("v\(Self.version)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
 
-                Text("Explore stunning 3D models and place them\nin your real-world space with augmented reality.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+            Text("3D & AR for Jetpack Compose, SwiftUI, and the Web.\nDeclarative, AI-friendly, open source.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal, 16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+    }
+
+    // MARK: - About cards
+
+    private var aboutCards: some View {
+        VStack(spacing: 12) {
+            AboutCard(
+                icon: "heart.circle.fill",
+                iconColor: .pink,
+                title: "Open Source",
+                subtitle: "Apache 2.0 — free for any project, forever",
+                trailing: nil,
+                action: nil
+            )
+
+            AboutCard(
+                icon: "book.fill",
+                iconColor: .blue,
+                title: "Documentation",
+                subtitle: "Guides, API reference, recipes",
+                trailing: .link,
+                url: URL(string: "https://sceneview.github.io")
+            )
+
+            AboutCard(
+                icon: "chevron.left.forwardslash.chevron.right",
+                iconColor: .indigo,
+                title: "GitHub",
+                subtitle: "Source, issues, releases",
+                trailing: .link,
+                url: URL(string: "https://github.com/sceneview/sceneview")
+            )
+
+            AboutCard(
+                icon: "sparkles",
+                iconColor: .orange,
+                title: "3D Playground",
+                subtitle: "Try every feature in the browser",
+                trailing: .link,
+                url: URL(string: "https://sceneview.github.io/playground.html")
+            )
+
+            AboutCard(
+                icon: "heart.fill",
+                iconColor: .red,
+                title: "Sponsor",
+                subtitle: "Help keep the project free & active",
+                trailing: .link,
+                url: URL(string: "https://github.com/sponsors/sceneview")
+            )
+
+            AboutCard(
+                icon: "person.2.fill",
+                iconColor: .teal,
+                title: "Credits",
+                subtitle: "Built with RealityKit, ARKit, SwiftUI",
+                trailing: nil,
+                action: nil
+            )
+        }
+    }
+
+    // MARK: - Star CTA
+
+    private var starCTA: some View {
+        Link(destination: URL(string: "https://github.com/sceneview/sceneview")!) {
+            HStack(spacing: 10) {
+                Image(systemName: "star.fill")
+                    .font(.title3)
+                Text("Star on GitHub")
+                    .font(.headline)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            .padding(.vertical, 14)
+            .background(.tint, in: Capsule())
+            .foregroundStyle(.white)
         }
+        .accessibilityLabel("Star SceneView on GitHub")
     }
 
-    private var featuresSection: some View {
-        Section("What You Can Do") {
-            FeatureRow(
-                icon: "cube.fill",
-                title: "Browse 3D Models",
-                description: "Explore a curated gallery of vehicles, creatures, objects, and scenes",
-                color: .blue
-            )
-            FeatureRow(
-                icon: "arkit",
-                title: "Augmented Reality",
-                description: "Place any model in your real-world space using your camera",
-                color: .green
-            )
-            FeatureRow(
-                icon: "heart.fill",
-                title: "Save Favorites",
-                description: "Mark your favorite models for quick access anytime",
-                color: .red
-            )
-            FeatureRow(
-                icon: "square.and.arrow.up",
-                title: "Share",
-                description: "Capture and share screenshots of your 3D and AR scenes",
-                color: .orange
-            )
-            FeatureRow(
-                icon: "hand.draw.fill",
-                title: "Interactive Controls",
-                description: "Pinch to zoom, drag to orbit, and rotate models freely",
-                color: .purple
-            )
-        }
-    }
+    // MARK: - Footer
 
-    private var capabilitiesSection: some View {
-        Section("3D Capabilities") {
-            CapabilityRow(name: "3D Models", detail: "USDZ format with animations")
-            CapabilityRow(name: "Materials", detail: "Physically-based rendering (PBR)")
-            CapabilityRow(name: "Lighting", detail: "Directional, point & spot lights")
-            CapabilityRow(name: "Environments", detail: "HDR image-based lighting presets")
-            CapabilityRow(name: "Physics", detail: "Dynamic, static & kinematic bodies")
-            CapabilityRow(name: "Custom Geometry", detail: "Procedural shapes and meshes")
-        }
-    }
-
-    private var tipsSection: some View {
-        Section("Tips") {
-            TipRow(
-                icon: "hand.pinch.fill",
-                text: "Pinch with two fingers to zoom in and out on 3D models"
-            )
-            TipRow(
-                icon: "hand.draw.fill",
-                text: "Drag to orbit around the model and see it from every angle"
-            )
-            TipRow(
-                icon: "iphone.radiowaves.left.and.right",
-                text: "In AR mode, slowly scan your surroundings to detect surfaces"
-            )
-            TipRow(
-                icon: "hand.tap.fill",
-                text: "Tap any detected surface to place the selected model"
-            )
-        }
-    }
-
-    private var linksSection: some View {
-        Section("Learn More") {
-            Link(destination: URL(string: "https://sceneview.github.io")!) {
-                Label("Website", systemImage: "globe")
+    private var footer: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                Text("Made with")
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.red)
+                Text("by Thomas Gorisse")
             }
-            .accessibilityLabel("Visit website")
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
-            Link(destination: URL(string: "https://sceneview.github.io/playground.html")!) {
-                Label("3D Playground", systemImage: "play.fill")
-            }
-            .accessibilityLabel("Open 3D Playground in browser")
-
-            Link(destination: URL(string: "https://github.com/sceneview/sceneview")!) {
-                Label("Open Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
-            }
-            .accessibilityLabel("View source code on GitHub")
-        }
-    }
-
-    private var creditsSection: some View {
-        Section {
-            Text("3D & AR Explorer \u{2014} Powered by SceneView")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Built with RealityKit, ARKit, and SwiftUI.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Open source under Apache License 2.0.")
+            Text("and the SceneView contributors")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .padding(.top, 8)
     }
 }
 
-// MARK: - Row components
+// MARK: - Liquid Glass row card
 
-private struct FeatureRow: View {
+private struct AboutCard: View {
+    enum Trailing {
+        case link
+        case chevron
+    }
+
     let icon: String
+    let iconColor: Color
     let title: String
-    let description: String
-    let color: Color
+    let subtitle: String
+    let trailing: Trailing?
+    var url: URL? = nil
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(color)
-                .frame(width: 32)
-                .accessibilityHidden(true)
+        if let url = url {
+            Link(destination: url) {
+                cardContent
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(title): \(subtitle). Opens \(url.host ?? "link")")
+        } else if let action = action {
+            Button(action: action) { cardContent }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(title): \(subtitle)")
+        } else {
+            cardContent
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(title): \(subtitle)")
+        }
+    }
+
+    private var cardContent: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(iconColor.opacity(0.18))
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(iconColor)
+            }
+            .frame(width: 44, height: 44)
+            .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline).bold()
-                Text(description).font(.caption).foregroundStyle(.secondary)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 4)
+
+            if let trailing = trailing {
+                Image(systemName: trailing == .link ? "arrow.up.right" : "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct CapabilityRow: View {
-    let name: String
-    let detail: String
-
-    var body: some View {
-        HStack {
-            Text(name)
-                .font(.subheadline)
-            Spacer()
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(name): \(detail)")
-    }
-}
-
-private struct TipRow: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(.blue)
-                .frame(width: 24)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
     }
 }
