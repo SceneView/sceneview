@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — iOS V1 honest + Android rendering uplift + Sketchfab streaming scaffolds + Claude Code plugin marketplace
+## v4.1.0 — iOS V1 honest + Android rendering uplift + Sketchfab streaming + Claude Code plugin marketplace (2026-05-11)
 
 ### ⚠️ BREAKING — Android render defaults change visual look out-of-the-box
 
