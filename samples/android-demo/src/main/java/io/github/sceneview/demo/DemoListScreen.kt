@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun DemoListScreen(onDemoClick: (String) -> Unit) {
+fun DemoListScreen(
+    onDemoClick: (String) -> Unit,
+    onAboutClick: () -> Unit = {},
+) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val grouped = remember {
         DEMO_CATEGORIES.map { cat ->
@@ -39,6 +46,14 @@ fun DemoListScreen(onDemoClick: (String) -> Unit) {
         topBar = {
             LargeTopAppBar(
                 title = { Text("SceneView") },
+                actions = {
+                    IconButton(onClick = onAboutClick) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = "About",
+                        )
+                    }
+                },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,

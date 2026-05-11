@@ -196,12 +196,18 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
         popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
     ) {
         composable("list") {
-            DemoListScreen(onDemoClick = { id -> navController.navigate("demo/$id") })
+            DemoListScreen(
+                onDemoClick = { id -> navController.navigate("demo/$id") },
+                onAboutClick = { navController.navigate("about") },
+            )
         }
         composable("demo/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: return@composable
             val onBack: () -> Unit = { navController.popBackStack() }
             DemoRouter(id = id, onBack = onBack)
+        }
+        composable("about") {
+            AboutScreen(onBack = { navController.popBackStack() })
         }
     }
 }

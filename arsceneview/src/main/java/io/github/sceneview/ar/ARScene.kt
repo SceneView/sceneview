@@ -307,9 +307,23 @@ fun ARSceneView(
      */
     onSessionPaused: ((session: Session) -> Unit)? = null,
     /**
-     * Invoked when an ARCore error occurred.
+     * Invoked when an ARCore error occurred during session creation / resume / configuration
+     * (missing ARCore install, permission denied, device-unsupported, etc.).
+     *
+     * Playback-dataset failures (`PlaybackFailedException` or any exception thrown by
+     * [Session.setPlaybackDataset]) are routed here ONLY when [onPlaybackFailed] is `null`.
+     * Set [onPlaybackFailed] for fine-grained handling of "bad MP4 path" vs "AR unavailable".
      */
     onSessionFailed: ((exception: Exception) -> Unit)? = null,
+    /**
+     * Optional dedicated callback for failures that originate from the
+     * [playbackDataset] binding — typically `PlaybackFailedException` from ARCore when the
+     * MP4 cannot be opened, parsed, or already has an active recording.
+     *
+     * When `null` (default), playback failures fall through to [onSessionFailed] for
+     * backwards compatibility.
+     */
+    onPlaybackFailed: ((exception: Exception) -> Unit)? = null,
     /**
      * Updates of the state of the ARCore system.
      * Invoked once per [Frame] immediately before the Scene is updated.
@@ -362,6 +376,7 @@ fun ARSceneView(
     val onSessionResumedRef = remember { AtomicReference(onSessionResumed) }
     val onSessionPausedRef = remember { AtomicReference(onSessionPaused) }
     val onSessionFailedRef = remember { AtomicReference(onSessionFailed) }
+    val onPlaybackFailedRef = remember { AtomicReference(onPlaybackFailed) }
     val onSessionUpdatedRef = remember { AtomicReference(onSessionUpdated) }
     val onTrackingFailureChangedRef = remember { AtomicReference(onTrackingFailureChanged) }
     val sessionConfigurationRef = remember { AtomicReference(sessionConfiguration) }
@@ -372,6 +387,7 @@ fun ARSceneView(
         onSessionResumedRef.set(onSessionResumed)
         onSessionPausedRef.set(onSessionPaused)
         onSessionFailedRef.set(onSessionFailed)
+        onPlaybackFailedRef.set(onPlaybackFailed)
         onSessionUpdatedRef.set(onSessionUpdated)
         onTrackingFailureChangedRef.set(onTrackingFailureChanged)
         sessionConfigurationRef.set(sessionConfiguration)
@@ -398,11 +414,13 @@ fun ARSceneView(
                     try {
                         session.setPlaybackDataset(file.absolutePath)
                     } catch (e: PlaybackFailedException) {
-                        onSessionFailedRef.get()?.invoke(e)
+                        // Prefer the dedicated playback callback when wired (audit #876),
+                        // fall back to onSessionFailed for backwards compatibility.
+                        (onPlaybackFailedRef.get() ?: onSessionFailedRef.get())?.invoke(e)
                     } catch (e: Exception) {
                         // Defensive — ARCore may throw IllegalStateException if the session
                         // has already been resumed elsewhere. Don't crash; surface to caller.
-                        onSessionFailedRef.get()?.invoke(e)
+                        (onPlaybackFailedRef.get() ?: onSessionFailedRef.get())?.invoke(e)
                     }
                 }
                 sessionCameraConfigRef.get()?.let { session.cameraConfig = it(session) }

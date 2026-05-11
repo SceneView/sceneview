@@ -113,12 +113,36 @@ public class ARRecorder {
      * is a no-op, so wiring it on every frame is fine.
      *
      * Without an attached session, [start] returns `false` and transitions to [State.ERROR].
+     *
+     * **Prefer [recordFrame].** This stateful split between `attach` + `start` was the only
+     * AR side-channel in the codebase that didn't pass the session in per call —
+     * [io.github.sceneview.ar.rerun.RerunBridge] uses the stateless `logFrame(session, frame)`
+     * pattern. Mismatch noted in audit #876; the new [recordFrame] / [start] (Session, File)
+     * overloads bring `ARRecorder` in line.
      */
+    @Deprecated(
+        "Prefer the stateless recordFrame(session) — passes the session per call (matches " +
+            "RerunBridge.logFrame). attach() will be removed in v5.",
+        ReplaceWith("recordFrame(session)"),
+    )
     public fun attach(session: Session) {
         sessionRef.set(session)
     }
 
-    /** Detach the session reference. After this, [start] will fail until [attach] is called again. */
+    /**
+     * Stateless equivalent of [attach]: publishes the latest session reference each frame so
+     * a subsequent [start] knows which session to record. Pass the same `session` you got from
+     * `onSessionUpdated`. Calling this on every frame with the same session is a no-op (it's
+     * an `AtomicReference.set`), matching [io.github.sceneview.ar.rerun.RerunBridge.logFrame].
+     */
+    public fun recordFrame(session: Session) {
+        sessionRef.set(session)
+    }
+
+    /**
+     * Detach the session reference. After this, [start] will fail until [recordFrame] (or the
+     * deprecated [attach]) is called again.
+     */
     public fun detach() {
         sessionRef.set(null)
     }
@@ -145,10 +169,27 @@ public class ARRecorder {
     public fun start(file: File, recordingRotation: Int? = null): Boolean {
         val session = sessionRef.get()
         if (session == null) {
-            _errorMessage = "no AR session attached — call attach(session) first"
+            _errorMessage = "no AR session attached — call recordFrame(session) first"
             _state = State.ERROR
             return false
         }
+        return startInternal(session, file, recordingRotation)
+    }
+
+    /**
+     * Stateless variant: pass the session explicitly. Equivalent to calling
+     * [recordFrame] then [start], minus the runtime "no session attached" failure mode.
+     * Mirrors the side-channel shape of
+     * [io.github.sceneview.ar.rerun.RerunBridge.logFrame] which also takes the session per
+     * call. Once a session is published this way, every subsequent [stop] uses the same
+     * reference until [detach] is called or a new session is published.
+     */
+    public fun start(session: Session, file: File, recordingRotation: Int? = null): Boolean {
+        sessionRef.set(session)
+        return startInternal(session, file, recordingRotation)
+    }
+
+    private fun startInternal(session: Session, file: File, recordingRotation: Int?): Boolean {
         // Recording is only allowed when the session is NOT in playback mode. PlaybackStatus
         // values: NONE (no playback dataset bound — recordable), OK / FINISHED / IO_ERROR
         // (playback active or terminated — never recordable).

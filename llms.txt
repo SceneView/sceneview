@@ -1452,13 +1452,11 @@ fun ARRecord() {
 
     ARSceneView(
         modifier = Modifier.fillMaxSize(),
-        // Wire attach() ONLY through onSessionUpdated. The recorder publishes the
-        // latest Session via an AtomicReference (cheap), and the same Session
-        // instance survives Activity pause/resume — the swap only happens on full
-        // composable disposal (e.g. key() remount or navigating away and back),
-        // and onSessionUpdated re-fires on the new Session naturally. No need to
-        // also wire onSessionCreated.
-        onSessionUpdated = { session, _ -> recorder.attach(session) }
+        // Stateless side-channel — pass the session per frame, exactly like
+        // RerunBridge.logFrame. The recorder publishes the latest reference
+        // through an AtomicReference (cheap), and the same Session instance
+        // survives Activity pause/resume.
+        onSessionUpdated = { session, _ -> recorder.recordFrame(session) }
     )
 }
 ```
