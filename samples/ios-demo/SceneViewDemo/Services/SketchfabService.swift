@@ -188,7 +188,14 @@ actor SketchfabService {
         }
         do {
             return try decoder.decode(T.self, from: data)
+        } catch let decodingError as DecodingError {
+            // Log the actual decode failure so schema drift is debuggable —
+            // without this, every API change shows up as a generic
+            // "invalid response" with no clue what field broke.
+            print("[Sketchfab] DecodingError on \(path): \(decodingError)")
+            throw SketchfabError.invalidResponse
         } catch {
+            print("[Sketchfab] Decode failed on \(path): \(error)")
             throw SketchfabError.invalidResponse
         }
     }

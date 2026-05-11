@@ -50,6 +50,7 @@ struct OrbitalARDemo: View {
 
     @State private var loadedNodes: [Int: ModelNode] = [:]
     @State private var anchorAdded = false
+    @State private var orbitTimer: Timer?
 
     var body: some View {
         ZStack {
@@ -67,6 +68,10 @@ struct OrbitalARDemo: View {
         }
         .navigationTitle("Orbital AR")
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            orbitTimer?.invalidate()
+            orbitTimer = nil
+        }
     }
 
     // MARK: - AR Scene
@@ -117,6 +122,8 @@ struct OrbitalARDemo: View {
     // MARK: - Animation tick
 
     private func startTicker() {
+        // Invalidate any prior timer (e.g. session re-start) to avoid stacking ticks.
+        orbitTimer?.invalidate()
         let start = Date()
         let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
             let now = Date().timeIntervalSince(start)
@@ -129,6 +136,7 @@ struct OrbitalARDemo: View {
             }
         }
         RunLoop.main.add(timer, forMode: .common)
+        orbitTimer = timer
     }
 
     private func position(for planet: Planet, time: Float) -> SIMD3<Float> {

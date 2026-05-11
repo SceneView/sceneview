@@ -856,18 +856,14 @@ private struct FilterChip: View {
                 isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.tint.opacity(0.12)),
                 in: Capsule()
             )
-            .foregroundStyle(isOn ? .white : .tint)
+            .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.tint))
             .overlay(
-                Capsule().strokeBorder(isOn ? Color.clear : Color.tint.opacity(0.0))
+                Capsule().strokeBorder(Color.clear)
             )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(label) filter, \(isOn ? "on" : "off")")
     }
-}
-
-extension Color {
-    static var tint: Color { .blue }
 }
 
 // MARK: - Category chip

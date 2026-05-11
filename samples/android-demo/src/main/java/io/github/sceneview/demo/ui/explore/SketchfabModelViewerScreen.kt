@@ -66,7 +66,10 @@ import io.github.sceneview.demo.ui.explore.components.AsyncNetworkImage
 import io.github.sceneview.demo.ui.explore.components.formattedFaceCount
 import io.github.sceneview.demo.ui.explore.components.preferredThumbnailUrl
 import io.github.sceneview.demo.ui.explore.components.primaryTagDisplay
+import com.google.android.filament.Engine
 import io.github.sceneview.environment.Environment
+import io.github.sceneview.loaders.EnvironmentLoader
+import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
@@ -99,6 +102,15 @@ fun SketchfabModelViewerScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var stage by remember(model.uid) { mutableStateOf<Stage>(Stage.Preview) }
 
+    // Hoist Engine + loaders ABOVE the Crossfade so the Filament engine survives
+    // stage transitions. Previously every Crossfade swap (Preview → Downloading
+    // → Rendering) tore down and recreated the Engine inside RenderContent
+    // (200-400 ms freeze + black flash). With the engine remembered here it
+    // outlives the crossfade tween and only releases when the sheet closes.
+    val engine = rememberEngine()
+    val modelLoader = rememberModelLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -124,7 +136,13 @@ fun SketchfabModelViewerScreen(
                     onReady = { file -> stage = Stage.Rendering(file) },
                     onError = { stage = Stage.Error(it) },
                 )
-                is Stage.Rendering -> RenderContent(file = s.file, model = model)
+                is Stage.Rendering -> RenderContent(
+                    file = s.file,
+                    model = model,
+                    engine = engine,
+                    modelLoader = modelLoader,
+                    environmentLoader = environmentLoader,
+                )
                 is Stage.Error -> ErrorContent(message = s.message, onRetry = { stage = Stage.Preview })
             }
         }
@@ -368,10 +386,13 @@ private fun DownloadingContent(
  *    blend) for the "Apple Store" framing.
  */
 @Composable
-private fun RenderContent(file: File, model: SketchfabModel) {
-    val engine = rememberEngine()
-    val modelLoader = rememberModelLoader(engine)
-    val environmentLoader = rememberEnvironmentLoader(engine)
+private fun RenderContent(
+    file: File,
+    model: SketchfabModel,
+    engine: Engine,
+    modelLoader: ModelLoader,
+    environmentLoader: EnvironmentLoader,
+) {
     // `rememberModelInstance` accepts asset paths or URIs; we pass a `file://`
     // URI so Filament reads from the local on-disk cache without re-decoding
     // through the asset pipeline.

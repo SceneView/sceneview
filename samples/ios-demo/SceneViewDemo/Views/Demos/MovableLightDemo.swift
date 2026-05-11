@@ -27,6 +27,11 @@ struct MovableLightDemo: View {
     @State private var loadedModel: ModelNode?
     @State private var isLoading: Bool = true
     @State private var loadError: String?
+    // Hold references to the live entities so drag gestures can mutate their
+    // position directly (avoids `.id()`-based scene rebuild at every pixel of
+    // drag, which froze the rendering 200-400 ms per frame).
+    @State private var lightEntityRef: Entity?
+    @State private var markerEntityRef: Entity?
 
     /// Fixed orbit radius. ~1.5 m sits the light close enough to the model that
     /// the specular highlight is sharp and clearly tracks the cursor, but far
@@ -92,6 +97,8 @@ struct MovableLightDemo: View {
                 )
                 userLight.entity.position = lightPosition
                 root.addChild(userLight.entity)
+                // Stash for direct mutation by the drag gesture (no scene rebuild).
+                DispatchQueue.main.async { lightEntityRef = userLight.entity }
 
                 // Yellow unlit marker sphere — unlit so it always reads as
                 // self-emissive regardless of where *the* light is.
@@ -102,13 +109,16 @@ struct MovableLightDemo: View {
                     )
                     marker.entity.position = lightPosition
                     root.addChild(marker.entity)
+                    DispatchQueue.main.async { markerEntityRef = marker.entity }
+                } else {
+                    DispatchQueue.main.async { markerEntityRef = nil }
                 }
             }
-            // The .id() bumps on every state change so the RealityView rebuilds
-            // — required because the imperative builder runs only once per
-            // identity. Including all three reactive states in the key keeps
-            // intensity/visibility/light-pos changes live.
-            .id("movable-\(azimuth)-\(elevation)-\(intensity)-\(showLightSource)-\(loadedModel != nil)")
+            // Identity only depends on inputs that need a real rebuild (model
+            // load, intensity, marker visibility). Azimuth/elevation drive a
+            // direct entity mutation below, so they MUST stay out of `.id`
+            // — including them caused a full SceneView teardown per drag pixel.
+            .id("movable-\(intensity)-\(showLightSource)-\(loadedModel != nil)")
             .ignoresSafeArea()
 
             // Transparent overlay that captures drag gestures *before* SceneView
@@ -129,6 +139,10 @@ struct MovableLightDemo: View {
                             elevation -= dy * sensitivity
                             elevation = min(max(elevation, minElevation), maxElevation)
                             lastDragTranslation = value.translation
+                            // Direct entity mutation — no SceneView rebuild.
+                            let pos = lightPosition
+                            lightEntityRef?.position = pos
+                            markerEntityRef?.position = pos
                         }
                         .onEnded { _ in
                             lastDragTranslation = .zero

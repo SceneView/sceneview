@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -96,7 +97,7 @@ fun ExploreTabScreen(
     var feedsError by remember { mutableStateOf<String?>(null) }
     var loadingFeeds by remember { mutableStateOf(false) }
 
-    val sketchfabService = SketchfabService.getInstance(androidx.compose.ui.platform.LocalContext.current)
+    val sketchfabService = SketchfabService.getInstance(LocalContext.current)
 
     /** (re)load the three feeds when the animated toggle flips or on first composition. */
     LaunchedEffect(animatedOnly) {
