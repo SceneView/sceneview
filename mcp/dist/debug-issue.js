@@ -676,13 +676,21 @@ export function autoDetectIssue(description) {
     // matched — the natural phrasings "ar camera is black", "my AR is black",
     // "ARScene shows nothing", etc. fell through to null.
     //
-    // The regex `\b(ar|arscene|arsceneview|arcore)\b.*\bblack\b` catches any
-    // sentence where "AR" (in any of its forms) and "black" both appear,
-    // independent of the connecting words ("is", "feed is", "camera was",
-    // etc.). Bare `\bcamera\b.*\bblack\b` covers the half where the user
-    // doesn't even say "AR" but the demo title is.
-    const arBlackHints = /\b(ar|arscene|arsceneview|arcore)\b.*\bblack\b/.test(lower)
-        || /\bcamera\b.*\bblack\b/.test(lower);
+    // The regex `\b(ar|arscene|arsceneview|arcore)\b.*\b(black|dark)\b` catches
+    // any sentence where "AR" (in any of its forms) and a "no signal" keyword
+    // both appear, independent of the connecting words ("is", "feed is",
+    // "camera was", etc.). "dark" is added per the #940 review — "AR mode is
+    // dark" / "AR feed dimmed" are common synonyms users reach for.
+    //
+    // The bare `\bcamera\b.*\b(black|dark)\b` check is NOW gated on the
+    // sentence containing an AR-flavoured token — without that gate it
+    // false-positives on "the orbit camera in my 3D scene renders a black
+    // background" (a 3D-only issue that should route to model-not-showing
+    // or material). Caught by the #940 follow-up review.
+    const hasArContext = /\b(ar|arscene|arsceneview|arcore|arkit|arcore)\b/.test(lower)
+        || lower.includes("augmented reality");
+    const arBlackHints = (hasArContext && /\b(black|dark|dimmed)\b/.test(lower))
+        || /\b(ar|arscene|arsceneview|arcore)\b.*\b(black|dark|dimmed)\b/.test(lower);
     if (lower.includes("ar not") ||
         lower.includes("ar doesn't") ||
         lower.includes("arcore") ||

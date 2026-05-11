@@ -129,9 +129,30 @@ describe("autoDetectIssue", () => {
     expect(autoDetectIssue("AR black, no preview")).toBe("ar-not-working");
     expect(autoDetectIssue("ARScene black on launch")).toBe("ar-not-working");
     expect(autoDetectIssue("ARSceneView black")).toBe("ar-not-working");
-    // Bare "camera black" — could be 3D too, but AR is the more common case
-    // and the model-not-showing branch covers the 3D angle anyway.
-    expect(autoDetectIssue("camera black after permission grant")).toBe("ar-not-working");
+    // Augmented Reality phrasing alongside "black" — covers the spelt-out
+    // variant a non-engineer reaches for.
+    expect(autoDetectIssue("Augmented Reality is dark on my phone")).toBe(
+      "ar-not-working",
+    );
+  });
+
+  it("detects ar-not-working from 'dark' synonym (#940 follow-up)", () => {
+    expect(autoDetectIssue("AR mode is dark")).toBe("ar-not-working");
+    expect(autoDetectIssue("AR feed dimmed even after granting camera")).toBe(
+      "ar-not-working",
+    );
+  });
+
+  it("does NOT route pure-3D 'camera black' to AR (#940 follow-up)", () => {
+    // The 3D orbit-camera vs AR-session distinction matters — pre-fix the
+    // bare /\bcamera\b.*\bblack\b/ regex over-matched here and shunted 3D
+    // users to ARCore troubleshooting.
+    expect(autoDetectIssue("the orbit camera in my 3D scene renders a black background")).not.toBe(
+      "ar-not-working",
+    );
+    expect(autoDetectIssue("3D scene camera shows black, no model")).not.toBe(
+      "ar-not-working",
+    );
   });
 
   it("detects model-not-showing from natural phrasings (#940)", () => {
