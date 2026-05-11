@@ -363,8 +363,8 @@ struct ExploreTab: View {
                     SamplePromoCard(title: "PBR Materials", subtitle: "Metallic + roughness spectrum", icon: "paintpalette.fill", gradient: [.purple.opacity(0.35), .pink.opacity(0.18)]) {
                         AnyView(MaterialsDemo())
                     }
-                    SamplePromoCard(title: "Light Types", subtitle: "Directional · point · spot", icon: "lightbulb.fill", gradient: [.yellow.opacity(0.30), .orange.opacity(0.18)]) {
-                        AnyView(LightTypesDemo())
+                    SamplePromoCard(title: "Lighting", subtitle: "Directional · point · spot", icon: "lightbulb.fill", gradient: [.yellow.opacity(0.30), .orange.opacity(0.18)]) {
+                        AnyView(LightingDemo())
                     }
                     SamplePromoCard(title: "Physics", subtitle: "Dynamic · static · kinematic", icon: "figure.walk", gradient: [.green.opacity(0.30), .teal.opacity(0.18)]) {
                         AnyView(PhysicsDemo())

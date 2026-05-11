@@ -57,23 +57,24 @@ enum DemoDeepLinkRegistry {
             #endif
 
         // 3D basics + content — covered by the Scenes tab gallery already.
-        case "geometry":      AllShapesDemo()
+        case "geometry":      GeometryDemo()
         case "custom-mesh":   CustomMeshDemo()
-        case "shape":         AllShapesDemo()
+        case "shape":         GeometryDemo()
         case "text":          TextDemo()
         case "billboard":     BillboardDemo()
         case "lines-paths":   LinesPathsDemo()
-        case "image":         ImagePlaneDemo()
+        case "image":         ImageDemo()
+        case "animation":     AnimationDemo()
 
         // Lighting + effects.
-        case "lighting":      LightTypesDemo()
+        case "lighting":      LightingDemo()
         case "movable-light": MovableLightDemo()
         case "dynamic-sky":   DynamicSkyDemo()
         case "fog":           FogDemo()
         case "physics":       PhysicsDemo()
 
         // Interaction.
-        case "camera-controls": OrbitCameraDemo()
+        case "camera-controls": CameraControlsDemo()
 
         default:
             DeepLinkPlaceholder(id: id, reason: "This demo isn't available in the iOS app yet — open it on Android, or browse the Scenes tab for the full iOS catalog.")

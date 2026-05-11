@@ -3,7 +3,8 @@ import RealityKit
 import SceneViewSwift
 
 /// Interactive orbit camera with grid reference and instructions.
-struct OrbitCameraDemo: View {
+/// Named `CameraControlsDemo` to mirror the Android demo of the same name.
+struct CameraControlsDemo: View {
     var body: some View {
         ZStack {
             SceneView { root in

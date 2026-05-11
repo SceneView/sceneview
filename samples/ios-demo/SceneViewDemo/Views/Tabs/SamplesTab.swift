@@ -195,8 +195,8 @@ struct SamplesTab: View {
         var items: [DemoItem] = [
             // MARK: Geometry
 
-            DemoItem(title: "All Shapes", icon: "cube.fill", subtitle: "Cube, sphere, cylinder, cone, plane", category: .geometry) {
-                AllShapesDemo()
+            DemoItem(title: "Geometry", icon: "cube.fill", subtitle: "Cube, sphere, cylinder, cone, plane", category: .geometry) {
+                GeometryDemo()
             },
             DemoItem(title: "Materials", icon: "paintpalette.fill", subtitle: "PBR metallic & roughness spectrum", category: .geometry) {
                 MaterialsDemo()
@@ -222,8 +222,8 @@ struct SamplesTab: View {
             DemoItem(title: "Lines & Paths", icon: "point.topleft.down.to.point.bottomright.curvepath", subtitle: "Polylines, helix, grids, circles", category: .content) {
                 LinesPathsDemo()
             },
-            DemoItem(title: "Image Planes", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
-                ImagePlaneDemo()
+            DemoItem(title: "Image", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
+                ImageDemo()
             },
             DemoItem(
                 comingSoonTitle: "Video Texture",
@@ -234,8 +234,8 @@ struct SamplesTab: View {
 
             // MARK: Lighting
 
-            DemoItem(title: "Light Types", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
-                LightTypesDemo()
+            DemoItem(title: "Lighting", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
+                LightingDemo()
             },
             DemoItem(title: "Movable Light", icon: "sun.dust.fill", subtitle: "Drag to orbit the light around the model", category: .lighting) {
                 MovableLightDemo()
@@ -254,13 +254,10 @@ struct SamplesTab: View {
             },
 
             // MARK: Interaction (mostly coming soon — Android-only today)
+            // Note: "Camera Controls" itself ships in the .advanced section via
+            // CameraControlsDemo (orbit + grid). The advanced pan/fly/first-person
+            // modes are tracked separately as Android-only for now.
 
-            DemoItem(
-                comingSoonTitle: "Camera Controls",
-                icon: "camera.aperture",
-                subtitle: "Orbit, pan, fly & first-person modes",
-                category: .interaction
-            ),
             DemoItem(
                 comingSoonTitle: "Gesture Editing",
                 icon: "hand.pinch.fill",
@@ -282,11 +279,11 @@ struct SamplesTab: View {
 
             // MARK: Advanced
 
-            DemoItem(title: "Orbit Camera", icon: "camera.fill", subtitle: "Interactive orbit with grid reference", category: .advanced) {
-                OrbitCameraDemo()
+            DemoItem(title: "Camera Controls", icon: "camera.fill", subtitle: "Interactive orbit with grid reference", category: .advanced) {
+                CameraControlsDemo()
             },
-            DemoItem(title: "Auto Rotate", icon: "rotate.3d.fill", subtitle: "Continuous rotation animation", category: .advanced) {
-                AutoRotateDemo()
+            DemoItem(title: "Animation", icon: "rotate.3d.fill", subtitle: "Continuous rotation animation", category: .advanced) {
+                AnimationDemo()
             },
             DemoItem(title: "Scene Gallery", icon: "square.grid.3x3.fill", subtitle: "Multiple shapes in one scene", category: .advanced) {
                 SceneGalleryDemo()

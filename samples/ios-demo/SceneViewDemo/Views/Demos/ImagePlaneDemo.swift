@@ -3,7 +3,8 @@ import RealityKit
 import SceneViewSwift
 
 /// ImageNode demo -- colored planes arranged in a gallery layout.
-struct ImagePlaneDemo: View {
+/// Named `ImageDemo` to mirror the Android demo of the same name.
+struct ImageDemo: View {
     var body: some View {
         ZStack {
             SceneView { root in
