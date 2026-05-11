@@ -149,3 +149,4 @@ mcp-strategy-report.md
 # Treat each MP4 like the device screenshots from the 2026-05-07 incident:
 # fully audit content before promoting to a tracked file.
 samples/android-demo/src/androidTest/assets/ar-recordings/*.mp4
+samples/screenshots/qa_log*.txt

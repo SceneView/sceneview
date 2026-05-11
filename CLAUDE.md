@@ -174,7 +174,7 @@ Never say "everything is good" without verifying published packages.
 - 🔒 **Big repo scrub** committed in this session:
   - Removed off-topic personal-portfolio code from public sceneview/sceneview repo: `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy / submission docs that listed every personal MCP
   - Scrubbed in-place mentions in `CLAUDE.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/docs/ai-context.md`, `.gitignore`
-  - Untracked `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md`, `.dart_tool/`, `qa_log.txt` — these were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references
+  - Untracked `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md`, `.dart_tool/`, `qa_log.txt` — these were carrying employer-domain leakage and references to the suspended (lowercase) GitHub account
   - Verified the standard employer/portfolio identifier greps return **0 hits** in tracked HEAD files
   - `npm hub-mcp` deprecated with a "project discontinued — use individual MCPs directly" message; local backups deleted
 - ⚠️ **Past git history** still contains the leaked strings + the moved-out files. A `git filter-repo` session is the next-up follow-up — must coordinate with the 9 active worktrees before force-push.
@@ -185,7 +185,7 @@ Never say "everything is good" without verifying published packages.
 2. **Submit Anthropic marketplace** — guide at `~/Projects/profile-private/marketplace-submissions/2026-05-07-anthropic-marketplace-submission.md` (Thomas clicks through the in-app form).
 3. **Reddit + HN posts** — drafts at `~/Projects/profile-private/announcements/` (single-plugin framing, ready to post when Thomas is ready).
 - 4-agent independent Opus review caught 6 BLOCKING + 5 MAJOR before public announcement: dead-code hooks (matcher syntax invalid, validator missed it), license mismatch (Apache-2.0 vs MIT), 1.4 GB monolithic clone (split to dedicated repo to fix), `/review` `/test` namespace collision with built-in skills, version drift (plugin pinned 4.0.9 vs npm @4.0.11), DL/mo numbers gonflés in announcement drafts. All BLOCKING fixed in [`a88f7f8c`](https://github.com/sceneview/sceneview/commit/a88f7f8c) + the marketplace migration.
-- 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
+- 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and suspended-account references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
 - Side effect: enriched `.claude/commands/*.md` with YAML frontmatter (`description:`) so `/help` now shows one-line summaries for every contributor command.
 - README.md "Claude Code plugin" section explains the MCP + commands + hooks bundle and points at the dedicated marketplace repo.
 
