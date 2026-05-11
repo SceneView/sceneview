@@ -34,7 +34,9 @@ describe("analyzeProject — project type detection", () => {
   it("detects an Android project via build.gradle.kts", async () => {
     const result = await analyzeProject({ path: ANDROID_OK });
     expect(result.projectType).toBe("android");
-    expect(result.sceneViewVersion).toBe("4.0.0-rc.1");
+    // Fixture is now pinned to LATEST_SCENEVIEW_VERSION (see fixture
+    // comment) — verify the pin survives + isOutdated reads false.
+    expect(result.sceneViewVersion).toBe(LATEST_SCENEVIEW_VERSION);
     expect(result.isOutdated).toBe(false);
     expect(result.latestVersion).toBe(LATEST_SCENEVIEW_VERSION);
   });
@@ -69,7 +71,9 @@ describe("analyzeProject — project type detection", () => {
 describe("analyzeProject — version extraction", () => {
   it("extracts the patch version from a Gradle dependency string", async () => {
     const result = await analyzeProject({ path: ANDROID_OK });
-    expect(result.sceneViewVersion).toBe("4.0.0-rc.1");
+    // Fixture is pinned to LATEST_SCENEVIEW_VERSION (see android-ok/
+    // build.gradle.kts) — same reason as the "up-to-date" assertion above.
+    expect(result.sceneViewVersion).toBe(LATEST_SCENEVIEW_VERSION);
   });
 
   it("extracts the version from a Package.swift `from:` clause", async () => {

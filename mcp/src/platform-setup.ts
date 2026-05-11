@@ -5,6 +5,8 @@
  * Consolidates Android, iOS, Web, Flutter, React Native, Desktop, and TV.
  */
 
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
+
 export type Platform = "android" | "ios" | "web" | "flutter" | "react-native" | "desktop" | "tv";
 export type SetupType = "3d" | "ar";
 
@@ -25,7 +27,7 @@ const ANDROID_3D = `## SceneView Android — 3D Setup
 \`\`\`kotlin
 // build.gradle.kts (app module)
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0")
+    implementation("io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}")
 }
 \`\`\`
 
@@ -101,7 +103,7 @@ const ANDROID_AR = `## SceneView Android — AR Setup
 \`\`\`kotlin
 // build.gradle.kts (app module)
 dependencies {
-    implementation("io.github.sceneview:arsceneview:4.0.0")
+    implementation("io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}")
     // arsceneview includes sceneview transitively
 }
 \`\`\`
@@ -654,7 +656,7 @@ plugins {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("io.github.sceneview:sceneview-desktop:4.0.0") // when published
+    implementation("io.github.sceneview:sceneview-desktop:${LATEST_SCENEVIEW_RELEASE}") // when published
 }
 \`\`\`
 
@@ -663,6 +665,7 @@ dependencies {
 \`\`\`kotlin
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 
 fun main() = application {
     Window(
@@ -706,7 +709,7 @@ SceneView on Android TV uses the same Filament renderer as mobile Android, with 
 
 \`\`\`kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0")
+    implementation("io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}")
     implementation("androidx.leanback:leanback:1.0.0")
     implementation("androidx.tv:tv-foundation:1.0.0-alpha10")
 }

@@ -1,3 +1,5 @@
+import { PACKAGE_VERSION } from "./generated/version.js";
+
 interface GitHubIssue {
   number: number;
   title: string;
@@ -172,7 +174,10 @@ export async function fetchKnownIssues(): Promise<string> {
       {
         headers: {
           Accept: "application/vnd.github+json",
-          "User-Agent": "sceneview-mcp/3.5.4",
+          // Plumb the actual MCP package version so GitHub abuse-watch
+          // logs show which MCP build is hitting them — was hardcoded
+          // to "3.5.4" pre-#941, far behind the current release.
+          "User-Agent": `sceneview-mcp/${PACKAGE_VERSION}`,
           "X-GitHub-Api-Version": "2022-11-28",
         },
       }

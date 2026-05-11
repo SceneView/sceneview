@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 import { getPlatformSetup, listPlatforms, PLATFORM_IDS, type Platform, type SetupType } from "./platform-setup.js";
 
 describe("PLATFORM_IDS", () => {
@@ -17,7 +18,7 @@ describe("PLATFORM_IDS", () => {
 describe("getPlatformSetup", () => {
   it("returns Android 3D setup with Gradle dependency", () => {
     const result = getPlatformSetup("android", "3d");
-    expect(result).toContain("io.github.sceneview:sceneview:4.0.0");
+    expect(result).toContain(`io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}`);
     expect(result).toContain("rememberEngine");
     expect(result).toContain("SceneView(");
   });

@@ -66,7 +66,7 @@ export interface ArtifactResult {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const FILAMENT_CDN = "https://cdn.jsdelivr.net/npm/filament@1.70.1/filament.js";
+const FILAMENT_CDN = "https://cdn.jsdelivr.net/npm/filament@1.70.2/filament.js";
 
 const DEFAULT_MODEL =
   "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb";

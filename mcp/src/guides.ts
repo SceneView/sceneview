@@ -4,6 +4,8 @@
  * Static content for the platform roadmap, best practices, and AR setup tools.
  */
 
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
+
 // ─── Platform Roadmap ─────────────────────────────────────────────────────────
 
 export const PLATFORM_ROADMAP = `# SceneView Multi-Platform Roadmap
@@ -12,12 +14,12 @@ export const PLATFORM_ROADMAP = `# SceneView Multi-Platform Roadmap
 
 | Platform | Status | Artifact | Renderer |
 |----------|--------|----------|----------|
-| **Android (Compose)** | Stable | \`io.github.sceneview:sceneview:4.0.0\` | Filament |
-| **Android (AR)** | Stable | \`io.github.sceneview:arsceneview:4.0.0\` | Filament + ARCore |
+| **Android (Compose)** | Stable | \`io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}\` | Filament |
+| **Android (AR)** | Stable | \`io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}\` | Filament + ARCore |
 | **iOS (SwiftUI)** | Alpha | SceneViewSwift SPM \`from: "4.0.0"\` | RealityKit + ARKit |
 | **macOS (SwiftUI)** | Alpha | SceneViewSwift SPM (in Package.swift) | RealityKit |
 | **visionOS (SwiftUI)** | Alpha | SceneViewSwift SPM (in Package.swift) | RealityKit |
-| **KMP Core** | Stable | \`io.github.sceneview:sceneview-core:4.0.0\` | N/A (shared logic) |
+| **KMP Core** | Stable | \`io.github.sceneview:sceneview-core:${LATEST_SCENEVIEW_RELEASE}\` | N/A (shared logic) |
 
 ## Architecture: Native Renderers per Platform
 
@@ -435,7 +437,7 @@ ARSceneView(
 \`\`\`kotlin
 // build.gradle.kts (app module)
 dependencies {
-    implementation("io.github.sceneview:arsceneview:4.0.0")
+    implementation("io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}")
     // arsceneview includes sceneview transitively — no need to add both
 }
 \`\`\`
