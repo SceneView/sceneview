@@ -21,7 +21,7 @@ import { recordClientInit, recordToolCall } from "./telemetry.js";
 import { isProTool, getToolTier } from "./tiers.js";
 import { dispatchProxyToolCall, isProxyConfigured, DEFAULT_PRICING_URL, } from "./proxy.js";
 import { API_DOCS, TOOL_DEFINITIONS, dispatchTool, } from "./tools/index.js";
-import { PACKAGE_VERSION } from "./generated/version.js";
+import { LATEST_SCENEVIEW_RELEASE, PACKAGE_VERSION } from "./generated/version.js";
 // ─── v4 lite-mode startup banner ─────────────────────────────────────────────
 //
 // MCP servers must keep stdout clean for JSON-RPC, so we log to stderr.
@@ -57,7 +57,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
         {
             uri: "sceneview://api",
             name: "SceneView API Reference",
-            description: "Complete SceneView 4.0.0 API — SceneView, ARSceneView, SceneScope DSL, ARSceneScope DSL, node types, resource loading, camera, gestures, math types, threading rules, and common patterns. Read this before writing any SceneView code.",
+            description: `Complete SceneView ${LATEST_SCENEVIEW_RELEASE} API — SceneView, ARSceneView, SceneScope DSL, ARSceneScope DSL, node types, resource loading, camera, gestures, math types, threading rules, and common patterns. Read this before writing any SceneView code.`,
             mimeType: "text/markdown",
         },
         {

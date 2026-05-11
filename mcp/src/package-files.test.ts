@@ -144,8 +144,13 @@ describe("npm tarball includes every runtime module imported by src/index.ts", (
     expect(tarballSet.has("dist/index.js")).toBe(true);
   });
 
-  it("ships llms.txt (the SDK API reference resource)", () => {
-    expect(tarballSet.has("llms.txt")).toBe(true);
+  it("does NOT ship the raw llms.txt (it's already embedded in dist/generated)", () => {
+    // The raw `llms.txt` (~127 kB) was historically in the tarball but
+    // `dist/generated/llms-txt.js` already embeds the same text as a TS
+    // string constant. Shipping both doubled the unpacked footprint for
+    // zero runtime benefit — see #938. Single source of truth = the
+    // generated module.
+    expect(tarballSet.has("llms.txt")).toBe(false);
   });
 
   it("ships the generated llms-txt module used by the tools library", () => {
