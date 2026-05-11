@@ -2,6 +2,47 @@
 
 ## Unreleased — iOS V1 honest + Android rendering uplift + Sketchfab streaming scaffolds
 
+### Fixed — Android demo polish (QA pass 2026-05-11)
+
+A QA agent walked the demo screens and reported user-visible papercut issues.
+Five low-effort high-impact fixes shipped (`65f6d8db`, `ea4c513e`, `15c8d254`, `15bcaf8c`):
+
+- **ModelViewerDemo**: helmet was pinned to the lower half of the viewport with a big
+  empty band at the top. `rememberHeroOrbitCameraManipulator(yHeight = 0.2f → 0f)`.
+- **CameraControlsDemo**: helmet rendered at ~10% of the viewport at the default home
+  camera distance. `homePosition = Position(0, 0, 4) → (0, 0, 1.5)`.
+- **PhysicsDemo**: first frame showed a single ball on an empty floor — the demo's hook
+  ("colourful rain on the floor") was invisible until the user pressed Drop. Initial
+  `sphereCount = 1 → 5` so the first frame is the actual demo content.
+- **ARStreetscapeDemo**: the permission gate showed only a "Denied" error message with
+  no escape — Back was the only way out. Now offers `Retry` (re-launches the system
+  prompt) and `Open Settings` (deep-links into the app's permission page) buttons.
+- **DynamicSkyDemo**: rendered as "fully black at noon" because `DynamicSkyNode`
+  positions a directional sun but doesn't paint a sky dome, and the default neutral
+  IBL had no skybox. Mitigation in the demo (not the library): swap the IBL based on
+  the time-of-day slider — `rooftop_night_2k` / `sunset_2k` / `outdoor_cloudy_2k`.
+  Three buckets is coarse but covers the obvious user expectations; a proper
+  procedural-atmosphere skybox is library-level work for a later sprint.
+
+### Added — `MovableLightDemo` + `OrbitalARDemo` (samples)
+
+Two new sample demos shipped on both iOS and Android (commits `c345404b`, `54233d56`).
+
+- **`MovableLightDemo`** — drag-anywhere-on-the-scene → spherical-orbit math (azimuth /
+  elevation, fixed radius 1.5 m) → light position updates live → specular highlights
+  track the cursor on a PBR model (Damaged Helmet on Android, Ferrari F40 on iOS).
+  Camera is locked so the only thing moving is the light; a yellow unlit marker sphere
+  shows where the light source is. Intensity slider 1k → 100k, "Show light source"
+  toggle hides/shows the marker.
+- **`OrbitalARDemo`** — solar-system-style AR scene: eight distinct bundled models orbit
+  around the user at radius 1.5 m, each with its own orbital speed (0.05 → 0.30 rad/s,
+  21 s to 125 s for a full lap) and a slow local spin. Heights are equipartitioned
+  across ±0.5 m so the formation reads as varied elevations as the user turns. Plane
+  detection is disabled — the formation lives in world space, anchored at the user's
+  starting position.
+
+
+
 Branch [`claude/magical-lovelace-7176b1`](https://github.com/sceneview/sceneview/tree/claude/magical-lovelace-7176b1) — staged for the next minor cut.
 
 ### Added — `RenderQuality` preset (Android)
