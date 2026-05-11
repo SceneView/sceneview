@@ -107,6 +107,62 @@ class ARRecorderTest {
         assertEquals(before, after)
     }
 
+    // ── recordFrame() — stateless side-channel mirror (audit #876) ───────────
+
+    @Test
+    fun `recordFrame does not change state`() {
+        val recorder = ARRecorder()
+        recorder.recordFrame(FakeSession())
+        assertEquals(ARRecorder.State.IDLE, recorder.state)
+        assertNull(recorder.errorMessage)
+        assertNull(recorder.recordingFile)
+    }
+
+    @Test
+    fun `recordFrame publishes the session for a subsequent start`() {
+        val recorder = ARRecorder()
+        val session = FakeSession(playbackStatus = PlaybackStatus.NONE)
+
+        // Mirror RerunBridge.logFrame: caller passes session every frame.
+        recorder.recordFrame(session)
+
+        val started = recorder.start(outFile)
+        assertTrue("start() should succeed after recordFrame()", started)
+        assertEquals(ARRecorder.State.RECORDING, recorder.state)
+        assertEquals(1, session.startRecordingCount)
+    }
+
+    @Test
+    fun `start with explicit session and file does not need a prior recordFrame`() {
+        val recorder = ARRecorder()
+        val session = FakeSession(playbackStatus = PlaybackStatus.NONE)
+
+        // Stateless overload — no need to publish the session first.
+        val started = recorder.start(session, outFile)
+
+        assertTrue("start(session, file) should succeed without recordFrame()", started)
+        assertEquals(ARRecorder.State.RECORDING, recorder.state)
+        assertEquals(outFile, recorder.recordingFile)
+        assertNull(recorder.errorMessage)
+        assertEquals(1, session.startRecordingCount)
+    }
+
+    @Test
+    fun `start with explicit session refreshes the published reference for stop`() {
+        val recorder = ARRecorder()
+        val first = FakeSession(playbackStatus = PlaybackStatus.NONE)
+        val second = FakeSession(playbackStatus = PlaybackStatus.NONE)
+
+        // Publish the first session, then immediately replace it via the explicit-session
+        // start overload — stop() must call stopRecording on the SECOND session.
+        recorder.recordFrame(first)
+        assertTrue(recorder.start(second, outFile))
+        recorder.stop()
+
+        assertEquals(0, first.stopRecordingCount)
+        assertEquals(1, second.stopRecordingCount)
+    }
+
     // ── start() success ──────────────────────────────────────────────────────
 
     @Test

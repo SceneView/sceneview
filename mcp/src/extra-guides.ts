@@ -4,6 +4,8 @@
  * Material, collision, model optimization, and web rendering guides.
  */
 
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
+
 // ─── Material Guide ─────────────────────────────────────────────────────────
 
 export const MATERIAL_GUIDE = `# SceneView Material & Shader Guide
@@ -414,7 +416,7 @@ export const WEB_RENDERING_GUIDE = `# SceneView Web Rendering Guide (Filament.js
 
 ## Architecture
 
-SceneView Web uses **Filament.js v1.70.1** — Google's Filament engine compiled to WebAssembly. This is the **same PBR rendering engine** as SceneView Android, ensuring visual parity.
+SceneView Web uses **Filament.js v1.70.2** — Google's Filament engine compiled to WebAssembly. This is the **same PBR rendering engine** as SceneView Android, ensuring visual parity.
 
 \`\`\`
 Browser → WebGL2 → Filament.js (WASM) → GPU
@@ -427,7 +429,7 @@ Browser → WebGL2 → Filament.js (WASM) → GPU
 ### Using sceneview.js (npm or local)
 \`\`\`html
 <!-- Option 1: npm CDN -->
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.0/sceneview-web.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@${LATEST_SCENEVIEW_RELEASE}/sceneview-web.js"></script>
 
 <!-- Option 2: local hosting (recommended for production) -->
 <!-- Copy js/filament/ directory to your server for faster WASM loading -->
@@ -525,7 +527,7 @@ camera {
 
 | Feature | SceneView (Filament.js) | model-viewer |
 |---------|------------------------|--------------|
-| **Engine** | Filament v1.70.1 WASM | Filament WASM (same engine) |
+| **Engine** | Filament v1.70.2 WASM | Filament WASM (same engine) |
 | **Bundle size** | ~215KB JS + 3.3MB WASM | ~800 KB (subset) |
 | **Procedural geometry** | Yes (cubes, spheres, etc.) | No |
 | **Custom materials** | Yes (full Filament API) | Limited |

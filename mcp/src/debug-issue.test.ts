@@ -122,6 +122,44 @@ describe("autoDetectIssue", () => {
     expect(autoDetectIssue("ARCore error")).toBe("ar-not-working");
   });
 
+  // ── Natural phrasings the original ladder missed (#940)
+  it("detects ar-not-working from natural 'black' phrasings (#940)", () => {
+    expect(autoDetectIssue("my AR camera is black")).toBe("ar-not-working");
+    expect(autoDetectIssue("the AR feed is black")).toBe("ar-not-working");
+    expect(autoDetectIssue("AR black, no preview")).toBe("ar-not-working");
+    expect(autoDetectIssue("ARScene black on launch")).toBe("ar-not-working");
+    expect(autoDetectIssue("ARSceneView black")).toBe("ar-not-working");
+    // Augmented Reality phrasing alongside "black" — covers the spelt-out
+    // variant a non-engineer reaches for.
+    expect(autoDetectIssue("Augmented Reality is dark on my phone")).toBe(
+      "ar-not-working",
+    );
+  });
+
+  it("detects ar-not-working from 'dark' synonym (#940 follow-up)", () => {
+    expect(autoDetectIssue("AR mode is dark")).toBe("ar-not-working");
+    expect(autoDetectIssue("AR feed dimmed even after granting camera")).toBe(
+      "ar-not-working",
+    );
+  });
+
+  it("does NOT route pure-3D 'camera black' to AR (#940 follow-up)", () => {
+    // The 3D orbit-camera vs AR-session distinction matters — pre-fix the
+    // bare /\bcamera\b.*\bblack\b/ regex over-matched here and shunted 3D
+    // users to ARCore troubleshooting.
+    expect(autoDetectIssue("the orbit camera in my 3D scene renders a black background")).not.toBe(
+      "ar-not-working",
+    );
+    expect(autoDetectIssue("3D scene camera shows black, no model")).not.toBe(
+      "ar-not-working",
+    );
+  });
+
+  it("detects model-not-showing from natural phrasings (#940)", () => {
+    expect(autoDetectIssue("model not visible")).toBe("model-not-showing");
+    expect(autoDetectIssue("no model on screen")).toBe("model-not-showing");
+  });
+
   it("detects crash from description", () => {
     expect(autoDetectIssue("My app crashes when loading a model")).toBe("crash");
     expect(autoDetectIssue("SIGABRT on destroy")).toBe("crash");

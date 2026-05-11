@@ -1,0 +1,56 @@
+// swift-tools-version: 5.10
+//
+// Root-level Swift Package manifest for the SceneView monorepo.
+//
+// Why this exists
+// ===============
+// Pre-#920, the canonical Swift-Package-Manager entry point for SceneView
+// was a mirror repo `github.com/sceneview/sceneview-swift` whose contents
+// were a manual copy of the `SceneViewSwift/` subtree of this monorepo.
+// That mirror got stuck on `v4.0.0` while the monorepo shipped through
+// `v4.0.9`, so every iOS consumer following the README was silently 9
+// versions behind.
+//
+// This file makes the monorepo itself a valid SPM root. The single
+// product `SceneViewSwift` points at `SceneViewSwift/Sources/SceneViewSwift`
+// via the `path` parameter, so Xcode users can now do:
+//
+//     .package(url: "https://github.com/sceneview/sceneview", from: "4.0.9")
+//
+// and pin to any tag the monorepo has cut, no manual mirroring required.
+// The `SceneViewSwift/Package.swift` sub-manifest is left in place so the
+// legacy `sceneview-swift` mirror repo (still kept as a redirect / for
+// existing consumers) continues to build.
+
+import PackageDescription
+
+let package = Package(
+    name: "SceneViewSwift",
+    platforms: [
+        .iOS("18.0"),
+        .macOS("15.0"),
+        .visionOS(.v1)
+    ],
+    products: [
+        .library(
+            name: "SceneViewSwift",
+            targets: ["SceneViewSwift"]
+        )
+    ],
+    dependencies: [],
+    targets: [
+        .target(
+            name: "SceneViewSwift",
+            dependencies: [],
+            // Same sources the sub-manifest declares — single source of truth
+            // lives in `SceneViewSwift/Sources/SceneViewSwift/`; this just
+            // surfaces it at the monorepo root for SPM consumers.
+            path: "SceneViewSwift/Sources/SceneViewSwift"
+        ),
+        .testTarget(
+            name: "SceneViewSwiftTests",
+            dependencies: ["SceneViewSwift"],
+            path: "SceneViewSwift/Tests/SceneViewSwiftTests"
+        )
+    ]
+)

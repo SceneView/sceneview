@@ -6,12 +6,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import io.github.sceneview.demo.demos.ARCloudAnchorDemo
+import io.github.sceneview.demo.demos.ARDepthOcclusionDemo
 import io.github.sceneview.demo.demos.ARFaceDemo
 import io.github.sceneview.demo.demos.ARImageDemo
+import io.github.sceneview.demo.demos.ARImageStabilizationDemo
+import io.github.sceneview.demo.demos.ARInstantPlacementDemo
 import io.github.sceneview.demo.demos.ARPlacementDemo
 import io.github.sceneview.demo.demos.ARPoseDemo
+import io.github.sceneview.demo.demos.ARRecordPlaybackDemo
 import io.github.sceneview.demo.demos.ARRerunDemo
+import io.github.sceneview.demo.demos.ARRooftopAnchorDemo
 import io.github.sceneview.demo.demos.ARStreetscapeDemo
+import io.github.sceneview.demo.demos.ARTerrainAnchorDemo
 import io.github.sceneview.demo.demos.AnimationDemo
 import io.github.sceneview.demo.demos.BillboardDemo
 import io.github.sceneview.demo.demos.CameraControlsDemo
@@ -131,6 +137,13 @@ class DemoHostActivity : ComponentActivity() {
             "ar-streetscape" -> ARStreetscapeDemo(onBack = back)
             "ar-pose" -> ARPoseDemo(onBack = back)
             "ar-rerun" -> ARRerunDemo(onBack = back)
+            // 6 AR demos shipped after the previous DemoHostActivity revision (#888):
+            "ar-record-playback" -> ARRecordPlaybackDemo(onBack = back)
+            "ar-depth-occlusion" -> ARDepthOcclusionDemo(onBack = back)
+            "ar-instant-placement" -> ARInstantPlacementDemo(onBack = back)
+            "ar-terrain" -> ARTerrainAnchorDemo(onBack = back)
+            "ar-rooftop" -> ARRooftopAnchorDemo(onBack = back)
+            "ar-image-stabilization" -> ARImageStabilizationDemo(onBack = back)
             else -> error("Unknown demo id '$id'")
         }
     }

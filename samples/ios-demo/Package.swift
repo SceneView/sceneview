@@ -5,11 +5,7 @@ let package = Package(
     name: "SceneViewDemo",
     platforms: [.iOS(.v18), .macOS(.v15)],
     dependencies: [
-        .package(name: "SceneViewSwift", path: "../../SceneViewSwift"),
-        .package(
-            url: "https://github.com/pointfreeco/swift-snapshot-testing",
-            from: "1.17.0"
-        )
+        .package(name: "SceneViewSwift", path: "../../SceneViewSwift")
     ],
     targets: [
         .executableTarget(
@@ -21,6 +17,10 @@ let package = Package(
         )
         // iOS snapshot tests are run via generate-ios-goldens.py + verify-ios-goldens.py
         // which use xcrun simctl screenshots + Python Pillow for pixel comparison.
-        // See .claude/scripts/generate-ios-goldens.py
+        // See .claude/scripts/generate-ios-goldens.py — the swift-snapshot-testing
+        // ScreenshotTests target was dropped (#882): it imported `SceneViewDemoLib`,
+        // a module that never existed, was never wired in the Xcode scheme's
+        // TestAction, and therefore never ran on any CI system. The Python flow
+        // is the canonical iOS regression path.
     ]
 )

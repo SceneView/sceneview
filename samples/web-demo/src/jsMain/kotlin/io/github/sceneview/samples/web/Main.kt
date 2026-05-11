@@ -9,7 +9,9 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLCanvasElement
+import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.HTMLImageElement
 import org.w3c.dom.HTMLInputElement
 
 /**
@@ -21,7 +23,7 @@ import org.w3c.dom.HTMLInputElement
  * - WebXR AR/VR toggle buttons
  * - Tab-based navigation (Model Viewer / Geometry)
  * - Responsive dark theme
- * - SDK version 3.6.1 badge
+ * - SDK version 4.0.9 badge
  *
  * Uses Filament.js (WASM) — same rendering engine as SceneView Android.
  */
@@ -217,7 +219,15 @@ private fun setupSearch() {
 
 private fun performSearch(query: String) {
     val resultsContainer = document.getElementById("search-results") as? HTMLElement ?: return
-    resultsContainer.innerHTML = "<div class='search-status'>Searching for \"$query\"...</div>"
+    // Use DOM construction (createElement + textContent) instead of
+    // innerHTML interpolation — Sketchfab response fields (model.name,
+    // model.user.displayName, model.user.username) are attacker-controlled
+    // strings; if any contains a `"` or `<`, string-templated innerHTML
+    // breaks out of the attribute / element boundary and lets a malicious
+    // model author execute JS in the origin (DOM XSS). Same hygiene for
+    // the status/error messages, where `query` is user-controlled.
+    resultsContainer.clearChildren()
+    resultsContainer.appendChild(buildStatus("Searching for \"$query\"..."))
 
     val url = "$SKETCHFAB_API&q=${encodeURIComponent(query)}"
 
@@ -231,35 +241,30 @@ private fun performSearch(query: String) {
         val results = json.results
         val count = (results.length as? Number)?.toInt() ?: 0
 
+        resultsContainer.clearChildren()
         if (count == 0) {
-            resultsContainer.innerHTML =
-                "<div class='search-status'>No downloadable models found for \"$query\".</div>"
+            resultsContainer.appendChild(
+                buildStatus("No downloadable models found for \"$query\".")
+            )
             return@then
         }
-
-        resultsContainer.innerHTML = ""
 
         for (i in 0 until count) {
             val model = results[i]
             val name = (model.name as? String) ?: "Untitled"
             val uid = (model.uid as? String) ?: continue
-            val authorName = model.user?.displayName as? String ?: model.user?.username as? String ?: "Unknown"
+            val authorName = model.user?.displayName as? String
+                ?: model.user?.username as? String
+                ?: "Unknown"
             val viewCount = (model.viewCount as? Number)?.toInt() ?: 0
-
-            // Get thumbnail URL
             val thumbUrl = extractThumbnail(model)
 
-            val card = document.createElement("div") as HTMLElement
-            card.className = "result-card"
-            card.innerHTML = """
-                <img class="result-thumb" src="$thumbUrl" alt="$name" loading="lazy" onerror="this.style.display='none'">
-                <div class="result-info">
-                    <div class="result-name" title="$name">$name</div>
-                    <div class="result-author">by $authorName</div>
-                    <div class="result-views">$viewCount views</div>
-                </div>
-            """.trimIndent()
-
+            val card = buildResultCard(
+                name = name,
+                authorName = authorName,
+                viewCount = viewCount,
+                thumbUrl = thumbUrl,
+            )
             card.addEventListener("click", {
                 // Highlight active card
                 val cards = document.querySelectorAll(".result-card")
@@ -267,18 +272,96 @@ private fun performSearch(query: String) {
                     (cards.item(j) as? HTMLElement)?.className = "result-card"
                 }
                 card.className = "result-card active"
-
                 // Try to get the direct GLB download URL via the Sketchfab download API
                 fetchModelDownloadUrl(uid, name)
             })
-
             resultsContainer.appendChild(card)
         }
     }.catch { error ->
-        resultsContainer.innerHTML =
-            "<div class='search-status error'>Search failed: ${error.asDynamic().message ?: error}</div>"
+        val msg = (error.asDynamic().message as? String) ?: error.toString()
+        resultsContainer.clearChildren()
+        resultsContainer.appendChild(buildStatus("Search failed: $msg", error = true))
         console.error("Sketchfab search error:", error)
     }
+}
+
+/**
+ * Pure-DOM equivalent of `Element.replaceChildren()` (not in the Kotlin/JS
+ * stdlib bindings as of Kotlin 2.x). Avoids `innerHTML = ""` since assigning
+ * any string back to innerHTML, even the empty one, fires Trusted-Types
+ * violation reports on origins that enable the policy.
+ */
+private fun HTMLElement.clearChildren() {
+    while (firstChild != null) {
+        removeChild(firstChild!!)
+    }
+}
+
+/**
+ * Build a `<div class="search-status">` (optionally `.error`) with the given
+ * text safely placed via `textContent` — never `innerHTML` — so any quotes /
+ * angle brackets in the input render as inert text instead of HTML.
+ */
+private fun buildStatus(text: String, error: Boolean = false): HTMLDivElement {
+    val div = document.createElement("div") as HTMLDivElement
+    div.className = if (error) "search-status error" else "search-status"
+    div.textContent = text
+    return div
+}
+
+/**
+ * Build a Sketchfab search-result card via DOM nodes. All user-controlled
+ * fields (`name`, `authorName`, `thumbUrl`) flow through `setAttribute` or
+ * `textContent`; nothing is ever string-interpolated into `innerHTML`. This
+ * is the DOM XSS hardening for issue #957 — Sketchfab usernames + model
+ * names are public-attacker-controllable.
+ */
+private fun buildResultCard(
+    name: String,
+    authorName: String,
+    viewCount: Int,
+    thumbUrl: String,
+): HTMLElement {
+    val card = document.createElement("div") as HTMLElement
+    card.className = "result-card"
+
+    val img = document.createElement("img") as HTMLImageElement
+    img.className = "result-thumb"
+    // `src` and `alt` go through setAttribute; the browser parses them as
+    // attribute values, not HTML. A `"` inside `name` simply stays in the
+    // alt text — it cannot terminate the attribute or inject a tag.
+    img.setAttribute("src", thumbUrl)
+    img.setAttribute("alt", name)
+    img.setAttribute("loading", "lazy")
+    // The "hide on 404" handler was previously inline (`onerror=...`) inside
+    // innerHTML, which is the exact pattern that gave attackers an XSS sink.
+    // Re-attach it as an event listener instead — same UX, no script-in-HTML.
+    img.addEventListener("error", {
+        (img.style.asDynamic()).display = "none"
+    })
+    card.appendChild(img)
+
+    val info = document.createElement("div") as HTMLDivElement
+    info.className = "result-info"
+
+    val nameDiv = document.createElement("div") as HTMLDivElement
+    nameDiv.className = "result-name"
+    nameDiv.setAttribute("title", name)
+    nameDiv.textContent = name
+    info.appendChild(nameDiv)
+
+    val authorDiv = document.createElement("div") as HTMLDivElement
+    authorDiv.className = "result-author"
+    authorDiv.textContent = "by $authorName"
+    info.appendChild(authorDiv)
+
+    val viewsDiv = document.createElement("div") as HTMLDivElement
+    viewsDiv.className = "result-views"
+    viewsDiv.textContent = "$viewCount views"
+    info.appendChild(viewsDiv)
+
+    card.appendChild(info)
+    return card
 }
 
 /**

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 import { SAMPLES, SAMPLE_IDS, getSample } from "./samples.js";
 
 const ANDROID_IDS = SAMPLE_IDS.filter((id) => !SAMPLES[id].language || SAMPLES[id].language === "kotlin");
@@ -79,8 +80,8 @@ describe("every Android sample", () => {
 
     it(`${id}: dependency is a valid sceneview artifact`, () => {
       expect([
-        "io.github.sceneview:sceneview:4.0.0",
-        "io.github.sceneview:arsceneview:4.0.0",
+        `io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}`,
+        `io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}`,
       ]).toContain(sample.dependency);
     });
   }
@@ -122,7 +123,7 @@ describe("AR samples", () => {
 
   it("all Android AR samples use arsceneview dependency", () => {
     for (const id of androidArIds) {
-      expect(SAMPLES[id].dependency).toBe("io.github.sceneview:arsceneview:4.0.0");
+      expect(SAMPLES[id].dependency).toBe(`io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}`);
     }
   });
 
@@ -153,7 +154,7 @@ describe("3D samples", () => {
 
   it("all Android 3D samples use sceneview dependency", () => {
     for (const id of android3dIds) {
-      expect(SAMPLES[id].dependency).toBe("io.github.sceneview:sceneview:4.0.0");
+      expect(SAMPLES[id].dependency).toBe(`io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}`);
     }
   });
 

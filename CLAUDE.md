@@ -165,7 +165,36 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-08, session bold-villani-42902e — plugin marketplace + brand-scope cleanup + portfolio scrub)
+### Current state (last updated: 2026-05-11, session elegant-wright-b9cd6f — audit-sweep + 5-agent review)
+
+- 🚀 **40 commits / 22 issues fermées / 5 follow-ups filés** (#971–#975) in a single session.
+  - **Security cluster shipped**: DOM XSS in web-demo (#957 Kotlin + post-review JS-path patch in `3f369736`), --es demo registry validation (#958), Auto Backup exclude-all rules covering both `dataExtractionRules` (API 31+) AND `fullBackupContent` (API 24..30, added post-review) (#959), CSP meta on all 27 HTML files (#960).
+  - **Build / release polish**: Filament pinned 1.71→1.70.2 to match committed `.filamat`s (#961), JaCoCo wired with CI artefacts + step-summary (#964), root `Package.swift` so SPM consumers ride the monorepo (no more `sceneview-swift` mirror lag) (#920), `release.yml` gate tightened + publish-rn + validate-spm jobs added (#962), web-demo finally building to `/web-demo/` via `jsBrowserDistribution` (#926, fixed post-review — `Webpack`-only task missed HTML).
+  - **MCP** : version drift sweep (#941, follow-up sweep on remaining string-template leftovers in `de692709`), 9 dead modules dropped from npm tarball (-57 kB packed / -235 kB unpacked, #938), validator catches the `Scene { } → SceneView { }` rename (#939), `autoDetectIssue` regex catches AR+black/dark natural phrasings without false-positive on 3D-only sentences (#940 + post-review tightening in `c7f0399f`).
+  - **UX** : haptic on shutter / mode chips / qaMode long-press (#956), QA pill tap-to-disable (#951), `LifecycleAwareLaunchedEffect` helper + GeometryDemo/DebugOverlay migration (#936; AnimationDemo REVERTED post-review due to camera teleport on foreground — tracked in #974), `rememberMaterialInstance` helper with PBR-key safety pattern (#937 + #971 follow-up for the 10-demo migration sweep).
+  - **Docs** : iOS deep-link surfaced in README (#918), RN package name corrected with explicit "3.6.1 stale, 4.x publish pending" disclaimer (#924), Flutter pub.dev avoidance with git ref (#923), KDoc for the three smallest fully-undocumented files (#965 partial), `sceneview-web` hand-written `.d.ts` shipped (#946).
+  - **Scripts** : `capture-play-store-screenshots.sh` lifted from chat history into `.claude/scripts/` (#919, with #975 follow-up for `--status-bar-px` flag + reject-multi-device).
+- 🛡️ **5-agent Opus independent review** ran in parallel after the initial wave and caught **3 BLOCKERS + 4 MAJORS + 8 MINORS** before any public announcement:
+  - DOM XSS duplicate in the inline-JS path of `samples/web-demo/src/jsMain/resources/index.html` (Kotlin fix didn't reach it).
+  - MCP `list_platforms` rendered literal `${LATEST_SCENEVIEW_RELEASE}` text — substring was in `"..."` not `` `...` ``.
+  - `data_extraction_rules.xml` covered 1 storage domain instead of 5, and `fullBackupContent` was missing entirely so API 24..30 still leaked to Drive.
+  - `docs.yml` web-demo deploy used `jsBrowserProductionWebpack` (HTML missing) instead of `jsBrowserDistribution`.
+  - Plus 4 MAJORs (rememberMaterialInstance PBR-key churn, AnimationDemo teleport-on-foreground, RN docs 3.6.1 stale, MCP residual `4.0.0`/`1.70.1` leftovers). All shipped in `de692709`.
+- ✅ **3002 tests passing** end-to-end (sceneview 306 + arsceneview 123 + samples 41 + MCP 2532). 8 pre-existing orphan `dist/*.test.js` suite-loads still fail (modules dropped by #938, stale compiled tests).
+- ✅ `:samples:android-demo:assembleDebug` → 161 MB APK built. Deploy website + docs CI green on `f2af4615`.
+- 📊 **JaCoCo baselines surfaced**: `sceneview` 7.46 % line coverage, `arsceneview` 10.24 %. Honest starting point; delta-coverage gate is #973's job.
+- 50 → 39 open issues. Remaining critical: #966 audit umbrella, #932 Delaunator thread-safety, #933 MaterialLoader coroutine leak, #934 APK 84→30 MB, #928 SceneViewSwift 21 silent stubs, #929 SceneViewSwift 9 test fails, #917 iOS App Store screenshots stale.
+
+### Followups for next session
+
+1. **#971** — migrate the remaining 10 demos to `rememberMaterialInstance` (good-first-issue; PBR-key safety doc'd in the helper).
+2. **#972** — wire test infra in `samples/common/` so `LifecycleAwareLaunchedEffect` + `rememberMaterialInstance` get regression pins. Prereq for #971.
+3. **#973** — JaCoCo delta-coverage gate. Establish baseline file + fail PR if `delta < -0.5pp`.
+4. **#974** — state-preserving lifecycle pattern for AnimationDemo. 3 design options sketched.
+5. **#975** — capture-play-store-screenshots.sh hardening (multi-device reject, --status-bar-px, variance threshold).
+6. Optional: continue #965 KDoc sweep — 7 more fully-undocumented files (`RenderableManager.kt`, `NodeAnimator.kt`, `Cube/Cone/Cylinder/Sphere/Capsule/Torus.kt`, `Texture/VideoTexture/TextureSampler/ImageTexture.kt`, `UbershaderInstance.kt`, `sceneview-core/logging/Log.kt`). Pre-req for the Detekt `UndocumentedPublic*` rule.
+
+### Previous state (last updated: 2026-05-08, session bold-villani-42902e — plugin marketplace + brand-scope cleanup + portfolio scrub)
 
 - 🚀 **Claude Code plugin marketplace LIVE** at [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace), single plugin scoped strictly to SceneView:
   - **sceneview** v4.0.11 (Apache-2.0) — `sceneview-mcp` + 11 namespaced contributor commands + cross-platform reminder hooks
@@ -174,18 +203,18 @@ Never say "everything is good" without verifying published packages.
 - 🔒 **Big repo scrub** committed in this session:
   - Removed off-topic personal-portfolio code from public sceneview/sceneview repo: `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy / submission docs that listed every personal MCP
   - Scrubbed in-place mentions in `CLAUDE.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/docs/ai-context.md`, `.gitignore`
-  - Untracked `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md`, `.dart_tool/`, `qa_log.txt` — these were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references
-  - Verified `git ls-files | grep -iE 'urssaf|impôts|service-public|french-admin'` returns **0 hits** in HEAD
+  - Untracked `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md`, `.dart_tool/`, `qa_log.txt` — these were carrying employer-domain leakage and references to the suspended (lowercase) GitHub account
+  - Verified the standard employer/portfolio identifier greps return **0 hits** in tracked HEAD files
   - `npm hub-mcp` deprecated with a "project discontinued — use individual MCPs directly" message; local backups deleted
 - ⚠️ **Past git history** still contains the leaked strings + the moved-out files. A `git filter-repo` session is the next-up follow-up — must coordinate with the 9 active worktrees before force-push.
 
 ### Followups for next session
 
-1. **filter-repo run** — scrub `octopuscommunity`, `AjaxMusic@gmail`, `thomasgorisse` (lowercase) from the entire git history of `sceneview/sceneview`. See plan in `~/Projects/profile-private/plans/filter-repo-plan.md`.
+1. **filter-repo run** — scrub the historical employer/portfolio strings from the entire git history of `sceneview/sceneview`. See plan in `~/Projects/profile-private/plans/filter-repo-plan.md`.
 2. **Submit Anthropic marketplace** — guide at `~/Projects/profile-private/marketplace-submissions/2026-05-07-anthropic-marketplace-submission.md` (Thomas clicks through the in-app form).
 3. **Reddit + HN posts** — drafts at `~/Projects/profile-private/announcements/` (single-plugin framing, ready to post when Thomas is ready).
 - 4-agent independent Opus review caught 6 BLOCKING + 5 MAJOR before public announcement: dead-code hooks (matcher syntax invalid, validator missed it), license mismatch (Apache-2.0 vs MIT), 1.4 GB monolithic clone (split to dedicated repo to fix), `/review` `/test` namespace collision with built-in skills, version drift (plugin pinned 4.0.9 vs npm @4.0.11), DL/mo numbers gonflés in announcement drafts. All BLOCKING fixed in [`a88f7f8c`](https://github.com/sceneview/sceneview/commit/a88f7f8c) + the marketplace migration.
-- 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
+- 🔒 CDI-safety scrub on the same commit: untracked all `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md` etc. that were carrying employer-domain leakage and suspended-account references. `.gitignore` extended to stop new HEAD leaks. Past history still leaked — separate `git filter-repo` session is the next-up follow-up.
 - Side effect: enriched `.claude/commands/*.md` with YAML frontmatter (`description:`) so `/help` now shows one-line summaries for every contributor command.
 - README.md "Claude Code plugin" section explains the MCP + commands + hooks bundle and points at the dedicated marketplace repo.
 

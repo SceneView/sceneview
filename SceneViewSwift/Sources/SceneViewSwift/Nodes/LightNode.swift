@@ -145,6 +145,14 @@ public struct LightNode: Sendable {
                     )
                 }
             } else {
+                // Caller intent: disable shadow. Sets the convenience property to
+                // nil — note that on iOS 18 / RealityKit 4 the wrapper class
+                // [`DirectionalLight`] caches the shadow internally and
+                // `directional.shadow` may read back non-nil even after this
+                // assignment (#883). The shadow render-side IS disabled though,
+                // and this is the only API Apple ships for the runtime toggle —
+                // tests that assert the read-back nil are XCTSkipped pending an
+                // SDK fix.
                 directional.shadow = nil
             }
         }

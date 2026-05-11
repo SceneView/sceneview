@@ -5,7 +5,7 @@ SceneView provides a React Native module that bridges to native SceneView render
 ## Install
 
 ```bash
-npm install react-native-sceneview
+npm install @sceneview-sdk/react-native
 cd ios && pod install
 ```
 
@@ -14,7 +14,7 @@ cd ios && pod install
 ### 3D Scene
 
 ```tsx
-import { SceneView } from 'react-native-sceneview';
+import { SceneView } from '@sceneview-sdk/react-native';
 
 export default function ModelViewer() {
   return (
@@ -33,7 +33,7 @@ export default function ModelViewer() {
 ### AR Scene
 
 ```tsx
-import { ARSceneView } from 'react-native-sceneview';
+import { ARSceneView } from '@sceneview-sdk/react-native';
 
 export default function ARViewer() {
   return (

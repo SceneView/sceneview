@@ -1,3 +1,4 @@
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 /**
  * debug-issue.ts
  *
@@ -324,7 +325,7 @@ fun DebugModelViewer() {
     title: "Build / Gradle Errors",
     guide: `## Debugging: Build Errors
 
-### "Cannot resolve io.github.sceneview:sceneview:4.0.0"
+### "Cannot resolve io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}"
 
 1. Check repositories in \`settings.gradle.kts\`:
    \`\`\`kotlin
@@ -367,7 +368,7 @@ SceneView bundles Filament. If you also depend on Filament directly:
 \`\`\`kotlin
 // Remove direct Filament dependency — SceneView includes it
 // implementation("com.google.android.filament:filament-android:1.x.x") // REMOVE
-implementation("io.github.sceneview:sceneview:4.0.0") // This includes Filament
+implementation("io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}") // This includes Filament
 \`\`\`
 
 ### "Cannot find Filament material"
@@ -701,10 +702,43 @@ export function autoDetectIssue(description: string): DebugCategory | null {
     return "crash";
   }
 
-  if (lower.includes("not showing") || lower.includes("invisible") || lower.includes("can't see") || lower.includes("model doesn't appear") || lower.includes("model not visible") || lower.includes("nothing shows up") || lower.includes("model is null") || lower.includes("remembermodelinstance returns null")) {
+  if (lower.includes("not showing") || lower.includes("invisible") || lower.includes("can't see") || lower.includes("model doesn't appear") || lower.includes("model not visible") || lower.includes("nothing shows up") || lower.includes("model is null") || lower.includes("remembermodelinstance returns null") || lower.includes("no model")) {
     return "model-not-showing";
   }
-  if (lower.includes("ar not") || lower.includes("ar doesn't") || lower.includes("arcore") || lower.includes("plane") || lower.includes("anchor") || lower.includes("camera permission") || lower.includes("augmented reality") || lower.includes("hit test") || lower.includes("hitresult")) {
+  // AR-not-working catches "the AR camera feed is dark" and the half-dozen
+  // ways a user describes a non-functional AR session. Pre-#940 only "ar not",
+  // "ar doesn't", and the technical terms (arcore/plane/anchor/hit test)
+  // matched — the natural phrasings "ar camera is black", "my AR is black",
+  // "ARScene shows nothing", etc. fell through to null.
+  //
+  // The regex `\b(ar|arscene|arsceneview|arcore)\b.*\b(black|dark)\b` catches
+  // any sentence where "AR" (in any of its forms) and a "no signal" keyword
+  // both appear, independent of the connecting words ("is", "feed is",
+  // "camera was", etc.). "dark" is added per the #940 review — "AR mode is
+  // dark" / "AR feed dimmed" are common synonyms users reach for.
+  //
+  // The bare `\bcamera\b.*\b(black|dark)\b` check is NOW gated on the
+  // sentence containing an AR-flavoured token — without that gate it
+  // false-positives on "the orbit camera in my 3D scene renders a black
+  // background" (a 3D-only issue that should route to model-not-showing
+  // or material). Caught by the #940 follow-up review.
+  const hasArContext = /\b(ar|arscene|arsceneview|arcore|arkit|arcore)\b/.test(lower)
+    || lower.includes("augmented reality");
+  const arBlackHints =
+    (hasArContext && /\b(black|dark|dimmed)\b/.test(lower))
+    || /\b(ar|arscene|arsceneview|arcore)\b.*\b(black|dark|dimmed)\b/.test(lower);
+  if (
+    lower.includes("ar not") ||
+    lower.includes("ar doesn't") ||
+    lower.includes("arcore") ||
+    lower.includes("plane") ||
+    lower.includes("anchor") ||
+    lower.includes("camera permission") ||
+    lower.includes("augmented reality") ||
+    lower.includes("hit test") ||
+    lower.includes("hitresult") ||
+    arBlackHints
+  ) {
     return "ar-not-working";
   }
   if (lower.includes("crash") || lower.includes("sigabrt") || lower.includes("native crash") || lower.includes("fatal") || lower.includes("exception") || lower.includes("destroy") || lower.includes("double free") || lower.includes("segfault") || (lower.includes("oom") && !lower.includes("zoom")) || lower.includes("out of memory") || lower.includes("nullpointerexception") || lower.includes("npe")) {

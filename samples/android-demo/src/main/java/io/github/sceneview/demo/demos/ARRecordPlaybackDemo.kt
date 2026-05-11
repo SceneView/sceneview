@@ -41,7 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -188,11 +190,25 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val chipHaptic = LocalHapticFeedback.current
                 Mode.values().forEach { mode ->
                     FilterChip(
                         selected = currentMode == mode,
                         onClick = {
                             if (currentMode != mode) {
+                                // TextHandleMove is Compose's "small confirm"
+                                // pulse — same one Material 3 uses on chip
+                                // toggles when the system honours haptic-on-
+                                // touch. Explicit here so it fires on every
+                                // device, not only those with the OS setting
+                                // turned on (#956). Skipped in qaMode so
+                                // adb-driven instrumentation tests that tap
+                                // these chips don't get unexpected vibration.
+                                if (!io.github.sceneview.demo.DemoSettings.qaMode) {
+                                    chipHaptic.performHapticFeedback(
+                                        HapticFeedbackType.TextHandleMove
+                                    )
+                                }
                                 currentMode = mode
                                 if (mode != Mode.PLAYBACK) currentPlaybackFile = null
                             }
@@ -377,8 +393,9 @@ private fun ModeContent(
         onSessionUpdated = { session: Session, frame: Frame ->
             latestFrame = frame
             isTracking = frame.camera.trackingState == TrackingState.TRACKING
-            // Wire the recorder every frame — attach is idempotent so this is cheap.
-            recorder.attach(session)
+            // Stateless side-channel pattern (#876) — recordFrame publishes the
+            // session per call, mirroring RerunBridge.logFrame. Idempotent.
+            recorder.recordFrame(session)
         },
         onTrackingFailureChanged = { trackingFailureReason = it },
         onGestureListener = rememberOnGestureListener(
@@ -500,9 +517,16 @@ private fun RecordOverlay(
             // user from a confusing ERROR state and the disc visually fades
             // so the affordance "wait, it's not ready" is unambiguous.
             val isTappable = isRecording || startEnabled
+            // Camera-app feel: a sharp pulse on shutter press so the user can
+            // feel they started/stopped a recording without staring at the UI.
+            // No haptic on a no-op tap (greyed shutter) — that would be
+            // confusing rather than confirming. iOS/Android camera apps both
+            // use a LongPress-strength haptic for shutter; matching it (#956).
+            val shutterHaptic = LocalHapticFeedback.current
             Surface(
                 onClick = {
                     if (!isTappable) return@Surface
+                    shutterHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (isRecording) onStop() else onStart()
                 },
                 shape = androidx.compose.foundation.shape.CircleShape,

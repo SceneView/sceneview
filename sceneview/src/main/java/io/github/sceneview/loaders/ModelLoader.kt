@@ -1,6 +1,7 @@
 package io.github.sceneview.loaders
 
 import android.content.Context
+import androidx.annotation.MainThread
 import androidx.annotation.RawRes
 import com.google.android.filament.Engine
 import com.google.android.filament.EntityManager
@@ -58,6 +59,7 @@ class ModelLoader(
      * @throws IllegalArgumentException if the buffer cannot be parsed.
      * @see AssetLoader.createAsset
      */
+    @MainThread
     fun createModel(
         buffer: Buffer,
         releaseSourceData: Boolean = true,
@@ -76,6 +78,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModel(
         assetFileLocation: String,
         releaseSourceData: Boolean = true,
@@ -89,6 +92,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModel(
         @RawRes rawResId: Int,
         releaseSourceData: Boolean = true,
@@ -100,6 +104,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModel(
         file: File,
         releaseSourceData: Boolean = true,
@@ -162,6 +167,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModelInstance(
         buffer: Buffer,
         resourceResolver: (resourceFileName: String) -> Buffer? = { null }
@@ -174,6 +180,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModelInstance(
         assetFileLocation: String,
         resourceResolver: (resourceFileName: String) -> Buffer? = {
@@ -188,6 +195,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModelInstance(
         @RawRes rawResId: Int,
         resourceResolver: (resourceFileName: String) -> Buffer? = { null }
@@ -200,6 +208,7 @@ class ModelLoader(
      *
      * @see createModel
      */
+    @MainThread
     fun createModelInstance(
         file: File,
         resourceResolver: (resourceFileName: String) -> Buffer? = { resourceFile ->
@@ -251,6 +260,7 @@ class ModelLoader(
      *
      * @see AssetLoader.createInstancedAsset
      */
+    @MainThread
     fun createInstancedModel(
         buffer: Buffer,
         count: Int,
@@ -275,6 +285,7 @@ class ModelLoader(
      *
      * @see createInstancedModel
      */
+    @MainThread
     fun createInstancedModel(
         assetFileLocation: String,
         count: Int,
@@ -297,6 +308,7 @@ class ModelLoader(
      *
      * @see createInstancedModel
      */
+    @MainThread
     fun createInstancedModel(
         @RawRes rawResId: Int,
         count: Int,
@@ -314,6 +326,7 @@ class ModelLoader(
      *
      * @see createInstancedModel
      */
+    @MainThread
     fun createInstancedModel(
         file: File,
         count: Int,
@@ -376,7 +389,10 @@ class ModelLoader(
         },
         onResult: (List<ModelInstance>) -> Unit
     ): Job = coroutineScope.launch {
-        loadInstancedModel(fileLocation, count, resourceResolver).also(onResult)
+        val instances = loadInstancedModel(fileLocation, count, resourceResolver)
+        withContext(Dispatchers.Main) {
+            onResult(instances)
+        }
     }
 
     /**

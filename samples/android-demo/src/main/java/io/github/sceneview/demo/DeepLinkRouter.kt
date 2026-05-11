@@ -48,6 +48,22 @@ internal object DeepLinkRouter {
     fun parse(data: Uri?, registry: List<DemoEntry> = ALL_DEMOS): String? {
         if (data == null) return null
         val candidate = extractCandidate(data) ?: return null
+        return validate(candidate, registry)
+    }
+
+    /**
+     * Validates a raw demo id against [registry]. Used by the QA-channel
+     * ingress (`--es demo <id>` from `adb shell am`) so the same allow-list
+     * applies whether the id comes from a URL deep-link or from the intent
+     * extra. Without this, any app on the device could steer navigation by
+     * passing an arbitrary string — same risk as the unvalidated
+     * `ar_playback_file` extra fixed in commit `a7dec5e3`. See #958.
+     *
+     * Returns the candidate iff it is non-blank AND matches a registered
+     * demo; otherwise `null`, which the caller treats as "no deep-link".
+     */
+    fun validate(id: String?, registry: List<DemoEntry> = ALL_DEMOS): String? {
+        val candidate = id?.takeIf { it.isNotBlank() } ?: return null
         return if (registry.any { it.id == candidate }) candidate else null
     }
 

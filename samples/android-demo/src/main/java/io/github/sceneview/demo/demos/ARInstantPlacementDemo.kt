@@ -69,9 +69,9 @@ private data class InstantPlacedModel(
 
 private data class InstantCycleEntry(val assetPath: String, val displayName: String)
 
+// Avocado dropped per audit #949 — see ARPlacementDemo for the rationale.
 private val INSTANT_MODEL_CYCLE = listOf(
     InstantCycleEntry("models/khronos_damaged_helmet.glb", "Damaged Helmet"),
-    InstantCycleEntry("models/khronos_avocado.glb", "Avocado"),
     InstantCycleEntry("models/khronos_fox.glb", "Fox"),
     InstantCycleEntry("models/khronos_lantern.glb", "Lantern"),
     InstantCycleEntry("models/khronos_toy_car.glb", "Toy Car"),

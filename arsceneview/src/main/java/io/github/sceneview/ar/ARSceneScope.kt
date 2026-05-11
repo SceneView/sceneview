@@ -38,7 +38,9 @@ import io.github.sceneview.ar.node.AugmentedImageNode as AugmentedImageNodeImpl
 import io.github.sceneview.ar.node.CloudAnchorNode as CloudAnchorNodeImpl
 import io.github.sceneview.ar.node.HitResultNode as HitResultNodeImpl
 import io.github.sceneview.ar.node.PoseNode as PoseNodeImpl
+import io.github.sceneview.ar.node.RooftopAnchorNode as RooftopAnchorNodeImpl
 import io.github.sceneview.ar.node.StreetscapeGeometryNode as StreetscapeGeometryNodeImpl
+import io.github.sceneview.ar.node.TerrainAnchorNode as TerrainAnchorNodeImpl
 import io.github.sceneview.ar.node.TrackableNode as TrackableNodeImpl
 
 /**
@@ -87,13 +89,20 @@ class ARSceneScope internal constructor(
     modelLoader: ModelLoader,
     materialLoader: MaterialLoader,
     environmentLoader: EnvironmentLoader,
-    _nodes: SnapshotStateList<NodeImpl>
+    _nodes: SnapshotStateList<NodeImpl>,
+    // Same SIGABRT-prevention contract as the 3D root scope: removes the node
+    // from the Filament scene synchronously inside detach() before node.destroy()
+    // runs, so a MaterialInstance is never destroyed while its Renderable entity
+    // is still registered. Without this the AR scope re-introduces the crash
+    // class fixed in PR #851/#852 for any AR demo that disposes nodes.
+    nodeRemover: ((NodeImpl) -> Unit)? = null
 ) : SceneScope(
     engine = engine,
     modelLoader = modelLoader,
     materialLoader = materialLoader,
     environmentLoader = environmentLoader,
-    _nodes = _nodes
+    _nodes = _nodes,
+    nodeRemover = nodeRemover
 ) {
 
     // ── AnchorNode ────────────────────────────────────────────────────────────────────────────────
@@ -399,6 +408,12 @@ class ARSceneScope internal constructor(
      *
      * @param augmentedFace         The ARCore [AugmentedFace] to render.
      * @param meshMaterialInstance  Optional material applied to the face mesh.
+     * @param computeTangents       Whether to compute and upload per-vertex tangent
+     *                              quaternions every frame. Required by PBR (lit) materials;
+     *                              **set `false` when [meshMaterialInstance] is unlit**
+     *                              (e.g. `materialLoader.createUnlitColorInstance(...)`)
+     *                              to skip ~30 Hz of pure-waste Mikkelsen compute + JNI
+     *                              roundtrip + buffer upload. Default `true` (#878 audit).
      * @param onTrackingStateChanged Callback when tracking state changes.
      * @param onUpdated             Callback invoked each frame while the face is updated.
      * @param apply                 Additional imperative configuration.
@@ -408,16 +423,18 @@ class ARSceneScope internal constructor(
     fun AugmentedFaceNode(
         augmentedFace: AugmentedFace,
         meshMaterialInstance: MaterialInstance? = null,
+        computeTangents: Boolean = true,
         onTrackingStateChanged: ((TrackingState) -> Unit)? = null,
         onUpdated: ((AugmentedFace) -> Unit)? = null,
         apply: AugmentedFaceNodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null
     ) {
-        val node = remember(engine, augmentedFace) {
+        val node = remember(engine, augmentedFace, computeTangents) {
             AugmentedFaceNodeImpl(
                 engine = engine,
                 augmentedFace = augmentedFace,
                 meshMaterialInstance = meshMaterialInstance,
+                computeTangents = computeTangents,
                 onTrackingStateChanged = onTrackingStateChanged,
                 onUpdated = onUpdated
             ).apply(apply)
@@ -590,5 +607,87 @@ class ARSceneScope internal constructor(
             node.onUpdated = onUpdated
         }
         NodeLifecycle(node, content)
+    }
+
+    // ── TerrainAnchorNode ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * A composable wrapper for an already-resolved [TerrainAnchorNode][TerrainAnchorNodeImpl].
+     *
+     * **Resolution stays imperative.** ARCore's `TerrainAnchorNode.resolve(...)` is async and
+     * may take seconds (it calls Google Cloud's VPS service). Wrap that call in a
+     * `LaunchedEffect` keyed on the (lat, lng, altitude) triple, then pass the resolved
+     * instance to this composable so it lives inside the scene tree like any other node:
+     *
+     * ```kotlin
+     * val anchorNodes = remember { mutableStateListOf<TerrainAnchorNode>() }
+     *
+     * ARSceneView(
+     *     sessionConfiguration = { _, config -> config.geospatialMode = Config.GeospatialMode.ENABLED },
+     *     onSessionUpdated = { session, _ ->
+     *         val earth = session.earth ?: return@ARSceneView
+     *         if (earth.trackingState == TrackingState.TRACKING && anchorNodes.isEmpty()) {
+     *             TerrainAnchorNode.resolve(
+     *                 engine = engine,
+     *                 earth = earth,
+     *                 latitude = 48.8584, longitude = 2.2945, altitudeAboveTerrain = 1.5,
+     *                 eusQuaternion = Quaternion(),
+     *             ) { state, anchorNode ->
+     *                 if (state == Anchor.TerrainAnchorState.SUCCESS && anchorNode != null) {
+     *                     anchorNodes += anchorNode
+     *                 }
+     *             }
+     *         }
+     *     }
+     * ) {
+     *     anchorNodes.forEach { TerrainAnchorNode(node = it) {
+     *         ModelNode(modelInstance = signpost, scaleToUnits = 0.5f)
+     *     } }
+     * }
+     * ```
+     *
+     * Requires `Config.GeospatialMode.ENABLED`, ARCore Cloud API key, ACCESS_FINE_LOCATION,
+     * internet, and outdoor VPS coverage. 100-anchor cap (Terrain + Rooftop combined).
+     *
+     * @param node      The resolved [TerrainAnchorNodeImpl] returned by `TerrainAnchorNode.resolve(...)`.
+     * @param apply     Additional imperative configuration applied once on first composition.
+     * @param content   Optional child nodes declared in a [NodeScope].
+     */
+    @Composable
+    fun TerrainAnchorNode(
+        node: TerrainAnchorNodeImpl,
+        apply: TerrainAnchorNodeImpl.() -> Unit = {},
+        content: (@Composable NodeScope.() -> Unit)? = null
+    ) {
+        val attached = remember(node) { node.apply(apply) }
+        NodeLifecycle(attached, content)
+    }
+
+    // ── RooftopAnchorNode ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * A composable wrapper for an already-resolved [RooftopAnchorNode][RooftopAnchorNodeImpl].
+     *
+     * Same usage pattern as [TerrainAnchorNode] — call `RooftopAnchorNode.resolve(...)`
+     * imperatively (async, returns a `Future`), then pass the resolved instance here so it
+     * participates in the scene tree. The altitude argument is interpreted relative to the
+     * rooftop of the building at the given lat/lng, falling back to terrain altitude when
+     * no building is detected.
+     *
+     * Requires `Config.GeospatialMode.ENABLED`, ARCore Cloud API key, ACCESS_FINE_LOCATION,
+     * internet, and outdoor VPS coverage. 100-anchor cap (Terrain + Rooftop combined).
+     *
+     * @param node      The resolved [RooftopAnchorNodeImpl] returned by `RooftopAnchorNode.resolve(...)`.
+     * @param apply     Additional imperative configuration applied once on first composition.
+     * @param content   Optional child nodes declared in a [NodeScope].
+     */
+    @Composable
+    fun RooftopAnchorNode(
+        node: RooftopAnchorNodeImpl,
+        apply: RooftopAnchorNodeImpl.() -> Unit = {},
+        content: (@Composable NodeScope.() -> Unit)? = null
+    ) {
+        val attached = remember(node) { node.apply(apply) }
+        NodeLifecycle(attached, content)
     }
 }

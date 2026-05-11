@@ -74,6 +74,17 @@ open class AugmentedFaceNode(
     engine: Engine,
     val augmentedFace: AugmentedFace,
     private val meshMaterialInstance: MaterialInstance? = null,
+    /**
+     * Whether to compute and upload per-vertex tangent quaternions every frame for the face
+     * mesh. Required by PBR (lit) materials — they encode normal + tangent + bitangent into
+     * the FLOAT4 TANGENTS attribute.
+     *
+     * **Set to `false` when the material is unlit** (e.g. `materialLoader.createUnlitColorInstance`)
+     * — unlit shaders never sample TANGENTS, so the per-frame Mikkelsen build + JNI roundtrip
+     * + buffer upload (~30 Hz of `vertexCount * 16` bytes) is pure waste. Default `true` keeps
+     * the lit-PBR behaviour shipping today (#878 audit).
+     */
+    private val computeTangents: Boolean = true,
     private val builder: RenderableManager.Builder.() -> Unit = {},
     onTrackingStateChanged: ((TrackingState) -> Unit)? = null,
     onUpdated: ((AugmentedFace) -> Unit)? = null
@@ -149,7 +160,15 @@ open class AugmentedFaceNode(
         // + bitangent), not raw FLOAT3 normals — uploading normals as if they were
         // quaternions left the mesh with undefined lighting and rendered it invisible
         // under the transparent colored material used by the demo.
-        val tangents = computeTangents(vertices, normals, uvs, indices, vertexCount)
+        //
+        // Skip the compute + upload entirely for unlit materials (#878 audit) — they
+        // never sample TANGENTS, so the per-frame Mikkelsen build + JNI roundtrip is
+        // pure waste at ~30 Hz.
+        val tangents = if (computeTangents) {
+            computeTangents(vertices, normals, uvs, indices, vertexCount)
+        } else {
+            null
+        }
 
         if (meshNode == null) {
             meshNode = MeshNode(
@@ -169,9 +188,17 @@ open class AugmentedFaceNode(
                     .vertexCount(vertexCount)
                     .build(engine).apply {
                         // Fill all slots before the node becomes visible,
-                        // so Filament can compute a non-empty AABB (build:552)
+                        // so Filament can compute a non-empty AABB (build:552).
                         setBufferAt(engine, 0, vertices) // positions  (dynamic)
-                        setBufferAt(engine, 1, tangents) // tangents   (dynamic, recomputed)
+                        // Slot 1 (TANGENTS, FLOAT4) MUST be a 16-byte-per-vertex buffer
+                        // even for unlit materials — Filament asserts on stride mismatch.
+                        // For lit materials we upload the just-computed Mikkelsen quats;
+                        // for unlit we upload an identity-quaternion buffer ONCE here
+                        // (built lazily) and never touch it again per frame.
+                        setBufferAt(
+                            engine, 1,
+                            tangents ?: identityTangentsBuffer(vertexCount)
+                        )
                         setBufferAt(engine, 2, uvs)      // UVs        (static)
                     },
                 indexBuffer = IndexBuffer.Builder()
@@ -205,10 +232,14 @@ open class AugmentedFaceNode(
 
         // Update dynamic buffers every frame — positions + recomputed tangents.
         // Tangent quaternions depend on normals and must be rebuilt whenever the
-        // mesh deforms (i.e. every tracked frame).
+        // mesh deforms (i.e. every tracked frame). For unlit materials we skip
+        // the per-frame TANGENTS upload entirely (#878) — the static
+        // identity-quaternion buffer uploaded at construction is unchanged.
         meshNode?.vertexBuffer?.apply {
             setBufferAt(engine, 0, vertices) // positions
-            setBufferAt(engine, 1, tangents) // tangent quaternions
+            if (tangents != null) {
+                setBufferAt(engine, 1, tangents) // tangent quaternions
+            }
         }
 
         centerNode.pose = augmentedFace.centerPose
@@ -255,6 +286,30 @@ open class AugmentedFaceNode(
      * [SurfaceOrientation]. The returned buffer holds `vertexCount * 16` bytes
      * (4 floats per vertex) and is rewound to position 0, ready for upload.
      */
+    /**
+     * Identity-quaternion buffer for unlit face mesh — fills the TANGENTS slot once at
+     * construction so Filament's stride contract is honoured, then is never re-uploaded.
+     * Layout: 4 floats per vertex `(0, 0, 0, 1)` (identity quaternion). The shader
+     * never samples it, so the value doesn't matter — but the slot must be the right
+     * size and never empty (Filament asserts at build time).
+     */
+    private fun identityTangentsBuffer(vertexCount: Int): ByteBuffer {
+        val neededBytes = vertexCount * 4 * 4
+        val buf = tangentsBuffer?.takeIf { it.capacity() >= neededBytes }
+            ?: ByteBuffer.allocateDirect(neededBytes).order(ByteOrder.nativeOrder())
+                .also { tangentsBuffer = it }
+
+        buf.clear()
+        buf.limit(neededBytes)
+        // Write (0, 0, 0, 1) per vertex — identity quaternion. Cheap one-shot pass.
+        val floats = buf.asFloatBuffer()
+        repeat(vertexCount) {
+            floats.put(0f); floats.put(0f); floats.put(0f); floats.put(1f)
+        }
+        buf.rewind()
+        return buf
+    }
+
     private fun computeTangents(
         positions: java.nio.FloatBuffer,
         normals: java.nio.FloatBuffer,

@@ -1,3 +1,4 @@
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 /**
  * generate-scene.ts
  *
@@ -303,7 +304,7 @@ export function generateScene(description: string): GeneratedScene {
 
   // Build the code
   const isAR = parsed.isAR;
-  dependencies.push(isAR ? "io.github.sceneview:arsceneview:4.0.0" : "io.github.sceneview:sceneview:4.0.0");
+  dependencies.push(isAR ? "io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}" : "io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}");
 
   // Build model instance declarations
   const modelElements = elements.filter((e) => e.type === "model");

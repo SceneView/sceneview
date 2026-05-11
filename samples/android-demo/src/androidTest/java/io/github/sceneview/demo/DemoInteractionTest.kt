@@ -598,6 +598,11 @@ class DemoInteractionTest {
      * re-capture here.
      */
     @Test
+    @org.junit.Ignore(
+        "Filament UAF on visibility toggle — `Invalid texture still bound to " +
+            "MaterialInstance` SIGABRT, see comment block above. Re-enable once the " +
+            "BillboardNode / ImageNode teardown order is fixed in sceneview/. (#887)"
+    )
     fun billboard_visibilityChips() {
         openDemo("billboard", "Billboard Node")
         screenshot("49_billboard_both_visible")

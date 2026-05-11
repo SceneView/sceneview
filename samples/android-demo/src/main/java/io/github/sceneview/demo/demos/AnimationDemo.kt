@@ -194,6 +194,18 @@ fun AnimationDemo(onBack: () -> Unit) {
     // canonicalize all Animatable values at entry, then run a `while (true)`
     // sequence of `animateTo` calls. Cancellation comes for free because Compose
     // tears down the LaunchedEffect when `cameraMode` changes.
+    //
+    // NOTE: this LaunchedEffect intentionally does NOT use
+    // `LifecycleAwareLaunchedEffect` even though the cinematic loops are the
+    // heaviest battery draw in the app. The reason: every `when (cameraMode)`
+    // arm begins with `xAnim.snapTo(initialValue)` to canonicalize state, and
+    // `repeatOnLifecycle(STARTED)` re-runs the block from the top on every
+    // foreground — so a user who Alt-Tabs mid-orbit would see the camera
+    // teleport back to yaw=0 on return. The Filament render thread already
+    // stops drawing when the SceneView surface backgrounds, so the visible
+    // CPU/GPU cost of "loop keeps animating in background" is limited to
+    // the Compose snapshot updates on the Animatable values. Acceptable
+    // until we wire a state-preserving lifecycle pattern. See #936 review.
     // ---------------------------------------------------------------------------
     LaunchedEffect(cameraMode, DemoSettings.qaMode) {
         // QA freeze — match the hero-orbit helper so screenshot tests stay stable.

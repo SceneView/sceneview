@@ -4,6 +4,7 @@ plugins {
     id 'filament-tools-plugin'
     alias(libs.plugins.dokka)
     alias(libs.plugins.compose.compiler)
+    id 'jacoco'
 }
 
 // *************************************************************************************************
@@ -62,6 +63,10 @@ android {
         debug {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Enable JaCoCo bytecode coverage on debug unit tests so the
+            // `jacocoTestReport` task below can pull an exec file out of
+            // `build/jacoco/`. See #964.
+            testCoverageEnabled true
         }
     }
 
@@ -125,3 +130,39 @@ dependencies {
 }
 
 apply plugin: "com.vanniktech.maven.publish"
+
+// ── JaCoCo coverage report ────────────────────────────────────────────────
+//
+// `./gradlew :sceneview:jacocoTestReport` runs the debug-unit-test suite
+// (already runs in CI) and emits XML + HTML coverage at
+// `sceneview/build/reports/jacoco/jacocoTestReport/`. The XML lands as a
+// CI artefact via the `jacoco-coverage` workflow step so PR comments can
+// surface deltas. No threshold is enforced yet — see #964 follow-up to
+// land a baseline once the headline number is stable across two consecutive
+// CI runs.
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+tasks.register('jacocoTestReport', JacocoReport) {
+    dependsOn 'testDebugUnitTest'
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    def fileFilter = [
+        '**/R.class', '**/R$*.class', '**/BuildConfig.*',
+        '**/Manifest*.*', '**/*Test*.*',
+        '**/dagger/**', '**/hilt/**',
+    ]
+    def debugTree = fileTree(dir: "${buildDir}/tmp/kotlin-classes/debug", excludes: fileFilter)
+    def mainSrc = "${projectDir}/src/main/java"
+    sourceDirectories.setFrom(files([mainSrc]))
+    classDirectories.setFrom(files([debugTree]))
+    // AGP 8+ drops the exec file under `outputs/unit_test_code_coverage/`,
+    // not the legacy `build/jacoco/` location the Detekt template uses.
+    executionData.setFrom(fileTree(dir: buildDir, includes: [
+        'outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec',
+        'jacoco/testDebugUnitTest.exec', // fallback for older AGP
+    ]))
+}

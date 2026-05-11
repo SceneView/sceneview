@@ -16,7 +16,7 @@ app.get("/health", (c) =>
   c.json({
     ok: true,
     service: "sceneview-mcp-gateway",
-    version: "0.0.1",
+    version: "1.0.0",
   }),
 );
 

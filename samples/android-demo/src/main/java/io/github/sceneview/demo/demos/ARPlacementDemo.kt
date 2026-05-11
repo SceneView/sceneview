@@ -45,7 +45,7 @@ import io.github.sceneview.rememberOnGestureListener
  * Plane detection is rendered as a translucent overlay. Each tap on a detected horizontal or
  * vertical plane spawns a NEW [ModelNode] instance attached to its own
  * [AnchorNode][io.github.sceneview.ar.node.AnchorNode]. The model cycles through a small curated
- * list of bundled GLBs so the user can sample the SDK's variety: helmet, avocado, fox, lantern,
+ * list of bundled GLBs so the user can sample the SDK's variety: helmet, fox, lantern,
  * boom-box-style toy car, and shiba.
  *
  * Each placed model is **editable** — `isEditable = true` on the [ModelNode] enables
@@ -68,9 +68,10 @@ private data class CycleEntry(val assetPath: String, val displayName: String)
 
 // Curated list of bundled GLBs that look good as small AR objects on a plane.
 // Each has a distinct silhouette and material so the cycle visibly rotates through variety.
+// (Khronos Avocado dropped per audit #949 — 7.7 MB grey-green low-poly that read as
+// 2003-textbook quality next to the helmet/lantern/dragon brass-and-PBR neighbours.)
 private val MODEL_CYCLE = listOf(
     CycleEntry("models/khronos_damaged_helmet.glb", "Damaged Helmet"),
-    CycleEntry("models/khronos_avocado.glb", "Avocado"),
     CycleEntry("models/khronos_fox.glb", "Fox"),
     CycleEntry("models/khronos_lantern.glb", "Lantern"),
     CycleEntry("models/khronos_toy_car.glb", "Toy Car"),

@@ -236,6 +236,22 @@ describe("migration/old-api", () => {
     expect(hasRule(`ArSceneView(modifier = Modifier.fillMaxSize())`, RULE)).toBe(true);
   });
 
+  // ── 4.0 rename: `Scene { }` / `ARScene { }` → `SceneView { }` / `ARSceneView { }`
+  it("fires on legacy Scene { } trailing-lambda call (4.0 rename — #939)", () => {
+    expect(hasRule(`Scene { ModelNode(...) }`, RULE)).toBe(true);
+  });
+
+  it("fires on legacy ARScene { } trailing-lambda call (4.0 rename — #939)", () => {
+    expect(hasRule(`ARScene { ModelNode(...) }`, RULE)).toBe(true);
+  });
+
+  it("does NOT false-positive on Filament's `Scene` class (followed by `.` or `(`)", () => {
+    // Filament has its own `Scene` class which is used as `Scene()` or
+    // `scene.addEntity(...)`. The 4.0-rename rule must NOT fire there.
+    expect(hasRule(`val s = Scene()`, RULE)).toBe(false);
+    expect(hasRule(`scene.addEntity(entity)`, RULE)).toBe(false);
+  });
+
   it("fires on TransformableNode", () => {
     expect(hasRule(`val node = TransformableNode(system)`, RULE)).toBe(true);
   });

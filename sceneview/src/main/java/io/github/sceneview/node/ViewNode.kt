@@ -109,10 +109,20 @@ class ViewNode(
         setMaterialInstanceAt(0, it)
     }
         set(value) {
+            // ── UAF-safe swap order ──────────────────────────────────────────
+            // (1) Wire the NEW MaterialInstance to the renderable FIRST so any
+            //     concurrent render frame finds a valid pointer, then
+            // (2) destroy the OLD MaterialInstance.
+            //
+            // The previous `destroy(old) → setMaterialInstanceAt(new)` order
+            // left the renderable holding a dangling MI pointer between the
+            // two calls. A frame submitted in that window re-creates the same
+            // class of UAF bug fixed in PR #851/#852. Mirrors the pattern
+            // adopted for ViewNode lifecycle there.
             val old = field
-            materialLoader.destroyMaterialInstance(old)
             field = value
             setMaterialInstanceAt(0, value)
+            materialLoader.destroyMaterialInstance(old)
         }
 
     constructor(

@@ -44,7 +44,15 @@
     "dist/**/*.js",
     "!dist/**/*.test.js",
     "!dist/**/__fixtures__/**",
-    "llms.txt",
+    "!dist/auth.js",
+    "!dist/billing.js",
+    "!dist/convert-platform.js",
+    "!dist/optimize-scene.js",
+    "!dist/explain-api.js",
+    "!dist/generate-animation.js",
+    "!dist/generate-environment.js",
+    "!dist/generate-gesture.js",
+    "!dist/generate-physics.js",
     "README.md"
   ],
   "engines": {
@@ -53,7 +61,7 @@
   "scripts": {
     "prebuild": "node scripts/generate-llms-txt.js && node scripts/generate-version.js",
     "build": "tsc",
-    "prepare": "cp ../llms.txt ./llms.txt && node scripts/generate-llms-txt.js && node scripts/generate-version.js && tsc",
+    "prepare": "node scripts/generate-llms-txt.js && node scripts/generate-version.js && tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "node scripts/generate-llms-txt.js && node scripts/generate-version.js && vitest run"

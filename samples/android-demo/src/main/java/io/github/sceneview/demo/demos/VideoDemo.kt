@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import dev.romainguy.kotlin.math.lookAt
@@ -93,10 +94,11 @@ fun VideoDemo(onBack: () -> Unit) {
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
-    // Manual MediaPlayer — `rememberMediaPlayer` only accepts asset paths, but we want
-    // streaming so the APK stays slim. `prepareAsync` keeps the main thread responsive
-    // while the network buffer fills; the quad shows black until `setOnPreparedListener`
-    // fires.
+    // MediaPlayer reading from the BUNDLED `assets/videos/sample.mp4` (517 KB) — works
+    // offline, in airplane mode, on Play Store reviewer's metered network, and
+    // doesn't depend on a third-party mirror staying up (#886). Previous remote URL
+    // (commondatastorage / w3schools) had broken multiple times historically.
+    val context = LocalContext.current
     val player = remember {
         MediaPlayer().apply {
             setAudioAttributes(
@@ -108,13 +110,11 @@ fun VideoDemo(onBack: () -> Unit) {
             isLooping = true
             // Start muted — auto-play with sound surprises users on mobile.
             setVolume(0f, 0f)
-            setDataSource(
-                // Big Buck Bunny by Blender Foundation (CC-BY 3.0). The previously-used
-                // commondatastorage.googleapis.com mirror started returning 403 in 2026,
-                // so we point at the W3Schools mirror — same content, ~788 kB MP4 with
-                // audio, well-known and stable.
-                "https://www.w3schools.com/html/mov_bbb.mp4"
-            )
+            // Bundled-asset path: AssetFileDescriptor lets MediaPlayer stream directly
+            // from the APK without copying to internal storage first.
+            context.assets.openFd("videos/sample.mp4").use { afd ->
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            }
             setOnPreparedListener {
                 isReady = true
                 start()

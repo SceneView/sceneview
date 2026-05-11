@@ -103,6 +103,9 @@ fun ARFaceDemo(onBack: () -> Unit) {
                     AugmentedFaceNode(
                         augmentedFace = face,
                         meshMaterialInstance = faceMaterial,
+                        // Unlit material → no PBR sampling of TANGENTS, so skip the
+                        // per-frame Mikkelsen compute + JNI upload (#878).
+                        computeTangents = false,
                         onTrackingStateChanged = { state ->
                             // Face tracking state changed
                         }

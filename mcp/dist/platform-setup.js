@@ -4,6 +4,7 @@
  * Setup guides for every supported SceneView platform.
  * Consolidates Android, iOS, Web, Flutter, React Native, Desktop, and TV.
  */
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 export const PLATFORM_IDS = ["android", "ios", "web", "flutter", "react-native", "desktop", "tv"];
 const ANDROID_3D = `## SceneView Android — 3D Setup
 
@@ -12,7 +13,7 @@ const ANDROID_3D = `## SceneView Android — 3D Setup
 \`\`\`kotlin
 // build.gradle.kts (app module)
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0")
+    implementation("io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}")
 }
 \`\`\`
 
@@ -87,7 +88,7 @@ const ANDROID_AR = `## SceneView Android — AR Setup
 \`\`\`kotlin
 // build.gradle.kts (app module)
 dependencies {
-    implementation("io.github.sceneview:arsceneview:4.0.0")
+    implementation("io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}")
     // arsceneview includes sceneview transitively
 }
 \`\`\`
@@ -177,7 +178,7 @@ In Xcode: **File > Add Package Dependencies** > paste:
 \`\`\`
 https://github.com/sceneview/sceneview
 \`\`\`
-Set version rule to **"from: 4.0.0"**.
+Set version rule to **"from: ${LATEST_SCENEVIEW_RELEASE}"**.
 
 Or in Package.swift:
 \`\`\`swift
@@ -188,7 +189,7 @@ let package = Package(
     name: "MyApp",
     platforms: [.iOS(.v18), .macOS(.v15), .visionOS(.v1)],
     dependencies: [
-        .package(url: "https://github.com/sceneview/sceneview", from: "4.0.0")
+        .package(url: "https://github.com/sceneview/sceneview", from: "${LATEST_SCENEVIEW_RELEASE}")
     ],
     targets: [
         .executableTarget(
@@ -273,7 +274,7 @@ const IOS_AR = `## SceneViewSwift — iOS AR Setup
 ### 1. SPM Dependency
 
 \`\`\`swift
-.package(url: "https://github.com/sceneview/sceneview", from: "4.0.0")
+.package(url: "https://github.com/sceneview/sceneview", from: "${LATEST_SCENEVIEW_RELEASE}")
 \`\`\`
 
 ### 2. Info.plist — Camera Permission (Required)
@@ -414,10 +415,18 @@ SceneView Flutter uses **PlatformView** to embed native SceneView (Android: Fila
 
 ### 1. Dependencies
 
+> **Note:** the 4.0 line of \`sceneview_flutter\` is not yet on pub.dev
+> (registry still holds an unrelated 0.0.1 demo) — see #923. Use the
+> git dependency snippet below for now.
+
 \`\`\`yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.0.0
+  sceneview_flutter:
+    git:
+      url: https://github.com/sceneview/sceneview
+      path: flutter/sceneview_flutter
+      ref: v${LATEST_SCENEVIEW_RELEASE}
 \`\`\`
 
 ### 2. Android Setup
@@ -475,8 +484,13 @@ const FLUTTER_AR = `## SceneView Flutter — AR Setup
 ### 1. Dependencies
 
 \`\`\`yaml
+# pub.dev publish for 4.x is pending — see #923. Use the git ref:
 dependencies:
-  sceneview_flutter: ^4.0.0
+  sceneview_flutter:
+    git:
+      url: https://github.com/sceneview/sceneview
+      path: flutter/sceneview_flutter
+      ref: v${LATEST_SCENEVIEW_RELEASE}
 \`\`\`
 
 ### 2. Android Manifest
@@ -632,7 +646,7 @@ plugins {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("io.github.sceneview:sceneview-desktop:4.0.0") // when published
+    implementation("io.github.sceneview:sceneview-desktop:${LATEST_SCENEVIEW_RELEASE}") // when published
 }
 \`\`\`
 
@@ -641,6 +655,7 @@ dependencies {
 \`\`\`kotlin
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 
 fun main() = application {
     Window(
@@ -683,7 +698,7 @@ SceneView on Android TV uses the same Filament renderer as mobile Android, with 
 
 \`\`\`kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0")
+    implementation("io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}")
     implementation("androidx.leanback:leanback:1.0.0")
     implementation("androidx.tv:tv-foundation:1.0.0-alpha10")
 }
@@ -748,14 +763,14 @@ const SETUPS = {
     android: {
         name: "Android (Jetpack Compose)",
         renderer: "Filament (OpenGL ES / Vulkan)",
-        status: "Stable (v4.0.0)",
+        status: "Stable (v${LATEST_SCENEVIEW_RELEASE})",
         guide3d: ANDROID_3D,
         guideAr: ANDROID_AR,
     },
     ios: {
         name: "iOS / macOS / visionOS (SwiftUI)",
         renderer: "RealityKit (Metal)",
-        status: "Alpha (v4.0.0)",
+        status: "Alpha (v${LATEST_SCENEVIEW_RELEASE})",
         guide3d: IOS_3D,
         guideAr: IOS_AR,
     },

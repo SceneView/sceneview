@@ -99,7 +99,7 @@ A Flutter plugin that bridges to native SceneView rendering on both Android (Fil
 
 - **Android**: `ComposeView` hosting `SceneView { }` composable
 - **iOS**: `UIHostingController` hosting SwiftUI `SceneView { }`
-- **Install**: `sceneview_flutter: ^0.1.0` in pubspec.yaml
+- **Install**: Git dependency via `git: { url: https://github.com/sceneview/sceneview, path: flutter/sceneview_flutter, ref: v4.0.9 }` in pubspec.yaml — pub.dev publish pending ([#923](https://github.com/sceneview/sceneview/issues/923))
 
 [:octicons-arrow-right-24: Flutter Quickstart](quickstart-flutter.md)
 
@@ -111,7 +111,7 @@ A React Native module that bridges to native SceneView rendering on both Android
 
 - **Android**: `SimpleViewManager` with `ComposeView` hosting `SceneView { }`
 - **iOS**: `RCTViewManager` with `UIHostingController` hosting `SceneView { }`
-- **Install**: `npm install react-native-sceneview`
+- **Install**: `npm install @sceneview-sdk/react-native`
 
 [:octicons-arrow-right-24: React Native Quickstart](quickstart-react-native.md)
 

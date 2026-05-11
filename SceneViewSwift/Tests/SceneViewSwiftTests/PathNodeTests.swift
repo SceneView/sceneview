@@ -70,8 +70,11 @@ final class PathNodeTests: XCTestCase {
 
     func testCircleCreatesClosedPath() {
         let circle = PathNode.circle(radius: 0.5, segments: 16)
-        // 16 segments + 1 closing segment = 17 child entities
-        XCTAssertEqual(circle.entity.children.count, 17)
+        // `segments: 16` means 16 sample points around the circle. PathNode
+        // produces (n - 1) inter-point segments + 1 closing segment = n segments
+        // total. The pre-fix assertion of 17 was off by one — `segments: N`
+        // returns N child entities, not N + 1. (#883)
+        XCTAssertEqual(circle.entity.children.count, 16)
     }
 
     func testCirclePointCount() {
@@ -132,8 +135,9 @@ final class PathNodeTests: XCTestCase {
             color: .blue
         )
         XCTAssertNotNil(circle.entity)
-        // 8 segments + 1 closing = 9 children
-        XCTAssertEqual(circle.entity.children.count, 9)
+        // `segments: 8` → 8 child entities total (7 inter-point + 1 closing).
+        // Pre-fix the assertion was 9 — same off-by-one as testCircleCreatesClosedPath. (#883)
+        XCTAssertEqual(circle.entity.children.count, 8)
     }
 
     func testGridWithCustomThicknessAndColor() {

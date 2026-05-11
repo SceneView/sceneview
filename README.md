@@ -8,7 +8,7 @@ Same concepts, same simplicity — Android, iOS, Web, Desktop, TV, Flutter, Reac
 <!-- Platforms -->
 [![Android 3D](https://img.shields.io/maven-central/v/io.github.sceneview/sceneview?label=Android%203D&logo=android&color=34a853)](https://central.sonatype.com/artifact/io.github.sceneview/sceneview)
 [![Android AR](https://img.shields.io/maven-central/v/io.github.sceneview/arsceneview?label=Android%20AR&logo=android&color=34a853)](https://central.sonatype.com/artifact/io.github.sceneview/arsceneview)
-[![iOS / macOS / visionOS](https://img.shields.io/github/v/release/sceneview/sceneview?label=Swift&logo=swift&color=f05138)](https://github.com/sceneview/sceneview-swift)
+[![iOS / macOS / visionOS](https://img.shields.io/github/v/release/sceneview/sceneview?label=Swift&logo=swift&color=f05138)](https://github.com/sceneview/sceneview)
 [![sceneview.js](https://img.shields.io/npm/v/sceneview-web?label=sceneview.js&logo=javascript&color=f7df1e)](https://www.npmjs.com/package/sceneview-web)
 [![MCP Server](https://img.shields.io/npm/v/sceneview-mcp?label=MCP&logo=anthropic&color=d97706)](https://www.npmjs.com/package/sceneview-mcp)
 [![Flutter](https://img.shields.io/badge/Flutter-v4.0.9-02569B?logo=flutter)](https://github.com/sceneview/sceneview/tree/main/flutter)
@@ -29,8 +29,8 @@ See SceneView capabilities in action — install the live demos in one tap:
 
 <p>
   <a href="https://play.google.com/store/apps/details?id=io.github.sceneview.demo"><img src="website-static/assets/brand/stores/google-play-badge-trimmed.png" alt="Get it on Google Play" height="56"></a>&nbsp;
-  <a href="https://apps.apple.com/us/app/sceneview/id6761329763"><img src="website-static/assets/brand/stores/app-store-badge.svg" alt="Download on the App Store" height="56"></a>&nbsp;
-  <a href="https://sceneview.github.io/playground.html"><img src="website-static/assets/brand/stores/web-playground-button.svg" alt="Open the Web Playground" height="56"></a>
+  <a href="https://apps.apple.com/us/app/sceneview/id6761329763"><img src="website-static/assets/brand/stores/app-store.svg" alt="Download on the App Store" height="56"></a>&nbsp;
+  <a href="https://sceneview.github.io/playground.html"><img src="website-static/assets/brand/stores/web-playground.svg" alt="Open the Web Playground" height="56"></a>
 </p>
 
 Browse all sample sources in [`samples/`](samples/) — Android · iOS · Web · Desktop · TV · Flutter · React Native.
@@ -102,7 +102,7 @@ dependencies {
 
 **iOS / macOS / visionOS** (Swift Package Manager):
 ```
-https://github.com/sceneview/sceneview-swift.git  (from: 4.0.9)
+https://github.com/sceneview/sceneview.git  (from: 4.0.9)
 ```
 
 **Web** (sceneview.js — friendly DSL, two `<script>` tags):
@@ -288,7 +288,7 @@ ARSceneView(planeDetection: .horizontal) { position, arView in
 
 Plus the **iOS `RerunBridge`** with the same wire format as Android, and a `NodeBuilder` DSL for declarative composition outside SwiftUI.
 
-**Install:** `https://github.com/sceneview/sceneview-swift.git` (SPM, from 4.0.9)
+**Install:** `https://github.com/sceneview/sceneview.git` (SPM, from 4.0.9)
 
 ---
 

@@ -44,6 +44,11 @@ dependencies {
     api libs.androidx.compose.material
     api libs.androidx.compose.ui.tooling.preview
     api libs.androidx.navigation.compose
+    // lifecycle-runtime-compose ships `repeatOnLifecycle` + the
+    // `LocalLifecycleOwner` used by `LifecycleAwareLaunchedEffect`. `api`
+    // (not `implementation`) so any sample wrapping a `while(true)` loop
+    // picks the helper up without re-declaring the dep. See #936.
+    api libs.androidx.lifecycle.runtime.compose
     debugApi libs.androidx.compose.ui.tooling
 
     // Material 3
@@ -51,4 +56,12 @@ dependencies {
 
     // Material
     api libs.google.material
+
+    // SceneView SDK — required by `rememberMaterialInstance` so the helper
+    // can call `MaterialLoader.createColorInstance` and own destruction.
+    // `api` so demo modules pick the SDK up transitively from :samples:common
+    // (which most already do anyway via their direct sceneview dep, but
+    // declaring it here keeps :samples:common's surface complete on its own).
+    api project(":sceneview")
+    api libs.filament.android
 }

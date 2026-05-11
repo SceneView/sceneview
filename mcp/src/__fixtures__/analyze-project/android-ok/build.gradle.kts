@@ -17,5 +17,10 @@ android {
 }
 
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.0.0-rc.1")
+    // Pinned to the current LATEST_SCENEVIEW_RELEASE so the
+    // "Android project is up-to-date" assertion in analyze-project.test.ts
+    // doesn't break every time the SDK ships a new patch. The fixture's
+    // whole purpose is to represent a happy-path consumer project — by
+    // definition that means using the current version.
+    implementation("io.github.sceneview:sceneview:4.0.9")
 }

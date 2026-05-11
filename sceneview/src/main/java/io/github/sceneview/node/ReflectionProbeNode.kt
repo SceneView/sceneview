@@ -2,7 +2,7 @@ package io.github.sceneview.node
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import com.google.android.filament.Scene
 import dev.romainguy.kotlin.math.length
@@ -76,7 +76,13 @@ fun ReflectionProbeNode(
     // Determine whether this probe's zone contains the camera.
     val isActive = radius <= 0f || length(cameraPosition - position) <= radius
 
-    SideEffect {
+    // Only push to Filament when the active state actually transitions or when the
+    // bound environment changes — not on every successful recomposition. The previous
+    // SideEffect ran after every recompose (60×/s when caller writes camera position
+    // into Compose state), which made ReflectionProbeNode the dominant Compose-driven
+    // JNI cost in cinematic demos. Per-frame Filament JNI is fine; 60×/s redundant
+    // assignment of the SAME indirectLight pointer is wasteful.
+    LaunchedEffect(filamentScene, environment, isActive) {
         if (isActive) {
             filamentScene.indirectLight = environment.indirectLight
         }
@@ -85,8 +91,8 @@ fun ReflectionProbeNode(
     DisposableEffect(filamentScene, environment) {
         onDispose {
             // Restore the indirect light that was active before this probe was composed.
-            // If a different probe is still active, its own SideEffect will re-apply after
-            // this disposal.
+            // If a different probe is still active, its own LaunchedEffect will re-apply
+            // after this disposal.
             filamentScene.indirectLight = previousIndirectLight
         }
     }

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Auto Backup & Device-To-Device transfer rules for the SceneView demo app.
+    HONOURED ONLY ON ANDROID 12+ (API 31+). For API 24..30, see the paired
+    `android:fullBackupContent="@xml/backup_descriptor"` attribute in
+    AndroidManifest.xml and `res/xml/backup_descriptor.xml`.
+
+    Why this exists
+    ===============
+    Android 12+ auto-backs-up app data to Google Drive and to a new device
+    when the user sets one up. Without explicit `<include>` / `<exclude>`
+    rules every shared-prefs file, ARCore session cache, ARCore Cloud handoff
+    token, and downloaded recording lands in the user's Drive. For a public
+    demo app that ingests Sketchfab models and ARCore recordings (which can
+    carry location-tagged frames) that's the wrong default — see #959.
+
+    Policy
+    ======
+    Exclude EVERYTHING from both cloud-backup AND device-transfer. The demo
+    has no state worth restoring across devices.
+
+    Why per-domain `<exclude>` instead of `<exclude domain="root">`
+    ===============================================================
+    `<exclude>` operates per-domain, NOT across the whole storage hierarchy
+    (the per-domain semantics are documented in the Android
+    `data-extraction-rules` schema). Without ANY `<include>`, the default is
+    "everything in every domain is backed up"; a single
+    `<exclude domain="root">` clause does NOT propagate to `sharedpref` /
+    `database` / `external` etc. — those domains stay default-included and
+    silently leak. Explicit per-domain `<exclude>` entries are required to
+    actually block the whole app — caught by an independent #960 review of
+    the original commit.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

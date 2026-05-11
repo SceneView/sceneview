@@ -1,6 +1,7 @@
 package io.github.sceneview.loaders
 
 import android.content.Context
+import androidx.annotation.MainThread
 import com.google.android.filament.Engine
 import com.google.android.filament.Material
 import com.google.android.filament.MaterialInstance
@@ -103,6 +104,7 @@ class MaterialLoader(
      *
      * @see MaterialLoader.loadMaterial
      */
+    @MainThread
     fun createMaterial(payload: Buffer): Material =
         Material.Builder()
             .payload(payload, payload.remaining())
@@ -111,6 +113,7 @@ class MaterialLoader(
                 materials += it
             }
 
+    @MainThread
     fun getUbershaderMaterial(
         config: MaterialKey,
         uvMap: List<UvCoordinate> = listOf(
@@ -132,6 +135,7 @@ class MaterialLoader(
         materials += it
     }
 
+    @MainThread
     fun createUbershaderInstance(
         config: MaterialKey,
         uvMap: List<UvCoordinate> = listOf(
@@ -162,6 +166,7 @@ class MaterialLoader(
      *
      * @see createMaterial
      */
+    @MainThread
     fun createMaterial(assetFileLocation: String): Material =
         createMaterial(assets.readBuffer(assetFileLocation))
 
@@ -186,6 +191,12 @@ class MaterialLoader(
     /**
      * Loads a [Material] from the contents of a Filamat file within a created coroutine scope.
      *
+     * The [onResult] callback is **always invoked on the main thread**, mirroring
+     * [ModelLoader.loadModelAsync]. This guarantees Filament JNI calls inside the
+     * callback (e.g. `materialLoader.createColorInstance(material)`,
+     * `renderableManager.setMaterialInstanceAt(...)`) run on the correct thread —
+     * Filament asserts on JNI thread mismatch.
+     *
      * @param fileLocation the .filamat file location:
      * - A relative asset file location *materials/mymaterial.filamat*
      * - An Android resource from the res folder *context.getResourceUri(R.raw.mymaterial)*
@@ -196,7 +207,10 @@ class MaterialLoader(
      */
     fun loadMaterialAsync(fileLocation: String, onResult: (Material?) -> Unit) =
         coroutineScope.launch {
-            loadMaterial(fileLocation).also(onResult)
+            val material = loadMaterial(fileLocation)
+            withContext(Dispatchers.Main) {
+                onResult(material)
+            }
         }
 
     fun createInstance(material: Material) = material.createInstance().also {
@@ -215,6 +229,7 @@ class MaterialLoader(
      * For a flat color that ignores scene lighting (no PBR shading), use
      * [createUnlitColorInstance] instead.
      */
+    @MainThread
     fun createColorInstance(
         color: androidx.compose.ui.graphics.Color,
         metallic: Float = kMaterialDefaultMetallic,
@@ -234,6 +249,7 @@ class MaterialLoader(
      * For a flat color that ignores scene lighting (no PBR shading), use
      * [createUnlitColorInstance] instead.
      */
+    @MainThread
     fun createColorInstance(
         color: Int,
         metallic: Float = kMaterialDefaultMetallic,
@@ -253,6 +269,7 @@ class MaterialLoader(
      * For a flat color that ignores scene lighting (no PBR shading), use
      * [createUnlitColorInstance] instead.
      */
+    @MainThread
     fun createColorInstance(
         color: Color,
         metallic: Float = kMaterialDefaultMetallic,
@@ -280,6 +297,7 @@ class MaterialLoader(
      * For physically-based shading with metallic/roughness/reflectance, use
      * [createColorInstance] instead.
      */
+    @MainThread
     fun createUnlitColorInstance(color: androidx.compose.ui.graphics.Color) =
         createUnlitColorInstance(colorOf(color))
 
@@ -296,6 +314,7 @@ class MaterialLoader(
      * For physically-based shading with metallic/roughness/reflectance, use
      * [createColorInstance] instead.
      */
+    @MainThread
     fun createUnlitColorInstance(color: Int) = createUnlitColorInstance(colorOf(color))
 
     /**
@@ -311,6 +330,7 @@ class MaterialLoader(
      * For physically-based shading with metallic/roughness/reflectance, use
      * [createColorInstance] instead.
      */
+    @MainThread
     fun createUnlitColorInstance(color: Color): MaterialInstance =
         createInstance(
             if (color.a == 1.0f) opaqueUnlitColoredMaterial else transparentUnlitColoredMaterial
@@ -326,6 +346,7 @@ class MaterialLoader(
      * [MaterialInstance.setMetallic], [MaterialInstance.setRoughness],
      * [MaterialInstance.setReflectance].
      */
+    @MainThread
     fun createTextureInstance(
         texture: Texture,
         isOpaque: Boolean = true,
@@ -341,11 +362,13 @@ class MaterialLoader(
                 setReflectance(reflectance)
             }
 
+    @MainThread
     fun createImageInstance(imageTexture: Texture, sampler: TextureSampler = TextureSampler2D()) =
         createInstance(imageTextureMaterial).apply {
             setTexture(imageTexture, sampler)
         }
 
+    @MainThread
     fun createVideoInstance(videoTexture: Texture, chromaKeyColor: Int? = null) =
         if (chromaKeyColor == null) {
             createInstance(videoTextureMaterial)
@@ -357,6 +380,7 @@ class MaterialLoader(
             setExternalTexture(videoTexture)
         }
 
+    @MainThread
     fun createViewInstance(
         viewTexture: Texture,
         unlit: Boolean = false,

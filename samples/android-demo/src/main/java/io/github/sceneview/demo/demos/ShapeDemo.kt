@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.sample.rememberMaterialInstance
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Position2
 import io.github.sceneview.rememberCameraManipulator
@@ -69,16 +70,18 @@ fun ShapeDemo(onBack: () -> Unit) {
     }
 
     // On-brand ramp — Primary blue (triangle), Accent purple (star), TintLight (hexagon).
-    // Pre-allocate one MaterialInstance per colour up-front. rememberMaterialLoader owns
-    // these and disposes them at the end of the SceneView — individual Node.destroy() does
-    // not touch MaterialInstances, so sharing them between siblings is safe.
-    val shapeMaterials = remember(materialLoader) {
-        mapOf(
-            "Triangle" to materialLoader.createColorInstance(SceneViewColors.Primary),
-            "Star" to materialLoader.createColorInstance(SceneViewColors.Accent),
-            "Hexagon" to materialLoader.createColorInstance(SceneViewColors.TintLight),
-        )
-    }
+    // Each instance is owned by `rememberMaterialInstance` (DisposableEffect-backed),
+    // so the JNI handle dies the moment this composable leaves the composition
+    // instead of waiting for MaterialLoader.destroy(). Same affordance as
+    // `rememberModelInstance` — see #937.
+    val triangleMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Primary)
+    val starMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Accent)
+    val hexagonMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.TintLight)
+    val shapeMaterials = mapOf(
+        "Triangle" to triangleMaterial,
+        "Star" to starMaterial,
+        "Hexagon" to hexagonMaterial,
+    )
     val shapePaths = mapOf(
         "Triangle" to trianglePath,
         "Star" to starPath,

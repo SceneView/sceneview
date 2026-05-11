@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 import { MIGRATION_GUIDE } from "./migration.js";
 
 describe("MIGRATION_GUIDE", () => {
@@ -43,8 +44,8 @@ describe("MIGRATION_GUIDE", () => {
   });
 
   it("covers gradle dependency changes", () => {
-    expect(MIGRATION_GUIDE).toContain("io.github.sceneview:sceneview:4.0.0");
-    expect(MIGRATION_GUIDE).toContain("io.github.sceneview:arsceneview:4.0.0");
+    expect(MIGRATION_GUIDE).toContain(`io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}`);
+    expect(MIGRATION_GUIDE).toContain(`io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}`);
   });
 
   it("includes a migration checklist", () => {

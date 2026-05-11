@@ -1,6 +1,5 @@
 # sceneview_flutter
 
-[![pub.dev](https://img.shields.io/pub/v/sceneview_flutter.svg)](https://pub.dev/packages/sceneview_flutter)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub](https://img.shields.io/badge/GitHub-sceneview%2Fsceneview-black)](https://github.com/sceneview/sceneview)
 
@@ -22,11 +21,20 @@ Flutter plugin for [SceneView](https://sceneview.github.io) — 3D and AR scenes
 
 ## Installation
 
-Add the dependency to your `pubspec.yaml`:
+> **Status:** the plugin is not yet on pub.dev for the 4.0 line. The pub.dev
+> registry still holds an unrelated 0.0.1 demo from an earlier prototype. Add the
+> plugin as a Git dependency for now — pub.dev publishing for `4.0.x` is tracked
+> in [#923](https://github.com/sceneview/sceneview/issues/923).
+
+In your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  sceneview_flutter: ^3.6.2
+  sceneview_flutter:
+    git:
+      url: https://github.com/sceneview/sceneview
+      path: flutter/sceneview_flutter
+      ref: v4.0.9   # any released `v[0-9]+.[0-9]+.[0-9]+` tag
 ```
 
 Then run:

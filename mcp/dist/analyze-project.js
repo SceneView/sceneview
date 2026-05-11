@@ -21,9 +21,16 @@
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 // ─── Constants ───────────────────────────────────────────────────────────────
-/** The latest SceneView release known to this build of the MCP. */
-export const LATEST_SCENEVIEW_VERSION = "4.0.0";
+/**
+ * The latest SceneView release known to this build of the MCP, snapshotted
+ * from the root `gradle.properties:VERSION_NAME` at build time via
+ * `scripts/generate-version.js`. See #941 — pre-fix this was hardcoded to
+ * "4.0.0" and never bumped, so every install of every MCP version told the
+ * LLM that "4.0.0" was current even when the real SDK was at 4.0.9.
+ */
+export const LATEST_SCENEVIEW_VERSION = LATEST_SCENEVIEW_RELEASE;
 /** Hard cap on the number of source files inspected per call. */
 export const MAX_FILES_SCANNED = 30;
 /** Hard cap on total bytes read across all source files per call (500 KB). */

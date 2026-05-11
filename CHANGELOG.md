@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — iOS V1 honest + Android rendering uplift + Sketchfab streaming scaffolds
+## Unreleased — iOS V1 honest + Android rendering uplift + Sketchfab streaming scaffolds + Claude Code plugin marketplace
 
 ### ⚠️ BREAKING — Android render defaults change visual look out-of-the-box
 
@@ -121,6 +121,26 @@ Closes [#928](https://github.com/sceneview/sceneview/issues/928) (the 4 stubs in
 ### Stitch design assets (UI refonte pending)
 
 Project `15993476369356042112` on Stitch contains the 8 mockup screens for the V1 UI refresh (4 iOS Liquid Glass + 4 Android M3 Expressive). Pending: actual SwiftUI / Compose implementation in `samples/{ios,android}-demo` based on those mockups.
+
+### Added — `sceneview/claude-marketplace` Claude Code plugin
+
+- **New marketplace repo:** [`github.com/sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace) (Apache-2.0). Single plugin (`sceneview` v4.0.11) bundling the `sceneview-mcp` server, 11 namespaced contributor commands (`/sceneview:contribute`, `/release`, `/review`, `/test`, `/document`, `/quality-gate`, `/publish-check`, `/sync-check`, `/version-bump`, `/evaluate`, `/maintain`), and 5 cross-platform reminder hooks that fire on edits to nudge Android ↔ iOS ↔ Web ↔ Flutter ↔ RN API parity.
+- **Install (Claude Code):**
+  ```
+  /plugin marketplace add sceneview/claude-marketplace
+  /plugin install sceneview@sceneview
+  ```
+- **Marketplace clone ~256 KB** (vs 1.4 GB if it had lived in the SDK monorepo — split-to-dedicated-repo decision after a multi-agent review flagged the monorepo clone as a ship-blocker).
+- **Plugin manifest references its npm-published MCP via `npx`** — no code vendoring, `sceneview-mcp` stays independently versioned on npm.
+- **Discovery surfaces wired** ([`01114229`](https://github.com/sceneview/sceneview/commit/01114229)): plugin-install instructions added to `README.md`, `llms.txt`, `mcp/README.md`, `docs/docs/ai-development.md`, `docs/docs/index.md`. GitHub topics on the marketplace repo cover `claude-code`, `claude-plugin`, `mcp`, `3d`, `ar`, `android`, `ios`, `web`, `jetpack-compose`, `swiftui`.
+
+### Added — `.claude/scripts/sync-plugin-versions.sh`
+
+Verifies the `sceneview` plugin's manifest version matches `npm view sceneview-mcp version`. Lives in the marketplace repo (also). Decoupled from `sync-versions.sh` because the plugin tracks the wrapped npm MCP, not `gradle.properties` `VERSION_NAME`.
+
+### Security — sceneview/sceneview HEAD scrub
+
+Removed off-topic personal-portfolio code from the public SDK repo that had nothing to do with SceneView: `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy/registry-submission docs that listed unrelated MCPs. Also dropped tracked CDI-sensitive session artefacts (`.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `RERUN-CHECK.md`, hardcoded user paths in samples). The standard employer/portfolio identifier greps return 0 hits in HEAD. Past commits still contain the historical strings — a `git filter-repo` session is the planned followup.
 
 ## v4.0.9 — Web unlit parity + Android demo APK -38% + Play Store race fix (2026-05-07)
 

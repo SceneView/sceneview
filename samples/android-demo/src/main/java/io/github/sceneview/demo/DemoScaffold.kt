@@ -2,6 +2,7 @@
 
 package io.github.sceneview.demo
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
@@ -52,12 +55,17 @@ fun DemoScaffold(
     scene: @Composable BoxScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val haptic = LocalHapticFeedback.current
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     // Long-press the title to toggle QA mode — showcase camera
                     // animations freeze, which is what test harnesses want.
+                    // The gesture is intentionally hidden so the haptic pulse
+                    // is the only "you did something" confirmation a user gets
+                    // — without it the title is silently re-tappable forever
+                    // (see #951 discoverability + #956).
                     Row(
                         modifier = Modifier
                             .combinedClickable(
@@ -65,14 +73,20 @@ fun DemoScaffold(
                                 indication = null,
                                 onClick = {},
                                 onLongClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     DemoSettings.qaMode = !DemoSettings.qaMode
                                 },
                             )
                     ) {
                         Text(title)
                         if (DemoSettings.qaMode) {
+                            // Tappable QA pill: tap to disable, so a user who
+                            // long-pressed the title by accident has a
+                            // single-tap escape hatch instead of having to
+                            // guess that another long-press toggles it back
+                            // off. See #951.
                             Text(
-                                text = " QA",
+                                text = " QA ×",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier
@@ -80,6 +94,15 @@ fun DemoScaffold(
                                     .wrapContentSize()
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) {
+                                        haptic.performHapticFeedback(
+                                            HapticFeedbackType.LongPress
+                                        )
+                                        DemoSettings.qaMode = false
+                                    }
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }

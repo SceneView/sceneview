@@ -32,6 +32,27 @@ public struct ModelNode: @unchecked Sendable {
     /// - Note: Managed externally — the scene checks `tapHandler` after a hit test.
     public var tapHandler: (() -> Void)?
 
+    /// Reference-type registry that tracks every `AnimationPlaybackController`
+    /// returned by `playAnimation*` so `pauseAllAnimations` / `resumeAllAnimations`
+    /// can target them. The `ModelNode` itself is a value type, so this class
+    /// gives the per-node animation state a stable identity across copies of
+    /// the wrapper struct (the underlying ModelEntity is already a reference).
+    private final class AnimationRegistry: @unchecked Sendable {
+        var controllers: [AnimationPlaybackController] = []
+    }
+    private let registry: AnimationRegistry
+
+    /// Active controllers — internal hook for the pause/resume implementation
+    /// below. Public callers should drive playback through the `playAnimation*`
+    /// + `pauseAllAnimations` / `resumeAllAnimations` / `stopAllAnimations` APIs.
+    fileprivate var activeControllers: [AnimationPlaybackController] {
+        get { registry.controllers }
+        nonmutating set { registry.controllers = newValue }
+    }
+    fileprivate func trackController(_ controller: AnimationPlaybackController) {
+        registry.controllers.append(controller)
+    }
+
     /// World-space position.
     public var position: SIMD3<Float> {
         get { entity.position }
@@ -54,6 +75,7 @@ public struct ModelNode: @unchecked Sendable {
     public init(_ entity: ModelEntity) {
         self.entity = entity
         self.tapHandler = nil
+        self.registry = AnimationRegistry()
     }
 
     /// Loads a 3D model from a bundle resource path.
@@ -213,29 +235,6 @@ public struct ModelNode: @unchecked Sendable {
         return scale(scaleFactor)
     }
 
-    // MARK: - Center origin (mirrors Android's ModelNode.centerOrigin)
-
-    /// Re-centres the model so that its bounding-box centre lands at the given target.
-    ///
-    /// Many 3D assets (e.g. glTF/USDZ files exported from DCC tools) place their
-    /// authored pivot at the floor of the bounding box, which causes the model to
-    /// render in the lower portion of an orbit camera framed at world origin.
-    /// Calling `centerOrigin()` after `scaleToUnits(_:)` shifts the model so its
-    /// geometric centre coincides with `target` (defaults to world origin).
-    ///
-    /// Mirrors Android's `ModelNode(centerOrigin = Position(0, 0, 0))`.
-    ///
-    /// - Parameter target: Local-space target for the bounding-box centre. Defaults to origin.
-    /// - Returns: Self with the centring offset applied.
-    @discardableResult
-    public func centerOrigin(_ target: SIMD3<Float> = .zero) -> ModelNode {
-        let bounds = entity.visualBounds(relativeTo: nil)
-        let center = bounds.center
-        let offset = target - center
-        entity.position = entity.position + offset
-        return self
-    }
-
     // MARK: - Animation (mirrors Android's ModelNode animation API)
 
     /// The number of available animations on this model.
@@ -260,14 +259,17 @@ public struct ModelNode: @unchecked Sendable {
     ///   - loop: Whether animations should repeat. Default `true`.
     ///   - speed: Playback speed multiplier. Default 1.0.
     public func playAllAnimations(loop: Bool = true, speed: Float = 1.0) {
+        // Drive playback speed through `AnimationPlaybackController.speed` —
+        // the parameter was previously dropped silently. (#883)
         for animation in entity.availableAnimations {
-            let controller: AnimationPlaybackController
-            if loop {
-                controller = entity.playAnimation(animation.repeat(), transitionDuration: 0.0, startsPaused: false)
-            } else {
-                controller = entity.playAnimation(animation, transitionDuration: 0.0, startsPaused: false)
-            }
+            let resource = if loop { animation.repeat() } else { animation }
+            let controller = entity.playAnimation(
+                resource,
+                transitionDuration: 0.0,
+                startsPaused: false
+            )
             controller.speed = speed
+            trackController(controller)
         }
     }
 
@@ -286,19 +288,16 @@ public struct ModelNode: @unchecked Sendable {
     ) {
         guard index < entity.availableAnimations.count else { return }
         let animation = entity.availableAnimations[index]
-        let controller: AnimationPlaybackController
-        if loop {
-            controller = entity.playAnimation(
-                animation.repeat(),
-                transitionDuration: transitionDuration
-            )
-        } else {
-            controller = entity.playAnimation(
-                animation,
-                transitionDuration: transitionDuration
-            )
-        }
+        let resource = if loop { animation.repeat() } else { animation }
+        let controller = entity.playAnimation(
+            resource,
+            transitionDuration: transitionDuration
+        )
+        // (#883) speed was dropped silently before this fix — set it on the
+        // returned AnimationPlaybackController so the caller's parameter
+        // actually drives playback.
         controller.speed = speed
+        trackController(controller)
     }
 
     /// Names of all available animations on this model.
@@ -328,30 +327,39 @@ public struct ModelNode: @unchecked Sendable {
         guard let animation = entity.availableAnimations.first(where: {
             $0.name == name
         }) else { return }
-        let controller: AnimationPlaybackController
-        if loop {
-            controller = entity.playAnimation(
-                animation.repeat(),
-                transitionDuration: transitionDuration
-            )
-        } else {
-            controller = entity.playAnimation(
-                animation,
-                transitionDuration: transitionDuration
-            )
-        }
+        let resource = if loop { animation.repeat() } else { animation }
+        let controller = entity.playAnimation(
+            resource,
+            transitionDuration: transitionDuration
+        )
         controller.speed = speed
+        trackController(controller)
     }
 
-    /// Stops all animations on the model.
+    /// Stops all animations on the model — destroys playhead. Re-playing
+    /// restarts from t=0. Also clears any tracked playback controllers.
     public func stopAllAnimations() {
         entity.stopAllAnimations()
+        activeControllers.removeAll()
     }
 
-    /// Pauses all animations on the model.
+    /// Pauses every active animation playback controller in place.
+    ///
+    /// The previous implementation called `stopAllAnimations()` which destroyed
+    /// the playhead and made the contract a lie — stop, not pause. We now track
+    /// controllers returned by `playAnimation(...)` (in [activeControllers])
+    /// so pause/resume can target them individually. (#883)
     public func pauseAllAnimations() {
-        // RealityKit doesn't have a native pause — stop is the closest
-        entity.stopAllAnimations()
+        for controller in activeControllers {
+            controller.pause()
+        }
+    }
+
+    /// Resumes every paused animation playback controller in place.
+    public func resumeAllAnimations() {
+        for controller in activeControllers {
+            controller.resume()
+        }
     }
 
     // MARK: - Collision
