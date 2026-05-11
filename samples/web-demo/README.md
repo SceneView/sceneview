@@ -11,7 +11,7 @@ Browser-based 3D viewer using SceneView.js (Filament.js WASM engine).
 - **WebXR AR/VR** — enter immersive AR or VR sessions (when browser supports WebXR)
 - **Tab Navigation** — Models, Geometry, and Settings tabs
 - **Responsive dark theme** — works on desktop and mobile
-- **SDK version badge** — displays SceneView v3.6.2
+- **SDK version badge** — displays SceneView v4.0.9
 
 ## Run
 

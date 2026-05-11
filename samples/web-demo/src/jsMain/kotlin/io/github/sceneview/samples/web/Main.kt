@@ -23,7 +23,7 @@ import org.w3c.dom.HTMLInputElement
  * - WebXR AR/VR toggle buttons
  * - Tab-based navigation (Model Viewer / Geometry)
  * - Responsive dark theme
- * - SDK version 3.6.1 badge
+ * - SDK version 4.0.9 badge
  *
  * Uses Filament.js (WASM) — same rendering engine as SceneView Android.
  */
