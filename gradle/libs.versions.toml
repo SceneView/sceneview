@@ -34,7 +34,7 @@ kotlinMath = "1.8.0"
 # `sceneview/src/main/materials/*.mat` and commit the regenerated v70 .filamat.
 # Session #800 / #961 track future Filament bumps with the same paired-update
 # guarantee.
-filament = "1.71.0"
+filament = "1.71.3"
 arCore = "1.53.0"
 
 # Networking
