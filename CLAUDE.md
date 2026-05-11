@@ -165,7 +165,28 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-08, session bold-villani-42902e — plugin marketplace + brand-scope cleanup + portfolio scrub)
+### Current state (last updated: 2026-05-11 evening, session upbeat-kare-a31ed4 — v4.1.0 SHIPPED + release.yml fixes)
+
+- 🚀 **v4.1.0 published**: magical-lovelace branch was rescued from origin after its worktree had been deleted (lost the dirty version bump + an untracked `RenderQualityComparisonDemo.kt`), merged with main via [PR #976](https://github.com/sceneview/sceneview/pull/976) at `6b4afca1`. Tag `v4.1.0` pushed. **Confirmed published**: Maven Central `<latest>4.1.0</latest>`, npm `sceneview-web@4.1.0`, Dokka API docs, Play Store production track (Google review in progress), GitHub Release v4.1.0 (body filled manually, see below).
+- ⚠️ **BREAKING — Android render defaults** changed at v4.1.0: main light intensity `100_000` → `10_000` lux, shadows on by default, new fill light at 30% main, SSAO + bloom on, neutral exposure `(12, 1/200, 200)`. Migration recipe at the top of `CHANGELOG.md`.
+- 🐛 **release.yml had two latent bugs surfaced by v4.1.0** — fixed in [PR #985](https://github.com/sceneview/sceneview/pull/985) at `070e6c9f`:
+  1. `Validate SceneViewSwift SPM tag` regex `\.library\(name:\s*"SceneViewSwift"` is single-line but both `Package.swift` manifests use multi-line `.library(\n    name: ...)` — silent fail on every tag since #920. Fix: `tr '\n' ' '` before grep.
+  2. `Publish @sceneview-sdk/react-native to npm` ERESOLVE because react-native@0.84.1 needs `@types/react@^19` but the bridge devDeps pin `@types/react@^18`. Fix: `npm install --legacy-peer-deps`. Real fix tracked in #909.
+- ✅ **Workflow re-triggered post-fix via `workflow_dispatch`** on main (`070e6c9f`) to publish the RN bridge for v4.1.0 (Maven/web were already on 4.1.0; idempotent skip-if-published). Check https://github.com/sceneview/sceneview/actions for the dispatch run.
+- 🔵 **8 follow-up issues** filed from the magical-lovelace 5-agent review: [#977 Sketchfab key via mcp-gateway](https://github.com/sceneview/sceneview/issues/977), [#978 orbit angle modulo](https://github.com/sceneview/sceneview/issues/978), [#979 MaterialLoader audit](https://github.com/sceneview/sceneview/issues/979), [#980 supervisorScope](https://github.com/sceneview/sceneview/issues/980), [#981 iOS Timer audit](https://github.com/sceneview/sceneview/issues/981), [#982 Sketchfab fake progress](https://github.com/sceneview/sceneview/issues/982), [#983 AR screenshot Metal](https://github.com/sceneview/sceneview/issues/983), [#984 ViewNode lib fix](https://github.com/sceneview/sceneview/issues/984).
+- 📦 **30-location version sync** is now the canonical count (handoff had said "9 files" — wrong). `bash .claude/scripts/sync-versions.sh` covers Gradle modules / npm / Flutter / Docs / iOS pbxproj / Issue template / Website softwareVersion. 0 errors / 0 warnings at v4.1.0.
+- 🧹 **Worktree cleanup**: `magical-lovelace-7176b1/` removed (branch merged), `claude/magical-lovelace-7176b1` + `claude/release-yml-fixes-v4.1` branches deleted local + remote.
+
+### Followups for next session
+
+1. **Verify the workflow_dispatch run completed successfully** — `@sceneview-sdk/react-native@4.1.0` should appear on npm. Currently the RN bridge is stale at v3.6.x (#884) until that publish lands.
+2. **Confirm Play Store production track delivered v4.1.0** to users — Google review takes 0-12h after the deploy workflow succeeded.
+3. **Push the v4.1.0 changelog to website**: the website-static landing page needs a refreshed version badge + the announcement block. `sceneview.github.io` is a separate repo, follow the pattern from v4.0.9.
+4. **Address the 30 still-open issues** (#928 SceneViewSwift 21 silent stubs is the biggest remaining critical) + #971-#984 follow-ups.
+5. **iOS parity for `renderQuality` + `fillLightNode`** was deferred for v4.2.0 (`llms.txt` marks them Android-only at v4.1.0).
+6. **`RenderQualityComparisonDemo.kt`** was lost when the magical-lovelace worktree was deleted (untracked). Re-write if useful — would showcase the new `RenderQuality` preset side-by-side.
+
+### Previous state (last updated: 2026-05-08, session bold-villani-42902e — plugin marketplace + brand-scope cleanup + portfolio scrub)
 
 - 🚀 **Claude Code plugin marketplace LIVE** at [`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace), single plugin scoped strictly to SceneView:
   - **sceneview** v4.0.11 (Apache-2.0) — `sceneview-mcp` + 11 namespaced contributor commands + cross-platform reminder hooks
