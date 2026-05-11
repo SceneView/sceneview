@@ -16,7 +16,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -233,17 +232,36 @@ public constructor(
     /**
      * Stop the writer loop and close the socket. Safe to call multiple times.
      * The bridge can be reused: call [connect] again to re-open.
+     *
+     * **Non-blocking.** The previous implementation called `runBlocking { job?.join() }`
+     * to wait for the writer's `finally` block, which froze the calling thread
+     * (typically Compose's main thread) until the socket finished closing — up
+     * to several seconds on a flaky network. The new implementation cancels
+     * the writer and lets the next [connect] guard against the race using a
+     * fresh job: callers who need synchronous completion should use [closeAsync]
+     * and `await()` the returned [Job].
      */
     public fun disconnect() {
         val job = writerJob
         writerJob = null
         closeQuietly()
         job?.cancel()
-        // Block briefly to let the cancelled coroutine finish its finally block,
-        // so that a subsequent connect() doesn't race with the old cleanup.
-        runCatching {
-            runBlocking { job?.join() }
-        }
+        // No join() — caller's thread is not blocked. A subsequent connect()
+        // creates a brand-new writer; the cancelled job's finally block runs
+        // asynchronously on its original CoroutineScope.
+    }
+
+    /**
+     * Like [disconnect], but returns the (already-cancelled) writer [Job] so
+     * callers that need a strict happens-before relationship can `await()` /
+     * `join()` it from a coroutine. Returns `null` if no writer was active.
+     */
+    public fun closeAsync(): Job? {
+        val job = writerJob
+        writerJob = null
+        closeQuietly()
+        job?.cancel()
+        return job
     }
 
     /** Release all resources. The bridge is unusable after this call. */

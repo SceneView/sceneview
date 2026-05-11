@@ -186,6 +186,12 @@ class MaterialLoader(
     /**
      * Loads a [Material] from the contents of a Filamat file within a created coroutine scope.
      *
+     * The [onResult] callback is **always invoked on the main thread**, mirroring
+     * [ModelLoader.loadModelAsync]. This guarantees Filament JNI calls inside the
+     * callback (e.g. `materialLoader.createColorInstance(material)`,
+     * `renderableManager.setMaterialInstanceAt(...)`) run on the correct thread —
+     * Filament asserts on JNI thread mismatch.
+     *
      * @param fileLocation the .filamat file location:
      * - A relative asset file location *materials/mymaterial.filamat*
      * - An Android resource from the res folder *context.getResourceUri(R.raw.mymaterial)*
@@ -196,7 +202,10 @@ class MaterialLoader(
      */
     fun loadMaterialAsync(fileLocation: String, onResult: (Material?) -> Unit) =
         coroutineScope.launch {
-            loadMaterial(fileLocation).also(onResult)
+            val material = loadMaterial(fileLocation)
+            withContext(Dispatchers.Main) {
+                onResult(material)
+            }
         }
 
     fun createInstance(material: Material) = material.createInstance().also {

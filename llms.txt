@@ -848,6 +848,70 @@ ARSceneView(modifier = Modifier.fillMaxSize()) {
 )
 ```
 
+### TerrainAnchorNode — Geospatial anchor pinned to ground at lat/lng
+
+**Imperative API only — async resolve via `Earth`.** Pin a node to Google's outdoor terrain at any GPS coordinate. No plane detection required — works wherever VPS / Street View has coverage.
+
+```kotlin
+import io.github.sceneview.ar.node.TerrainAnchorNode
+
+// Inside `onSessionUpdated = { session, frame -> ... }` once Earth is TRACKING:
+val earth: Earth? = session.earth
+if (earth?.trackingState == TrackingState.TRACKING) {
+    val future: ResolveAnchorOnTerrainFuture = TerrainAnchorNode.resolve(
+        engine = engine,
+        earth = earth,
+        latitude = 48.8584,           // Eiffel Tower
+        longitude = 2.2945,
+        altitudeAboveTerrain = 1.5,    // metres above terrain (0 = on the ground)
+        eusQuaternion = Quaternion()   // east-up-south rotation
+    ) { state: TerrainAnchorState, anchorNode: TerrainAnchorNode? ->
+        if (state == TerrainAnchorState.SUCCESS && anchorNode != null) {
+            // anchorNode IS-A AnchorNode — pin children via the standard composable:
+            anchorNodes.add(anchorNode)
+        }
+    }
+}
+```
+
+Then declare it inside the scene tree using the standard `AnchorNode` composable (since `TerrainAnchorNode extends AnchorNode`):
+
+```kotlin
+ARSceneView(...) {
+    anchorNodes.forEach { node ->
+        AnchorNode(anchor = node.anchor) {
+            ModelNode(modelInstance = signpost, scaleToUnits = 0.5f)
+        }
+    }
+}
+```
+
+Requires:
+- `Config.GeospatialMode.ENABLED`
+- ARCore Cloud API key (see API key warning above)
+- `ACCESS_FINE_LOCATION` permission
+- Internet connection (resolve calls Google Cloud)
+- Outdoor environment with VPS / Street View coverage
+
+100-anchor cap per session (Terrain + Rooftop combined). Demo: `samples/android-demo/.../ARTerrainAnchorDemo.kt`.
+
+### RooftopAnchorNode — Geospatial anchor pinned to a building rooftop
+
+Same async-resolve API as `TerrainAnchorNode`, but the altitude is interpreted relative to the rooftop of the building at the given lat/lng (or the terrain if no building is detected).
+
+```kotlin
+val future = RooftopAnchorNode.resolve(
+    engine = engine,
+    earth = earth,
+    latitude = 48.8738,             // Arc de Triomphe
+    longitude = 2.2950,
+    altitudeAboveRooftop = 0.0,
+    eusQuaternion = Quaternion()
+) { state: RooftopAnchorState, anchorNode: RooftopAnchorNode? -> /* ... */ }
+```
+
+Same requirements as `TerrainAnchorNode`. Demo: `samples/android-demo/.../ARRooftopAnchorDemo.kt`.
+
 ---
 
 ## Node Properties & Interaction
@@ -2390,7 +2454,7 @@ For an exhaustive, AI-first reference covering every node composable — signatu
 - **Standard nodes:** ModelNode (animations, `scaleToUnits`), LightNode (intensity units by type, the `apply` trap), ViewNode (Compose UI on a plane, why `viewNodeWindowManager` is mandatory)
 - **Procedural geometry:** CubeNode / SphereNode / CylinderNode / PlaneNode / LineNode / PathNode / MeshNode — with the recomposition model for reactive geometry updates
 - **Content nodes:** TextNode, ImageNode, VideoNode, BillboardNode, ReflectionProbeNode
-- **AR-only nodes:** AnchorNode (the correct pattern for pinning state without 60 FPS recomposition), PoseNode, HitResultNode, AugmentedImageNode, AugmentedFaceNode, CloudAnchorNode, StreetscapeGeometryNode
+- **AR-only nodes:** AnchorNode (the correct pattern for pinning state without 60 FPS recomposition), PoseNode, HitResultNode, AugmentedImageNode, AugmentedFaceNode, CloudAnchorNode, StreetscapeGeometryNode, TerrainAnchorNode (lat/lng → terrain), RooftopAnchorNode (lat/lng → rooftop)
 - **Composition & state:** nesting and parent→child coordinate spaces, reactive parameters, automatic destruction, imperative `apply = { … }` blocks, and a table of common mistakes with symptoms and fixes
 
 This reference is consumed by `sceneview-mcp` so Claude and other AI assistants can answer deep questions about any node without hallucinating parameter names.

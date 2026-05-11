@@ -376,7 +376,10 @@ class ModelLoader(
         },
         onResult: (List<ModelInstance>) -> Unit
     ): Job = coroutineScope.launch {
-        loadInstancedModel(fileLocation, count, resourceResolver).also(onResult)
+        val instances = loadInstancedModel(fileLocation, count, resourceResolver)
+        withContext(Dispatchers.Main) {
+            onResult(instances)
+        }
     }
 
     /**
