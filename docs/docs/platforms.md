@@ -111,7 +111,7 @@ A React Native module that bridges to native SceneView rendering on both Android
 
 - **Android**: `SimpleViewManager` with `ComposeView` hosting `SceneView { }`
 - **iOS**: `RCTViewManager` with `UIHostingController` hosting `SceneView { }`
-- **Install**: `npm install react-native-sceneview`
+- **Install**: `npm install @sceneview-sdk/react-native`
 
 [:octicons-arrow-right-24: React Native Quickstart](quickstart-react-native.md)
 

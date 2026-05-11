@@ -1,6 +1,6 @@
-# react-native-sceneview
+# @sceneview-sdk/react-native
 
-[![npm version](https://img.shields.io/npm/v/react-native-sceneview.svg)](https://www.npmjs.com/package/react-native-sceneview)
+[![npm version](https://img.shields.io/npm/v/@sceneview-sdk/react-native.svg)](https://www.npmjs.com/package/@sceneview-sdk/react-native)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub](https://img.shields.io/badge/GitHub-sceneview%2Fsceneview-black)](https://github.com/sceneview/sceneview)
 
@@ -20,7 +20,7 @@ React Native bindings for [SceneView](https://sceneview.github.io) — 3D and AR
 ## Installation
 
 ```sh
-npm install react-native-sceneview
+npm install @sceneview-sdk/react-native
 ```
 
 ### iOS
@@ -51,7 +51,7 @@ android {
 ### 3D Scene
 
 ```tsx
-import { SceneView } from 'react-native-sceneview';
+import { SceneView } from '@sceneview-sdk/react-native';
 
 <SceneView
   style={{ flex: 1 }}
@@ -64,7 +64,7 @@ import { SceneView } from 'react-native-sceneview';
 ### AR Scene
 
 ```tsx
-import { ARSceneView } from 'react-native-sceneview';
+import { ARSceneView } from '@sceneview-sdk/react-native';
 
 <ARSceneView
   style={{ flex: 1 }}
