@@ -260,7 +260,13 @@ jobs:
         if: steps.check-rn.outputs.skip != 'true'
         working-directory: react-native/react-native-sceneview
         run: |
-          npm install --no-audit --no-fund
+          # react-native 0.84.x peer-deps require @types/react@^19 but the
+          # bridge's devDeps still pin @types/react@^18 (RN bridges scoped
+          # to RN 0.72.x consumers). The v4.1.0 release failed at this step
+          # with ERESOLVE; --legacy-peer-deps unblocks the publish without
+          # forcing a breaking @types/react bump on consumers. Real fix
+          # tracked in #909 (RN/Flutter bridges coverage).
+          npm install --no-audit --no-fund --legacy-peer-deps
           npm run build
 
       - name: Publish to npm
@@ -307,9 +313,13 @@ jobs:
             echo "::error::Missing at tag ${GITHUB_REF_NAME}: ${missing[*]}"
             exit 1
           fi
-          # Both manifests must declare the SceneViewSwift product.
+          # Both manifests must declare the SceneViewSwift product. The
+          # `.library(...)` block in SwiftPM manifests is conventionally
+          # written across multiple lines (`.library(\n    name: "X",\n    targets: ...)`)
+          # so we flatten the file to one line before the regex check
+          # (the previous single-line grep silently failed on v4.1.0).
           for f in Package.swift SceneViewSwift/Package.swift; do
-            if ! grep -qE '\.library\(name:\s*"SceneViewSwift"' "$f"; then
+            if ! tr '\n' ' ' < "$f" | grep -qE '\.library\(\s*name:\s*"SceneViewSwift"'; then
               echo "::error::$f does not declare a SceneViewSwift product"
               exit 1
             fi
