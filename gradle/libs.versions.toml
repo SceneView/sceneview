@@ -14,6 +14,7 @@ composeBom = "2026.03.00"
 composeMaterial3Expressive = "1.5.0-alpha17"
 activityCompose = "1.13.0"
 navigationCompose = "2.9.7"
+lifecycleRuntimeCompose = "2.10.0"
 
 # Kotlin Libraries
 coroutines = "1.10.2"
@@ -80,6 +81,7 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-compose-material3-expressive = { group = "androidx.compose.material3", name = "material3", version.ref = "composeMaterial3Expressive" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
 
 # Kotlin
 kotlin-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }

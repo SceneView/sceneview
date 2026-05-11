@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import io.github.sceneview.sample.LifecycleAwareLaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -367,8 +368,11 @@ private fun DebugOverlay(
     modifier: Modifier = Modifier,
 ) {
     // Periodic recomposition so the text updates even when no other state changes.
+    // Wrapped in LifecycleAwareLaunchedEffect so the 250 ms tick doesn't keep
+    // recomposing (and re-running the SceneView render pass that reads `tick`)
+    // when the app is backgrounded. See #936.
     var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    LifecycleAwareLaunchedEffect(Unit) {
         while (true) {
             delay(250)
             tick++

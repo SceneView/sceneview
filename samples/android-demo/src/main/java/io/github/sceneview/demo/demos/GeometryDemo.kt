@@ -15,6 +15,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import io.github.sceneview.sample.LifecycleAwareLaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -98,10 +99,14 @@ fun GeometryDemo(onBack: () -> Unit) {
     // `--ez qa_mode true` from adb) freezes the spin at a recognisable 30° angle so
     // screenshot tests get a deterministic frame.
     var spinDegrees by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(DemoSettings.qaMode) {
+    // Spin pauses when the app is backgrounded — without the lifecycle wrap
+    // the `while(true) { withFrameNanos { … } }` loop kept burning frames
+    // (and the SceneView render thread alongside it) on the home screen.
+    // See #936.
+    LifecycleAwareLaunchedEffect(DemoSettings.qaMode) {
         if (DemoSettings.qaMode) {
             spinDegrees = 30f // ~front-3/4 view, all shapes show their depth
-            return@LaunchedEffect
+            return@LifecycleAwareLaunchedEffect
         }
         var lastNanos = 0L
         while (true) {

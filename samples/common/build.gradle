@@ -44,6 +44,11 @@ dependencies {
     api libs.androidx.compose.material
     api libs.androidx.compose.ui.tooling.preview
     api libs.androidx.navigation.compose
+    // lifecycle-runtime-compose ships `repeatOnLifecycle` + the
+    // `LocalLifecycleOwner` used by `LifecycleAwareLaunchedEffect`. `api`
+    // (not `implementation`) so any sample wrapping a `while(true)` loop
+    // picks the helper up without re-declaring the dep. See #936.
+    api libs.androidx.lifecycle.runtime.compose
     debugApi libs.androidx.compose.ui.tooling
 
     // Material 3
