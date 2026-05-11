@@ -32,10 +32,13 @@ fun ModelViewerDemo(onBack: () -> Unit) {
 
     // Camera orbits; model stays fixed. Radius 1.4 m keeps the 0.3 m helmet framed
     // comfortably at portrait aspect without clipping the near plane.
+    // yHeight kept at 0 so the model sits centered vertically — the previous 0.2f tilted
+    // the orbit downward and pinned the helmet in the lower half of the viewport with a
+    // big empty top band (QA finding 2026-05-11).
     val cameraManipulator = rememberHeroOrbitCameraManipulator(
         trigger = modelInstance != null,
         radius = 1.4f,
-        yHeight = 0.2f,
+        yHeight = 0f,
         durationMillis = 20_000,
     )
 
