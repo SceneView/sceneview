@@ -7,6 +7,8 @@ on:
       - 'website-static/**'
       - 'docs/**'
       - 'marketing/**'
+      - 'samples/web-demo/**'
+      - 'sceneview-web/**'
       - 'llms.txt'
       - 'CHANGELOG.md'
       - 'MIGRATION.md'
@@ -80,6 +82,27 @@ jobs:
           done
           # Root llms.txt
           [ ! -f "site/llms.txt" ] && [ -f "llms.txt" ] && cp llms.txt site/ || true
+
+      # ── 3b. Build and publish samples/web-demo to /web-demo/ ────────────
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Build samples/web-demo (Kotlin/JS webpack)
+        run: |
+          # `:samples:web-demo:jsBrowserProductionWebpack` emits HTML +
+          # `sceneview-web-demo.js` (+ filament.wasm if WebXR is on) under
+          # `samples/web-demo/build/dist/js/productionExecutable/`. Copying
+          # the whole directory to `site/web-demo/` makes
+          # `sceneview.github.io/web-demo/` actually load the Sketchfab-
+          # search + geometry-showcase demo instead of falling through to
+          # the landing page. See #926.
+          chmod +x ./gradlew
+          ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
+          mkdir -p site/web-demo
+          cp -r samples/web-demo/build/dist/js/productionExecutable/* site/web-demo/
 
       # ── 4. Include Dokka API docs if available ──────────────────────────
       - name: Download Dokka API docs (if available)
