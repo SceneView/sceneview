@@ -51,7 +51,10 @@ fun CameraControlsDemo(onBack: () -> Unit) {
     // from scratch at its home position. Both the mode chips and the Reset button go through it.
     var resetKey by remember { mutableIntStateOf(0) }
 
-    val homePosition = remember { Position(0.0f, 0.0f, 4.0f) }
+    // Home camera at 1.5 m so the 0.3 m helmet fills a meaningful fraction of the
+    // viewport. Previous z = 4 made the model render at ~10% of frame — far too small.
+    // QA finding 2026-05-11.
+    val homePosition = remember { Position(0.0f, 0.0f, 1.5f) }
     val target = remember { Position(0.0f, 0.0f, 0.0f) }
 
     val engine = rememberEngine()
