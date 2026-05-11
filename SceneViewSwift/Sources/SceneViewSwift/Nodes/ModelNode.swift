@@ -213,6 +213,29 @@ public struct ModelNode: @unchecked Sendable {
         return scale(scaleFactor)
     }
 
+    // MARK: - Center origin (mirrors Android's ModelNode.centerOrigin)
+
+    /// Re-centres the model so that its bounding-box centre lands at the given target.
+    ///
+    /// Many 3D assets (e.g. glTF/USDZ files exported from DCC tools) place their
+    /// authored pivot at the floor of the bounding box, which causes the model to
+    /// render in the lower portion of an orbit camera framed at world origin.
+    /// Calling `centerOrigin()` after `scaleToUnits(_:)` shifts the model so its
+    /// geometric centre coincides with `target` (defaults to world origin).
+    ///
+    /// Mirrors Android's `ModelNode(centerOrigin = Position(0, 0, 0))`.
+    ///
+    /// - Parameter target: Local-space target for the bounding-box centre. Defaults to origin.
+    /// - Returns: Self with the centring offset applied.
+    @discardableResult
+    public func centerOrigin(_ target: SIMD3<Float> = .zero) -> ModelNode {
+        let bounds = entity.visualBounds(relativeTo: nil)
+        let center = bounds.center
+        let offset = target - center
+        entity.position = entity.position + offset
+        return self
+    }
+
     // MARK: - Animation (mirrors Android's ModelNode animation API)
 
     /// The number of available animations on this model.

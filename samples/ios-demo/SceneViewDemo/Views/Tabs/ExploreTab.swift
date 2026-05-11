@@ -1166,6 +1166,11 @@ struct ModelViewerScreen: View {
         do {
             let node = try await ModelNode.load(model.asset)
             _ = node.scaleToUnits(model.scale)
+            // centerOrigin recenters the model's bounding box on world origin
+            // so the orbit camera (looking at 0,0,0) frames the body, not the
+            // asset's authored pivot point (often the floor of the bounding box).
+            // Mirrors the Android fix (commit 36156142, QA 2026-05-11).
+            _ = node.centerOrigin()
             loadedModel = node
         } catch {
             errorMessage = error.localizedDescription
@@ -1459,6 +1464,9 @@ struct SketchfabModelViewerScreen: View {
             )
             let node = try await ModelNode.load(contentsOf: localURL)
             _ = node.scaleToUnits(1.0)
+            // centerOrigin recenters the bounding box on world origin so the orbit
+            // camera frames the model body, not the asset's authored pivot.
+            _ = node.centerOrigin()
             loadedNode = node
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
