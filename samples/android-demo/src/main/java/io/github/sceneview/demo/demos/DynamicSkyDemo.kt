@@ -36,6 +36,22 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+    // Pick an HDR environment that matches the current time of day. Without this
+    // the SceneView default neutral_ibl gives a black-ish skybox that hides the
+    // dynamic sun entirely (QA finding 2026-05-11 — "Dynamic Sky black at noon").
+    // Three buckets is a coarse approximation, but it covers the three obvious
+    // user expectations: night = stars / lights, dawn / dusk = sunset, daytime
+    // = blue sky.
+    val envAsset = when {
+        timeOfDay < 6f || timeOfDay >= 19f -> "environments/rooftop_night_2k.hdr"
+        timeOfDay < 9f || timeOfDay >= 17f -> "environments/sunset_2k.hdr"
+        else                               -> "environments/outdoor_cloudy_2k.hdr"
+    }
+    val environment = io.github.sceneview.rememberEnvironment(
+        environmentLoader = environmentLoader,
+    ) {
+        environmentLoader.createHDREnvironment(envAsset)!!
+    }
 
     DemoScaffold(
         title = "Dynamic Sky",
@@ -67,9 +83,11 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
+            environment = environment,
             // Disable the constant 110 klx default main light so the DynamicSkyNode's SUN is
-            // the only directional contribution. The default IBL is kept for ambient fill
-            // so the helmet stays visible at night when the sun is below the horizon.
+            // the only directional contribution. The HDR IBL ambient fill keeps the helmet
+            // visible at night when the sun is below the horizon, and the matching skybox
+            // gives the user a clear visual feedback that time-of-day actually changed.
             mainLightNode = null,
             cameraManipulator = rememberCameraManipulator()
         ) {
