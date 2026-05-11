@@ -203,13 +203,122 @@ jobs:
           cd "$BUILD_DIR"
           npm publish --access public
 
+  # ── 4b. Publish React Native bindings to npm ──────────────────────────────
+  publish-rn:
+    name: Publish @sceneview-sdk/react-native to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Check if version already published
+        id: check-rn
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION=$(node -p "require('./react-native/react-native-sceneview/package.json').version")
+          else
+            VERSION=${GITHUB_REF_NAME#v}
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # @sceneview-sdk/react-native is scoped; we check the specific
+          # version rather than the latest dist-tag so a re-run after a
+          # partial failure becomes idempotent.
+          PUBLISHED=$(npm view "@sceneview-sdk/react-native@$VERSION" version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "::notice::@sceneview-sdk/react-native@$VERSION already published — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Publishing @sceneview-sdk/react-native@$VERSION (not yet on npm)"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync package version from VERSION_NAME
+        if: steps.check-rn.outputs.skip != 'true'
+        run: |
+          # Belt-and-suspenders: the version-bump skill already updates
+          # this file in the bump commit, but a workflow_dispatch run
+          # against a stale tree would otherwise publish whatever
+          # package.json currently says. Re-derive from the tag here.
+          VERSION="${{ steps.check-rn.outputs.version }}"
+          cd react-native/react-native-sceneview
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Install + build the lib
+        if: steps.check-rn.outputs.skip != 'true'
+        working-directory: react-native/react-native-sceneview
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Publish to npm
+        if: steps.check-rn.outputs.skip != 'true'
+        working-directory: react-native/react-native-sceneview
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+  # ── 4c. Tag SceneViewSwift for Swift Package Manager consumers ────────────
+  # SPM has no central registry — consumers point Xcode at the git URL and
+  # SPM resolves the highest tag matching their version constraint. We
+  # therefore don't run a publish step; the `v[0-9]+.[0-9]+.[0-9]+` push
+  # tag that triggered this workflow IS the SPM publish. This job just
+  # validates that the tag's commit actually contains a Package.swift
+  # rooted at SceneViewSwift/ so a malformed tag doesn't quietly poison
+  # `.package(url:from:)` resolution for every iOS user.
+  validate-spm:
+    name: Validate SceneViewSwift SPM tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Assert SceneViewSwift/Package.swift exists at this tag
+        run: |
+          if [ ! -f "SceneViewSwift/Package.swift" ]; then
+            echo "::error::SceneViewSwift/Package.swift missing at tag ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          # Surface the declared version so a release-checklist scan can pick it up.
+          grep -E '\.library\(name:|swiftLanguageVersions' SceneViewSwift/Package.swift || true
+
+  # NOTE: pub.dev / Flutter publish is not yet automated. Requires a
+  # `PUB_TOKEN` org-level secret + `dart pub publish --force`. Tracked
+  # separately in #962 follow-up.
+
   # ── 5. Create GitHub Release with auto-generated notes ────────────────────
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [publish-library, publish-mcp, publish-web]
-    if: always() && needs.publish-library.result == 'success' && startsWith(github.ref, 'refs/tags/v')
+    needs: [publish-library, publish-mcp, publish-web, publish-rn, validate-spm]
+    # All three publishers must NOT have failed before the GitHub Release is
+    # cut. Previously the gate only checked `publish-library == 'success'`,
+    # so a Maven Central success with an npm publish failure still
+    # produced a "v4.0.9" GitHub Release advertising packages that never
+    # shipped — and users `npm i sceneview-mcp@4.0.9` would see the
+    # version was missing from the registry. Skipped (because the version
+    # is already on the registry) is OK — only an outright failure blocks.
+    # See #962.
+    if: |
+      always()
+      && needs.publish-library.result == 'success'
+      && needs.publish-mcp.result != 'failure'
+      && needs.publish-mcp.result != 'cancelled'
+      && needs.publish-web.result != 'failure'
+      && needs.publish-web.result != 'cancelled'
+      && needs.publish-rn.result != 'failure'
+      && needs.publish-rn.result != 'cancelled'
+      && needs.validate-spm.result == 'success'
+      && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
