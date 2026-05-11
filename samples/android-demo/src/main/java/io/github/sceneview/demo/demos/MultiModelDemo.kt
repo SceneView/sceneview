@@ -40,7 +40,7 @@ import io.github.sceneview.rememberModelLoader
  * at its own scale + position + rotation, all under the same warm dusk lighting.
  *
  * Lighting comes from `studio_warm_2k.hdr` — a soft golden-hour interior wash that
- * makes the four very different materials (avocado skin, lantern brass, helmet metal
+ * makes the four very different materials (shiba fur, lantern brass, helmet metal
  * paint, dragon scales) read distinctly while feeling like one cohesive scene.
  *
  * Controls:
@@ -54,7 +54,7 @@ import io.github.sceneview.rememberModelLoader
  */
 @Composable
 fun MultiModelDemo(onBack: () -> Unit) {
-    var showAvocado by remember { mutableStateOf(true) }
+    var showShiba by remember { mutableStateOf(true) }
     var showLantern by remember { mutableStateOf(true) }
     var showHelmet by remember { mutableStateOf(true) }
     var showDragon by remember { mutableStateOf(true) }
@@ -64,7 +64,9 @@ fun MultiModelDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
 
-    val avocado = rememberModelInstance(modelLoader, "models/khronos_avocado.glb")
+    // Shiba swapped out per audit #949 — shiba reads warmer next to the brass /
+    // metal / scales of the other three pieces and matches the dusk-lit display tone.
+    val shiba = rememberModelInstance(modelLoader, "models/shiba.glb")
     val lantern = rememberModelInstance(modelLoader, "models/khronos_lantern.glb")
     val helmet = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
     val dragon = rememberModelInstance(modelLoader, "models/animated_dragon.glb")
@@ -81,7 +83,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
-    val allLoaded = avocado != null && lantern != null && helmet != null && dragon != null
+    val allLoaded = shiba != null && lantern != null && helmet != null && dragon != null
     // Yaw drives the parent-scene rotation when "Spin scene" is on. Slow 30 s sweep
     // so the viewer can take in each face of the display before it cycles round.
     val sceneYaw = rememberHeroYaw(
@@ -98,9 +100,9 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 FilterChip(
-                    selected = showAvocado,
-                    onClick = { showAvocado = !showAvocado },
-                    label = { Text("Avocado") },
+                    selected = showShiba,
+                    onClick = { showShiba = !showShiba },
+                    label = { Text("Shiba") },
                 )
                 FilterChip(
                     selected = showLantern,
@@ -149,7 +151,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
             ) {
                 // Tabletop arrangement: helmet at front-center as the hero, lantern
                 // at back-right as the warm light source, dragon at back-left where
-                // its tail sweep doesn't intersect the helmet, avocado as a small
+                // its tail sweep doesn't intersect the helmet, shiba as a small
                 // front-left accent. Front row z=-1.3, back row z=-1.7 so the
                 // depth difference reads even on a portrait phone viewport.
                 //
@@ -159,7 +161,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 // as the formation sweeps — gives a "turntable display" feel.
                 val centerZ = -1.5f
                 val displays = listOf(
-                    Display(showAvocado, avocado, x = -0.55f, z = -1.3f, scale = 0.4f),
+                    Display(showShiba, shiba, x = -0.55f, z = -1.3f, scale = 0.4f),
                     Display(showHelmet, helmet, x = 0.0f, z = -1.3f, scale = 0.5f),
                     Display(showDragon, dragon, x = -0.45f, z = -1.7f, scale = 0.4f),
                     Display(showLantern, lantern, x = 0.55f, z = -1.7f, scale = 0.5f),

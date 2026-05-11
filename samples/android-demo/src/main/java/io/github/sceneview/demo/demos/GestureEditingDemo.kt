@@ -143,7 +143,7 @@ fun GestureEditingDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
-    // Damaged helmet — visually richer than the avocado: PBR materials with
+    // Damaged helmet — visually rich PBR materials with
     // metallic, roughness, and emissive maps make rotation gestures actually
     // useful (you see the lighting react). Centered via centerOrigin = (0,0,0).
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")

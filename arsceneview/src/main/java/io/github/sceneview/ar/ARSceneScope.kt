@@ -406,6 +406,12 @@ class ARSceneScope internal constructor(
      *
      * @param augmentedFace         The ARCore [AugmentedFace] to render.
      * @param meshMaterialInstance  Optional material applied to the face mesh.
+     * @param computeTangents       Whether to compute and upload per-vertex tangent
+     *                              quaternions every frame. Required by PBR (lit) materials;
+     *                              **set `false` when [meshMaterialInstance] is unlit**
+     *                              (e.g. `materialLoader.createUnlitColorInstance(...)`)
+     *                              to skip ~30 Hz of pure-waste Mikkelsen compute + JNI
+     *                              roundtrip + buffer upload. Default `true` (#878 audit).
      * @param onTrackingStateChanged Callback when tracking state changes.
      * @param onUpdated             Callback invoked each frame while the face is updated.
      * @param apply                 Additional imperative configuration.
@@ -415,16 +421,18 @@ class ARSceneScope internal constructor(
     fun AugmentedFaceNode(
         augmentedFace: AugmentedFace,
         meshMaterialInstance: MaterialInstance? = null,
+        computeTangents: Boolean = true,
         onTrackingStateChanged: ((TrackingState) -> Unit)? = null,
         onUpdated: ((AugmentedFace) -> Unit)? = null,
         apply: AugmentedFaceNodeImpl.() -> Unit = {},
         content: (@Composable NodeScope.() -> Unit)? = null
     ) {
-        val node = remember(engine, augmentedFace) {
+        val node = remember(engine, augmentedFace, computeTangents) {
             AugmentedFaceNodeImpl(
                 engine = engine,
                 augmentedFace = augmentedFace,
                 meshMaterialInstance = meshMaterialInstance,
+                computeTangents = computeTangents,
                 onTrackingStateChanged = onTrackingStateChanged,
                 onUpdated = onUpdated
             ).apply(apply)
