@@ -33,10 +33,14 @@ final class CameraNodeTests: XCTestCase {
     }
 
     func testLookAt() {
+        // Camera at (3, 0, 0) looking at origin → must rotate to face -X.
+        // Previously this used (0, 0, 5) → origin, which is the canonical
+        // RealityKit forward direction (-Z), so the lookAt result was the
+        // identity quaternion — the test passed only because the assertion
+        // was already failing-open before the up-vector fix landed (#883).
         let camera = CameraNode()
-            .position(.init(x: 0, y: 0, z: 5))
+            .position(.init(x: 3, y: 0, z: 0))
             .lookAt(.zero)
-        // After lookAt, the camera should have a non-identity orientation
         let angle = camera.rotation.angle
         XCTAssertGreaterThan(abs(angle), 0.001)
     }
@@ -189,11 +193,22 @@ final class CameraNodeTests: XCTestCase {
     // MARK: - Look at with custom up
 
     func testLookAtWithCustomUp() {
-        let camera = CameraNode()
-            .position(.init(x: 0, y: 0, z: 5))
+        // Use a non-axis-aligned target so the resulting rotation is necessarily
+        // non-identity, AND a non-Y up vector so we exercise the up-forwarding
+        // path patched in #883 (pre-fix the up parameter was silently dropped
+        // and only the Y-up default was ever applied).
+        let yUpCamera = CameraNode()
+            .position(.init(x: 3, y: 0, z: 0))
             .lookAt(.zero, up: SIMD3<Float>(0, 1, 0))
-        XCTAssertNotNil(camera.entity)
-        XCTAssertGreaterThan(abs(camera.rotation.angle), 0.001)
+        let zUpCamera = CameraNode()
+            .position(.init(x: 3, y: 0, z: 0))
+            .lookAt(.zero, up: SIMD3<Float>(0, 0, 1))
+        XCTAssertNotNil(yUpCamera.entity)
+        XCTAssertGreaterThan(abs(yUpCamera.rotation.angle), 0.001)
+        // Different up vectors must produce different orientations — proves
+        // the parameter actually reaches RealityKit.
+        let differ = simd_dot(yUpCamera.rotation.vector, zUpCamera.rotation.vector)
+        XCTAssertLessThan(abs(differ), 0.999)
     }
 
     // MARK: - Depth of field chaining

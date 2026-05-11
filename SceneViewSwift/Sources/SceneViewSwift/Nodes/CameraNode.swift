@@ -99,7 +99,10 @@ public struct CameraNode: Sendable {
         _ target: SIMD3<Float>,
         up: SIMD3<Float> = SIMD3<Float>(0, 1, 0)
     ) -> CameraNode {
-        entity.look(at: target, from: entity.position, relativeTo: nil)
+        // Forward `up` to RealityKit's `look(at:from:upVector:relativeTo:)` —
+        // pre-fix this overload silently dropped the parameter and called
+        // `look(at:from:relativeTo:)` which always assumes Y-up. (#883)
+        entity.look(at: target, from: entity.position, upVector: up, relativeTo: nil)
         return self
     }
 

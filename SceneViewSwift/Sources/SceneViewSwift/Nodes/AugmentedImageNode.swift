@@ -34,6 +34,21 @@ import UIKit
 /// ```
 public struct AugmentedImageNode: Sendable {
 
+    /// Errors thrown during reference-image construction.
+    public enum Error: Swift.Error, CustomStringConvertible, Sendable {
+        /// The supplied `UIImage` had no `cgImage` representation
+        /// (e.g. CIImage- or vector-backed images). Convert via
+        /// `UIGraphicsImageRenderer.image { _ in image.draw(...) }.cgImage` first.
+        case cgImageUnavailable
+
+        public var description: String {
+            switch self {
+            case .cgImageUnavailable:
+                return "AugmentedImageNode.ReferenceImage: UIImage has no cgImage representation"
+            }
+        }
+    }
+
     /// A reference image to detect in the real world.
     public struct ReferenceImage: Sendable {
         /// Unique name to identify this image when detected.
@@ -47,13 +62,23 @@ public struct AugmentedImageNode: Sendable {
 
         /// Creates a reference image from a UIImage.
         ///
+        /// Throws when `image.cgImage` is `nil` — that happens for CIImage- or
+        /// `CGImageSource`-backed UIImages (e.g. from `UIGraphicsImageRenderer`
+        /// with vector content). Pre-fix this initializer force-unwrapped and
+        /// crashed; now callers get a recoverable error path. (#883)
+        ///
         /// - Parameters:
         ///   - name: Unique identifier for this image.
-        ///   - image: The image to detect.
+        ///   - image: The image to detect. Must be CGImage-backed.
         ///   - physicalWidth: Real-world width in meters.
-        public init(name: String, image: UIImage, physicalWidth: CGFloat) {
+        /// - Throws: `Error.cgImageUnavailable` when the UIImage has no
+        ///   `cgImage` representation.
+        public init(name: String, image: UIImage, physicalWidth: CGFloat) throws {
+            guard let cg = image.cgImage else {
+                throw Error.cgImageUnavailable
+            }
             self.name = name
-            self.cgImage = image.cgImage!
+            self.cgImage = cg
             self.physicalWidth = physicalWidth
         }
 
