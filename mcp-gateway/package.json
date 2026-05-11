@@ -1,6 +1,6 @@
 {
   "name": "sceneview-mcp-gateway",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "HTTP gateway multiplexing the SceneView MCP servers with auth, rate limiting, and billing on Cloudflare Workers.",
   "type": "module",

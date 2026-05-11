@@ -8,10 +8,6 @@ import kotlin.math.sqrt
 
 private val kEpsilon = 2.0.pow(-52.0)
 
-// Note: this shared mutable array makes Delaunator NOT thread-safe.
-// Do not construct multiple Delaunator instances concurrently.
-private val kEdgeStack = Array(512) { 0 }
-
 /**
  * Fast [Delaunay triangulation](https://en.wikipedia.org/wiki/Delaunay_triangulation) of 2D points
  * implemented in Kotlin.
@@ -23,8 +19,21 @@ private val kEdgeStack = Array(512) { 0 }
  * Copyright [Delaunator-Kt](https://github.com/ygdrasil-io/Delaunator-Kt)
  *
  * Thanks [ygdrasil-io](https://github.com/ygdrasil-io)
+ *
+ * ### Thread-safety
+ *
+ * Each `Delaunator` instance owns its own working memory ([edgeStack]) — different
+ * instances on different threads are safe. A single instance is **NOT** safe for
+ * concurrent calls; construct one per worker.
+ *
+ * Prior versions used a file-level `edgeStack` array shared across instances, which
+ * silently corrupted the legalize pass when two `Delaunator` constructors ran in
+ * parallel (e.g. a multi-window app pre-baking shape data on different threads).
  */
 class Delaunator<out T : Delaunator.IPoint>(val points: List<T>) {
+
+    /** Per-instance scratch buffer used by [legalize]; replaces the old file-level mutable array. */
+    private val edgeStack = IntArray(512)
 
     var triangles: Array<Int>
     var halfEdges: Array<Int>
@@ -338,7 +347,7 @@ class Delaunator<out T : Delaunator.IPoint>(val points: List<T>) {
 
             if (b == -1) {
                 if (i == 0) break
-                a = kEdgeStack[--i]
+                a = edgeStack[--i]
                 continue
             }
 
@@ -380,12 +389,12 @@ class Delaunator<out T : Delaunator.IPoint>(val points: List<T>) {
 
                 val br = b0 + (b + 1) % 3
 
-                if (i < kEdgeStack.size) {
-                    kEdgeStack[i++] = br
+                if (i < edgeStack.size) {
+                    edgeStack[i++] = br
                 }
             } else {
                 if (i == 0) break
-                a = kEdgeStack[--i]
+                a = edgeStack[--i]
             }
         }
 

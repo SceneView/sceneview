@@ -661,13 +661,15 @@ fun ARSceneView(
     // ── DSL content ───────────────────────────────────────────────────────────────────────────────
 
     if (content != null) {
-        val scope = remember(engine, modelLoader, materialLoader, environmentLoader) {
+        val scope = remember(engine, modelLoader, materialLoader, environmentLoader, nodeManager) {
             ARSceneScope(
                 engine = engine,
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
-                _nodes = scopeChildNodes
+                _nodes = scopeChildNodes,
+                // Synchronous detach — see ARSceneScope KDoc on `nodeRemover`.
+                nodeRemover = nodeManager::removeNode
             )
         }
         scope.content()

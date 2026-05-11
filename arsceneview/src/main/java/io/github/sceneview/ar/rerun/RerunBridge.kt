@@ -163,16 +163,26 @@ public constructor(
         // accumulate misleading totals across attempts.
         _eventsSent = 0L
         writerJob = scope.launch {
+            // Capture local refs so the writer's finally block does NOT race a
+            // subsequent connect() that may have replaced the writer/socket
+            // fields. Without this, disconnect() → connect() → old writer's
+            // finally would null out the NEW socket created by the new writer.
+            var localSocket: Socket? = null
+            var localWriter: BufferedWriter? = null
+            var localReaderJob: Job? = null
             try {
                 val s = Socket()
                 s.connect(InetSocketAddress(host, port), /* timeout = */ 2000)
                 val w = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
+                localSocket = s
+                localWriter = w
                 socket = s
                 writer = w
                 _isConnected = true
 
                 // Start the reader for sidecar acks AFTER the socket is live.
-                readerJob = scope.launch { readSidecarAcks(s) }
+                localReaderJob = scope.launch { readSidecarAcks(s) }
+                readerJob = localReaderJob
 
                 for (line in outbox) {
                     try {
@@ -188,9 +198,15 @@ public constructor(
                 logWarning("connect to $host:$port failed: ${e.message}")
             } finally {
                 _isConnected = false
-                closeQuietly()
-                readerJob?.cancel()
-                readerJob = null
+                // Close ONLY the resources this writer owns, then null out the
+                // shared fields ONLY if they still point to our locals (i.e. a
+                // subsequent connect() hasn't already replaced them).
+                try { localWriter?.close() } catch (_: Exception) {}
+                try { localSocket?.close() } catch (_: Exception) {}
+                if (writer === localWriter) writer = null
+                if (socket === localSocket) socket = null
+                localReaderJob?.cancel()
+                if (readerJob === localReaderJob) readerJob = null
             }
         }
     }
@@ -244,6 +260,12 @@ public constructor(
     public fun disconnect() {
         val job = writerJob
         writerJob = null
+        // Flip the observable state up-front so callers see a deterministic
+        // "disconnected" immediately after disconnect() returns. The writer's
+        // own finally block also sets this, but it may run later on its IO
+        // coroutine — and the public contract is that `isConnected == false`
+        // the moment disconnect() / close() returns to the caller.
+        _isConnected = false
         closeQuietly()
         job?.cancel()
         // No join() — caller's thread is not blocked. A subsequent connect()
@@ -259,6 +281,7 @@ public constructor(
     public fun closeAsync(): Job? {
         val job = writerJob
         writerJob = null
+        _isConnected = false
         closeQuietly()
         job?.cancel()
         return job

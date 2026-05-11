@@ -87,13 +87,20 @@ class ARSceneScope internal constructor(
     modelLoader: ModelLoader,
     materialLoader: MaterialLoader,
     environmentLoader: EnvironmentLoader,
-    _nodes: SnapshotStateList<NodeImpl>
+    _nodes: SnapshotStateList<NodeImpl>,
+    // Same SIGABRT-prevention contract as the 3D root scope: removes the node
+    // from the Filament scene synchronously inside detach() before node.destroy()
+    // runs, so a MaterialInstance is never destroyed while its Renderable entity
+    // is still registered. Without this the AR scope re-introduces the crash
+    // class fixed in PR #851/#852 for any AR demo that disposes nodes.
+    nodeRemover: ((NodeImpl) -> Unit)? = null
 ) : SceneScope(
     engine = engine,
     modelLoader = modelLoader,
     materialLoader = materialLoader,
     environmentLoader = environmentLoader,
-    _nodes = _nodes
+    _nodes = _nodes,
+    nodeRemover = nodeRemover
 ) {
 
     // ── AnchorNode ────────────────────────────────────────────────────────────────────────────────

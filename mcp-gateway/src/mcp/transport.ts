@@ -106,7 +106,7 @@ export interface TransportContext {
  */
 const SERVER_INFO = {
   name: "sceneview-mcp-gateway",
-  version: "0.0.1",
+  version: "1.0.0",
 } as const;
 
 /**

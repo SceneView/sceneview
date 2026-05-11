@@ -1702,7 +1702,13 @@ class NodeScope internal constructor(
     modelLoader = scope.modelLoader,
     materialLoader = scope.materialLoader,
     environmentLoader = scope.environmentLoader,
-    _nodes = scope._nodes
+    _nodes = scope._nodes,
+    // Inherit the parent's synchronous-detach hook so a child node's renderable
+    // entity is removed from the Filament scene BEFORE node.destroy() runs.
+    // Without this, destroying a child's MaterialInstance while its Renderable
+    // is still registered triggers the same SIGABRT class as PR #851/#852.
+    // Mirrors the contract enforced by SceneScope (root) and ARSceneScope.
+    nodeRemover = scope.nodeRemover
 ) {
     /**
      * Attaches [node] as a child of [parentNode].
@@ -1712,9 +1718,16 @@ class NodeScope internal constructor(
     }
 
     /**
-     * Removes [node] from [parentNode]'s children.
+     * Removes [node] from [parentNode]'s children, then asks the parent scope's
+     * [nodeRemover] to detach the renderable entity from the Filament scene
+     * synchronously (see super [detach] for the lifecycle contract).
      */
     override fun detach(node: NodeImpl) {
         parentNode.removeChildNode(node)
+        // super.detach also calls nodeRemover + removes from _nodes — but
+        // child nodes are NOT in _nodes (they're tracked via parentNode.children),
+        // so we only invoke nodeRemover directly to avoid a no-op _nodes.remove
+        // and keep the per-frame Filament-scene contract honest.
+        nodeRemover?.invoke(node)
     }
 }
