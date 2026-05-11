@@ -21,14 +21,20 @@ coroutines = "1.10.2"
 kotlinMath = "1.8.0"
 
 # 3D / AR
-# Filament is pinned to 1.70.2 to match the .filamat files committed under
-# sceneview/src/main/assets/materials/ and website-static/materials/. Those
-# are compiled by buildSrc/FilamentPlugin (matc) but the plugin is gated on
-# filamentPluginEnabled=true in gradle.properties (default off) — bumping
-# this version without re-running matc lands an ABI mismatch that crashes
-# at material-load time on certain devices. Session #800 / #961 track the
-# 1.71+ bump as a dedicated work-stream that also flips the plugin flag.
-filament = "1.70.2"
+# Filament 1.71.0 — must match the binary version of .filamat files committed
+# under sceneview/src/main/assets/materials/ and website-static/materials/.
+# Those were recompiled to material-binary version 71 in commit `efd296f1`
+# (Apr 11) when Filament was first bumped 1.70.2 → 1.71.0. The follow-up
+# `4a31b579` (May 11) reverted ONLY the runtime to 1.70.2 thinking the
+# .filamat were still v70 — they are not. That mismatch caused v4.1.0 to
+# SIGABRT at material-load on Lighting / Geometry / Animation / MovableLight /
+# MultiModel demos (Filament 1.70.2 cannot parse v71 packages). v4.1.1
+# restores the consistent pair: 1.71.0 runtime + v71 .filamat. To downgrade
+# back to 1.70.2 in the future, you MUST first run matc 1.70.2 against
+# `sceneview/src/main/materials/*.mat` and commit the regenerated v70 .filamat.
+# Session #800 / #961 track future Filament bumps with the same paired-update
+# guarantee.
+filament = "1.71.0"
 arCore = "1.53.0"
 
 # Networking

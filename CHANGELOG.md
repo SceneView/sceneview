@@ -1,5 +1,40 @@
 # Changelog
 
+## v4.1.1 — Filament 1.71.0 / .filamat ABI realignment hotfix (2026-05-12)
+
+**Status:** stable. Critical bug fix release. **All v4.1.0 consumers should upgrade.**
+
+### Fixed — `SIGABRT` on `MaterialLoader.createColorInstance` (every demo using bundled materials)
+
+A multi-agent post-ship audit caught a hard crash regression introduced in v4.1.0 — `Lighting`, `Geometry`, `Animation`, `MovableLight`, and `MultiModel` demos (and any consumer app touching `MaterialLoader.createColorInstance` or any default Filament post-process material) `SIGABRT`'d on launch with `Filament: could not parse the material package for material Opaque Colored`.
+
+**Root cause** — Filament binary version mismatch:
+
+- Commit [`efd296f1`](https://github.com/sceneview/sceneview/commit/efd296f1) (Apr 11) bumped Filament 1.70.2 → 1.71.0 and recompiled all 21 `.filamat` files via `matc 1.71.0` to material-binary version 71.
+- Commit [`4a31b579`](https://github.com/sceneview/sceneview/commit/4a31b579) (May 11, [#961](https://github.com/sceneview/sceneview/issues/961)) reverted ONLY `gradle/libs.versions.toml`'s `filament` to `1.70.2` thinking the `.filamat` files were still v70 — they had been at v71 for a month. Filament 1.70.2 runtime cannot parse v71 packages → `SIGABRT` in `libfilament-jni.so`.
+- v4.0.8, v4.0.9, and v4.1.0 all shipped this broken pair, but only v4.1.0 was caught (Lighting / Geometry / Animation / MovableLight / MultiModel were all new or refactored demos in the v4.1.0 sprint, exposing the regression).
+
+**The fix** ([`<commit-sha>`]) reverts `4a31b579` — restores `filament = "1.71.0"` to match the v71 `.filamat` files. Future Filament downgrades MUST first run `matc <version>` against `sceneview/src/main/materials/*.mat` and commit the regenerated `.filamat`s.
+
+### Tested — visual regression on Pixel_7a emulator
+
+All 6 demos validated post-fix on Pixel_7a (Apple M3 host GPU, OpenGL ES 3.0):
+
+- ✅ Lighting (was CRASH) — directional light + helmet renders correctly
+- ✅ Geometry (was CRASH) — primitives render with PBR material
+- ✅ Animation (was CRASH) — soldier walks in cinematic studio HDR with shadows
+- ✅ MovableLight (was CRASH) — F40 model with marker sphere + intensity slider
+- ✅ MultiModel (was CRASH) — 4-model tabletop tableau with studio HDR
+- ✅ ModelViewer (was alive) — helmet still renders
+
+`./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin :samples:android-demo:compileDebugKotlin :sceneview:test :arsceneview:testDebugUnitTest` all green at Filament 1.71.0.
+
+### No public API changes
+
+Library API is identical to v4.1.0. Maven Central publishes the bumped triplet (`sceneview` / `arsceneview` / `sceneview-core` `4.1.1`) and the npm packages bump for version-tracking and to keep the cross-platform release set coherent.
+
+---
+
 ## v4.1.0 — iOS V1 honest + Android rendering uplift + Sketchfab streaming + Claude Code plugin marketplace (2026-05-11)
 
 ### ⚠️ BREAKING — Android render defaults change visual look out-of-the-box

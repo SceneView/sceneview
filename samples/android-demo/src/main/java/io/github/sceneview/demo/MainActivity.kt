@@ -226,9 +226,12 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
             val onBack: () -> Unit = { navController.popBackStack() }
             DemoRouter(id = id, onBack = onBack)
         }
-        composable("about") {
-            AboutScreen(onBack = { navController.popBackStack() })
-        }
+        // Note: the legacy `composable("about") { AboutScreen(...) }` route was
+        // removed (alongside `AboutScreen.kt`) because RootScreen's bottom-tab
+        // `RootTab.About → AboutTabContent()` is the only About surface — no
+        // caller ever navigated to "about". Deletion verified via grep:
+        // 0 `navigate("about")` calls anywhere. The @Ignore'd ScreenshotTest
+        // for AboutScreen stays disabled per its own comment.
     }
 }
 
