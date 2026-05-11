@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Full history so quality-gate.sh can run git diff/ls-files against
           # main and so version checks can resolve historical refs.
@@ -86,7 +86,7 @@ jobs:
 
       - name: Upload validate-demo-assets log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: validate-demo-assets-log
           path: /tmp/validate-demo-assets.log
@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload check-deprecated-api log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: check-deprecated-api-log
           path: /tmp/check-deprecated-api.log

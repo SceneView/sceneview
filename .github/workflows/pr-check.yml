@@ -160,7 +160,7 @@ jobs:
         run: ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
 
       - name: Upload bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: success()
         with:
           name: web-demo-bundle
@@ -207,7 +207,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: success()
         with:
           name: flutter-demo-apk
