@@ -184,12 +184,18 @@ jobs:
         run: |
           VERSION="${{ steps.check-web.outputs.version }}"
           BUILD_DIR="sceneview-web/build/kotlin-webpack/js/productionExecutable"
+          # Hand-written TypeScript declarations — Kotlin/JS 2.x doesn't emit
+          # a `.d.ts` from `@JsExport` by default and the API surface is small
+          # enough that a hand-maintained file is cheaper than wiring
+          # dtsGenerator. See #946.
+          cp sceneview-web/sceneview-web.d.ts "$BUILD_DIR/sceneview-web.d.ts"
           cat > "$BUILD_DIR/package.json" << EOF
           {
             "name": "sceneview-web",
             "version": "$VERSION",
             "description": "SceneView for Web — 3D rendering with Filament.js (WebGL2/WASM)",
             "main": "sceneview-web.js",
+            "types": "sceneview-web.d.ts",
             "keywords": ["3d", "webgl", "filament", "sceneview", "gltf", "wasm"],
             "homepage": "https://github.com/sceneview/sceneview",
             "repository": {
