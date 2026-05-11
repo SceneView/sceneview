@@ -25,9 +25,9 @@ Always determine the target platform first. Ask if unclear. Default to Android (
 
 ### Version info
 - Current version: **4.0.9**
-- Android: `io.github.sceneview:sceneview:4.0.9` (3D) / `io.github.sceneview:arsceneview:4.0.9` (AR)
+- Android: `io.github.sceneview:sceneview:4.1.0` (3D) / `io.github.sceneview:arsceneview:4.1.0` (AR)
 - Apple: SPM `https://github.com/sceneview/sceneview-swift.git` (from: "4.1.0"))
-- Web: `npm install sceneview-web@4.0.9` (also `<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.0.9/sceneview-web.js">`)
+- Web: `npm install sceneview-web@4.1.0` (also `<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.1.0/sceneview-web.js">`)
 - MCP: `npx sceneview-mcp` (latest 4.0.11) — adds 28 AI tools
 - Min SDK: 24 | Target: 36 | Kotlin: 2.3.20
 

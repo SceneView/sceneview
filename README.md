@@ -102,7 +102,7 @@ dependencies {
 
 **iOS / macOS / visionOS** (Swift Package Manager):
 ```
-https://github.com/sceneview/sceneview.git  (from: 4.0.9)
+https://github.com/sceneview/sceneview.git  (from: 4.1.0)
 ```
 
 **Web** (sceneview.js — friendly DSL, two `<script>` tags):
@@ -288,7 +288,7 @@ ARSceneView(planeDetection: .horizontal) { position, arView in
 
 Plus the **iOS `RerunBridge`** with the same wire format as Android, and a `NodeBuilder` DSL for declarative composition outside SwiftUI.
 
-**Install:** `https://github.com/sceneview/sceneview.git` (SPM, from 4.0.9)
+**Install:** `https://github.com/sceneview/sceneview.git` (SPM, from 4.1.0)
 
 ---
 
