@@ -2,9 +2,9 @@
 
 > Ship fast, ship often. Every feature = a release.
 
-## Current: v4.0.0 stable (April 2026)
+## Current: v4.0.9 stable (May 2026)
 
-**AI-first SDK** — 9 platforms, MCP monetization live, Rerun.io debug integration.
+**AI-first SDK** — 9 platforms, MCP server on npm, Claude Code plugin marketplace, Rerun.io debug integration.
 
 | What | Status |
 |---|---|
@@ -15,24 +15,22 @@
 | Android TV | Alpha |
 | Flutter bridge | Alpha |
 | React Native bridge | Alpha |
-| MCP on npm | **4.0.1 @latest** |
-| MCP Gateway (Stripe billing) | **Live** (first paying customer) |
+| MCP on npm | **4.0.11 @latest** |
+| Claude Code plugin marketplace | **Live** ([`sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace)) |
 | Telemetry Worker | **Live** |
 | Rerun.io debug integration | **Shipped** (Android + iOS + Python) |
 | Play Store demo app | Deployed |
 | App Store demo app | TestFlight |
-| GitHub Release | **v4.0.0 stable** |
+| GitHub Release | **v4.0.9 stable** |
 
-### Completed in v4.0.0
+### Completed in v4.0
 - [x] Unify naming: `SceneView {}` / `ARSceneView {}` (v3.6)
 - [x] Separate modules intentionally: `sceneview` (3D-only) + `arsceneview` (opt-in AR)
 - [x] Render tests CI (SwiftShader, 4 test classes)
 - [x] NodeAnimator bug fix (#388)
-- [x] MCP Pro with Stripe Billing (free/pro/team tiers, gateway live)
-- [x] Hub MCP (11 vertical libraries bundled)
 - [x] Anonymous telemetry (Cloudflare Worker + D1)
 - [x] Claude playground on website
-- [x] First paying customer (dogfooding)
+- [x] Claude Code plugin marketplace (Apache-2.0, single `sceneview` plugin v4.0.11)
 
 ---
 

@@ -10,7 +10,7 @@
   /plugin marketplace add sceneview/claude-marketplace
   /plugin install sceneview@sceneview
   ```
-- **Marketplace clone ~50 KB** (vs 1.4 GB if it had lived in the SDK monorepo — split-to-dedicated-repo decision after a multi-agent review flagged the monorepo clone as a ship-blocker).
+- **Marketplace clone ~256 KB** (vs 1.4 GB if it had lived in the SDK monorepo — split-to-dedicated-repo decision after a multi-agent review flagged the monorepo clone as a ship-blocker).
 - **Plugin manifest references its npm-published MCP via `npx`** — no code vendoring, `sceneview-mcp` stays independently versioned on npm.
 - **Discovery surfaces wired** ([`01114229`](https://github.com/sceneview/sceneview/commit/01114229)): plugin-install instructions added to `README.md`, `llms.txt`, `mcp/README.md`, `docs/docs/ai-development.md`, `docs/docs/index.md`. GitHub topics on the marketplace repo cover `claude-code`, `claude-plugin`, `mcp`, `3d`, `ar`, `android`, `ios`, `web`, `jetpack-compose`, `swiftui`.
 
@@ -20,7 +20,7 @@ Verifies the `sceneview` plugin's manifest version matches `npm view sceneview-m
 
 ### Security — sceneview/sceneview HEAD scrub
 
-Removed off-topic personal-portfolio code from the public SDK repo that had nothing to do with SceneView ([`c1a5c99f`](https://github.com/sceneview/sceneview/commit/c1a5c99f)): `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy/registry-submission docs that listed every unrelated MCP. Also dropped tracked CDI-sensitive session artefacts (`.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `RERUN-CHECK.md`, hardcoded user paths in samples). Verified `git ls-files | grep -iE 'urssaf|impôts|service-public|french-admin|octopuscommunity|ajaxmusic'` returns 0 hits in HEAD. Past commits still contain the strings — separate `git filter-repo` session is the planned followup.
+Removed off-topic personal-portfolio code from the public SDK repo that had nothing to do with SceneView: `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy/registry-submission docs that listed unrelated MCPs. Also dropped tracked CDI-sensitive session artefacts (`.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `RERUN-CHECK.md`, hardcoded user paths in samples). The standard employer/portfolio identifier greps return 0 hits in HEAD. Past commits still contain the historical strings — a `git filter-repo` session is the planned followup.
 
 ## v4.0.9 — Web unlit parity + Android demo APK -38% + Play Store race fix (2026-05-07)
 

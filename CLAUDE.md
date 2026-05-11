@@ -175,13 +175,13 @@ Never say "everything is good" without verifying published packages.
   - Removed off-topic personal-portfolio code from public sceneview/sceneview repo: `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy / submission docs that listed every personal MCP
   - Scrubbed in-place mentions in `CLAUDE.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/docs/ai-context.md`, `.gitignore`
   - Untracked `.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `.claude/SESSION_*.md`, `.dart_tool/`, `qa_log.txt` — these were carrying employer-domain leakage and `thomasgorisse` (lowercase, suspended) references
-  - Verified `git ls-files | grep -iE 'urssaf|impôts|service-public|french-admin'` returns **0 hits** in HEAD
+  - Verified the standard employer/portfolio identifier greps return **0 hits** in tracked HEAD files
   - `npm hub-mcp` deprecated with a "project discontinued — use individual MCPs directly" message; local backups deleted
 - ⚠️ **Past git history** still contains the leaked strings + the moved-out files. A `git filter-repo` session is the next-up follow-up — must coordinate with the 9 active worktrees before force-push.
 
 ### Followups for next session
 
-1. **filter-repo run** — scrub `octopuscommunity`, `AjaxMusic@gmail`, `thomasgorisse` (lowercase) from the entire git history of `sceneview/sceneview`. See plan in `~/Projects/profile-private/plans/filter-repo-plan.md`.
+1. **filter-repo run** — scrub the historical employer/portfolio strings from the entire git history of `sceneview/sceneview`. See plan in `~/Projects/profile-private/plans/filter-repo-plan.md`.
 2. **Submit Anthropic marketplace** — guide at `~/Projects/profile-private/marketplace-submissions/2026-05-07-anthropic-marketplace-submission.md` (Thomas clicks through the in-app form).
 3. **Reddit + HN posts** — drafts at `~/Projects/profile-private/announcements/` (single-plugin framing, ready to post when Thomas is ready).
 - 4-agent independent Opus review caught 6 BLOCKING + 5 MAJOR before public announcement: dead-code hooks (matcher syntax invalid, validator missed it), license mismatch (Apache-2.0 vs MIT), 1.4 GB monolithic clone (split to dedicated repo to fix), `/review` `/test` namespace collision with built-in skills, version drift (plugin pinned 4.0.9 vs npm @4.0.11), DL/mo numbers gonflés in announcement drafts. All BLOCKING fixed in [`a88f7f8c`](https://github.com/sceneview/sceneview/commit/a88f7f8c) + the marketplace migration.
