@@ -1300,6 +1300,13 @@ struct ModelViewerScreen: View {
 /// This is the showcase path for the demo: every model the user touches — bundled or
 /// streamed — flows through SceneView's renderer (RealityKit on iOS). The Sketchfab web
 /// viewer / iframe / embed is intentionally never used.
+///
+/// Wow-factor polish (2026-05-11 session `wow-factor-sketchfab`):
+/// - Premium studio HDR environment by default (PBR-flattering reflections).
+/// - Cross-fade from the Sketchfab thumbnail (Ken-Burns zoom) to the live SceneView
+///   so the model "comes to life" instead of popping in.
+/// - Subtle radial vignette overlay for cinematic / Apple-Store framing.
+/// - Auto-rotate on by default — the model presents itself from every angle.
 struct SketchfabModelViewerScreen: View {
     let model: SketchfabModel
     @State private var loadedNode: ModelNode?
@@ -1308,7 +1315,18 @@ struct SketchfabModelViewerScreen: View {
     @State private var errorMessage: String?
     @State private var selectedEnvironment: SceneEnvironment = .studio
     @State private var autoRotate = true
+    /// Drives the thumbnail Ken-Burns zoom during download, and the post-reveal
+    /// cross-fade once the SceneView is ready.
+    @State private var thumbnailZoom: CGFloat = 1.0
+    @State private var sceneRevealed = false
     @Environment(\.dismiss) private var dismiss
+
+    /// Largest Sketchfab thumbnail (for the during-download Ken-Burns hero).
+    private var heroThumbnailURL: URL? {
+        let images = model.thumbnails.images
+        let preferred = images.max(by: { $0.width < $1.width }) ?? images.first
+        return preferred.flatMap { URL(string: $0.url) }
+    }
 
     var body: some View {
         ZStack {
@@ -1324,6 +1342,24 @@ struct SketchfabModelViewerScreen: View {
 
             sceneView
                 .ignoresSafeArea()
+                .opacity(sceneRevealed ? 1 : 0)
+
+            // Thumbnail cross-fade overlay — shows the Sketchfab image with a slow
+            // Ken-Burns zoom during download. Fades out (over 0.6 s) once the
+            // SceneView has had time to mount the loaded ModelNode, producing the
+            // "come to life" transition.
+            if !sceneRevealed {
+                thumbnailHero
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+
+            // Cinematic vignette — radial dark gradient at the corners, invisible
+            // in the centre. Costs nothing to render and gives the viewer the
+            // "Apple Store hero" framing without obscuring the model.
+            vignette
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
 
             if isLoading {
                 VStack(spacing: 14) {
@@ -1386,6 +1422,25 @@ struct SketchfabModelViewerScreen: View {
             }
         }
         .task { await loadFromSketchfab() }
+        .onAppear {
+            // Start the Ken-Burns slow zoom on the thumbnail the moment the screen
+            // appears, so it's already animating when the user reads the title.
+            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
+                thumbnailZoom = 1.18
+            }
+        }
+        .onChange(of: loadedNode != nil) { _, ready in
+            guard ready else { return }
+            // Give the SceneView one frame to mount its content before fading
+            // the thumbnail out — avoids a brief black flash mid-transition.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(220))
+                withAnimation(.easeOut(duration: 0.6)) { sceneRevealed = true }
+                #if os(iOS)
+                HapticManager.lightTap()
+                #endif
+            }
+        }
     }
 
     private func loadFromSketchfab() async {
@@ -1434,6 +1489,41 @@ struct SketchfabModelViewerScreen: View {
             .environment(selectedEnvironment)
             .cameraControls(.orbit)
             .id("sketchfab-manual-\(loadedNode != nil)-\(selectedEnvironment.name)")
+        }
+    }
+
+    /// Cinematic vignette — costs ~0 GPU and lifts the model in the centre
+    /// without obscuring it. Matches the "Apple Store" / Sketchfab hero look.
+    private var vignette: some View {
+        RadialGradient(
+            colors: [.black.opacity(0.0), .black.opacity(0.35)],
+            center: .center,
+            startRadius: 200,
+            endRadius: 800
+        )
+        .blendMode(.multiply)
+    }
+
+    /// Hero thumbnail shown during download with a slow Ken-Burns zoom; cross-fades
+    /// out once the SceneView has mounted the loaded ModelNode.
+    @ViewBuilder
+    private var thumbnailHero: some View {
+        ZStack {
+            AsyncImage(url: heroThumbnailURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                default:
+                    Color.clear
+                }
+            }
+            .scaleEffect(thumbnailZoom)
+            // Soft blur so the thumbnail feels like a "preview state" rather
+            // than the final render, and the transition to SceneView reads as
+            // "now it's real and live".
+            .blur(radius: 6)
+            // Slight darkening so the foreground progress card stays legible.
+            Color.black.opacity(0.30)
         }
     }
 
