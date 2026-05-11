@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Auto Backup & Device-To-Device transfer rules for the SceneView demo app.
+
+    Why this exists
+    ===============
+    Android 12+ (API 31) auto-backs-up app data to Google Drive and to a new
+    device when the user sets one up. Without explicit `<include>` / `<exclude>`
+    rules every shared-prefs file, AR session cache, ARCore Cloud handoff token,
+    and downloaded recording lands in the user's Drive. For a public demo app
+    that ingests Sketchfab models and ARCore recordings (which can carry
+    location-tagged frames) that's the wrong default — see issue #959.
+
+    Policy
+    ======
+    1. Cloud backup (`<cloud-backup>`) — exclude EVERYTHING. The demo has no
+       state worth restoring across devices; preferences are throwaway, model
+       caches re-download in <1 s, and AR recordings should never leave the
+       device automatically.
+    2. Device transfer (`<device-transfer>`) — same exclude-all policy. A new
+       phone re-paired from the old one gets a clean install of the demo.
+
+    The single `<exclude domain="root">` clause covers all four storage roots
+    (`root`, `file`, `database`, `sharedpref`, `external`) on Android 12+ which
+    is the targetSdk; older devices fall back to the deprecated
+    `fullBackupContent` attribute, which we leave unset to keep this file the
+    single source of truth.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+    </device-transfer>
+</data-extraction-rules>
