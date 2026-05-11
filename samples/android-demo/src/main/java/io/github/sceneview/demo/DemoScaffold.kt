@@ -31,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
@@ -52,12 +54,17 @@ fun DemoScaffold(
     scene: @Composable BoxScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val haptic = LocalHapticFeedback.current
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     // Long-press the title to toggle QA mode — showcase camera
                     // animations freeze, which is what test harnesses want.
+                    // The gesture is intentionally hidden so the haptic pulse
+                    // is the only "you did something" confirmation a user gets
+                    // — without it the title is silently re-tappable forever
+                    // (see #951 discoverability + #956).
                     Row(
                         modifier = Modifier
                             .combinedClickable(
@@ -65,6 +72,7 @@ fun DemoScaffold(
                                 indication = null,
                                 onClick = {},
                                 onLongClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     DemoSettings.qaMode = !DemoSettings.qaMode
                                 },
                             )
