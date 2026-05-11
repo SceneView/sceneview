@@ -56,4 +56,12 @@ dependencies {
 
     // Material
     api libs.google.material
+
+    // SceneView SDK — required by `rememberMaterialInstance` so the helper
+    // can call `MaterialLoader.createColorInstance` and own destruction.
+    // `api` so demo modules pick the SDK up transitively from :samples:common
+    // (which most already do anyway via their direct sceneview dep, but
+    // declaring it here keeps :samples:common's surface complete on its own).
+    api project(":sceneview")
+    api libs.filament.android
 }
