@@ -22,6 +22,18 @@ struct DynamicSkyDemo: View {
         return "Dusk"
     }
 
+    /// Pick an HDR environment that visually matches the current time of day so the
+    /// background isn't a flat black box when the sun is up. Mirrors the Android fix
+    /// in commit `15bcaf8c`. Three buckets is coarse — the tint jumps rather than
+    /// fading smoothly — but it covers the obvious user expectations.
+    private var skyEnvironment: SceneEnvironment {
+        switch timeOfDay {
+        case ..<6, 19...: return .night
+        case ..<9, 17...: return .sunset
+        default: return .outdoor
+        }
+    }
+
     var body: some View {
         ZStack {
             SceneView { root in
@@ -49,8 +61,9 @@ struct DynamicSkyDemo: View {
                 let sky = DynamicSkyNode(timeOfDay: timeOfDay, turbidity: 3, sunIntensity: 1500)
                 root.addChild(sky.entity)
             }
+            .environment(skyEnvironment)
             .cameraControls(.orbit)
-            .id("sky-\(Int(timeOfDay * 10))")
+            .id("sky-\(Int(timeOfDay * 10))-\(skyEnvironment.name)")
             .ignoresSafeArea()
 
             VStack {
