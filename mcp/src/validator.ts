@@ -224,6 +224,15 @@ const RULES: Rule[] = [
     check(code, lines) {
       const issues: ValidationIssue[] = [];
       const renames: Array<[RegExp, string]> = [
+        // The headline 4.0 rename — `Scene { }` / `ARScene { }` became
+        // `SceneView { }` / `ARSceneView { }`. Pre-#939 this was missing
+        // from the validator so legacy snippets passed as "no issues".
+        // The regex requires a word boundary + the opening `{` of the
+        // trailing-lambda call, so we don't false-positive on Filament's
+        // own `Scene` class (which is referenced with `()` or `.`, never
+        // followed by `{`).
+        [/\bScene\s*\{/, "`Scene { }` → renamed to `SceneView { }` in 4.0"],
+        [/\bARScene\s*\{/, "`ARScene { }` → renamed to `ARSceneView { }` in 4.0"],
         [/\bArSceneView\s*\(/, "`ArSceneView(…)` → renamed to `ARSceneView(…)` in 3.0"],
         [/\bPlacementNode\b/, "`PlacementNode` removed → use `AnchorNode` + `HitResultNode` in 3.0"],
         [/\bTransformableNode\b/, "`TransformableNode` removed → set `isEditable = true` on `ModelNode` in 3.0"],

@@ -667,10 +667,32 @@ export function autoDetectIssue(description) {
     if (lower.includes("wrong thread") || lower.includes("off main thread") || lower.includes("dispatchers.io") || lower.includes("background thread")) {
         return "crash";
     }
-    if (lower.includes("not showing") || lower.includes("invisible") || lower.includes("can't see") || lower.includes("model doesn't appear") || lower.includes("model not visible") || lower.includes("nothing shows up") || lower.includes("model is null") || lower.includes("remembermodelinstance returns null")) {
+    if (lower.includes("not showing") || lower.includes("invisible") || lower.includes("can't see") || lower.includes("model doesn't appear") || lower.includes("model not visible") || lower.includes("nothing shows up") || lower.includes("model is null") || lower.includes("remembermodelinstance returns null") || lower.includes("no model")) {
         return "model-not-showing";
     }
-    if (lower.includes("ar not") || lower.includes("ar doesn't") || lower.includes("arcore") || lower.includes("plane") || lower.includes("anchor") || lower.includes("camera permission") || lower.includes("augmented reality") || lower.includes("hit test") || lower.includes("hitresult")) {
+    // AR-not-working catches "the AR camera feed is dark" and the half-dozen
+    // ways a user describes a non-functional AR session. Pre-#940 only "ar not",
+    // "ar doesn't", and the technical terms (arcore/plane/anchor/hit test)
+    // matched — the natural phrasings "ar camera is black", "my AR is black",
+    // "ARScene shows nothing", etc. fell through to null.
+    //
+    // The regex `\b(ar|arscene|arsceneview|arcore)\b.*\bblack\b` catches any
+    // sentence where "AR" (in any of its forms) and "black" both appear,
+    // independent of the connecting words ("is", "feed is", "camera was",
+    // etc.). Bare `\bcamera\b.*\bblack\b` covers the half where the user
+    // doesn't even say "AR" but the demo title is.
+    const arBlackHints = /\b(ar|arscene|arsceneview|arcore)\b.*\bblack\b/.test(lower)
+        || /\bcamera\b.*\bblack\b/.test(lower);
+    if (lower.includes("ar not") ||
+        lower.includes("ar doesn't") ||
+        lower.includes("arcore") ||
+        lower.includes("plane") ||
+        lower.includes("anchor") ||
+        lower.includes("camera permission") ||
+        lower.includes("augmented reality") ||
+        lower.includes("hit test") ||
+        lower.includes("hitresult") ||
+        arBlackHints) {
         return "ar-not-working";
     }
     if (lower.includes("crash") || lower.includes("sigabrt") || lower.includes("native crash") || lower.includes("fatal") || lower.includes("exception") || lower.includes("destroy") || lower.includes("double free") || lower.includes("segfault") || (lower.includes("oom") && !lower.includes("zoom")) || lower.includes("out of memory") || lower.includes("nullpointerexception") || lower.includes("npe")) {

@@ -122,6 +122,23 @@ describe("autoDetectIssue", () => {
     expect(autoDetectIssue("ARCore error")).toBe("ar-not-working");
   });
 
+  // ── Natural phrasings the original ladder missed (#940)
+  it("detects ar-not-working from natural 'black' phrasings (#940)", () => {
+    expect(autoDetectIssue("my AR camera is black")).toBe("ar-not-working");
+    expect(autoDetectIssue("the AR feed is black")).toBe("ar-not-working");
+    expect(autoDetectIssue("AR black, no preview")).toBe("ar-not-working");
+    expect(autoDetectIssue("ARScene black on launch")).toBe("ar-not-working");
+    expect(autoDetectIssue("ARSceneView black")).toBe("ar-not-working");
+    // Bare "camera black" — could be 3D too, but AR is the more common case
+    // and the model-not-showing branch covers the 3D angle anyway.
+    expect(autoDetectIssue("camera black after permission grant")).toBe("ar-not-working");
+  });
+
+  it("detects model-not-showing from natural phrasings (#940)", () => {
+    expect(autoDetectIssue("model not visible")).toBe("model-not-showing");
+    expect(autoDetectIssue("no model on screen")).toBe("model-not-showing");
+  });
+
   it("detects crash from description", () => {
     expect(autoDetectIssue("My app crashes when loading a model")).toBe("crash");
     expect(autoDetectIssue("SIGABRT on destroy")).toBe("crash");
