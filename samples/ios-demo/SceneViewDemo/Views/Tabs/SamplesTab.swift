@@ -222,7 +222,7 @@ struct SamplesTab: View {
             DemoItem(title: "Lines & Paths", icon: "point.topleft.down.to.point.bottomright.curvepath", subtitle: "Polylines, helix, grids, circles", category: .content) {
                 LinesPathsDemo()
             },
-            DemoItem(title: "Image", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
+            DemoItem(title: "Image Planes", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
                 ImageDemo()
             },
             DemoItem(
@@ -234,7 +234,7 @@ struct SamplesTab: View {
 
             // MARK: Lighting
 
-            DemoItem(title: "Lighting", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
+            DemoItem(title: "Light Types", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
                 LightingDemo()
             },
             DemoItem(title: "Movable Light", icon: "sun.dust.fill", subtitle: "Drag to orbit the light around the model", category: .lighting) {
@@ -282,7 +282,7 @@ struct SamplesTab: View {
             DemoItem(title: "Camera Controls", icon: "camera.fill", subtitle: "Interactive orbit with grid reference", category: .advanced) {
                 CameraControlsDemo()
             },
-            DemoItem(title: "Animation", icon: "rotate.3d.fill", subtitle: "Continuous rotation animation", category: .advanced) {
+            DemoItem(title: "Auto Rotate", icon: "rotate.3d.fill", subtitle: "Continuous rotation animation", category: .advanced) {
                 AnimationDemo()
             },
             DemoItem(title: "Scene Gallery", icon: "square.grid.3x3.fill", subtitle: "Multiple shapes in one scene", category: .advanced) {
