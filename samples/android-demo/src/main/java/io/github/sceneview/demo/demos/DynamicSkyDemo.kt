@@ -53,12 +53,28 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
         environmentLoader.createHDREnvironment(envAsset)!!
     }
 
+    // Period label for the user — gives continuous visual feedback as the slider moves,
+    // even when the HDR env is the same across multiple hours. QA finding 2026-05-11 :
+    // "slider has zero visual effect" — because the HDR env only swaps at 3 buckets and
+    // the sun direction change is hard to see against a static skybox. Showing the
+    // period label means every slider movement updates SOMETHING the user can see.
+    val periodLabel = when {
+        timeOfDay < 5f          -> "🌙 Night"
+        timeOfDay < 7f          -> "🌅 Dawn"
+        timeOfDay < 10f         -> "🌄 Morning"
+        timeOfDay < 14f         -> "☀️ Noon"
+        timeOfDay < 17f         -> "🌤️ Afternoon"
+        timeOfDay < 19f         -> "🌇 Sunset"
+        timeOfDay < 21f         -> "🌆 Dusk"
+        else                    -> "🌙 Night"
+    }
+
     DemoScaffold(
         title = "Dynamic Sky",
         onBack = onBack,
         controls = {
             Text(
-                "Time of Day: %.1f h".format(timeOfDay),
+                "Time of Day: %.1f h  ·  $periodLabel".format(timeOfDay),
                 style = MaterialTheme.typography.labelLarge
             )
             Slider(
