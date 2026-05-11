@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+#
+# capture-play-store-screenshots.sh — automated Play Store screenshot capture.
+#
+# Reproduces the flow Thomas used in session agitated-meitner-a66271 to refresh
+# the v4.0.9 phone screenshots (commit 47f60f97). Tracked in #919: that flow
+# previously only lived in the chat history.
+#
+# Usage:
+#   bash .claude/scripts/capture-play-store-screenshots.sh \
+#     [--demos model-viewer,ar-pose,reflection-probes,environment] \
+#     [--out samples/android-demo/play/listings/en-US/graphics] \
+#     [--no-build]
+#
+# Requirements:
+#   - A booted Pixel-class AVD (or physical phone) with ARCore-ish capabilities.
+#   - `adb` on $PATH (Android SDK platform-tools).
+#   - Python 3 with Pillow installed (`pip3 install pillow`).
+#
+# Output:
+#   `<out>/phone-screenshot-{1..N}.png` — 1080×2304 PNGs, Play Store 9:19.2,
+#   status bar trimmed. Plus a mosaic thumbnail at
+#   `<out>/.mosaic.png` for visual confirmation, kept well under the 1800 px
+#   session-image limit.
+#
+# Why crop 96 px off the top: the Android status bar at 480 dpi on the
+# stock Pixel_7a AVD is 96 px tall. Cropping it gives a clean device-frame
+# preview that survives Play Store's auto-resize without showing battery /
+# wifi / clock — those change every screenshot session and inflate the diff.
+
+set -euo pipefail
+
+# ── Defaults ─────────────────────────────────────────────────────────────────
+DEMOS_DEFAULT="model-viewer,ar-pose,reflection-probes,environment"
+OUT_DIR_DEFAULT="samples/android-demo/play/listings/en-US/graphics"
+PKG="io.github.sceneview.demo"
+APK_PATH="samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk"
+STATUS_BAR_PX=96
+# Pixel_7a AVD natural resolution = 1080×2400. Crop 96 px → 1080×2304 = 9:19.2.
+TARGET_HEIGHT=2304
+SETTLE_SECONDS=8
+VARIANCE_THRESHOLD=100
+
+DEMOS=""
+OUT_DIR=""
+SKIP_BUILD=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --demos) DEMOS="$2"; shift 2 ;;
+    --out)   OUT_DIR="$2"; shift 2 ;;
+    --no-build) SKIP_BUILD=1; shift ;;
+    -h|--help)
+      sed -n '2,30p' "$0"; exit 0 ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+DEMOS="${DEMOS:-$DEMOS_DEFAULT}"
+OUT_DIR="${OUT_DIR:-$OUT_DIR_DEFAULT}"
+
+# ── 1. Recover an offline AVD if needed ──────────────────────────────────────
+if ! adb devices | grep -qE "^emulator-|^[0-9A-F]{8}.*device$"; then
+  echo "[capture] No device responding; cycling adb server" >&2
+  adb kill-server || true
+  adb start-server
+  sleep 2
+  if ! adb devices | grep -qE "device$"; then
+    echo "[capture] No device after restart. Boot an AVD or plug a phone." >&2
+    exit 1
+  fi
+fi
+
+# Reject multiple devices — Play screenshots must come from one stable surface.
+DEVICE_LINES=$(adb devices | grep -cE "device$" || true)
+if [[ "$DEVICE_LINES" -ne 1 ]]; then
+  echo "[capture] $DEVICE_LINES devices visible to adb; targeting one with ANDROID_SERIAL is recommended" >&2
+fi
+
+# ── 2. Build a fresh debug APK ───────────────────────────────────────────────
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+  echo "[capture] Building :samples:android-demo:assembleDebug" >&2
+  ./gradlew :samples:android-demo:assembleDebug --stacktrace --no-daemon
+fi
+[[ -f "$APK_PATH" ]] || { echo "[capture] APK missing at $APK_PATH" >&2; exit 1; }
+
+# ── 3. Install ───────────────────────────────────────────────────────────────
+echo "[capture] adb install -r $APK_PATH" >&2
+adb install -r "$APK_PATH" >/dev/null
+
+# ── 4. Capture loop ──────────────────────────────────────────────────────────
+mkdir -p "$OUT_DIR"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+IFS=',' read -ra DEMO_ARR <<< "$DEMOS"
+INDEX=1
+for DEMO in "${DEMO_ARR[@]}"; do
+  DEMO="${DEMO// /}"  # trim whitespace
+  echo "[capture] [$INDEX] $DEMO" >&2
+
+  adb shell am force-stop "$PKG"
+  # Same `--es demo <id>` allow-listed ingress channel as the QA flow + #958.
+  adb shell am start -n "$PKG/.MainActivity" --es demo "$DEMO" >/dev/null
+  sleep "$SETTLE_SECONDS"
+
+  RAW="$TMP_DIR/raw-$INDEX.png"
+  adb shell screencap -p > "$RAW" 2>/dev/null
+  # adb shell may corrupt LF/CRLF on some shells — strip the spurious 0x0d.
+  python3 - "$RAW" <<'PY'
+import sys, re
+p = sys.argv[1]
+data = open(p, "rb").read()
+# Older adb shells convert LF→CRLF on stdout; reverse it for PNG.
+fixed = re.sub(rb"\r\n", b"\n", data)
+open(p, "wb").write(fixed)
+PY
+
+  OUT="$OUT_DIR/phone-screenshot-$INDEX.png"
+  python3 - "$RAW" "$OUT" "$STATUS_BAR_PX" "$TARGET_HEIGHT" "$VARIANCE_THRESHOLD" <<'PY'
+import sys
+from PIL import Image
+import math
+
+raw, out, status_px, target_h, var_thresh = sys.argv[1:6]
+status_px = int(status_px)
+target_h = int(target_h)
+var_thresh = float(var_thresh)
+
+img = Image.open(raw)
+w, h = img.size
+# Crop the status bar; preserve full width.
+crop = img.crop((0, status_px, w, h))
+# Pad / crop to the Play Store 9:19.2 target height if the source isn't 2400.
+cw, ch = crop.size
+if ch != target_h:
+    if ch > target_h:
+        crop = crop.crop((0, 0, cw, target_h))
+    else:
+        # Fill with black at the bottom to avoid scaling artefacts.
+        bg = Image.new(crop.mode, (cw, target_h), (0, 0, 0, 255) if crop.mode == "RGBA" else (0, 0, 0))
+        bg.paste(crop, (0, 0))
+        crop = bg
+
+# Variance sanity check on a 3×3 grid of 32×32 centre patches.
+pixels = crop.convert("RGB").load()
+samples = []
+for cy in (target_h // 4, target_h // 2, 3 * target_h // 4):
+    for cx in (cw // 4, cw // 2, 3 * cw // 4):
+        for dy in range(-16, 16, 8):
+            for dx in range(-16, 16, 8):
+                r, g, b = pixels[cx + dx, cy + dy]
+                samples.append((r + g + b) / 3)
+mean = sum(samples) / len(samples)
+variance = sum((s - mean) ** 2 for s in samples) / len(samples)
+if variance < var_thresh:
+    sys.exit(f"[variance] {variance:.1f} < {var_thresh} — capture looks blank/uniform")
+
+crop.save(out, optimize=True)
+print(f"[capture]   variance={variance:.1f}  → {out}")
+PY
+
+  INDEX=$((INDEX + 1))
+done
+TOTAL=$((INDEX - 1))
+
+# ── 5. Mosaic thumbnail (visual sanity, well under the 1800 px session limit) ─
+python3 - "$OUT_DIR" "$TOTAL" <<'PY'
+import sys, os
+from PIL import Image
+out_dir, total = sys.argv[1], int(sys.argv[2])
+images = []
+for i in range(1, total + 1):
+    p = os.path.join(out_dir, f"phone-screenshot-{i}.png")
+    if os.path.exists(p):
+        images.append(Image.open(p))
+if not images:
+    sys.exit(0)
+# 4-wide row of 360×768 thumbnails → 1440×768 total.
+thumb_w, thumb_h = 360, 768
+mosaic = Image.new("RGB", (thumb_w * len(images), thumb_h), (12, 14, 20))
+for i, img in enumerate(images):
+    t = img.resize((thumb_w, thumb_h), Image.LANCZOS)
+    mosaic.paste(t, (i * thumb_w, 0))
+mosaic_path = os.path.join(out_dir, ".mosaic.png")
+mosaic.save(mosaic_path, optimize=True)
+print(f"[capture]   mosaic → {mosaic_path}")
+PY
+
+echo "[capture] DONE — $TOTAL screenshots in $OUT_DIR/" >&2
+echo "[capture] Inspect $OUT_DIR/.mosaic.png before pushing to the Play Store." >&2
