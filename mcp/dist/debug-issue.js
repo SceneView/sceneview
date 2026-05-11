@@ -1,9 +1,4 @@
-/**
- * debug-issue.ts
- *
- * Targeted debugging guide for common SceneView issues.
- * Given a symptom, returns a focused diagnostic checklist.
- */
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 export const DEBUG_CATEGORIES = [
     "model-not-showing",
     "ar-not-working",
@@ -305,7 +300,7 @@ fun DebugModelViewer() {
         title: "Build / Gradle Errors",
         guide: `## Debugging: Build Errors
 
-### "Cannot resolve io.github.sceneview:sceneview:4.0.0"
+### "Cannot resolve io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}"
 
 1. Check repositories in \`settings.gradle.kts\`:
    \`\`\`kotlin
@@ -348,7 +343,7 @@ SceneView bundles Filament. If you also depend on Filament directly:
 \`\`\`kotlin
 // Remove direct Filament dependency — SceneView includes it
 // implementation("com.google.android.filament:filament-android:1.x.x") // REMOVE
-implementation("io.github.sceneview:sceneview:4.0.0") // This includes Filament
+implementation("io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}") // This includes Filament
 \`\`\`
 
 ### "Cannot find Filament material"

@@ -1,3 +1,4 @@
+import { LATEST_SCENEVIEW_RELEASE } from "./generated/version.js";
 export const MIGRATION_GUIDE = `# SceneView 2.x → 3.0 Migration Guide
 
 SceneView 3.0 is a full rewrite from Android Views to **Jetpack Compose**. Nearly every public API changed. This guide covers every breaking change and how to fix it.
@@ -6,10 +7,10 @@ SceneView 3.0 is a full rewrite from Android Views to **Jetpack Compose**. Nearl
 
 ## 1. Gradle dependency
 
-| 2.x | 3.0 |
-|-----|-----|
-| \`io.github.sceneview:sceneview:2.x.x\` | \`io.github.sceneview:sceneview:4.0.0\` |
-| \`io.github.sceneview:arsceneview:2.x.x\` | \`io.github.sceneview:arsceneview:4.0.0\` |
+| 2.x | Current |
+|-----|---------|
+| \`io.github.sceneview:sceneview:2.x.x\` | \`io.github.sceneview:sceneview:${LATEST_SCENEVIEW_RELEASE}\` |
+| \`io.github.sceneview:arsceneview:2.x.x\` | \`io.github.sceneview:arsceneview:${LATEST_SCENEVIEW_RELEASE}\` |
 
 ---
 

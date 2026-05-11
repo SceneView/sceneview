@@ -12,7 +12,7 @@
 //   - scene: multi-model 3D scene with lighting and environment (Filament.js)
 //   - product-360: product turntable with hotspot annotations (Filament.js)
 // ─── Constants ───────────────────────────────────────────────────────────────
-const FILAMENT_CDN = "https://cdn.jsdelivr.net/npm/filament@1.70.1/filament.js";
+const FILAMENT_CDN = "https://cdn.jsdelivr.net/npm/filament@1.70.2/filament.js";
 const DEFAULT_MODEL = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb";
 const DEFAULT_COLORS = [
     "#4285F4", "#EA4335", "#FBBC04", "#34A853", "#FF6D01",
