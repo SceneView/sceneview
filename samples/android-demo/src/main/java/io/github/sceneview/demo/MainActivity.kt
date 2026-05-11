@@ -90,7 +90,10 @@ class MainActivity : ComponentActivity() {
         // tests, (2) URL deep-links via the public sceneview://demo/<id> scheme parsed by
         // DeepLinkRouter. The QA channel takes precedence so a tester running adb against a
         // running app can deterministically navigate without competing with a stale URL intent.
-        pendingDemoId.value = intent?.getStringExtra("demo")
+        // Same allow-list (ALL_DEMOS) gates both ingress channels — without it
+        // any app could call `am start ... --es demo whatever` and steer
+        // navigation through PlaceholderDemo. See #958.
+        pendingDemoId.value = DeepLinkRouter.validate(intent?.getStringExtra("demo"))
             ?: DeepLinkRouter.parse(intent?.data)
         // QA mode ingress: `--ez qa_mode true` freezes auto-rotation / orbit / animations
         // so screenshot tests get a deterministic frame. Same setting reachable via the
@@ -118,7 +121,9 @@ class MainActivity : ComponentActivity() {
         // deep link, not the original launcher intent.
         setIntent(intent)
         // Same dual-ingress policy as onCreate — `--es demo` first, URL second.
-        pendingDemoId.value = intent.getStringExtra("demo")
+        // Both go through DeepLinkRouter.validate / .parse so unknown ids are
+        // dropped rather than routed to PlaceholderDemo. See #958.
+        pendingDemoId.value = DeepLinkRouter.validate(intent.getStringExtra("demo"))
             ?: DeepLinkRouter.parse(intent.data)
         DemoSettings.qaMode = intent.getBooleanExtra("qa_mode", false)
         DemoSettings.arPendingPlaybackFile = intent.getStringExtra("ar_playback_file")
