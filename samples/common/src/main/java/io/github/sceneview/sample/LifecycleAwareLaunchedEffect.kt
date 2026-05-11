@@ -50,8 +50,17 @@ import kotlinx.coroutines.CoroutineScope
  *
  * Keys behave exactly like `LaunchedEffect`'s — a change to any key cancels
  * the current coroutine (even if it's currently *paused* by the lifecycle)
- * and starts a new one. This matches the migration rule "use this when you
- * would have used LaunchedEffect" without surprise restart semantics.
+ * and starts a new one.
+ *
+ * **Important UX caveat** — on every `onStop` → `onStart` cycle the body
+ * is cancelled and **re-runs from the top**. For loops that capture
+ * snapshot state in their first statements (e.g. `yawAnim.snapTo(0f)`
+ * before a `while(true) { animateTo(...) }`), this teleports the user
+ * back to the initial state on every Alt-Tab. Migrate ONLY loops that
+ * (a) tolerate restart-from-top OR (b) read their starting value from
+ * existing Compose state. Camera cinematic loops in `AnimationDemo` are
+ * the documented counter-example and stayed on plain `LaunchedEffect`.
+ * See #936 review.
  *
  * @param keys arbitrary observation keys; a change to any key cancels and
  *   re-launches the effect, same as plain [LaunchedEffect].

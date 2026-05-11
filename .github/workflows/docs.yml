@@ -90,19 +90,38 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Build samples/web-demo (Kotlin/JS webpack)
+      - name: Build samples/web-demo (Kotlin/JS distribution)
         run: |
-          # `:samples:web-demo:jsBrowserProductionWebpack` emits HTML +
-          # `sceneview-web-demo.js` (+ filament.wasm if WebXR is on) under
-          # `samples/web-demo/build/dist/js/productionExecutable/`. Copying
-          # the whole directory to `site/web-demo/` makes
-          # `sceneview.github.io/web-demo/` actually load the Sketchfab-
-          # search + geometry-showcase demo instead of falling through to
-          # the landing page. See #926.
+          # `:samples:web-demo:jsBrowserDistribution` runs the webpack
+          # production build AND copies HTML resources from
+          # `src/jsMain/resources/` into the same output dir — without
+          # `Distribution`, the webpack-only task drops JS only and
+          # `site/web-demo/index.html` would be missing. Gradle plugin
+          # writes to `build/dist/js/productionExecutable/` for the
+          # Distribution task (vs `build/kotlin-webpack/js/
+          # productionExecutable/` for the webpack-only one). Both
+          # locations were caught by an independent review; the
+          # Distribution task is the correct one for "deploy a static
+          # site" because it bundles the HTML next to the JS bundle.
+          # See #926.
           chmod +x ./gradlew
-          ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
+          ./gradlew :samples:web-demo:jsBrowserDistribution --stacktrace
           mkdir -p site/web-demo
-          cp -r samples/web-demo/build/dist/js/productionExecutable/* site/web-demo/
+          # Defensive: support both AGP/Gradle output layouts.
+          if [ -d samples/web-demo/build/dist/js/productionExecutable ]; then
+            cp -r samples/web-demo/build/dist/js/productionExecutable/* site/web-demo/
+          elif [ -d samples/web-demo/build/kotlin-webpack/js/productionExecutable ]; then
+            cp -r samples/web-demo/build/kotlin-webpack/js/productionExecutable/* site/web-demo/
+            # Webpack-only output may lack index.html — copy it from sources.
+            [ -f samples/web-demo/src/jsMain/resources/index.html ] && \
+              cp samples/web-demo/src/jsMain/resources/index.html site/web-demo/index.html
+          else
+            echo "::error::Neither expected web-demo output dir exists; aborting"
+            ls -R samples/web-demo/build/ | head -50
+            exit 1
+          fi
+          [ -f site/web-demo/index.html ] || {
+            echo "::error::site/web-demo/index.html missing — deploy would 404"; exit 1; }
 
       # ── 4. Include Dokka API docs if available ──────────────────────────
       - name: Download Dokka API docs (if available)

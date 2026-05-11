@@ -19,8 +19,24 @@ React Native bindings for [SceneView](https://sceneview.github.io) — 3D and AR
 
 ## Installation
 
+> **Status note (May 2026):** the npm registry currently has
+> `@sceneview-sdk/react-native@3.6.1` as `latest`. The 4.0.x line of this
+> bridge — including the type-safe `unlit` prop and the v4 SceneView
+> bindings — has not yet been published to npm. Tracked in
+> [#924](https://github.com/sceneview/sceneview/issues/924) and
+> [#962](https://github.com/sceneview/sceneview/issues/962) (publish-rn
+> GitHub Actions job lands automatically on the next `v4.0.x` tag).
+> To pin against the latest source today, prefer the GitHub-package
+> snippet at the bottom of this section.
+
 ```sh
 npm install @sceneview-sdk/react-native
+```
+
+…or to ride main directly until the 4.0.x publish lands:
+
+```sh
+npm install github:sceneview/sceneview#v4.0.9 --save  # path includes react-native/react-native-sceneview/
 ```
 
 ### iOS

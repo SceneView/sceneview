@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import io.github.sceneview.sample.LifecycleAwareLaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -192,12 +191,21 @@ fun AnimationDemo(onBack: () -> Unit) {
     // Mode driver: each case below is a self-contained cinematic loop. We
     // canonicalize all Animatable values at entry, then run a `while (true)`
     // sequence of `animateTo` calls. Cancellation comes for free because Compose
-    // tears down the LifecycleAwareLaunchedEffect when `cameraMode` changes,
-    // AND `repeatOnLifecycle(STARTED)` ALSO suspends + restarts the loop on
-    // app background/foreground so the 4 cinematic camera tweens don't keep
-    // driving Filament when the user is on the home screen. See #936.
+    // tears down the LaunchedEffect when `cameraMode` changes.
+    //
+    // NOTE: this LaunchedEffect intentionally does NOT use
+    // `LifecycleAwareLaunchedEffect` even though the cinematic loops are the
+    // heaviest battery draw in the app. The reason: every `when (cameraMode)`
+    // arm begins with `xAnim.snapTo(initialValue)` to canonicalize state, and
+    // `repeatOnLifecycle(STARTED)` re-runs the block from the top on every
+    // foreground — so a user who Alt-Tabs mid-orbit would see the camera
+    // teleport back to yaw=0 on return. The Filament render thread already
+    // stops drawing when the SceneView surface backgrounds, so the visible
+    // CPU/GPU cost of "loop keeps animating in background" is limited to
+    // the Compose snapshot updates on the Animatable values. Acceptable
+    // until we wire a state-preserving lifecycle pattern. See #936 review.
     // ---------------------------------------------------------------------------
-    LifecycleAwareLaunchedEffect(cameraMode, DemoSettings.qaMode) {
+    LaunchedEffect(cameraMode, DemoSettings.qaMode) {
         // QA freeze — match the hero-orbit helper so screenshot tests stay stable.
         if (DemoSettings.qaMode) {
             yawAnim.snapTo(45f)
@@ -205,7 +213,7 @@ fun AnimationDemo(onBack: () -> Unit) {
             yHeightAnim.snapTo(baseYHeight)
             fovAnim.snapTo(defaultFovDegrees)
             trackingEye.value = null
-            return@LifecycleAwareLaunchedEffect
+            return@LaunchedEffect
         }
 
         // Reset overrides on every mode switch so previous mode state doesn't bleed in.

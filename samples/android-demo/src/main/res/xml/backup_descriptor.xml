@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Legacy Auto Backup rules for Android 6..11 (API 24..30) — the era
+    BEFORE `android:dataExtractionRules` (API 31+) became the only mechanism.
+    See `res/xml/data_extraction_rules.xml` for the modern rules; this file
+    duplicates the same exclude-everything policy in the older
+    `<full-backup-content>` schema.
+
+    The demo app declares minSdk 24 (per CLAUDE.md), so without this file
+    every install on API 24..30 would still get Auto Backup with the system
+    defaults — preferences + AR caches + recordings + ARCore Cloud handoff
+    tokens silently shipped to Google Drive. Caught by an independent #959
+    review.
+
+    Schema reference: https://developer.android.com/identity/data/autobackup#XMLSyntax
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

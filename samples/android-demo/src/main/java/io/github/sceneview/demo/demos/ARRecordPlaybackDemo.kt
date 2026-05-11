@@ -201,10 +201,14 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                                 // toggles when the system honours haptic-on-
                                 // touch. Explicit here so it fires on every
                                 // device, not only those with the OS setting
-                                // turned on (#956).
-                                chipHaptic.performHapticFeedback(
-                                    HapticFeedbackType.TextHandleMove
-                                )
+                                // turned on (#956). Skipped in qaMode so
+                                // adb-driven instrumentation tests that tap
+                                // these chips don't get unexpected vibration.
+                                if (!io.github.sceneview.demo.DemoSettings.qaMode) {
+                                    chipHaptic.performHapticFeedback(
+                                        HapticFeedbackType.TextHandleMove
+                                    )
+                                }
                                 currentMode = mode
                                 if (mode != Mode.PLAYBACK) currentPlaybackFile = null
                             }
