@@ -2,7 +2,6 @@
 
 package io.github.sceneview.demo.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -106,49 +105,6 @@ private fun curatedSamplesForExplore(): List<DemoEntry> {
         "animation",
     )
     return ids.mapNotNull { id -> ALL_DEMOS.firstOrNull { it.id == id } }
-}
-
-@Composable
-private fun ArViewTabContent(onDemoClick: (String) -> Unit) {
-    // V1: show only the AR-related demos as cards. This keeps the live-AR
-    // surface a one-tap-away affordance without bundling another full
-    // ARCore session into the bottom tab (which would force-init ARCore on
-    // every app launch and inflate cold-start by ~400 ms).
-    val arDemos = remember { ALL_DEMOS.filter { it.category == "Augmented Reality" } }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-    ) {
-        Text(
-            text = "AR View",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = "Live ARCore demos powered by SceneView",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-        )
-        arDemos.forEach { demo ->
-            ArDemoTile(demo = demo, onClick = { onDemoClick(demo.id) })
-        }
-    }
-}
-
-@Composable
-private fun ArDemoTile(demo: DemoEntry, onClick: () -> Unit) {
-    androidx.compose.material3.ListItem(
-        headlineContent = { Text(demo.title, fontWeight = FontWeight.SemiBold) },
-        supportingContent = { Text(demo.subtitle) },
-        leadingContent = { Icon(Icons.Filled.ViewInAr, contentDescription = null) },
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
-    )
 }
 
 @Composable
