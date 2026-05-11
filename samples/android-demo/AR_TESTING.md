@@ -80,18 +80,21 @@ responses — deterministic, fast, and reproducible across machines.
 
 ### 1. Pick the scenario
 
-Each baseline should exercise a different AR-feature surface so the regression suite
-covers everything. Suggested fixtures:
+The repo ships **`baseline.mp4`** today (room pan with floor + table; exercises
+plane detection + orientation classification) — it's the only fixture currently
+under `src/androidTest/assets/ar-recordings/`. The fixtures listed below are
+**aspirational** — record them as you encounter the corresponding regression
+needs. Each baseline should exercise a different AR-feature surface.
 
-| Filename | Scenario | What it exercises |
-|---|---|---|
-| `room-planes.mp4` | Slow pan around an indoor room with a flat floor + table | Plane detection, plane orientation classification |
-| `outdoor-streetscape.mp4` | Stationary capture outside facing buildings | Geospatial / Streetscape Geometry |
-| `face-front-camera.mp4` | Face mesh capture (front camera) | AugmentedFaceNode |
-| `image-detection.mp4` | Pan over the printed `qrcode.png` | Augmented Images |
-| `cloud-anchor.mp4` | Drop an anchor + survey + look back at it | Cloud Anchors |
-| `depth-occlusion.mp4` | Person walking in front of the camera | Depth Occlusion |
-| `instant-placement.mp4` | Tap-to-drop before plane convergence | Instant Placement |
+| Filename | Status | Scenario | What it exercises |
+|---|---|---|---|
+| `baseline.mp4` | ✅ shipped | Slow pan around an indoor room with a flat floor + table | Plane detection, plane orientation classification |
+| `outdoor-streetscape.mp4` | aspirational | Stationary capture outside facing buildings | Geospatial / Streetscape Geometry |
+| `face-front-camera.mp4` | aspirational | Face mesh capture (front camera) | AugmentedFaceNode |
+| `image-detection.mp4` | aspirational | Pan over the printed `qrcode.png` | Augmented Images |
+| `cloud-anchor.mp4` | aspirational | Drop an anchor + survey + look back at it | Cloud Anchors |
+| `depth-occlusion.mp4` | aspirational | Person walking in front of the camera | Depth Occlusion |
+| `instant-placement.mp4` | aspirational | Tap-to-drop before plane convergence | Instant Placement |
 
 Aim for **30 s recordings** — long enough to exercise the feature, short enough to keep
 fixtures under 50 MB each.
@@ -147,15 +150,19 @@ class ARDemoPlaybackSmokeTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun arPlacementDemo_replays_room_planes_baseline_without_crash() {
-        val fixture = copyAssetToCache("ar-recordings/room-planes.mp4")
+    fun arPlacementDemo_replays_baseline_without_crash() {
+        // Recipe today: stage the fixture to a private file, then deep-link the
+        // demo with the path through `--es ar_playback_file`. The MainActivity
+        // intent path validates the path is inside the app's external-files dir
+        // (security guard, see #958) and forwards it to ARRecordPlaybackDemo via
+        // DemoSettings.arPendingPlaybackFile. No `playbackOverride` parameter
+        // is exposed on the demo composables.
+        val fixture = copyAssetToAppFiles("ar-recordings/baseline.mp4")
+        DemoSettings.arPendingPlaybackFile = fixture.absolutePath
         composeRule.setContent {
-            ARPlacementDemo(
-                onBack = {},
-                playbackOverride = fixture, // exposed for tests; defaults to null in prod
-            )
+            ARRecordPlaybackDemo(onBack = {})
         }
-        composeRule.waitUntilExactlyOneExists(hasText("Tap to place"), timeoutMillis = 10_000)
+        composeRule.waitUntilExactlyOneExists(hasText("Replay"), timeoutMillis = 10_000)
         // Assert plane detection happens within N seconds:
         composeRule.waitUntil(timeoutMillis = 15_000) { /* check via testTag */ }
     }
@@ -186,8 +193,8 @@ after an ARCore SDK bump:
 3. Replace the fixture MP4s.
 4. Update this doc with the ARCore version that re-baseline'd the suite.
 
-Last full re-baseline: ARCore [version not yet pinned — first session adopting this
-workflow records the baselines and updates this line].
+Last full re-baseline: ARCore 1.54.0 (matches the `ARCORE_VERSION` pinned in the
+emulator-sideload section below).
 
 ---
 

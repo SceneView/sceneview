@@ -59,6 +59,7 @@ import io.github.sceneview.demo.demos.ARRooftopAnchorDemo
 import io.github.sceneview.demo.demos.ARImageStabilizationDemo
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
 import io.github.sceneview.demo.update.InAppUpdateManager
+import io.github.sceneview.demo.update.UpdateBanner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -68,7 +69,9 @@ import androidx.compose.ui.Modifier
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var updateManager: InAppUpdateManager
+    // Exposed (internal) so SceneViewDemoApp can hand the manager to UpdateBanner —
+    // the composable only renders the downloaded-and-ready chrome.
+    internal lateinit var updateManager: InAppUpdateManager
 
     /**
      * Latest demo id parsed from a deep-link intent (`sceneview://demo/<id>`
@@ -151,7 +154,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Two phases (#890): handle a partially-downloaded update from a prior session,
+        // then proactively check the Play Console for a newer release. Without
+        // checkForUpdate() the flexible-update flow never starts, so the UpdateBanner
+        // composable below also never lights up — making the entire in-app-update
+        // pipeline a phantom on production builds.
         updateManager.checkForStalledUpdate()
+        updateManager.checkForUpdate()
     }
 
     override fun onDestroy() {
@@ -163,6 +172,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SceneViewDemoApp(activity: MainActivity? = null) {
     val navController = rememberNavController()
+    // Compose the update banner above the NavHost so a downloaded-and-ready Play
+    // update is visible from any screen (#890). The banner is a no-op when state
+    // is IDLE / CHECKING / UP_TO_DATE — it only renders during DOWNLOADING /
+    // READY_TO_INSTALL so it doesn't take screen real estate from demos.
+    activity?.updateManager?.let { mgr ->
+        UpdateBanner(updateManager = mgr)
+    }
 
     // Watch for deep-link intents. On a non-null id we either navigate
     // directly (the demo list is the start destination, so navigate adds

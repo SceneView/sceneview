@@ -15,7 +15,13 @@ let package = Package(
             targets: ["SceneViewSwift"]
         )
     ],
-    dependencies: [],
+    dependencies: [
+        // DocC generation — `swift package generate-documentation --target SceneViewSwift`
+        // produces a browsable .doccarchive. CI publishes it alongside the SPM tag so
+        // Apple-side consumers get a real Apple-style docs site instead of just KDoc.
+        // (#945)
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.0")
+    ],
     targets: [
         .target(
             name: "SceneViewSwift",

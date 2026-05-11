@@ -393,8 +393,9 @@ private fun ModeContent(
         onSessionUpdated = { session: Session, frame: Frame ->
             latestFrame = frame
             isTracking = frame.camera.trackingState == TrackingState.TRACKING
-            // Wire the recorder every frame — attach is idempotent so this is cheap.
-            recorder.attach(session)
+            // Stateless side-channel pattern (#876) — recordFrame publishes the
+            // session per call, mirroring RerunBridge.logFrame. Idempotent.
+            recorder.recordFrame(session)
         },
         onTrackingFailureChanged = { trackingFailureReason = it },
         onGestureListener = rememberOnGestureListener(
