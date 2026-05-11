@@ -60,8 +60,8 @@ To set up: `npm install @google/stitch-sdk`, then add the Stitch MCP server in C
 
 ## When writing any SceneView code
 
-- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.1.0`)
-- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.1.0`)
+- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.1.1`)
+- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.1.1`)
 - Declare nodes as composables inside the trailing content block — not imperatively
 - Load models with `rememberModelInstance(modelLoader, "models/file.glb")` — returns `null`
   while loading, always handle the null case
@@ -167,7 +167,7 @@ Never say "everything is good" without verifying published packages.
 
 ### Current state (last updated: 2026-05-11 evening, session upbeat-kare-a31ed4 — v4.1.0 SHIPPED + release.yml fixes)
 
-- 🚀 **v4.1.0 published end-to-end**. magical-lovelace branch was rescued from origin after its worktree had been deleted (lost the dirty version bump + an untracked `RenderQualityComparisonDemo.kt`). Merged with main via [PR #976](https://github.com/sceneview/sceneview/pull/976) at `6b4afca1` (4 conflicts resolved: CHANGELOG, ModelNode.swift, DemoRegistry.kt, MainActivity.kt). Tag `v4.1.0` pushed. **Confirmed published**: Maven Central `<latest>4.1.0</latest>`, npm `sceneview-web@4.1.0`, Dokka API docs, Play Store production track (Google review in progress), [GitHub Release v4.1.0](https://github.com/sceneview/sceneview/releases/tag/v4.1.0) (body filled in manually after the workflow skipped it).
+- 🚀 **v4.1.0 published end-to-end**. magical-lovelace branch was rescued from origin after its worktree had been deleted (lost the dirty version bump + an untracked `RenderQualityComparisonDemo.kt`). Merged with main via [PR #976](https://github.com/sceneview/sceneview/pull/976) at `6b4afca1` (4 conflicts resolved: CHANGELOG, ModelNode.swift, DemoRegistry.kt, MainActivity.kt). Tag `v4.1.0` pushed. **Confirmed published**: Maven Central `<latest>4.1.0</latest>`, npm `sceneview-web@4.1.1`, Dokka API docs, Play Store production track (Google review in progress), [GitHub Release v4.1.0](https://github.com/sceneview/sceneview/releases/tag/v4.1.0) (body filled in manually after the workflow skipped it).
 - ⚠️ **BREAKING — Android render defaults** changed at v4.1.0: main directional light intensity `100_000` → `10_000` lux, shadows on by default, new `fillLightNode` at 30% main intensity, SSAO + bloom on, neutral exposure `(12, 1/200, 200)`. Apps embedding sceneview / arsceneview / sceneview-core / sceneview-web / sceneview_flutter / react-native-sceneview render with the new look unless they override defaults. Migration recipe at top of `CHANGELOG.md`.
 - 🐛 **release.yml had two latent bugs** surfaced by v4.1.0 — fixed in [PR #985](https://github.com/sceneview/sceneview/pull/985) at `070e6c9f`, workflow re-triggered via `workflow_dispatch` on main to publish the RN bridge:
   1. `Validate SceneViewSwift SPM tag`: regex `\.library\(name:\s*"SceneViewSwift"` is single-line but both Package.swift manifests use multi-line `.library(\n    name: ...)` — silent fail on every tag since #920. Fix: `tr '\n' ' '` before grep so multi-line block can match.
