@@ -990,8 +990,75 @@
         });
       }
 
+      // Helpers: build status row / result card via DOM construction.
+      // Sketchfab response fields (model.name, model.user.displayName,
+      // model.thumbnails[*].url) are attacker-controlled — string-concat
+      // into innerHTML allows a `"` inside any field to break out of an
+      // attribute. The Kotlin path in Main.kt was patched in #957; this
+      // inline JS path is the second copy of the same search and needs
+      // the same hygiene. See follow-up to #957.
+      function buildStatusRow(text, isError) {
+        var div = document.createElement('div');
+        div.className = isError ? 'search-status error' : 'search-status';
+        div.textContent = text;
+        return div;
+      }
+      function clearResults() {
+        while (modelResults.firstChild) {
+          modelResults.removeChild(modelResults.firstChild);
+        }
+      }
+      function buildResultCard(model) {
+        var name = model.name || 'Untitled';
+        var author = (model.user && (model.user.displayName || model.user.username)) || 'Unknown';
+        var views = model.viewCount || 0;
+        var thumb = extractThumb(model);
+
+        var card = document.createElement('div');
+        card.className = 'result-card';
+
+        if (thumb) {
+          var img = document.createElement('img');
+          img.className = 'result-thumb';
+          // setAttribute treats the value as an attribute string; a `"`
+          // inside `thumb` stays in the attribute, never terminates it.
+          img.setAttribute('src', thumb);
+          img.setAttribute('alt', '');
+          img.setAttribute('loading', 'lazy');
+          // Re-attach the "hide on 404" handler as an event listener so
+          // we don't have an inline `onerror=` in the markup.
+          img.addEventListener('error', function() {
+            img.style.display = 'none';
+          });
+          card.appendChild(img);
+        }
+
+        var info = document.createElement('div');
+        info.className = 'result-info';
+
+        var nameDiv = document.createElement('div');
+        nameDiv.className = 'result-name';
+        nameDiv.setAttribute('title', name);
+        nameDiv.textContent = name;
+        info.appendChild(nameDiv);
+
+        var authorDiv = document.createElement('div');
+        authorDiv.className = 'result-author';
+        authorDiv.textContent = 'by ' + author;
+        info.appendChild(authorDiv);
+
+        var badge = document.createElement('div');
+        badge.className = 'result-badge';
+        badge.textContent = formatViews(views) + ' views';
+        info.appendChild(badge);
+
+        card.appendChild(info);
+        return card;
+      }
+
       function searchSketchfab(query) {
-        modelResults.innerHTML = '<div class="search-status">Searching "' + escapeHtml(query) + '"...</div>';
+        clearResults();
+        modelResults.appendChild(buildStatusRow('Searching "' + query + '"...'));
 
         fetch(SKETCHFAB_API + '&q=' + encodeURIComponent(query) + '&count=20')
           .then(function(r) {
@@ -1000,42 +1067,30 @@
           })
           .then(function(data) {
             var results = data.results || [];
+            clearResults();
             if (results.length === 0) {
-              modelResults.innerHTML = '<div class="search-status">No downloadable models found for "' + escapeHtml(query) + '".</div>';
+              modelResults.appendChild(
+                buildStatusRow('No downloadable models found for "' + query + '".')
+              );
               return;
             }
-            modelResults.innerHTML = '';
 
             results.forEach(function(model) {
-              var name = model.name || 'Untitled';
               var uid = model.uid;
-              var author = (model.user && (model.user.displayName || model.user.username)) || 'Unknown';
-              var views = model.viewCount || 0;
-              var thumb = extractThumb(model);
-
-              var card = document.createElement('div');
-              card.className = 'result-card';
-
-              var imgHtml = thumb
-                ? '<img class="result-thumb" src="' + thumb + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
-                : '';
-              card.innerHTML = imgHtml +
-                '<div class="result-info">' +
-                '<div class="result-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>' +
-                '<div class="result-author">by ' + escapeHtml(author) + '</div>' +
-                '<div class="result-badge">' + formatViews(views) + ' views</div>' +
-                '</div>';
-
+              var name = model.name || 'Untitled';
+              var card = buildResultCard(model);
               card.addEventListener('click', function() {
                 highlightCard(card);
                 downloadSketchfabModel(uid, name);
               });
-
               modelResults.appendChild(card);
             });
           })
           .catch(function(err) {
-            modelResults.innerHTML = '<div class="search-status error">Search failed: ' + escapeHtml(err.message) + '</div>';
+            clearResults();
+            modelResults.appendChild(
+              buildStatusRow('Search failed: ' + (err && err.message ? err.message : err), true)
+            );
           });
       }
 
