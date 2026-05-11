@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Claude Code plugin marketplace (2026-05-08)
+
+### Added — `sceneview/claude-marketplace` Claude Code plugin
+
+- **New marketplace repo:** [`github.com/sceneview/claude-marketplace`](https://github.com/sceneview/claude-marketplace) (Apache-2.0). Single plugin (`sceneview` v4.0.11) bundling the `sceneview-mcp` server, 11 namespaced contributor commands (`/sceneview:contribute`, `/release`, `/review`, `/test`, `/document`, `/quality-gate`, `/publish-check`, `/sync-check`, `/version-bump`, `/evaluate`, `/maintain`), and 5 cross-platform reminder hooks that fire on edits to nudge Android ↔ iOS ↔ Web ↔ Flutter ↔ RN API parity.
+- **Install (Claude Code):**
+  ```
+  /plugin marketplace add sceneview/claude-marketplace
+  /plugin install sceneview@sceneview
+  ```
+- **Marketplace clone ~50 KB** (vs 1.4 GB if it had lived in the SDK monorepo — split-to-dedicated-repo decision after a multi-agent review flagged the monorepo clone as a ship-blocker).
+- **Plugin manifest references its npm-published MCP via `npx`** — no code vendoring, `sceneview-mcp` stays independently versioned on npm.
+- **Discovery surfaces wired** ([`01114229`](https://github.com/sceneview/sceneview/commit/01114229)): plugin-install instructions added to `README.md`, `llms.txt`, `mcp/README.md`, `docs/docs/ai-development.md`, `docs/docs/index.md`. GitHub topics on the marketplace repo cover `claude-code`, `claude-plugin`, `mcp`, `3d`, `ar`, `android`, `ios`, `web`, `jetpack-compose`, `swiftui`.
+
+### Added — `.claude/scripts/sync-plugin-versions.sh`
+
+Verifies the `sceneview` plugin's manifest version matches `npm view sceneview-mcp version`. Lives in the marketplace repo (also). Decoupled from `sync-versions.sh` because the plugin tracks the wrapped npm MCP, not `gradle.properties` `VERSION_NAME`.
+
+### Security — sceneview/sceneview HEAD scrub
+
+Removed off-topic personal-portfolio code from the public SDK repo that had nothing to do with SceneView ([`c1a5c99f`](https://github.com/sceneview/sceneview/commit/c1a5c99f)): `hub-gateway/`, `hub-mcp/`, `mcp-gaming/`, `mcp-interior/`, plus the strategy/registry-submission docs that listed every unrelated MCP. Also dropped tracked CDI-sensitive session artefacts (`.claude/handoff*.md`, `.claude/plans/`, `.claude/marketplace-submissions/`, `RERUN-CHECK.md`, hardcoded user paths in samples). Verified `git ls-files | grep -iE 'urssaf|impôts|service-public|french-admin|octopuscommunity|ajaxmusic'` returns 0 hits in HEAD. Past commits still contain the strings — separate `git filter-repo` session is the planned followup.
+
 ## v4.0.9 — Web unlit parity + Android demo APK -38% + Play Store race fix (2026-05-07)
 
 **Status:** stable. No new library API surface vs v4.0.8 — instead this release bundles cross-platform unlit parity (web + Flutter + RN bridges), big Android sample-app size cuts, and a fix for the Play Store deploy workflow's recurring internal-track race.
