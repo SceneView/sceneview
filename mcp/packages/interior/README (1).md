@@ -146,14 +146,14 @@ Use validate_interior_code with the generated room planner code
 ## Generated Code
 
 All tools generate complete, compilable Kotlin Compose code using:
-- `io.github.sceneview:sceneview:4.0.9` — 3D scenes
-- `io.github.sceneview:arsceneview:4.0.9` — AR scenes
+- `io.github.sceneview:sceneview:4.1.0` — 3D scenes
+- `io.github.sceneview:arsceneview:4.1.0` — AR scenes
 
 Add to your `build.gradle`:
 ```kotlin
-implementation("io.github.sceneview:sceneview:4.0.9")
+implementation("io.github.sceneview:sceneview:4.1.0")
 // For AR tools:
-implementation("io.github.sceneview:arsceneview:4.0.9")
+implementation("io.github.sceneview:arsceneview:4.1.0")
 ```
 
 ## Quality
