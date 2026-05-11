@@ -55,6 +55,12 @@ fun ModelViewerDemo(onBack: () -> Unit) {
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.3f,
+                        // centerOrigin lets SceneView re-centre the model's bounding box on
+                        // world origin so the camera (looking at 0,0,0) frames the body, not
+                        // the model's authored pivot point (typically the floor of the asset).
+                        // Without this the helmet sits in the lower third of the viewport.
+                        // QA finding 2026-05-11 PM.
+                        centerOrigin = io.github.sceneview.math.Position(0f, 0f, 0f),
                     )
                 }
             }
