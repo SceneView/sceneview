@@ -287,14 +287,34 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - name: Assert SceneViewSwift/Package.swift exists at this tag
+      - name: Assert both root and SceneViewSwift Package.swift exist
         run: |
-          if [ ! -f "SceneViewSwift/Package.swift" ]; then
-            echo "::error::SceneViewSwift/Package.swift missing at tag ${GITHUB_REF_NAME}"
+          # The monorepo ships TWO Package.swift manifests:
+          #   1. Root (./Package.swift) — what SPM consumers point at:
+          #      `https://github.com/sceneview/sceneview.git`. Added in #920
+          #      so iOS users don't need the separate `sceneview-swift` mirror
+          #      repo that historically got stuck on v4.0.0.
+          #   2. Sub-manifest (./SceneViewSwift/Package.swift) — kept in place
+          #      so the legacy `sceneview-swift` mirror repo (a flat copy of
+          #      the SceneViewSwift/ subtree) continues to build for any
+          #      consumer that hasn't migrated yet.
+          # Both must point at the SceneViewSwift target so a malformed tag
+          # doesn't quietly poison `.package(url:from:)` resolution.
+          missing=()
+          [ -f "Package.swift" ] || missing+=("Package.swift (root)")
+          [ -f "SceneViewSwift/Package.swift" ] || missing+=("SceneViewSwift/Package.swift")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing at tag ${GITHUB_REF_NAME}: ${missing[*]}"
             exit 1
           fi
-          # Surface the declared version so a release-checklist scan can pick it up.
-          grep -E '\.library\(name:|swiftLanguageVersions' SceneViewSwift/Package.swift || true
+          # Both manifests must declare the SceneViewSwift product.
+          for f in Package.swift SceneViewSwift/Package.swift; do
+            if ! grep -qE '\.library\(name:\s*"SceneViewSwift"' "$f"; then
+              echo "::error::$f does not declare a SceneViewSwift product"
+              exit 1
+            fi
+          done
+          echo "::notice::Both SPM manifests present and well-formed at tag ${GITHUB_REF_NAME}"
 
   # NOTE: pub.dev / Flutter publish is not yet automated. Requires a
   # `PUB_TOKEN` org-level secret + `dart pub publish --force`. Tracked
