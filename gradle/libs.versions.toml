@@ -20,7 +20,14 @@ coroutines = "1.10.2"
 kotlinMath = "1.8.0"
 
 # 3D / AR
-filament = "1.71.0"
+# Filament is pinned to 1.70.2 to match the .filamat files committed under
+# sceneview/src/main/assets/materials/ and website-static/materials/. Those
+# are compiled by buildSrc/FilamentPlugin (matc) but the plugin is gated on
+# filamentPluginEnabled=true in gradle.properties (default off) — bumping
+# this version without re-running matc lands an ABI mismatch that crashes
+# at material-load time on certain devices. Session #800 / #961 track the
+# 1.71+ bump as a dedicated work-stream that also flips the plugin flag.
+filament = "1.70.2"
 arCore = "1.53.0"
 
 # Networking
