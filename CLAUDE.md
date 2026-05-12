@@ -165,7 +165,30 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-11 evening, session upbeat-kare-a31ed4 — v4.1.0 SHIPPED + release.yml fixes)
+### Current state (last updated: 2026-05-12 night, session upbeat-kare-a31ed4 — v4.1.1 hotfix shipped + 5-agent post-ship audit)
+
+- 🚀 **v4.1.1 SHIPPED end-to-end at 22:09 UTC** (tag commit `a4a90064`). Critical hotfix for v4.1.0 SIGABRT regression. **All 7 release.yml jobs GREEN** (validate-spm + Maven Central publish + 3 npm + Dokka + GitHub Release auto-populated). Verified on Pixel_7a Apple M3 host emulator: 5 previously-crashing demos (Lighting / Geometry / Animation / MovableLight / MultiModel) all render correctly with the v4.1.0 BREAKING render defaults. [GitHub Release v4.1.1](https://github.com/sceneview/sceneview/releases/tag/v4.1.1) body auto-populated.
+- 🐛 **v4.1.0 root cause** (caught by 5-agent post-ship audit): Filament binary version mismatch. `efd296f1` (Apr 11) bumped Filament 1.70.2 → 1.71.0 + recompiled 21 `.filamat` to material-binary version 71. `4a31b579` (May 11) reverted ONLY runtime back to 1.70.2 thinking `.filamat` were still v70 — they were not. Runtime 1.70.2 cannot parse v71 packages → `Filament: could not parse the material package for material Opaque Colored` → `SIGABRT`. v4.1.1 fix: restore `filament = "1.71.0"` to match the v71 binaries. [PR #1001](https://github.com/sceneview/sceneview/pull/1001).
+- 🔧 **release.yml hardened** for future hotfixes [(PR #1002)](https://github.com/sceneview/sceneview/pull/1002): FU10 (publish-library skip-if-published HEAD against repo1.maven.org), FU11 (validate-spm runs on workflow_dispatch too), FU13 (create-release gate relaxed `== 'success'` → `!= 'failure' && != 'cancelled'`). Workflow_dispatch retries after partial failure now safe + idempotent.
+- 🧹 **15-file stale-refs sweep** [(PR #991)](https://github.com/sceneview/sceneview/pull/991): website-static / docs / gpt / README / Package.swift / mcp/packages all bumped from `:sceneview:4.0.9` → `:4.1.1`. Surfaced by `bash .claude/scripts/impact-check.sh` (caught 15 install-snippet drifts that `sync-versions.sh` doesn't track — tracked as [FU9 #990](https://github.com/sceneview/sceneview/issues/990)).
+- 🚢 **5-agent post-ship audit** ran in parallel ~21:30 UTC, surfaced:
+  - Agent 5 (visual regression on emulator): 🚨 BLOCKER — 5 demos crash on launch → triggered the v4.1.1 hotfix.
+  - Agent 1 (conflict resolution): CHANGELOG ✅, ModelNode.swift ✅ (centerOrigin re-add byte-identical to f6fe2356), DemoRegistry.kt 🔵 followup ([issue #1006](https://github.com/sceneview/sceneview/issues/1006) — label/AppBar mismatch), MainActivity.kt ⚠️ fix (dead `composable("about")` route — applied in v4.1.1 commit).
+  - Agent 2 (release.yml): FU10/11/13 hardening (PR #1002), [FU12 #1005](https://github.com/sceneview/sceneview/issues/1005) RN devDeps cleanup, [FU14 #1007](https://github.com/sceneview/sceneview/issues/1007) SPM regex tighten.
+  - Agent 3 (mcp@4.0.12 integrity): ✅ SHIP — tarball clean, llms-txt byte-identical to source, server starts, 28 tools registered.
+  - Agent 4 (cross-platform parity): iOS parity v4.2.0 backlog with 7 must-port APIs + 6 #928 silent-stub fixes + 3 AR feature ports — filed as [umbrella #1004](https://github.com/sceneview/sceneview/issues/1004).
+- 📊 Now at **17 PRs landed today / 16 issues filed today** (#977-984 + #990 + #1004-1007). All quality gates GREEN. Worktree synced to `origin/main` HEAD `a4a90064` (v4.1.1 merge).
+
+### Followups for next session
+
+1. **Validate Maven Central propagation** — `<latest>` may still show 4.1.0 for ~30 min after the workflow succeeded; confirm v4.1.1 .pom is reachable.
+2. **Monitor Play Store + iOS App Store** — v4.1.1 production track deployed; Google review 0-12h. iOS App Store v4.1.1 needs Xcode Cloud cut (not auto from monorepo Android tag).
+3. **iOS parity v4.2.0 sprint** — execute issue #1004 umbrella (7 must-port APIs + #928 silent stubs + AR feature parity).
+4. **release.yml hardening verification** — next tag push tests #1002's FU10/11/13 changes end-to-end.
+5. **DemoRegistry naming** — pick direction (issue #1006), ship in a small PR with screenshot regen.
+6. **Sketchfab API key extraction risk** ([#977 FU1](https://github.com/sceneview/sceneview/issues/977)) — V1.1 mcp-gateway proxy is the real fix.
+
+### Previous state (last updated: 2026-05-11 evening, session upbeat-kare-a31ed4 — v4.1.0 SHIPPED + release.yml fixes)
 
 - 🚀 **v4.1.0 published end-to-end**. magical-lovelace branch was rescued from origin after its worktree had been deleted (lost the dirty version bump + an untracked `RenderQualityComparisonDemo.kt`). Merged with main via [PR #976](https://github.com/sceneview/sceneview/pull/976) at `6b4afca1` (4 conflicts resolved: CHANGELOG, ModelNode.swift, DemoRegistry.kt, MainActivity.kt). Tag `v4.1.0` pushed. **Confirmed published**: Maven Central `<latest>4.1.0</latest>`, npm `sceneview-web@4.1.1`, Dokka API docs, Play Store production track (Google review in progress), [GitHub Release v4.1.0](https://github.com/sceneview/sceneview/releases/tag/v4.1.0) (body filled in manually after the workflow skipped it).
 - ⚠️ **BREAKING — Android render defaults** changed at v4.1.0: main directional light intensity `100_000` → `10_000` lux, shadows on by default, new `fillLightNode` at 30% main intensity, SSAO + bloom on, neutral exposure `(12, 1/200, 200)`. Apps embedding sceneview / arsceneview / sceneview-core / sceneview-web / sceneview_flutter / react-native-sceneview render with the new look unless they override defaults. Migration recipe at top of `CHANGELOG.md`.
