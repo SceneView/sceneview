@@ -6,6 +6,7 @@
 package io.github.sceneview.demo.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.view.MotionEvent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,21 +31,28 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -67,11 +75,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
@@ -87,12 +99,27 @@ import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberOnGestureListener
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
- * AR View tab — full-screen live ARSceneView with a glass status pill and a
- * floating M3-Expressive action bar. Mirrors the iOS `ARTab.swift` spec:
+ * AR View tab — opt-in live ARSceneView with a launcher screen that gates the
+ * heavy ARCore + Filament initialization behind an explicit user tap. Pattern
+ * mirrors Polycam / Reality Composer launchers: showing a giant CTA + a row of
+ * AR demo cards rather than auto-starting the camera the moment the tab opens.
+ *
+ * Why a launcher and not auto-start (as iOS does):
+ *  - Auto-starting ARSceneView on tab tap crashed the v4.1.0 Play Store build
+ *    on devices without ARCore Services installed (Filament panic when the
+ *    ARCore session failed to construct). The launcher lets us run an
+ *    [ArCoreApk.checkAvailability] gate first.
+ *  - Heavy resource use (camera, GPU, ARCore) shouldn't kick in until the user
+ *    asks for it. Saves battery and avoids spurious permission dialogs when
+ *    the user is just browsing.
+ *
+ * Once the user taps "Start AR Camera" we fall through to the legacy live AR
+ * experience, identical to the iOS spec:
  *
  *  - Full-bleed ARSceneView underneath (camera passthrough)
  *  - Top: glass status pill — "Tap a surface to place {Model}" / "N placed"
@@ -103,15 +130,10 @@ import java.util.UUID
  * ARSceneView — there is no `removeAllAnchors` on the wrapper, so we
  * recompose the whole subtree to clear ARCore state and start a fresh
  * session.
- *
- * The screenshot button is a stub that shares a deep link to the demo
- * placeholder for now — capturing the ARSceneView's GL surface requires
- * Frame.acquireCameraImage + Filament read-pixels plumbing that is out of
- * scope for this M3 Expressive UI refactor.
  */
 @Composable
 fun ArViewTabContent(
-    @Suppress("UNUSED_PARAMETER") onDemoClick: (String) -> Unit,
+    onDemoClick: (String) -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -133,6 +155,53 @@ fun ArViewTabContent(
         permissionsResolved = true
     }
 
+    // ---------- ARCore availability + launcher gate ----------
+    var sessionStarted by remember { mutableStateOf(false) }
+    var arCoreAvailability by remember {
+        mutableStateOf<ArCoreApk.Availability?>(null)
+    }
+    val activity = remember(context) { context as? Activity }
+
+    LaunchedEffect(activity) {
+        if (activity == null) {
+            arCoreAvailability = ArCoreApk.Availability.UNKNOWN_ERROR
+            return@LaunchedEffect
+        }
+        // ArCoreApk.checkAvailability is async on first call — it returns
+        // UNKNOWN_CHECKING until the Play Services lookup resolves. Poll until
+        // we get a real answer or give up after ~3s.
+        var availability = ArCoreApk.getInstance().checkAvailability(activity)
+        var attempts = 0
+        while (availability == ArCoreApk.Availability.UNKNOWN_CHECKING &&
+            attempts < 15
+        ) {
+            delay(200)
+            availability = ArCoreApk.getInstance().checkAvailability(activity)
+            attempts++
+        }
+        arCoreAvailability = availability
+    }
+
+    // Show launcher screen until the user explicitly starts an AR session.
+    // The launcher is also our graceful fallback when ARCore isn't installed:
+    // the "Start AR Camera" CTA disables itself and the row of AR demo cards
+    // still works because each demo handles its own ARCore install prompt.
+    if (!sessionStarted) {
+        ArLauncherScreen(
+            availability = arCoreAvailability,
+            cameraGranted = cameraGranted,
+            onRequestCamera = {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            },
+            onStartArSession = { sessionStarted = true },
+            onArDemoClick = onDemoClick,
+        )
+        return
+    }
+
+    // From this point the user has tapped "Start AR Camera" — we honor the
+    // permission flow exactly as the legacy code did before, then drop into
+    // the live ARSceneView.
     LaunchedEffect(Unit) {
         if (!cameraGranted) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -482,6 +551,285 @@ private fun ModelPickerGrid(
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
+
+/**
+ * Launcher screen shown when the AR tab opens. Gates the heavy ARCore +
+ * Filament init behind an explicit "Start AR Camera" tap and surfaces a row
+ * of the six headline AR demos so users have something to interact with even
+ * when ARCore isn't installed on their device (each demo handles its own
+ * install prompt independently of the live tab).
+ *
+ * Visual reference: Polycam launcher + Reality Composer entry screen.
+ */
+@Composable
+private fun ArLauncherScreen(
+    availability: ArCoreApk.Availability?,
+    cameraGranted: Boolean,
+    onRequestCamera: () -> Unit,
+    onStartArSession: () -> Unit,
+    onArDemoClick: (String) -> Unit,
+) {
+    val isChecking = availability == null ||
+        availability == ArCoreApk.Availability.UNKNOWN_CHECKING
+    val arSupported = availability == ArCoreApk.Availability.SUPPORTED_INSTALLED ||
+        availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ||
+        availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD
+
+    val statusMessage = when (availability) {
+        ArCoreApk.Availability.SUPPORTED_INSTALLED -> "AR ready on this device."
+        ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ->
+            "AR works on this device — ARCore will install on first launch."
+        ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD ->
+            "AR works on this device — an ARCore update is available."
+        ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE ->
+            "Live AR is not supported on this device, but you can still " +
+                "explore the AR demos below to see how the SDK is used."
+        ArCoreApk.Availability.UNKNOWN_TIMED_OUT,
+        ArCoreApk.Availability.UNKNOWN_ERROR ->
+            "Couldn't check AR availability. Tap Start AR Camera to try anyway."
+        ArCoreApk.Availability.UNKNOWN_CHECKING, null ->
+            "Checking AR availability…"
+    }
+
+    val ctaLabel = when {
+        isChecking -> "Checking…"
+        !cameraGranted -> "Grant Camera Access"
+        else -> "Start AR Camera"
+    }
+
+    val ctaEnabled = !isChecking && (arSupported || availability == ArCoreApk.Availability.UNKNOWN_ERROR ||
+        availability == ArCoreApk.Availability.UNKNOWN_TIMED_OUT)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        // Hero card
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = 2.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(vertical = 32.dp, horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.70f),
+                                ),
+                            ),
+                            shape = RoundedCornerShape(26.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.ViewInAr,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(48.dp),
+                    )
+                }
+                Text(
+                    text = "AR Experiences",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Place 3D models in your room, scan faces, anchor " +
+                        "content to terrain or rooftops, and stream depth.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp,
+                )
+            }
+        }
+
+        // Status line + CTA
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = if (arSupported || isChecking) {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            } else {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+            },
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (isChecking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (arSupported) {
+                                Icons.Filled.CheckCircle
+                            } else {
+                                Icons.Filled.Close
+                            },
+                            contentDescription = null,
+                            tint = if (arSupported) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Text(
+                        text = statusMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        if (!cameraGranted) {
+                            onRequestCamera()
+                        } else {
+                            onStartArSession()
+                        }
+                    },
+                    enabled = ctaEnabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp),
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                ) {
+                    Icon(
+                        Icons.Filled.ViewInAr,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(ctaLabel, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
+
+        // Section title
+        Text(
+            text = "Try an AR demo",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+        )
+
+        // Grid of 6 AR demo cards
+        val featured = remember { FEATURED_AR_DEMOS }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            featured.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { demo ->
+                        ArDemoCard(
+                            title = demo.title,
+                            subtitle = demo.subtitle,
+                            onClick = { onArDemoClick(demo.id) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun ArDemoCard(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .heightIn(min = 124.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(10.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.ViewInAr,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                lineHeight = 16.sp,
+            )
+        }
+    }
+}
+
+private data class FeaturedArDemo(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+)
+
+private val FEATURED_AR_DEMOS = listOf(
+    FeaturedArDemo("ar-placement", "Tap to Place", "Drop 3D models on detected planes"),
+    FeaturedArDemo("ar-face", "Face Mesh", "Track and overlay the user's face"),
+    FeaturedArDemo("ar-cloud-anchor", "Cloud Anchor", "Persistent anchors shared across devices"),
+    FeaturedArDemo("ar-streetscape", "Streetscape", "Geospatial geometry of cities"),
+    FeaturedArDemo("ar-depth-occlusion", "Depth Occlusion", "Real objects hide virtual ones"),
+    FeaturedArDemo("ar-pose", "Pose Placement", "Free pose positioning in space"),
+)
 
 @Composable
 private fun ArPermissionPlaceholder(granted: Boolean) {
