@@ -1,3 +1,7 @@
+## 4.2.0
+
+- Version alignment with SceneView v4.2.0. ⚠️ **iOS render defaults now match Android** (main 1k → 10k lux, fill 300 → 3k lux, new key+fill setup) — existing iOS apps embedding `sceneview_flutter` will render brighter / more cinematic. See root `CHANGELOG.md` for the full migration recipe + new `LightSlot` / `RenderQuality` / `NodeGesture` / `AnchorNode` AR APIs.
+
 ## 4.1.2
 
 - Version alignment with SceneView v4.1.2. ⚠️ Native Android renderer defaults changed: main light intensity 100k → 10k lux, shadows on, fill light, SSAO + bloom, neutral exposure. Existing apps embedding `sceneview_flutter` will render with the new RealityKit-equivalent look. See root `CHANGELOG.md`.
