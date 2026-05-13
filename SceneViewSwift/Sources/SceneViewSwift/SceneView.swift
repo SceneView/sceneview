@@ -25,6 +25,37 @@ import RealityKit
 ///     model = try? await ModelNode.load("models/car.usdz")
 /// }
 /// ```
+/// How a `SceneView` should provision a main / fill light slot.
+///
+/// Mirrors SceneView Android's `mainLightNode: LightNode?` / `fillLightNode: LightNode?`
+/// composable parameters (`Scene.kt`), but with a 3-state enum instead of a double-Optional
+/// sentinel — clearer at call sites and exhaustive in `switch`.
+///
+/// ```swift
+/// SceneView { /* ... */ }
+///   .fillLight(.systemDefault)              // (no-op — default fill at 3 000 lux)
+///   .fillLight(.disabled)                   // single-light setup
+///   .fillLight(.custom(LightNode.fill(intensity: 5_000)))   // user override
+/// ```
+///
+/// Note: today the slot is read once during scene setup. Reactive replacement
+/// (`SceneView(...).fillLight(.custom(newLight))` mid-frame) is tracked as a
+/// follow-up — the current `RealityView.update:` closure does not yet diff lights.
+public enum LightSlot {
+    /// Use the built-in default for this light slot.
+    /// - Main slot default: directional at `10_000` lux, oriented straight down, casts shadows.
+    /// - Fill slot default: directional at `3_000` lux, oriented from `(0.5, -0.5, 0.5)`, no shadow.
+    case systemDefault
+
+    /// Remove this light slot entirely. Use `.disabled` on the fill slot to get a single-light setup.
+    case disabled
+
+    /// Provision the slot with the caller's `LightNode`. The entity is added to the scene root
+    /// during setup; orient it via ``LightNode/lookAt(_:)`` or ``LightNode/position(_:)``
+    /// before passing it in.
+    case custom(LightNode)
+}
+
 public struct SceneView: View {
     let content: (Entity) -> Void
     var sceneEnvironment: SceneEnvironment?
@@ -32,6 +63,13 @@ public struct SceneView: View {
     var onEntityTapped: ((Entity) -> Void)?
     var enableAutoRotate: Bool = false
     var autoRotateSpeed: Float = 0.3
+
+    // Light slot overrides — read once during scene setup. Defaults to `.systemDefault`
+    // which provisions Android-parity 10 000-lux main + 3 000-lux fill (matches the
+    // v4.1.0 BREAKING render-defaults change on Android, finally reaching iOS in v4.2.0).
+    // Reactive replacement is tracked as a follow-up issue.
+    var mainLightSlot: LightSlot = .systemDefault
+    var fillLightSlot: LightSlot = .systemDefault
 
     /// Creates a 3D scene with imperative content setup.
     ///
@@ -69,7 +107,9 @@ public struct SceneView: View {
             cameraControlMode: cameraControlMode ?? .orbit,
             onEntityTapped: onEntityTapped,
             enableAutoRotate: enableAutoRotate,
-            autoRotateSpeed: autoRotateSpeed
+            autoRotateSpeed: autoRotateSpeed,
+            mainLightSlot: mainLightSlot,
+            fillLightSlot: fillLightSlot
         )
     }
 
@@ -105,6 +145,54 @@ public struct SceneView: View {
         copy.autoRotateSpeed = speed
         return copy
     }
+
+    /// Configures the main / key directional light slot.
+    ///
+    /// Mirrors SceneView Android's `mainLightNode: LightNode? = rememberMainLightNode(engine)`
+    /// composable parameter (`Scene.kt`). Pass `.disabled` for a rare IBL-only setup;
+    /// `.custom(LightNode)` to provide your own.
+    ///
+    /// Default (`.systemDefault`): directional light at `10 000` lux pointing straight
+    /// down (`-Y`), shadow casting enabled. Mirrors the Android v4.1.0 BREAKING
+    /// render-defaults change finally reaching iOS in v4.2.0.
+    ///
+    /// ```swift
+    /// SceneView { /* ... */ }
+    ///   .mainLight(.custom(LightNode.directional(intensity: 5_000)
+    ///       .lookAt(.zero)))                              // weaker key, custom angle
+    ///
+    /// SceneView { /* ... */ }
+    ///   .mainLight(.disabled)                              // IBL-only (rare)
+    /// ```
+    public func mainLight(_ slot: LightSlot) -> SceneView {
+        var copy = self
+        copy.mainLightSlot = slot
+        return copy
+    }
+
+    /// Configures the secondary fill directional light slot.
+    ///
+    /// Mirrors SceneView Android's `fillLightNode: LightNode? = rememberFillLightNode(engine)`
+    /// composable parameter (`Scene.kt`). Pair with ``mainLight(_:)`` to fully
+    /// override the key+fill setup.
+    ///
+    /// Default (`.systemDefault`): ``LightNode/fill(color:intensity:castsShadow:)`` at
+    /// `3 000` lux, no shadow, oriented along the canonical Android direction
+    /// `(0.5, -0.5, 0.5)` (upper-back-left → down-front-right) so the unlit side of
+    /// objects gets a soft kick without flattening them.
+    ///
+    /// ```swift
+    /// SceneView { /* ... */ }
+    ///   .fillLight(.custom(LightNode.fill(intensity: 6_000)))   // brighter fill
+    ///
+    /// SceneView { /* ... */ }
+    ///   .fillLight(.disabled)                                    // single-light setup
+    /// ```
+    public func fillLight(_ slot: LightSlot) -> SceneView {
+        var copy = self
+        copy.fillLightSlot = slot
+        return copy
+    }
 }
 
 // MARK: - Scene entities holder
@@ -128,6 +216,8 @@ private struct SceneViewRepresentation: View {
     let onEntityTapped: ((Entity) -> Void)?
     let enableAutoRotate: Bool
     let autoRotateSpeed: Float
+    let mainLightSlot: LightSlot
+    let fillLightSlot: LightSlot
 
     @State private var camera = CameraControls(mode: .orbit)
     @StateObject private var entities = SceneEntities()
@@ -208,29 +298,44 @@ private struct SceneViewRepresentation: View {
         // IBL entity (will be configured when environment loads)
         realityContent.add(entities.ibl)
 
-        // Default directional light (sun)
-        let sun = DirectionalLight()
-        sun.light = DirectionalLightComponent(
-            color: .white,
-            intensity: 1000,
-            isRealWorldProxy: false
-        )
-        sun.shadow = DirectionalLightComponent.Shadow(
-            maximumDistance: 8,
-            depthBias: 5.0
-        )
-        sun.look(at: .zero, from: [2, 4, 3], relativeTo: nil)
-        realityContent.add(sun)
+        // Main / key directional light slot. Defaults to Android-parity 10 000 lux
+        // pointing straight down with shadow casting — matches the v4.1.0 BREAKING
+        // render-defaults change that finally reaches iOS in v4.2.0.
+        switch mainLightSlot {
+        case .systemDefault:
+            let main = LightNode.directional(
+                color: .white,
+                intensity: 10_000,
+                castsShadow: true
+            )
+            // RealityKit directional lights emit along the entity's -Z axis; lookAt
+            // origin from above so the light points straight down (Android default
+            // direction `(0, -1, 0)`).
+            main.entity.look(at: .zero, from: [0, 1, 0], relativeTo: nil)
+            realityContent.add(main.entity)
+        case .disabled:
+            break
+        case .custom(let node):
+            realityContent.add(node.entity)
+        }
 
-        // Fill light to soften shadows
-        let fill = DirectionalLight()
-        fill.light = DirectionalLightComponent(
-            color: .white,
-            intensity: 300,
-            isRealWorldProxy: false
-        )
-        fill.look(at: .zero, from: [-1, -2, -1], relativeTo: nil)
-        realityContent.add(fill)
+        // Fill light slot. Defaults to LightNode.fill() at 3 000 lux from the canonical
+        // Android direction `(0.5, -0.5, 0.5)` (upper-back-left → down-front-right),
+        // no shadow. 30 % of main intensity — the soft kick on the unlit side.
+        switch fillLightSlot {
+        case .systemDefault:
+            let fill = LightNode.fill(intensity: 3_000)
+            // Orient toward origin from the canonical Android fill direction's source
+            // point: the light travels from `(0.5, -0.5, 0.5)` direction → place the
+            // entity at the opposite point and look at origin so emission lands on the
+            // shadow side of objects centered at world origin.
+            fill.entity.look(at: .zero, from: [-0.5, 0.5, -0.5], relativeTo: nil)
+            realityContent.add(fill.entity)
+        case .disabled:
+            break
+        case .custom(let node):
+            realityContent.add(node.entity)
+        }
 
         // Populate user content
         content(entities.root)
