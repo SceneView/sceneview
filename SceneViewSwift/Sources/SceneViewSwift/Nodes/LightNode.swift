@@ -23,7 +23,14 @@ import AppKit
 ///     content.add(sun.entity)
 /// }
 /// ```
-public struct LightNode: Sendable {
+///
+/// `LightNode` wraps a RealityKit `Entity` (a reference type that is
+/// main-actor-bound). The struct is therefore marked `@MainActor` so the
+/// compiler enforces the threading contract — the previously-declared
+/// `Sendable` conformance was unsound (#928 follow-up from the v4.1.0
+/// post-ship audit).
+@MainActor
+public struct LightNode {
     /// The underlying RealityKit entity holding the light component.
     public let entity: Entity
 
@@ -50,6 +57,61 @@ public struct LightNode: Sendable {
         color: LightNode.Color = .white,
         intensity: Float = 1000,
         castsShadow: Bool = true
+    ) -> LightNode {
+        let light = DirectionalLight()
+        light.light = DirectionalLightComponent(
+            color: color.platformColor,
+            intensity: intensity,
+            isRealWorldProxy: false
+        )
+        if castsShadow {
+            light.shadow = DirectionalLightComponent.Shadow(
+                maximumDistance: 8,
+                depthBias: 5.0
+            )
+        }
+        return LightNode(entity: light)
+    }
+
+    /// Creates a "fill" directional light — the soft secondary light in a key+fill setup.
+    ///
+    /// Mirrors SceneView Android's `LightNode.fill(...)` / `rememberFillLightNode()`
+    /// (`sceneview/src/main/java/io/github/sceneview/SceneFactories.kt`). Pairs with
+    /// ``directional(color:intensity:castsShadow:)`` (the main / key light) to produce
+    /// the soft, balanced lighting that matches RealityKit's default 2-light look:
+    /// - Default `intensity` is `3 000` lux — about 30 % of the typical 10 000-lux main
+    ///   light (the Android `DEFAULT_FILL_LIGHT_COLOR_INTENSITY`).
+    /// - Default `castsShadow` is `false` — only the main light contributes shadows by
+    ///   default. Override to `true` if you want soft secondary shadows.
+    ///
+    /// **Orientation**: this factory does NOT bake in a direction (consistent with the
+    /// other factories on `LightNode`). Call ``lookAt(_:)`` or set ``rotation`` after
+    /// creation. The canonical Android fill direction is `(0.5, -0.5, 0.5)` (upper-
+    /// back-left → down-front-right); the default ``SceneView`` fallback applies that
+    /// when this factory is the default fill slot.
+    ///
+    /// ```swift
+    /// // Standalone use:
+    /// let fill = LightNode.fill(intensity: 3_000)
+    ///     .lookAt(.zero)                           // point toward scene centre
+    /// scene.add(fill.entity)
+    ///
+    /// // With SceneView (closes Android parity):
+    /// SceneView { /* ... */ }
+    ///   .fillLight(.custom(LightNode.fill()))     // explicit
+    ///   // OR
+    ///   .fillLight(nil)                            // disable for single-light look
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - color: Light color. Default neutral white (≈ 6500 K).
+    ///   - intensity: Luminous intensity in lux. Default `3_000`.
+    ///   - castsShadow: Whether the fill light casts shadows. Default `false`.
+    /// - Returns: A configured ``LightNode``.
+    public static func fill(
+        color: LightNode.Color = .white,
+        intensity: Float = 3_000,
+        castsShadow: Bool = false
     ) -> LightNode {
         let light = DirectionalLight()
         light.light = DirectionalLightComponent(
