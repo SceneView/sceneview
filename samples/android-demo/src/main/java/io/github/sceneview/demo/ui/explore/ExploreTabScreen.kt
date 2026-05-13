@@ -94,7 +94,6 @@ fun ExploreTabScreen(
     var staffPicks by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var mostLiked by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var recent by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
-    var feedsError by remember { mutableStateOf<String?>(null) }
     var loadingFeeds by remember { mutableStateOf(false) }
 
     val sketchfabService = SketchfabService.getInstance(LocalContext.current)
@@ -103,7 +102,6 @@ fun ExploreTabScreen(
     LaunchedEffect(animatedOnly) {
         if (SketchfabConfig.apiKey == null) return@LaunchedEffect
         loadingFeeds = true
-        feedsError = null
         val animatedParam: Boolean? = if (animatedOnly) true else null
         val result = runCatching {
             coroutineScope {
@@ -119,7 +117,7 @@ fun ExploreTabScreen(
                 mostLiked = l
                 recent = r
             },
-            onFailure = { feedsError = "Couldn't reach Sketchfab — showing offline picks" },
+            onFailure = { /* swallow — empty FeedSection self-hides */ },
         )
         loadingFeeds = false
     }

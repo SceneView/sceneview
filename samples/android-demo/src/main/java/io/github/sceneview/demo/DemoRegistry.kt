@@ -2,39 +2,35 @@ package io.github.sceneview.demo
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudCircle
-import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FormatShapes
-import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Hexagon
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.LinearScale
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.PanoramaPhotosphere
+import androidx.compose.material.icons.filled.Pentagon
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PictureInPicture
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Roofing
+import androidx.compose.material.icons.filled.ScatterPlot
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Texture
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.TouchApp
@@ -113,26 +109,14 @@ val ALL_DEMOS = listOf(
     DemoEntry("video", "Video", "Video playback on 3D surface", "Content", Icons.Filled.VideoLibrary),
     // Interaction
     DemoEntry("camera-controls", "Camera Controls", "Orbit, fly, and free camera modes", "Interaction", Icons.Filled.PhotoCamera),
-    DemoEntry("gesture-editing", "Gesture Editing", "Move, scale, rotate with gestures", "Interaction", Icons.Filled.Gesture),
-    DemoEntry("collision", "Collision & Hit Test", "Hit testing and collision detection", "Interaction", Icons.Filled.DragIndicator),
-    DemoEntry(
-        // Marked KnownIssue 2026-05-13: regression of #801 — viewport stays
-        // black and gestures don't reach the embedded Compose tree. Surfaced
-        // by the v3 device audit (29 KB screenshot, then a libfilament panic
-        // on the next QA pass). A real fix needs a session on hardware with
-        // a hot ViewNode window manager instance.
-        "view-node",
-        "ViewNode",
-        "Compose UI embedded in 3D space",
-        "Interaction",
-        Icons.Filled.Dashboard,
-        DemoStatus.KnownIssue,
-    ),
+    DemoEntry("gesture-editing", "Gesture Editing", "Move, scale, rotate with gestures", "Interaction", Icons.Filled.OpenWith),
+    DemoEntry("collision", "Collision & Hit Test", "Hit testing and collision detection", "Interaction", Icons.Filled.CenterFocusStrong),
+    DemoEntry("view-node", "ViewNode", "Compose UI embedded in 3D space", "Interaction", Icons.Filled.Dashboard),
     // Advanced
-    DemoEntry("physics", "Physics", "Gravity, collisions, rigid bodies", "Advanced", Icons.Filled.Stars),
+    DemoEntry("physics", "Physics", "Gravity, collisions, rigid bodies", "Advanced", Icons.Filled.ScatterPlot),
     DemoEntry("post-processing", "Post Processing", "SSAO, anti-aliasing, tone mapping", "Advanced", Icons.Filled.Tune),
     DemoEntry("custom-mesh", "Custom Mesh", "Custom vertex and index buffers", "Advanced", Icons.Filled.Hexagon),
-    DemoEntry("shape", "All Shapes", "Extruded 2D polygons", "Advanced", Icons.Filled.LinearScale),
+    DemoEntry("shape", "All Shapes", "Extruded 2D polygons", "Advanced", Icons.Filled.Pentagon),
     DemoEntry("reflection-probes", "Reflection Probes", "Local cubemap reflections", "Advanced", Icons.Filled.BlurOn),
     DemoEntry("secondary-camera", "Camera Presets", "Picture-in-picture camera view", "Advanced", Icons.Filled.PictureInPicture),
     DemoEntry("debug-overlay", "Debug Overlay", "Performance stats overlay", "Advanced", Icons.Filled.Speed),

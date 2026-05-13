@@ -72,6 +72,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -156,7 +157,12 @@ fun ArViewTabContent(
     }
 
     // ---------- ARCore availability + launcher gate ----------
-    var sessionStarted by remember { mutableStateOf(false) }
+    //
+    // `sessionStarted` is `rememberSaveable` so process death (common on AR —
+    // high GPU/camera memory pressure) doesn't dump the user back on the
+    // launcher screen and re-prompt for everything. Anchors themselves are
+    // not Parcelable so we accept the loss of placed models across a kill.
+    var sessionStarted by rememberSaveable { mutableStateOf(false) }
     var arCoreAvailability by remember {
         mutableStateOf<ArCoreApk.Availability?>(null)
     }
@@ -170,16 +176,26 @@ fun ArViewTabContent(
         // ArCoreApk.checkAvailability is async on first call — it returns
         // UNKNOWN_CHECKING until the Play Services lookup resolves. Poll until
         // we get a real answer or give up after ~3s.
-        var availability = ArCoreApk.getInstance().checkAvailability(activity)
-        var attempts = 0
-        while (availability == ArCoreApk.Availability.UNKNOWN_CHECKING &&
-            attempts < 15
-        ) {
-            delay(200)
-            availability = ArCoreApk.getInstance().checkAvailability(activity)
-            attempts++
+        //
+        // The whole flow is wrapped in runCatching: on some OEMs (Huawei
+        // without Play Services, sideloaded Pixel builds) the lookup throws
+        // an unchecked exception instead of returning a status. Without the
+        // catch the coroutine would silently die and `arCoreAvailability`
+        // would stay `null` forever — locking the CTA on "Checking…".
+        runCatching {
+            var availability = ArCoreApk.getInstance().checkAvailability(activity)
+            var attempts = 0
+            while (availability == ArCoreApk.Availability.UNKNOWN_CHECKING &&
+                attempts < 15
+            ) {
+                delay(200)
+                availability = ArCoreApk.getInstance().checkAvailability(activity)
+                attempts++
+            }
+            arCoreAvailability = availability
+        }.onFailure {
+            arCoreAvailability = ArCoreApk.Availability.UNKNOWN_ERROR
         }
-        arCoreAvailability = availability
     }
 
     // Show launcher screen until the user explicitly starts an AR session.
@@ -199,19 +215,30 @@ fun ArViewTabContent(
         return
     }
 
-    // From this point the user has tapped "Start AR Camera" — we honor the
-    // permission flow exactly as the legacy code did before, then drop into
-    // the live ARSceneView.
-    LaunchedEffect(Unit) {
-        if (!cameraGranted) {
+    // From this point the user has tapped "Start AR Camera". Re-request the
+    // permission if the system revoked it between launcher and now (process
+    // resumed from background, settings toggled in another tab, etc.). If the
+    // user denies, we don't strand them on a dead placeholder — flip
+    // sessionStarted back to false so the launcher's "Grant Camera Access"
+    // CTA becomes available again.
+    LaunchedEffect(sessionStarted) {
+        if (sessionStarted && !cameraGranted) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
-        } else {
+        } else if (sessionStarted && cameraGranted) {
             permissionsResolved = true
         }
     }
 
-    if (!permissionsResolved || !cameraGranted) {
-        ArPermissionPlaceholder(granted = permissionsResolved && cameraGranted)
+    if (permissionsResolved && !cameraGranted) {
+        // Permission was definitively denied. Drop back to the launcher so
+        // the user can retry from the CTA instead of getting stuck on a
+        // generic "Camera permission is required" placeholder with no
+        // affordance.
+        sessionStarted = false
+        return
+    }
+    if (!permissionsResolved) {
+        ArPermissionPlaceholder(granted = false)
         return
     }
 
@@ -308,6 +335,35 @@ fun ArViewTabContent(
                     }
                 }
             }
+        }
+
+        // Top-end exit button — back affordance from the live AR session.
+        // Flips `sessionStarted = false` so the user lands on the launcher
+        // again instead of being stuck with only the tab nav. Detaches every
+        // ARCore anchor first so the underlying session releases its native
+        // refs before the wrapper recomposes away.
+        FilledIconButton(
+            onClick = {
+                placedAnchors.forEach { runCatching { it.anchor.detach() } }
+                placedAnchors.clear()
+                sessionStarted = false
+            },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 8.dp, end = 12.dp)
+                .size(40.dp),
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "Exit AR session",
+                modifier = Modifier.size(20.dp),
+            )
         }
 
         // Top status pill — translucent surface, capsule shape, M3 Expressive.
@@ -586,7 +642,8 @@ private fun ArLauncherScreen(
                 "explore the AR demos below to see how the SDK is used."
         ArCoreApk.Availability.UNKNOWN_TIMED_OUT,
         ArCoreApk.Availability.UNKNOWN_ERROR ->
-            "Couldn't check AR availability. Tap Start AR Camera to try anyway."
+            "Couldn't check AR availability. Try one of the demos below " +
+                "to see how the SDK is used."
         ArCoreApk.Availability.UNKNOWN_CHECKING, null ->
             "Checking AR availability…"
     }
@@ -597,62 +654,66 @@ private fun ArLauncherScreen(
         else -> "Start AR Camera"
     }
 
-    val ctaEnabled = !isChecking && (arSupported || availability == ArCoreApk.Availability.UNKNOWN_ERROR ||
-        availability == ArCoreApk.Availability.UNKNOWN_TIMED_OUT)
+    // CTA enabled only when ARCore is positively supported. UNKNOWN_* and
+    // UNSUPPORTED_DEVICE_NOT_CAPABLE leave the CTA disabled so we never
+    // re-enter the libfilament panic path that motivated the launcher in
+    // the first place ("try anyway" sounded helpful but landed users back
+    // in the SIGABRT). UNSUPPORTED also hides the button entirely below.
+    val ctaEnabled = !isChecking && arSupported
+    val showCta = availability != ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // Hero card
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            tonalElevation = 2.dp,
+        // Compact hero — icon + title on one line, tagline below. Cards
+        // get the screen real estate, not chrome.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Column(
-                modifier = Modifier.padding(vertical = 32.dp, horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(96.dp)
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.70f),
-                                ),
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.70f),
                             ),
-                            shape = RoundedCornerShape(26.dp),
                         ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.ViewInAr,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp),
-                    )
-                }
+                        shape = RoundedCornerShape(16.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.ViewInAr,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
                     text = "AR Experiences",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Place 3D models in your room, scan faces, anchor " +
-                        "content to terrain or rooftops, and stream depth.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Place models, scan faces, anchor to terrain.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp,
+                    lineHeight = 16.sp,
                 )
             }
         }
@@ -703,31 +764,33 @@ private fun ArLauncherScreen(
                     )
                 }
 
-                Button(
-                    onClick = {
-                        if (!cameraGranted) {
-                            onRequestCamera()
-                        } else {
-                            onStartArSession()
-                        }
-                    },
-                    enabled = ctaEnabled,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 52.dp),
-                    shape = RoundedCornerShape(percent = 50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                ) {
-                    Icon(
-                        Icons.Filled.ViewInAr,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(ctaLabel, style = MaterialTheme.typography.titleMedium)
+                if (showCta) {
+                    Button(
+                        onClick = {
+                            if (!cameraGranted) {
+                                onRequestCamera()
+                            } else {
+                                onStartArSession()
+                            }
+                        },
+                        enabled = ctaEnabled,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp),
+                        shape = RoundedCornerShape(percent = 50),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        Icon(
+                            Icons.Filled.ViewInAr,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(ctaLabel, style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
         }
