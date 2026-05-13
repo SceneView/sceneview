@@ -30,6 +30,7 @@ the documentation until it can.
 - NEVER deploy to stores without verifying the bundle builds locally first
 - When an agent modifies code, ALWAYS verify compilation before committing
 - If a review finds blockers, fix them ALL before pushing — no exceptions
+- If you bump `gradle/libs.versions.toml` → `filament = "X.Y.Z"`, you MUST recompile every `.filamat` blob in the same PR with the matching `matc` toolchain — see [CONTRIBUTING.md "Filament runtime ↔ .filamat ABI invariant"](CONTRIBUTING.md#filament-runtime--filamat-abi-invariant). v4.1.0 shipped split halves and crashed 10 demos at runtime.
 
 ### Quality plan: `.claude/plans/v4.0-quality-plan.md`
 

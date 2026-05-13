@@ -89,7 +89,7 @@ fun ShapeDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Shape Node",
+        title = "All Shapes",
         onBack = onBack,
         controls = {
             Text("Shape", style = MaterialTheme.typography.labelLarge)

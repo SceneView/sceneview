@@ -23,7 +23,7 @@ SCREENSHOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "andro
 DEMOS = [
     "Model Viewer",
     "Geometry Primitives",
-    "Animation",
+    "Auto Rotate",
     "Multi Model",
     "Lighting",
     "Dynamic Sky",
@@ -31,7 +31,7 @@ DEMOS = [
     "Environment Gallery",
     "Text Labels",
     "Lines & Paths",
-    "Image",
+    "Image Planes",
     "Billboard",
     "Video",
     "Camera Controls",
@@ -41,7 +41,7 @@ DEMOS = [
     "Physics",
     "Post Processing",
     "Custom Mesh",
-    "Shape",
+    "All Shapes",
     "Reflection Probes",
     "Secondary Camera",
     "Debug Overlay",
@@ -186,7 +186,7 @@ def main():
             continue
 
         # Wait for rendering
-        wait_time = 6 if demo in ("Model Viewer", "Multi Model", "Animation", "Video", "Physics") else 4
+        wait_time = 6 if demo in ("Model Viewer", "Multi Model", "Auto Rotate", "Video", "Physics") else 4
         print(f"  Waiting {wait_time}s for rendering...")
         time.sleep(wait_time)
 

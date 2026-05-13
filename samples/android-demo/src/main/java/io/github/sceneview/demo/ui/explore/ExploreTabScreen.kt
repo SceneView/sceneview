@@ -56,9 +56,9 @@ import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.sketchfab.SketchfabModel
 import io.github.sceneview.demo.sketchfab.SketchfabService
 import io.github.sceneview.demo.ui.explore.components.FeaturedSketchfabCard
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 
 /**
  * Curated 3D-model discovery feed. Mirrors the iOS `ExploreTab` so QA can
@@ -103,22 +103,20 @@ fun ExploreTabScreen(
         if (SketchfabConfig.apiKey == null) return@LaunchedEffect
         loadingFeeds = true
         val animatedParam: Boolean? = if (animatedOnly) true else null
-        val result = runCatching {
-            coroutineScope {
-                val a = async { sketchfabService.staffPicks(animated = animatedParam, limit = 10) }
-                val b = async { sketchfabService.featured(animated = animatedParam, limit = 10) }
-                val c = async { sketchfabService.recentlyAdded(animated = animatedParam, limit = 10) }
-                listOf(a, b, c).awaitAll()
-            }
+        // supervisorScope so a single feed failure (transient 429, network blip)
+        // doesn't cancel the other two — surviving feeds still render (#980).
+        // Each catch re-throws CancellationException so the parent
+        // LaunchedEffect cancellation (toggle re-keys, navigation away) still
+        // tears down the in-flight requests cleanly. `runCatching` swallows
+        // CancellationException, which would break structured concurrency.
+        supervisorScope {
+            val a = async { catchingFeed { sketchfabService.staffPicks(animated = animatedParam, limit = 10) } }
+            val b = async { catchingFeed { sketchfabService.featured(animated = animatedParam, limit = 10) } }
+            val c = async { catchingFeed { sketchfabService.recentlyAdded(animated = animatedParam, limit = 10) } }
+            staffPicks = a.await()
+            mostLiked = b.await()
+            recent = c.await()
         }
-        result.fold(
-            onSuccess = { (s, l, r) ->
-                staffPicks = s
-                mostLiked = l
-                recent = r
-            },
-            onFailure = { /* swallow — empty FeedSection self-hides */ },
-        )
         loadingFeeds = false
     }
 
@@ -274,6 +272,22 @@ private fun CarouselSection(
         )
         content()
     }
+}
+
+/**
+ * Run [block] and return its result, or `emptyList()` if it throws — but
+ * re-throw `CancellationException` so structured concurrency stays intact
+ * (the parent `LaunchedEffect` cancellation must propagate through the
+ * `supervisorScope` `await` calls).
+ */
+private suspend inline fun <T> catchingFeed(
+    crossinline block: suspend () -> List<T>,
+): List<T> = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Throwable) {
+    emptyList()
 }
 
 @Composable

@@ -451,7 +451,7 @@ fun AnimationDemo(onBack: () -> Unit) {
     val activeManipulator = if (cameraMode == CameraMode.FREE) freeManipulator else scriptedManipulator
 
     DemoScaffold(
-        title = "Animation",
+        title = "Auto Rotate",
         onBack = onBack,
         controls = {
             // Cinematic camera picker. Hero (heroic low-angle orbit), Reveal
