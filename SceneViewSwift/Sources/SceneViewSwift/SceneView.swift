@@ -264,6 +264,18 @@ private struct SceneViewRepresentation: View {
             .gesture(dragGesture)
             .gesture(pinchGesture)
             .simultaneousGesture(tapGesture)
+            // Per-entity gestures — dispatched to handlers registered via
+            // `Entity.onTap / onDrag / onScale / onRotate / onLongPress`
+            // (NodeGesture system). Each gesture is `.targetedToAnyEntity()`
+            // so it only fires when the user touches a real entity with a
+            // collision shape, and the camera-control gestures above keep
+            // working on empty-space drags. Closes the #928 silent-stub
+            // batch for NodeGesture dispatch.
+            .simultaneousGesture(entityTapGesture)
+            .simultaneousGesture(entityDragGesture)
+            .simultaneousGesture(entityMagnifyGesture)
+            .simultaneousGesture(entityRotateGesture)
+            .simultaneousGesture(entityLongPressGesture)
             .task {
                 // Auto-rotation loop
                 guard enableAutoRotate else { return }
@@ -476,6 +488,68 @@ private struct SceneViewRepresentation: View {
             .targetedToAnyEntity()
             .onEnded { value in
                 onEntityTapped?(value.entity)
+            }
+    }
+
+    // MARK: - Per-entity gestures (NodeGesture dispatch)
+
+    /// Dispatches a tap to any per-entity `Entity.onTap { }` handler registered
+    /// via the NodeGesture system. Fires in addition to `onEntityTapped(_:)`
+    /// because both contracts are useful: the modifier callback gets every
+    /// entity tap (broad listener), while NodeGesture lets the caller scope
+    /// handlers per-entity at construction time.
+    private var entityTapGesture: some Gesture {
+        SpatialTapGesture()
+            .targetedToAnyEntity()
+            .onEnded { value in
+                NodeGesture.dispatchTap(on: value.entity)
+            }
+    }
+
+    /// Per-entity drag — translates the gesture's screen-space delta into a
+    /// world-space SIMD3 and dispatches to the entity's `onDrag` handler.
+    /// `targetedToAnyEntity()` ensures empty-space drags continue to drive the
+    /// camera (`dragGesture` above), not the entity dispatch.
+    private var entityDragGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .targetedToAnyEntity()
+            .onChanged { value in
+                // RealityKit doesn't expose a one-line "screen → world" inverse;
+                // we approximate world-space translation by treating the drag's
+                // 2D screen delta as a planar XY translation at the entity's
+                // depth. Sufficient for sticker-style drag interactions; users
+                // who need full 3D-projected drags can compute via the camera
+                // ray themselves in the handler.
+                let dx = Float(value.translation.width) * 0.001
+                let dy = Float(-value.translation.height) * 0.001
+                NodeGesture.dispatchDrag(on: value.entity, translation: SIMD3<Float>(dx, dy, 0))
+            }
+    }
+
+    /// Per-entity pinch-to-scale.
+    private var entityMagnifyGesture: some Gesture {
+        MagnifyGesture()
+            .targetedToAnyEntity()
+            .onChanged { value in
+                NodeGesture.dispatchScale(on: value.entity, magnification: Float(value.magnification))
+            }
+    }
+
+    /// Per-entity two-finger rotate.
+    private var entityRotateGesture: some Gesture {
+        RotateGesture()
+            .targetedToAnyEntity()
+            .onChanged { value in
+                NodeGesture.dispatchRotate(on: value.entity, angle: Float(value.rotation.radians))
+            }
+    }
+
+    /// Per-entity long press.
+    private var entityLongPressGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.5)
+            .targetedToAnyEntity()
+            .onEnded { value in
+                NodeGesture.dispatchLongPress(on: value.entity)
             }
     }
 }
