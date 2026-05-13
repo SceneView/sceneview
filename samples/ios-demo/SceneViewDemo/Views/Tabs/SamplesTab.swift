@@ -317,6 +317,9 @@ struct SamplesTab: View {
             DemoItem(title: "Orbital AR", icon: "circle.dotted", subtitle: "Models orbit around you in AR", category: .ar) {
                 OrbitalARDemo()
             },
+            DemoItem(title: "AR Recording", icon: "record.circle", subtitle: "Capture the AR session as a screen video (record-only on iOS)", category: .ar) {
+                ARRecorderDemo()
+            },
             DemoItem(
                 comingSoonTitle: "AR Plane Placement",
                 icon: "arkit",
