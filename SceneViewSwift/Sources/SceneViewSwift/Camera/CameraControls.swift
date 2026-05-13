@@ -4,15 +4,22 @@ import RealityKit
 
 /// Camera interaction mode for the 3D scene.
 ///
-/// Mirrors SceneView Android's camera manipulator modes.
+/// Mirrors SceneView Android's camera manipulator modes
+/// (`CameraGestureDetector` + `FovZoomCameraManipulator`).
 public enum CameraControlMode: Sendable {
-    /// Orbit around a target point. Drag to rotate, pinch to zoom.
+    /// Orbit around a target point. Drag rotates the scene around the orbit
+    /// pivot; pinch dollies in/out by scaling the scene root.
     case orbit
 
-    /// Pan the camera in the view plane. Drag to move, pinch to zoom.
+    /// Pan the camera in the view plane. Drag translates the orbit target
+    /// laterally (the scene appears to slide), pinch keeps dollying in/out.
+    /// Rotation is preserved so callers can pan first then orbit.
     case pan
 
-    /// First-person camera. Drag to look around, pinch to move forward/back.
+    /// First-person look-around. Drag rotates the scene with no orbit
+    /// translation (camera stays put visually), pinch adjusts the
+    /// perspective camera's field of view — mirrors Android's
+    /// `FovZoomCameraManipulator`.
     case firstPerson
 }
 
@@ -81,6 +88,20 @@ public struct CameraControls: Sendable {
 
     /// First-person move speed (first-person mode only).
     public var moveSpeed: Float = 0.1
+
+    /// Field-of-view in degrees for ``CameraControlMode/firstPerson`` (pinch zoom).
+    /// Mirrors Android's `FovZoomCameraManipulator` (default range 10°..120°).
+    public var fov: Float = 60.0
+
+    /// Minimum FOV in degrees (firstPerson pinch-in limit).
+    public var minFov: Float = 10.0
+
+    /// Maximum FOV in degrees (firstPerson pinch-out limit).
+    public var maxFov: Float = 120.0
+
+    /// Per-pixel FOV delta in degrees (firstPerson pinch sensitivity).
+    /// Mirrors Android `FovZoomCameraManipulator.DEFAULT_PINCH_FOV_SPEED`.
+    public var pinchFovSpeed: Float = 0.05
 
     /// Whether touch/drag interaction is enabled.
     public var isEnabled: Bool = true
@@ -194,10 +215,23 @@ public struct CameraControls: Sendable {
 
     /// Updates orbit radius from a magnification gesture.
     ///
+    /// In ``CameraControlMode/orbit`` and ``CameraControlMode/pan`` this scales
+    /// the dolly radius (zoom). In ``CameraControlMode/firstPerson`` it
+    /// adjusts the perspective camera's field-of-view instead — mirrors
+    /// Android's `FovZoomCameraManipulator`.
+    ///
     /// - Parameter scale: The pinch gesture magnification factor.
     public mutating func handlePinch(_ scale: CGFloat) {
-        orbitRadius /= Float(scale)
-        orbitRadius = min(max(orbitRadius, minRadius), maxRadius)
+        guard isEnabled else { return }
+        switch mode {
+        case .orbit, .pan:
+            orbitRadius /= Float(scale)
+            orbitRadius = Swift.min(Swift.max(orbitRadius, minRadius), maxRadius)
+        case .firstPerson:
+            // Pinch out (scale > 1) ⇒ user wants to zoom IN ⇒ smaller FOV.
+            fov /= Float(scale)
+            fov = Swift.min(Swift.max(fov, minFov), maxFov)
+        }
     }
 
     /// Applies inertia deceleration. Call this on each frame after drag ends.

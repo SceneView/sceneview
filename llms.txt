@@ -3348,9 +3348,9 @@ public protocol EntityProvider {
 
 ```swift
 public enum CameraControlMode: Sendable {
-    case orbit         // drag to rotate, pinch to zoom (default)
-    case pan           // drag to pan, pinch to zoom
-    case firstPerson   // drag to look around
+    case orbit         // drag rotates the scene around the orbit pivot, pinch dollies (default)
+    case pan           // drag translates the target laterally, pinch dollies
+    case firstPerson   // drag rotates the view (no orbit translation), pinch adjusts FOV
 }
 
 public struct CameraControls: Sendable {
@@ -3364,6 +3364,11 @@ public struct CameraControls: Sendable {
     public var sensitivity: Float = 0.005
     public var isAutoRotating: Bool = false
     public var autoRotateSpeed: Float = 0.3
+    // firstPerson FOV controls (#1034)
+    public var fov: Float = 60.0
+    public var minFov: Float = 10.0
+    public var maxFov: Float = 120.0
+    public var pinchFovSpeed: Float = 0.05
 }
 ```
 

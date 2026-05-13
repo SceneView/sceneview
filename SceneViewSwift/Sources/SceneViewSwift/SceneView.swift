@@ -254,6 +254,13 @@ public struct SceneView: View {
 private final class SceneEntities: ObservableObject {
     let root = Entity()
     let ibl = Entity()
+    #if os(iOS) || os(macOS)
+    /// Holds the perspective camera so gesture handlers can mutate its
+    /// field-of-view directly. Used by ``CameraControlMode/firstPerson``
+    /// pinch — see #1034. visionOS renders through the headset, no manual
+    /// camera entity exists.
+    let perspCamera = PerspectiveCamera()
+    #endif
 }
 
 // MARK: - Internal implementation
@@ -274,6 +281,10 @@ private struct SceneViewRepresentation: View {
     @StateObject private var entities = SceneEntities()
     @State private var lastDragTranslation: CGSize = .zero
     @State private var initialPinchRadius: Float? = nil
+    /// Snapshotted FOV when a pinch begins in ``CameraControlMode/firstPerson``
+    /// — kept separate from `initialPinchRadius` so the orbit/pan dolly path
+    /// stays untouched. Closes #1034.
+    @State private var initialPinchFov: Float? = nil
     @State private var isDragging = false
 
     // Reactive light-slot caches — compared in `update:` closure to detect when the
@@ -360,10 +371,11 @@ private struct SceneViewRepresentation: View {
         // simulate orbit. The slight Y elevation gives a natural bird's-eye angle.
         // look(at:from:) handles both position and orientation — in RealityKit,
         // entities face +Z by default so explicit orientation is required.
-        let perspCamera = PerspectiveCamera()
-        perspCamera.camera.fieldOfViewInDegrees = 60
-        perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
-        realityContent.add(perspCamera)
+        // We keep a ref on the SceneEntities holder so `.firstPerson` pinch can
+        // mutate the FOV at runtime (#1034).
+        entities.perspCamera.camera.fieldOfViewInDegrees = 60
+        entities.perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
+        realityContent.add(entities.perspCamera)
         #endif
 
         // Root entity holds all user content
@@ -500,12 +512,49 @@ private struct SceneViewRepresentation: View {
     // MARK: - Camera
 
     private func applyCamera() {
+        // Sync the camera state's mode with the modifier-provided value. Done
+        // every frame because the modifier propagates as a `let` while the
+        // camera state is `@State` — without this, calling
+        // `.cameraControls(.pan)` would be silently ignored. Closes #1034.
+        if camera.mode != cameraControlMode {
+            camera.mode = cameraControlMode
+        }
+
         let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
         let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
         entities.root.orientation = yaw * pitch
 
-        let zoomScale = 5.0 / camera.orbitRadius
-        entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+        // Per-mode application of zoom + translation. Mirrors Android's
+        // `CameraGestureDetector` modes (ORBIT / PAN / FREE_FLIGHT) — closes
+        // #1034 (last #928 silent-stub item).
+        switch camera.mode {
+        case .orbit:
+            // Standard orbit: pinch scales scene; no translation.
+            let zoomScale = 5.0 / camera.orbitRadius
+            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+            entities.root.position = .zero
+
+        case .pan:
+            // Pan: pinch still dollies, drag translates `target` laterally.
+            // Visually the scene slides in screen space — equivalent to
+            // moving the camera in the opposite direction.
+            let zoomScale = 5.0 / camera.orbitRadius
+            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+            entities.root.position = -camera.target * zoomScale
+
+        case .firstPerson:
+            // First-person: no scale change (pinch mutates FOV instead — see
+            // pinchGesture). Rotation makes the scene yaw/pitch around the
+            // user as if they were standing still and looking around.
+            entities.root.scale = SIMD3<Float>(repeating: 1)
+            entities.root.position = .zero
+            #if os(iOS) || os(macOS)
+            // Sync the perspective camera FOV to the camera-controls state.
+            // Done every frame so external mutations of `camera.fov` also
+            // take effect; cheap enough that the cost is negligible.
+            entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
+            #endif
+        }
     }
 
     // MARK: - Gestures
@@ -528,21 +577,40 @@ private struct SceneViewRepresentation: View {
     }
 
     private var pinchGesture: some Gesture {
+        // Mode-aware pinch: orbit/pan dollies the radius, firstPerson scales
+        // the perspective camera's FOV (#1034). We snapshot the value at
+        // gesture start so the delta is applied to a stable base — same
+        // pattern as Android's `Manipulator.scrollBegin / scrollUpdate`.
         MagnifyGesture()
             .onChanged { value in
-                if initialPinchRadius == nil {
-                    initialPinchRadius = camera.orbitRadius
-                }
-                if let initial = initialPinchRadius {
-                    let newRadius = initial / Float(value.magnification)
-                    camera.orbitRadius = min(
-                        max(newRadius, camera.minRadius),
-                        camera.maxRadius
-                    )
+                switch camera.mode {
+                case .orbit, .pan:
+                    if initialPinchRadius == nil {
+                        initialPinchRadius = camera.orbitRadius
+                    }
+                    if let initial = initialPinchRadius {
+                        let newRadius = initial / Float(value.magnification)
+                        camera.orbitRadius = min(
+                            max(newRadius, camera.minRadius),
+                            camera.maxRadius
+                        )
+                    }
+                case .firstPerson:
+                    if initialPinchFov == nil {
+                        initialPinchFov = camera.fov
+                    }
+                    if let initial = initialPinchFov {
+                        let newFov = initial / Float(value.magnification)
+                        camera.fov = min(
+                            max(newFov, camera.minFov),
+                            camera.maxFov
+                        )
+                    }
                 }
             }
             .onEnded { _ in
                 initialPinchRadius = nil
+                initialPinchFov = nil
             }
     }
 
