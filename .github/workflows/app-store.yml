@@ -278,12 +278,21 @@ jobs:
           print(f"Latest build: {build_version} (ID: {build_id})")
 
           # Resolve the App Store version string. Tag pushes set
-          # ASC_VERSION_STRING via env (e.g. "v4.2.0"). Strip a leading "v"
-          # so we match Apple's plain "X.Y.Z" expected format. Fall back to
-          # the build's own version (which xcodebuild stamps from the
-          # Marketing Version field — itself bumped per release) when ASC_
-          # VERSION_STRING is empty (manual workflow_dispatch case).
-          version_string = (os.environ.get("ASC_VERSION_STRING") or "").lstrip("v")
+          # ASC_VERSION_STRING via env (e.g. "v4.2.0"). Drop the leading "v"
+          # via `removeprefix` (Py 3.9+, exact single-occurrence strip — we
+          # don't want `lstrip("v")` which would eat any number of leading
+          # v's). Fall back to the build's own version (which xcodebuild
+          # stamps from the Marketing Version field — itself bumped per
+          # release) when ASC_VERSION_STRING is empty (manual
+          # workflow_dispatch case).
+          #
+          # Apple's versionString validator accepts only clean `X` or `X.Y`
+          # or `X.Y.Z` — pre-release suffixes like `4.2.0-rc.1` are rejected
+          # at the appStoreVersions POST with HTTP 409. The release tagger
+          # in this repo only cuts clean semver tags so this isn't a
+          # present issue, but if a future RC flow lands, the resolution
+          # below would need a stripping step.
+          version_string = (os.environ.get("ASC_VERSION_STRING") or "").removeprefix("v")
           if not version_string:
               version_string = build_version
           print(f"Target App Store versionString: {version_string}")

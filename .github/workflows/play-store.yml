@@ -112,11 +112,23 @@ jobs:
       # Tag pushes target BOTH internal AND production so internal testers (the
       # release author's phone, beta partners) get the clean release on their
       # device the moment the tag is pushed — instead of waiting 1-3 days for
-      # the Google review of the production track to complete. Each track
-      # uploads a SEPARATE AAB with a track-specific versionCode (base+offset)
-      # because Google Play's Edits API rejects re-uploads of the same
-      # versionCode to a second track. See the `Build release AAB` step for
-      # the offset table.
+      # the Google review of the production track to complete.
+      #
+      # ONE AAB is built and uploaded to the FIRST track in the matrix list
+      # (always 'internal' for tag pushes). Subsequent tracks ('production'
+      # for tag pushes) are populated via the Play Edits API PROMOTION
+      # endpoint — the SAME versionCode is added to a second track without
+      # re-uploading the AAB (Google Play rejects re-uploads of the same
+      # versionCode but cheerfully accepts promotions). See the publish job's
+      # "Promote internal release to ${{ matrix.track }}" step.
+      #
+      # Matrix list ORDER matters: 'internal' must be first so the upload
+      # completes before the promote runs. `max-parallel: 1` + the array
+      # order below is the only ordering guarantee — GitHub Actions doesn't
+      # spec matrix expansion order in writing, but empirically follows JSON
+      # array order. If GHA ever reorders, the promote step's "release not
+      # found" branch fails loudly with a clear message rather than silently
+      # mis-deploying.
       - name: Compute target tracks
         id: tracks
         run: |
@@ -300,9 +312,12 @@ jobs:
                   "status": "completed",
                   "releaseNotes": hit.get("releaseNotes", []),
               }
+              # The target track name is in the URL path; including it
+              # in the body too is redundant but accepted by the API.
+              # Dropping it keeps the request minimal.
               r = sess.put(
                   f"{BASE}/edits/{edit_id}/tracks/{TARGET}",
-                  json={"track": TARGET, "releases": [promoted]},
+                  json={"releases": [promoted]},
               )
               r.raise_for_status()
               print(f"[promote] target track {TARGET} now carries versionCode {CODE}")
