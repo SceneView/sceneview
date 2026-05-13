@@ -1,6 +1,6 @@
 # Changelog
 
-## v4.1.1 — Demo app recovery: Filament .filamat mismatch fixed + AR tab no longer crashes + Samples tab redesign (2026-05-13)
+## v4.1.2 — Demo app recovery: Filament .filamat mismatch fixed + AR tab no longer crashes + Samples tab redesign (2026-05-13)
 
 The v4.1.0 Play Store release shipped a demo app the author summarised as "très très nul":
 the AR View tab crashed the whole process on tab tap, the Samples tab was a plain 2018-era
