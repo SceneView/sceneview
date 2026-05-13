@@ -165,7 +165,23 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-13 evening, session upbeat-kare-a31ed4 — iOS parity v4.2.0-WIP sprint, post-restart)
+### Current state (last updated: 2026-05-14 night, session upbeat-kare-a31ed4 — v4.2.0 SHIPPED end-to-end + handoff for new session)
+
+- 🚀🚀 **v4.2.0 fully published** — Maven Central `<latest>4.2.0</latest>` (.pom HTTP/2 200), npm `sceneview-web@4.2.0` + `@sceneview-sdk/react-native@4.2.0`, Dokka API docs, [GitHub Release v4.2.0](https://github.com/sceneview/sceneview/releases/tag/v4.2.0) auto-populated, Play Store production track delivered. **First fully-green `release.yml` run** (all 7 jobs ✅) since the v4.1.0 saga — release.yml hardening #1002 worked end-to-end.
+- ✅ **iOS parity sprint major scope COMPLETE** ([umbrella #1004](https://github.com/sceneview/sceneview/issues/1004) ~75% done). v4.2.0 ships LightSlot + LightNode.fill + .mainLight/.fillLight (#1016), RenderQuality preset (#1018), onEntityTapped real entity hit-test + CameraNode.exposure docs (#1019, #928), NodeGesture wire (#1024, #928), AnchorNode.image/.face/.body (#1025, #894 partial), iOS deep-link routing model-viewer + multi-model (#1020, closes #1015), reactive light update (#1031, closes #1017), AR sessionInterruption + LightNode.spot innerAngle clamp (#1013, #928).
+- 🔵 **5 v4.3.0 follow-up issues filed at handoff**: [#1032 ARRecorder via ReplayKit](https://github.com/sceneview/sceneview/issues/1032), [#1033 sceneview-core XCFramework](https://github.com/sceneview/sceneview/issues/1033), [#1034 CameraControls.firstPerson + .pan port](https://github.com/sceneview/sceneview/issues/1034) (last #928 fixable), [#1035 ViewNode<Content> v5.0](https://github.com/sceneview/sceneview/issues/1035), [#1036 RealityKit-impossible APIs umbrella](https://github.com/sceneview/sceneview/issues/1036). Plus [#1026 camera framing](https://github.com/sceneview/sceneview/issues/1026#issuecomment-4445612584) with detailed design comment.
+- 📦 **Cumulative session stats (upbeat-kare-a31ed4 across 2 days)**: 32 PRs merged + 23 issues filed + 3 tags shipped (v4.1.0, v4.1.1, **v4.2.0**). Cool-wescoff shipped v4.1.2 in parallel.
+
+### Followups for next session
+
+Full pickup notes in `~/.claude/projects/-Users-thomasgorisse-Projects-sceneview/memory/handoff_2026-05-14_v4.2.0_shipped.md`. Recommended order:
+
+1. **[#1034 CameraControls.firstPerson + .pan port](https://github.com/sceneview/sceneview/issues/1034)** — last #928 fixable item, M/MED. Port math from Android `CameraGestureDetector.kt`.
+2. **[#1026 camera framing auto-center](https://github.com/sceneview/sceneview/issues/1026)** — biggest UX win. Detailed design in issue comment: intermediate `contentRoot` Entity + auto-center on first stable frame.
+3. **[#1032 ARRecorder ReplayKit](https://github.com/sceneview/sceneview/issues/1032)** OR **[#1033 sceneview-core XCFramework](https://github.com/sceneview/sceneview/issues/1033)** — pick based on AR-vs-animation audience priority.
+4. **Close [#1036 RealityKit-impossible umbrella](https://github.com/sceneview/sceneview/issues/1036)** by adding the parity table to `docs/docs/cheatsheet-ios.md`.
+
+### Previous state (last updated: 2026-05-13 evening, session upbeat-kare-a31ed4 — iOS parity v4.2.0-WIP sprint, post-restart)
 
 - 🚀 **iOS parity sprint shipping toward v4.2.0** ([umbrella #1004](https://github.com/sceneview/sceneview/issues/1004)). Cumulative today **15 PRs landed by upbeat-kare** + 7 PRs by cool-wescoff (v4.1.2 Android demo recovery). All on top of v4.1.2 (`50145a78` → +12 commits).
 - ✅ **iOS parity items shipped this evening (post-restart)**:
