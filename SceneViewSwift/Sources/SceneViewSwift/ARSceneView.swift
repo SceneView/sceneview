@@ -263,7 +263,13 @@ public struct ARSceneView: UIViewRepresentable {
             onTapOnPlane: onTapOnPlane,
             planeDetection: planeDetection,
             onImageDetected: onImageDetected,
-            onFrame: onFrame
+            onFrame: onFrame,
+            imageTrackingDatabase: imageTrackingDatabase,
+            // Mesh reconstruction is implicitly enabled in makeUIView when
+            // supported; mirror the flag here so it's re-applied after an
+            // interruption (closes part of #928).
+            enableMeshReconstruction: true,
+            environmentTexturing: .automatic
         )
     }
 
@@ -282,6 +288,14 @@ public struct ARSceneView: UIViewRepresentable {
         var onImageDetected: ((String, AnchorNode, ARView) -> Void)?
         var onFrame: ((ARFrame, ARView) -> Void)?
         var planeDetection: PlaneDetectionMode
+        // Tracking config that must survive an interruption — previously only
+        // `planeDetection` was preserved, so any image database / mesh recon /
+        // environment-texturing flag was lost the moment the user backgrounded
+        // the app and returned. Closes part of #928. The full set is re-applied
+        // in `sessionInterruptionEnded(_:)` below.
+        var imageTrackingDatabase: Set<ARReferenceImage>?
+        var enableMeshReconstruction: Bool = true
+        var environmentTexturing: ARWorldTrackingConfiguration.EnvironmentTexturing = .automatic
         weak var arView: ARView?
         private var detectedImageNames: Set<String> = []
 
@@ -289,12 +303,18 @@ public struct ARSceneView: UIViewRepresentable {
             onTapOnPlane: ((SIMD3<Float>, ARView) -> Void)?,
             planeDetection: PlaneDetectionMode,
             onImageDetected: ((String, AnchorNode, ARView) -> Void)? = nil,
-            onFrame: ((ARFrame, ARView) -> Void)? = nil
+            onFrame: ((ARFrame, ARView) -> Void)? = nil,
+            imageTrackingDatabase: Set<ARReferenceImage>? = nil,
+            enableMeshReconstruction: Bool = true,
+            environmentTexturing: ARWorldTrackingConfiguration.EnvironmentTexturing = .automatic
         ) {
             self.onTapOnPlane = onTapOnPlane
             self.planeDetection = planeDetection
             self.onImageDetected = onImageDetected
             self.onFrame = onFrame
+            self.imageTrackingDatabase = imageTrackingDatabase
+            self.enableMeshReconstruction = enableMeshReconstruction
+            self.environmentTexturing = environmentTexturing
         }
 
         @objc func handleTap(_ recognizer: UITapGestureRecognizer) {
@@ -348,12 +368,27 @@ public struct ARSceneView: UIViewRepresentable {
         }
 
         public func sessionInterruptionEnded(_ session: ARSession) {
-            print("[SceneViewSwift] AR session interruption ended — resuming")
-            // Re-run session with the original config
+            print("[SceneViewSwift] AR session interruption ended — resuming with full config")
+            // Re-apply the FULL tracking configuration that was active before the
+            // interruption — previously only `planeDetection` survived, so consumers
+            // doing image tracking / mesh reconstruction / non-default environment
+            // texturing lost those features on every background→foreground cycle.
+            // Closes part of #928 (ARSceneView.sessionInterruptionEnded silent stub).
             let config = ARWorldTrackingConfiguration()
             config.planeDetection = planeDetection.arPlaneDetection
-            config.environmentTexturing = .automatic
-            // Reset detected images so they can be re-detected after interruption
+            config.environmentTexturing = environmentTexturing
+            if let images = imageTrackingDatabase, !images.isEmpty {
+                config.detectionImages = images
+                config.maximumNumberOfTrackedImages = images.count
+            }
+            if enableMeshReconstruction,
+               ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+                config.sceneReconstruction = .mesh
+            }
+            // Reset detected images so they can be re-detected after interruption.
+            // (The anchors themselves are kept — we don't pass .removeExistingAnchors
+            // here because the user's content + AnchorEntity references remain valid
+            // across an interruption per Apple's ARKit guide.)
             detectedImageNames.removeAll()
             session.run(config)
         }
