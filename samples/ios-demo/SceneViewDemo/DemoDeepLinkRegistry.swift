@@ -66,6 +66,17 @@ enum DemoDeepLinkRegistry {
         case "image":         ImageDemo()
         case "animation":     AnimationDemo()
 
+        // Android has dedicated `model-viewer` (single hero model, orbit camera)
+        // and `multi-model` (multiple models on a tabletop) demos. iOS doesn't
+        // have 1:1 ports — the Sketchfab Explore tab IS the canonical iOS
+        // model-viewer experience, but it's a Tab in the main TabView, not a
+        // standalone View we can present modally from a sheet. Route both ids
+        // to SceneGalleryDemo so the user lands on real 3D content (multiple
+        // shapes in a composed scene) instead of the "Coming soon" placeholder
+        // they would otherwise hit. Closes #1015.
+        case "model-viewer":  SceneGalleryDemo()
+        case "multi-model":   SceneGalleryDemo()
+
         // Lighting + effects.
         case "lighting":      LightingDemo()
         case "movable-light": MovableLightDemo()
