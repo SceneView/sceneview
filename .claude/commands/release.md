@@ -134,6 +134,34 @@ Wait 5-10 minutes, then run `/publish-check` to verify all artifacts are live:
 - GitHub Release with APKs attached
 - SPM tag available
 
+## Step 9.5: Verify the GitHub Release body matches CHANGELOG.md
+
+**`release.yml` extracts the `## vX.Y.Z — …` section from `CHANGELOG.md` and
+publishes it as the GitHub Release body.** Browse to
+`https://github.com/sceneview/sceneview/releases/tag/vX.Y.Z` and confirm:
+
+- Title `## vX.Y.Z — <thematic summary> (YYYY-MM-DD)` is rendered
+- Themed sections (`### Added`, `### Fixed`, `### Changed`, …) are present
+- A `BREAKING` block appears at the top if the release introduces breaking changes
+- `**Full Changelog**: …` link at the bottom
+
+If the release accidentally shipped the auto-generated `What's Changed → Other
+Changes` PR list (no `## vX.Y.Z` section was in CHANGELOG.md at tag time, or
+the workflow fell back), repair it manually:
+
+```bash
+VERSION=X.Y.Z
+awk -v ver="## v$VERSION" '
+  $0 ~ "^"ver"( |$)"  { found=1; print; next }
+  found && /^## v[0-9]/ { exit }
+  found                 { print }
+' CHANGELOG.md | gh release edit "v$VERSION" --notes-file -
+```
+
+The hand-written narrative is the project's release-note standard (see
+v4.0.9 / v4.1.0 for the reference quality). Never leave a release on the bare
+auto-generated list.
+
 ## Step 10: Post-release
 
 1. Update the deployed website (sceneview.github.io) if needed
