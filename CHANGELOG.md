@@ -1,5 +1,83 @@
 # Changelog
 
+## v4.1.1 — Demo app recovery: Filament .filamat mismatch fixed + AR tab no longer crashes + Samples tab redesign (2026-05-13)
+
+The v4.1.0 Play Store release shipped a demo app the author summarised as "très très nul":
+the AR View tab crashed the whole process on tab tap, the Samples tab was a plain 2018-era
+text list, and 10 of the 24 non-AR demos consistently crashed with a libfilament-jni.so
+`TPanic<PostconditionPanic>` SIGABRT. This release fixes all three.
+
+### Fixed — libfilament `TPanic<PostconditionPanic>` cascade (closes the v4.1.0 crash wave)
+
+The bundled `.filamat` material binaries in `sceneview/src/main/assets/materials/` had been
+recompiled with `matc 1.71` (commit `efd296f1`), but the Filament runtime was pinned back
+to `1.70.2` (commit `4a31b579`, PR #961) without recompiling the blobs. Filament 1.70.2
+silently *loaded* the 1.71 blobs and then panicked the moment a demo bound a sampler or
+uniform descriptor against the new layout — taking the whole process with it.
+
+- Reverted the 10 sampler-bearing `.filamat` to the pre-`efd296f1` snapshot
+  (`git checkout efd296f1~1 -- sceneview/src/main/assets/materials/`).
+- Recompiled the two newer `opaque_unlit_colored.filamat` + `transparent_unlit_colored.filamat`
+  with `matc 1.70.2` from the upstream `v1.70.2` release tarball so they match the runtime.
+- Verified on a Pixel_7a `-gpu host` emulator: **25 / 25 non-AR demos now pass** (was 14 / 25
+  in the v4.1.0 audit). Previously crashing: `lighting`, `movable-light`, `fog`, `environment`,
+  `text`, `lines-paths`, `image`, `billboard`, `view-node`, `debug-overlay` — all now render.
+
+### Fixed — AR View tab no longer kills the app
+
+Tapping the AR View tab on v4.1.0 unconditionally instantiated a live `ARSceneView`. On
+devices without ARCore Services installed (and on emulators) the ARCore session creation
+crashed Filament with the same `TPanic` signature.
+
+- New launcher screen gates the live `ARSceneView` behind an explicit "Start AR Camera"
+  CTA, with an `ArCoreApk.checkAvailability()` status pill and a 2×3 grid of the six
+  headline AR demos visible immediately.
+- `runCatching` around `checkAvailability` so it can't silently die on OEMs without Play
+  Services. CTA is hard-disabled on `UNSUPPORTED_DEVICE_NOT_CAPABLE` / `UNKNOWN_*` so the
+  user never re-enters the panic path.
+- Top-right exit button on the live AR view detaches every anchor and flips back to the
+  launcher — no more no-affordance dead end.
+- `sessionStarted` is now `rememberSaveable` so process death doesn't dump users back to
+  the launcher needlessly.
+
+### Changed — Samples tab redesign (Material 3 Expressive grid)
+
+Replaces the plain `ListItem` text list with a 2-column M3 Expressive grid. Each card has
+a compact accent-tinted icon tile (36% of card height — title and subtitle remain the
+visual anchors) plus a semantic Material icon picked per demo. Categories carry distinct
+accent hues (3D Basics purple, Lighting amber, Content blue, Interaction pink, Advanced
+teal, AR green) so users can scan the grid by colour at a glance. Visual reference:
+Sketchfab mobile + Polycam + Reality Composer launchers.
+
+- `DemoEntry` now carries `icon: ImageVector` and `status: DemoStatus`
+  (`Working` / `KnownIssue` / `ComingSoon`). Non-Working demos surface an outlined
+  "Preview" / "Soon" chip with an info icon — a calm honest signal, not a red alarm.
+- Dark-mode accent palette (`#6446CD` → `#B39DDB`, etc.) keeps the tinted icon tiles
+  legible on M3 dark `surfaceContainer` instead of burning at >9:1 contrast.
+- `LargeTopAppBar` scroll behaviour wraps `rememberTopAppBarState()` so the collapse
+  offset survives recomposition + rotation.
+- Grid item keys namespaced `"demo-${id}"` to guard against id collisions.
+
+### Changed — Explore tab polish
+
+- Dropped the dev-flavored "Set SKETCHFAB_API_KEY (env or local.properties)" placeholder
+  that leaked to end-user Play Store builds when the API key was missing. The Sketchfab
+  carousels now silently fall through to the "Try a sample" carousel + categories.
+- `SampleCard` rebuilt with the same accent-tinted icon-tile layout as the Samples grid
+  so both tabs feel like one product.
+- `FeedSection` self-hides when its Sketchfab feed is empty and not loading — no more
+  three "Nothing here yet." headers stacked under each other in the offline path.
+- Dropped the red "Couldn't reach Sketchfab" banner. The empty self-hide already conveys
+  the offline state without dev-flavored copy.
+
+### Other
+
+- `feedback_stitch_mandatory.md` memory rule rewritten to drop Google Stitch as the
+  mandated UI source — reference-driven (Sketchfab mobile / Polycam / Reality Composer)
+  + `DESIGN.md` tokens is the new SceneView demo workflow.
+- Local Sketchfab API key support in `local.properties` for developer builds (CI is
+  unchanged; release builds still source the key from the GitHub Secret).
+
 ## v4.1.0 — iOS V1 honest + Android rendering uplift + Sketchfab streaming + Claude Code plugin marketplace (2026-05-11)
 
 ### ⚠️ BREAKING — Android render defaults change visual look out-of-the-box
