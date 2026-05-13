@@ -67,9 +67,14 @@ public struct SceneView: View {
     // Light slot overrides — read once during scene setup. Defaults to `.systemDefault`
     // which provisions Android-parity 10 000-lux main + 3 000-lux fill (matches the
     // v4.1.0 BREAKING render-defaults change on Android, finally reaching iOS in v4.2.0).
-    // Reactive replacement is tracked as a follow-up issue.
+    // Reactive replacement is tracked as a follow-up issue (#1017).
     var mainLightSlot: LightSlot = .systemDefault
     var fillLightSlot: LightSlot = .systemDefault
+
+    // Render-quality preset — applied after scene setup to toggle shadows + IBL
+    // intensity per-tier. Mirrors Android's `RenderQuality` enum (`#1004`).
+    // Default `.default` preserves the scene's loaded settings.
+    var renderQualityPreset: RenderQuality = .default
 
     /// Creates a 3D scene with imperative content setup.
     ///
@@ -109,7 +114,8 @@ public struct SceneView: View {
             enableAutoRotate: enableAutoRotate,
             autoRotateSpeed: autoRotateSpeed,
             mainLightSlot: mainLightSlot,
-            fillLightSlot: fillLightSlot
+            fillLightSlot: fillLightSlot,
+            renderQualityPreset: renderQualityPreset
         )
     }
 
@@ -193,6 +199,33 @@ public struct SceneView: View {
         copy.fillLightSlot = slot
         return copy
     }
+
+    /// Applies a coherent set of rendering-quality defaults via a single preset.
+    ///
+    /// Mirrors Android's `SceneView(renderQuality = ...)` composable parameter and
+    /// `View.applyRenderQuality(...)` extension (`RenderQuality.kt`). Choose:
+    ///
+    /// - ``RenderQuality/cinematic`` — hero shots, product viewers (full shadow distance, IBL ≥ 1.0).
+    /// - ``RenderQuality/default`` — out-of-the-box balanced setup (preserves loaded settings).
+    /// - ``RenderQuality/performance`` — low-end / AR camera-feed (drops shadows, halves IBL).
+    ///
+    /// See ``RenderQuality`` for the iOS↔Android parity table — RealityKit's render-options
+    /// API is narrower than Filament's so the iOS preset honours what RealityKit exposes
+    /// (per-light shadow toggle + IBL intensity exponent) and documents the gaps for
+    /// SSAO / MSAA / HDR-buffer-quality / bloom strength which RealityKit does not expose.
+    ///
+    /// ```swift
+    /// SceneView { /* ... */ }
+    ///   .renderQuality(.cinematic)         // full key+fill+shadow, bright IBL
+    ///
+    /// SceneView { /* ... */ }
+    ///   .renderQuality(.performance)       // shadows off, IBL halved
+    /// ```
+    public func renderQuality(_ preset: RenderQuality) -> SceneView {
+        var copy = self
+        copy.renderQualityPreset = preset
+        return copy
+    }
 }
 
 // MARK: - Scene entities holder
@@ -218,6 +251,7 @@ private struct SceneViewRepresentation: View {
     let autoRotateSpeed: Float
     let mainLightSlot: LightSlot
     let fillLightSlot: LightSlot
+    let renderQualityPreset: RenderQuality
 
     @State private var camera = CameraControls(mode: .orbit)
     @StateObject private var entities = SceneEntities()
@@ -301,6 +335,8 @@ private struct SceneViewRepresentation: View {
         // Main / key directional light slot. Defaults to Android-parity 10 000 lux
         // pointing straight down with shadow casting — matches the v4.1.0 BREAKING
         // render-defaults change that finally reaches iOS in v4.2.0.
+        // Lights are added as children of `entities.root` so `applyRenderQuality(...)`
+        // can walk-and-tune them later in this same setup pass.
         switch mainLightSlot {
         case .systemDefault:
             let main = LightNode.directional(
@@ -312,11 +348,11 @@ private struct SceneViewRepresentation: View {
             // origin from above so the light points straight down (Android default
             // direction `(0, -1, 0)`).
             main.entity.look(at: .zero, from: [0, 1, 0], relativeTo: nil)
-            realityContent.add(main.entity)
+            entities.root.addChild(main.entity)
         case .disabled:
             break
         case .custom(let node):
-            realityContent.add(node.entity)
+            entities.root.addChild(node.entity)
         }
 
         // Fill light slot. Defaults to LightNode.fill() at 3 000 lux from the canonical
@@ -330,15 +366,26 @@ private struct SceneViewRepresentation: View {
             // entity at the opposite point and look at origin so emission lands on the
             // shadow side of objects centered at world origin.
             fill.entity.look(at: .zero, from: [-0.5, 0.5, -0.5], relativeTo: nil)
-            realityContent.add(fill.entity)
+            entities.root.addChild(fill.entity)
         case .disabled:
             break
         case .custom(let node):
-            realityContent.add(node.entity)
+            entities.root.addChild(node.entity)
         }
 
         // Populate user content
         content(entities.root)
+
+        // Apply RenderQuality preset to all directional lights + the IBL receiver entity.
+        // Runs AFTER lights + content are added so the preset walks the full scene tree.
+        // Cinematic bumps shadow distance + ensures IBL ≥ 1.0; Performance drops shadows
+        // + halves IBL. Default preserves whatever the scene loaded. Mirrors Android's
+        // `View.applyRenderQuality(RenderQuality.X)` pattern (#1004).
+        _ = applyRenderQuality(
+            renderQualityPreset,
+            to: entities.root,
+            iblReceiver: entities.ibl
+        )
     }
     #endif
 
