@@ -66,6 +66,29 @@ ARSceneView(
 .onSessionStarted { arView in }       // called when AR session begins
 ```
 
+## ARRecorder (v4.3.0+, record-only)
+
+```swift
+@StateObject private var recorder = ARRecorder()
+
+Button(recorder.isRecording ? "Stop" : "Record") {
+    Task {
+        if recorder.isRecording {
+            let url = try await recorder.stopRecording()
+            // url → MP4 in NSTemporaryDirectory(); move to PHPhotoLibrary to keep
+        } else {
+            try await recorder.startRecording()
+        }
+    }
+}
+```
+
+iOS port of Android `ARRecorder`. Uses ReplayKit's `RPScreenRecorder` to
+capture screen pixels (NOT an ARKit session dataset). The MP4 plays back
+in Photos / QuickTime; it **cannot** be replayed into `ARSession` (ARKit
+has no deterministic playback API — replay stays Android-only). See the
+parity table below.
+
 ---
 
 ## Node Types — 3D
