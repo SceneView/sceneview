@@ -18,13 +18,21 @@ export interface ModelNode {
 }
 /** A procedural geometry node (box, sphere, cylinder, plane). */
 export interface GeometryNode {
-    type: 'box' | 'sphere' | 'cylinder' | 'plane';
+    type: 'box' | 'cube' | 'sphere' | 'cylinder' | 'plane';
     size?: [number, number, number];
     position?: [number, number, number];
     rotation?: [number, number, number];
     scale?: number | [number, number, number];
     /** Hex color string, e.g. "#FF5500". */
     color?: string;
+    /**
+     * When `true` the material ignores all scene lighting (no PBR shading,
+     * no IBL, no shadows) and renders the flat [color] straight to the
+     * framebuffer. Use for HUD overlays, gizmos, axes, lines, or AR face/body
+     * meshes — anywhere lighting would fight the use case. Defaults to `false`
+     * (lit PBR).
+     */
+    unlit?: boolean;
 }
 /** A light source in the scene. */
 export interface LightNode {
