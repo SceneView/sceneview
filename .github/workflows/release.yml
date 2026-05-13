@@ -398,7 +398,34 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Extract the matching `## vX.Y.Z — …` section from CHANGELOG.md so the
+      # GitHub Release body matches the hand-written narrative we maintain in
+      # the repo (single source of truth). Bare `generate_release_notes: true`
+      # produces a flat "What's Changed → Other Changes" PR list because PRs
+      # rarely carry the labels declared in `.github/release.yml`, which is
+      # below the project's release-note quality standard (see v4.0.9 / v4.1.0
+      # for the reference format). If the CHANGELOG section is missing we
+      # fall back to the auto-generator so the release still ships.
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          awk -v ver="## v$VERSION" '
+            $0 ~ "^"ver"( |$)"  { found=1; print; next }
+            found && /^## v[0-9]/ { exit }
+            found                 { print }
+          ' CHANGELOG.md > release-notes.md || true
+          if [ -s release-notes.md ]; then
+            echo "extracted=true" >> "$GITHUB_OUTPUT"
+            echo "Extracted $(wc -l < release-notes.md) lines for v$VERSION from CHANGELOG.md"
+          else
+            echo "extracted=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No '## v$VERSION' section in CHANGELOG.md — falling back to auto-generated PR list"
+          fi
+
       - uses: softprops/action-gh-release@v3
         with:
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.extracted == 'true' && 'release-notes.md' || '' }}
+          generate_release_notes: ${{ steps.notes.outputs.extracted != 'true' }}
           make_latest: true
