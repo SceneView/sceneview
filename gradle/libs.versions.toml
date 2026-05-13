@@ -17,7 +17,7 @@ navigationCompose = "2.9.7"
 lifecycleRuntimeCompose = "2.10.0"
 
 # Kotlin Libraries
-coroutines = "1.10.2"
+coroutines = "1.11.0"
 kotlinMath = "1.8.0"
 
 # 3D / AR
