@@ -93,6 +93,13 @@ public struct SceneView: View {
     // Default `.default` preserves the scene's loaded settings.
     var renderQualityPreset: RenderQuality = .default
 
+    // Auto-centre user content the first frame the bounds are non-empty so
+    // demos placing objects at e.g. `z = -2` show up visually centred in
+    // the viewport. Mirrors Android's per-demo `ModelNode(centerOrigin: …)`
+    // pattern but at the library level. Default `true`; opt out via
+    // `.autoCenterContent(false)`. Closes #1026.
+    var autoCenterContentEnabled: Bool = true
+
     /// Creates a 3D scene with imperative content setup.
     ///
     /// - Parameter content: A closure that populates the scene. Receives a root
@@ -132,7 +139,8 @@ public struct SceneView: View {
             autoRotateSpeed: autoRotateSpeed,
             mainLightSlot: mainLightSlot,
             fillLightSlot: fillLightSlot,
-            renderQualityPreset: renderQualityPreset
+            renderQualityPreset: renderQualityPreset,
+            autoCenterContentEnabled: autoCenterContentEnabled
         )
     }
 
@@ -243,6 +251,30 @@ public struct SceneView: View {
         copy.renderQualityPreset = preset
         return copy
     }
+
+    /// Controls whether the library translates the user-content root entity
+    /// so its centroid lands at the orbit pivot on the first frame the
+    /// scene's `visualBounds` is non-empty. Default `true`. Closes #1026.
+    ///
+    /// Pass `false` for scenes that rely on intentional off-centre
+    /// placement (e.g. carousels, narrative dioramas, story-mode demos
+    /// where the camera is meant to look down on content placed below).
+    /// All existing demos and code that previously called
+    /// `ModelNode(centerOrigin: …)` work either way — the centring is
+    /// idempotent and reverses an off-centre placement to origin.
+    ///
+    /// ```swift
+    /// SceneView { root in
+    ///     // Hero piece placed deliberately off-centre for a horizon-line shot
+    ///     root.addChild(model.entity)
+    /// }
+    /// .autoCenterContent(false)
+    /// ```
+    public func autoCenterContent(_ enabled: Bool) -> SceneView {
+        var copy = self
+        copy.autoCenterContentEnabled = enabled
+        return copy
+    }
 }
 
 // MARK: - Scene entities holder
@@ -252,7 +284,17 @@ public struct SceneView: View {
 /// or recreated across SwiftUI re-renders — critical because @State on a
 /// reference type does not guarantee identity stability in all SwiftUI versions.
 private final class SceneEntities: ObservableObject {
+    /// The orbit / scale pivot. Receives the camera-controls rotation and
+    /// scale every frame so the scene appears to orbit / zoom around its
+    /// origin. Lights are added here so the auto-centering translation
+    /// applied to ``contentRoot`` does not move them.
     let root = Entity()
+    /// Holds user-supplied content. Translated by the auto-center helper
+    /// on the first frame where ``Entity/visualBounds(relativeTo:)`` is
+    /// non-empty, so demos placing objects at e.g. `z = -2` show up
+    /// visually centred in the viewport without each demo having to
+    /// `centerOrigin` itself. Closes #1026.
+    let contentRoot = Entity()
     let ibl = Entity()
     #if os(iOS) || os(macOS)
     /// Holds the perspective camera so gesture handlers can mutate its
@@ -276,6 +318,11 @@ private struct SceneViewRepresentation: View {
     let mainLightSlot: LightSlot
     let fillLightSlot: LightSlot
     let renderQualityPreset: RenderQuality
+    /// When true (default), the first frame where the user content's
+    /// `visualBounds` is non-empty triggers a one-time translation of
+    /// `entities.contentRoot` so the scene's centroid lands at the orbit
+    /// pivot. Closes #1026.
+    let autoCenterContentEnabled: Bool
 
     @State private var camera = CameraControls(mode: .orbit)
     @StateObject private var entities = SceneEntities()
@@ -286,6 +333,11 @@ private struct SceneViewRepresentation: View {
     /// stays untouched. Closes #1034.
     @State private var initialPinchFov: Float? = nil
     @State private var isDragging = false
+
+    /// Set to `true` once ``refreshContentCentering()`` has translated
+    /// `entities.contentRoot` so subsequent frames are a cheap no-op.
+    /// Closes #1026.
+    @State private var didCenterContent = false
 
     // Reactive light-slot caches — compared in `update:` closure to detect when the
     // caller mutated `.mainLight(_:)` / `.fillLight(_:)` so the corresponding entity
@@ -345,6 +397,13 @@ private struct SceneViewRepresentation: View {
             // pattern in `Scene.kt:287-305` ported to iOS).
             refreshLightSlot(.main, slot: mainLightSlot)
             refreshLightSlot(.fill, slot: fillLightSlot)
+            // Auto-center user content the first frame where `visualBounds`
+            // becomes non-empty (i.e. async-loaded models have populated).
+            // No-op once centered; opt-out via `.autoCenterContent(false)`.
+            // Closes #1026.
+            if autoCenterContentEnabled {
+                refreshContentCentering()
+            }
         }
         #else
         // RealityView requires macOS 15.0+; fall back to a placeholder on older SDKs
@@ -380,6 +439,11 @@ private struct SceneViewRepresentation: View {
 
         // Root entity holds all user content
         realityContent.add(entities.root)
+        // Intermediate contentRoot — user content goes here so the
+        // auto-center pass (refreshContentCentering, called from the
+        // RealityView.update: closure) can translate it independently of
+        // lights, IBL, and camera. Closes #1026.
+        entities.root.addChild(entities.contentRoot)
 
         // IBL entity (will be configured when environment loads)
         realityContent.add(entities.ibl)
@@ -393,8 +457,11 @@ private struct SceneViewRepresentation: View {
         appliedMainSlot = mainLightSlot
         appliedFillSlot = fillLightSlot
 
-        // Populate user content
-        content(entities.root)
+        // Populate user content. Goes into `contentRoot` (a child of root)
+        // instead of `root` directly so the auto-center translation in
+        // `refreshContentCentering()` only affects user content, not the
+        // lights provisioned just above.
+        content(entities.contentRoot)
 
         // Apply RenderQuality preset to all directional lights + the IBL receiver entity.
         // Runs AFTER lights + content are added so the preset walks the full scene tree.
@@ -482,6 +549,37 @@ private struct SceneViewRepresentation: View {
         } else {
             appliedFillSlot = slot
         }
+    }
+
+    // MARK: - Auto-center content (#1026)
+
+    /// Translates ``SceneEntities/contentRoot`` so the centroid of its
+    /// `visualBounds` lands at the parent (`entities.root`) origin. Runs
+    /// once on the first frame the bounds are non-empty — most async
+    /// model loads complete within a handful of frames after `setupScene`.
+    ///
+    /// Without this, iOS demos placing content at e.g. `z = -2` render
+    /// in the bottom-third of the viewport: the default perspective
+    /// camera at `[0, 0.3, 2]` looks at world origin, but content is far
+    /// from origin. Android achieves the same effect via the per-demo
+    /// `ModelNode(centerOrigin = …)` parameter; iOS now does it at the
+    /// library level so every demo benefits without per-demo plumbing.
+    ///
+    /// Opt-out via ``SceneView/autoCenterContent(_:)`` for scenes that
+    /// rely on intentional off-centre placement.
+    @MainActor
+    private func refreshContentCentering() {
+        guard !didCenterContent else { return }
+        let bounds = entities.contentRoot.visualBounds(relativeTo: entities.root)
+        let extents = bounds.extents
+        // Skip empty / degenerate bounds — async loads not done yet.
+        // `BoundingBox` defaults to (.init(repeating: -.infinity), .init(repeating: .infinity))
+        // for empty entities; the resulting extents are NaN/Inf.
+        guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite else { return }
+        let extentMax = max(extents.x, extents.y, extents.z)
+        guard extentMax > 0.001 else { return }
+        entities.contentRoot.position = -bounds.center
+        didCenterContent = true
     }
 
     // MARK: - Environment IBL
