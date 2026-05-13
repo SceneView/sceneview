@@ -321,6 +321,35 @@ model?.stopAllAnimations()
 
 ---
 
+## RealityKit-impossible APIs — parity gaps (#1036)
+
+A handful of Android APIs cannot be implemented on iOS because RealityKit
+does not expose the underlying feature. They stay deprecated with a clear
+redirect to a working alternative — `@available(*, deprecated, message: …)`
+fires at call site so consumers see the right path. This table is the
+canonical reference; consult it before re-attacking a deprecated API as if
+it were a silent stub.
+
+| Symbol | Why iOS can't | Working alternative |
+|---|---|---|
+| `LightNode.shadowColor(_:)` | `DirectionalLightComponent.Shadow` has no `color` property | Use `castsShadow(_:)` + `shadowMaximumDistance(_:)` |
+| `CustomMaterial.subsurface(...)` | RealityKit has no subsurface scattering | Approximate with `metallic` + `roughness` PBR tuning |
+| `ReflectionProbeNode.box(...) / .sphere(...)` (volumetric) | `ImageBasedLightReceiverComponent` is unbounded — no volume | Use a single global IBL via `SceneView.environment(...)` |
+| `FogNode.linear / .exponential / .heightBased` | RealityKit has no fog | Single fog mode kept; variant deprecated |
+| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | iOS gets record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
+| `SurfaceType.texture` | RealityKit always renders to `MTKView` | N/A — no port needed |
+| `CameraNode.depthOfField(focusDistance:aperture:)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process required (out of scope) |
+| `CameraNode.exposure(_:)` | `PerspectiveCameraComponent` has no `exposureCompensation` (verified Xcode 26.x compile failure in #1019) | `ARSceneView(cameraExposure:)` for AR; `SceneView.renderQuality(_:)` to tune IBL for 3D |
+| `StreetscapeGeometry` | ARGeoTrackingConfiguration exists but no mesh equivalent of ARCore's | iOS-skip with doc warning |
+| `TerrainAnchor / RooftopAnchor` (geo-anchored to terrain or rooftop) | `ARGeoAnchor` only does ground; rooftop has no ARKit equivalent | iOS-skip with doc warning |
+
+**Why this matters for AI assistants:** when generating SceneViewSwift code,
+treat the symbols in the left column as deprecated-only. Suggesting them
+will surface a compile-time warning and the alternative listed in the
+right column is always available, type-safe, and ships in the same module.
+
+---
+
 ## Android
 
 Building for Android with Jetpack Compose? See the [Android API Cheatsheet](cheatsheet.md).

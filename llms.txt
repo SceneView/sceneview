@@ -2352,15 +2352,27 @@ video.play() / .pause() / .stop() / .seek(to: 30.0) / .volume(0.5)
 CameraNode().position(.init(x: 0, y: 1.5, z: 3)).lookAt(.zero).fieldOfView(60)
 ```
 
-**iOS deprecations (v4.0.10+ — RealityKit-incompatible, no-op):**
+**iOS deprecations — RealityKit-impossible parity gaps (#1036):**
 
-| Deprecated | Replacement |
-|---|---|
-| `CameraNode.depthOfField(...)` | Use `.cameraControls(.cinematic)` or attach `DepthOfFieldEffect` via the underlying `ARView.cameraMode` — RealityKit lacks per-camera DoF. |
-| `CameraNode.exposure(_:)` | Use `ARSceneView(cameraExposure:)` (AR) or `.environment(...)` intensity (3D). |
-| `LightNode.shadowColor(_:)` | Removed — RealityKit shadow color is fixed. Tune ambient/IBL tint via `SceneEnvironment.custom(...)` instead. |
+Full canonical table lives in `docs/docs/cheatsheet-ios.md` — these symbols cannot
+be implemented on iOS because RealityKit does not expose the underlying feature.
+They compile with `@available(*, deprecated, message: …)` so the call site warns
+the consumer and the alternative is always available, type-safe, and in the same module.
 
-These three modifiers compile with a `@available(*, deprecated)` warning and silently no-op at runtime. Migrate before the v4.1 hard removal.
+| Deprecated | Why iOS can't | Replacement |
+|---|---|---|
+| `CameraNode.depthOfField(...)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process (out of scope) |
+| `CameraNode.exposure(_:)` | `PerspectiveCameraComponent` has no `exposureCompensation` (verified Xcode 26.x build) | `ARSceneView(cameraExposure:)` (AR) or `.renderQuality(_:)` IBL tune (3D) |
+| `LightNode.shadowColor(_:)` | `DirectionalLightComponent.Shadow` has no `color` property | `.castsShadow(_:)` + `.shadowMaximumDistance(_:)` |
+| `CustomMaterial.subsurface(...)` | No subsurface scattering in RealityKit | Approximate via `metallic` + `roughness` PBR tuning |
+| `ReflectionProbeNode.box(...) / .sphere(...)` (volumetric) | `ImageBasedLightReceiverComponent` is unbounded — no volume | Single global IBL via `SceneView.environment(...)` |
+| `FogNode.linear / .exponential / .heightBased` | RealityKit has no fog | Single fog mode kept; variant deprecated |
+| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
+| `SurfaceType.texture` | RealityKit always renders to `MTKView` | N/A — no port needed |
+| `StreetscapeGeometry` | ARGeoTrackingConfiguration has no mesh equivalent of ARCore | iOS-skip with doc warning |
+| `TerrainAnchor / RooftopAnchor` | `ARGeoAnchor` only does ground; rooftop has no ARKit equivalent | iOS-skip with doc warning |
+
+These modifiers compile with deprecation warnings and silently no-op at runtime; do not regenerate code that calls them.
 
 **PhysicsNode** — rigid body:
 ```swift
