@@ -14,10 +14,20 @@ name: Deploy iOS App to App Store
 on:
   push:
     branches: [main]
+    tags: ['v*']
+    # The `paths` filter applies to BOTH branch and tag pushes — i.e. a tag
+    # push must also touch one of these paths to trigger. Every release
+    # commit in this repo bumps `gradle.properties:VERSION_NAME` and adds an
+    # entry to `CHANGELOG.md` (per the Version Location Map in CLAUDE.md), so
+    # those two paths act as a "release commit always touches at least one
+    # of these" anchor that guarantees every clean release tag fires the
+    # workflow even if the iOS source itself didn't change in that PR.
     paths:
       - 'SceneViewSwift/**'
       - 'samples/ios-demo/**'
       - '.github/workflows/app-store.yml'
+      - 'gradle.properties'
+      - 'CHANGELOG.md'
   workflow_dispatch:
     inputs:
       submit_for_review:
@@ -201,10 +211,28 @@ jobs:
             -authenticationKeyIssuerID $APP_STORE_CONNECT_API_ISSUER_ID
 
       - name: Submit build for App Store review
-        if: github.event_name == 'workflow_dispatch' && inputs.submit_for_review == 'true'
+        # Auto-submit on:
+        #   - explicit workflow_dispatch with submit_for_review=true (legacy
+        #     manual gate)
+        #   - tag push starting with `v` (new — aligns with Android
+        #     play-store.yml's tag-push behaviour that auto-publishes to
+        #     production track + matches the implicit "tag = release"
+        #     semantics across the whole repo)
+        #
+        # Branch pushes to `main` still upload to TestFlight only — Apple
+        # review-submission is reserved for explicit release tags.
+        if: |
+          (github.event_name == 'workflow_dispatch' && inputs.submit_for_review == 'true') ||
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          # versionString for the App Store record. For a tag push we read it
+          # from the tag name (`refs/tags/v4.2.0` → `4.2.0`); otherwise we fall
+          # back to the SDK version declared in `gradle.properties` so manual
+          # workflow_dispatch from main still picks the latest committed
+          # version instead of a stale hardcoded constant.
+          ASC_VERSION_STRING: ${{ startsWith(github.ref, 'refs/tags/v') && format('{0}', github.ref_name) || '' }}
         run: |
           python3 -m venv $RUNNER_TEMP/asc-venv
           $RUNNER_TEMP/asc-venv/bin/pip install "PyJWT[crypto]" requests --quiet
@@ -249,24 +277,52 @@ jobs:
           build_version = builds[0]["attributes"]["version"]
           print(f"Latest build: {build_version} (ID: {build_id})")
 
+          # Resolve the App Store version string. Tag pushes set
+          # ASC_VERSION_STRING via env (e.g. "v4.2.0"). Drop the leading "v"
+          # via `removeprefix` (Py 3.9+, exact single-occurrence strip — we
+          # don't want `lstrip("v")` which would eat any number of leading
+          # v's). Fall back to the build's own version (which xcodebuild
+          # stamps from the Marketing Version field — itself bumped per
+          # release) when ASC_VERSION_STRING is empty (manual
+          # workflow_dispatch case).
+          #
+          # Apple's versionString validator accepts only clean `X` or `X.Y`
+          # or `X.Y.Z` — pre-release suffixes like `4.2.0-rc.1` are rejected
+          # at the appStoreVersions POST with HTTP 409. The release tagger
+          # in this repo only cuts clean semver tags so this isn't a
+          # present issue, but if a future RC flow lands, the resolution
+          # below would need a stripping step.
+          version_string = (os.environ.get("ASC_VERSION_STRING") or "").removeprefix("v")
+          if not version_string:
+              version_string = build_version
+          print(f"Target App Store versionString: {version_string}")
+
           # 3. Get or create the app store version
           r = requests.get(f"{BASE}/apps/{app_id}/appStoreVersions?filter[appStoreState]=PREPARE_FOR_SUBMISSION,READY_FOR_REVIEW", headers=headers)
           versions = r.json().get("data", [])
-          if versions:
-              version_id = versions[0]["id"]
-              print(f"Using existing version: {version_id}")
-          else:
+          # Pick a version record that already targets our versionString,
+          # otherwise fall back to the first editable one if any, otherwise
+          # create a new record. Picking by versionString avoids the
+          # previously-hardcoded "4.0.3" trap where any unrelated editable
+          # version would get hijacked for an unrelated build.
+          version_id = None
+          for v in versions:
+              if v.get("attributes", {}).get("versionString") == version_string:
+                  version_id = v["id"]
+                  print(f"Using matching version record: {version_id}")
+                  break
+          if not version_id:
               payload = {
                   "data": {
                       "type": "appStoreVersions",
-                      "attributes": {"platform": "IOS", "versionString": "4.0.3"},
+                      "attributes": {"platform": "IOS", "versionString": version_string},
                       "relationships": {"app": {"data": {"type": "apps", "id": app_id}}}
                   }
               }
               r = requests.post(f"{BASE}/appStoreVersions", headers=headers, json=payload)
               r.raise_for_status()
               version_id = r.json()["data"]["id"]
-              print(f"Created new version: {version_id}")
+              print(f"Created new version record: {version_id} ({version_string})")
 
           # 4. Attach the build to the version
           payload = {"data": {"type": "builds", "id": build_id}}
