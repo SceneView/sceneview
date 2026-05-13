@@ -161,9 +161,13 @@ fun ExploreTabScreen(
             }
         }
 
-        if (SketchfabConfig.apiKey == null) {
-            ApiKeyMissingNotice()
-        } else {
+        // The Sketchfab carousels are only rendered when the API key is wired
+        // in via gradle.properties / CI secret. On end-user Play Store builds
+        // the key is always present (see release.yml). Builds without the key
+        // silently fall back to the "Try a sample" carousel + curated category
+        // grid below — no dev-flavored "set SKETCHFAB_API_KEY" placeholder
+        // ever reaches a real user.
+        if (SketchfabConfig.apiKey != null) {
             if (feedsError != null) {
                 Text(
                     text = feedsError.orEmpty(),
@@ -172,19 +176,19 @@ fun ExploreTabScreen(
                 )
             }
             FeedSection(
-                title = "Staff Picks",
-                models = staffPicks,
-                loading = loadingFeeds && staffPicks.isEmpty(),
-                onModelClick = { selectedModel = it },
-            )
-            FeedSection(
-                title = "Most Liked",
+                title = "Trending models",
                 models = mostLiked,
                 loading = loadingFeeds && mostLiked.isEmpty(),
                 onModelClick = { selectedModel = it },
             )
             FeedSection(
-                title = "Recently Added",
+                title = "Staff picks",
+                models = staffPicks,
+                loading = loadingFeeds && staffPicks.isEmpty(),
+                onModelClick = { selectedModel = it },
+            )
+            FeedSection(
+                title = "Recently added",
                 models = recent,
                 loading = loadingFeeds && recent.isEmpty(),
                 onModelClick = { selectedModel = it },
@@ -454,32 +458,6 @@ private fun RecentSearchesSection(
                     Icon(Icons.Filled.Close, contentDescription = "Remove $query")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ApiKeyMissingNotice() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(16.dp),
-    ) {
-        Column {
-            Text(
-                text = "Sketchfab gallery off",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Set SKETCHFAB_API_KEY (env or local.properties) to enable the live 3D catalog.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
