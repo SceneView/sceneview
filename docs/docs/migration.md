@@ -7,6 +7,63 @@ description: "Migration guides for SceneView: 3.6.x to 4.0.0 Rerun integration, 
 
 ---
 
+## SceneView 4.2.x to 4.3.0 (iOS) — silent-stub modes now active
+
+### `.cameraControls(.pan)` and `.cameraControls(.firstPerson)` no longer silently orbit ([#1034](https://github.com/sceneview/sceneview/issues/1034))
+
+In v4.2.0 these two modes existed in the enum but `applyCamera()` ignored
+them — they produced orbit behaviour at runtime. v4.3.0 wires them to
+real per-mode handlers.
+
+**Action**:
+
+- Apps that called `.cameraControls(.pan)` *expecting* orbit behaviour
+  should switch to `.cameraControls(.orbit)` (or drop the modifier
+  entirely — orbit is the default).
+- Apps that called `.cameraControls(.firstPerson)` get FOV-zoom pinch
+  instead of dolly. To keep the v4.2.0 orbit-with-dolly behaviour,
+  switch to `.orbit`.
+
+```swift
+// v4.2.0 (silent stub)
+SceneView { /* ... */ }
+  .cameraControls(.pan)   // actually orbited
+
+// v4.3.0 (wired)
+SceneView { /* ... */ }
+  .cameraControls(.pan)   // now translates target; drop modifier for orbit
+```
+
+### Library-level auto-center is on by default ([#1026](https://github.com/sceneview/sceneview/issues/1026))
+
+iOS v4.3.0 introduces an intermediate `contentRoot` Entity and translates
+it on the first frame the scene's `visualBounds` is non-empty so the
+centroid lands at the orbit pivot. Most demos benefit; scenes that rely
+on intentional off-centre placement (carousels, dioramas, story-mode)
+will see content re-centre.
+
+**Action**: append `.autoCenterContent(false)` for off-centre-by-design
+scenes.
+
+```swift
+// v4.2.0 — manual per-demo centring
+SceneView { root in
+    let model = ModelNode.load("hero.usdz")
+    model.entity.position = .init(x: 0, y: -0.5, z: -2)  // intentional offset
+    root.addChild(model.entity)
+}
+
+// v4.3.0 — opt out of library centring to keep the offset
+SceneView { root in
+    let model = ModelNode.load("hero.usdz")
+    model.entity.position = .init(x: 0, y: -0.5, z: -2)
+    root.addChild(model.entity)
+}
+.autoCenterContent(false)   // ← restore strict v4.2.0 placement
+```
+
+---
+
 ## SceneView 3.6.x to 4.0.0 (Release Candidate)
 
 **Status:** `v4.0.0` is live as a release candidate. Maven Central and Swift Package Manager artifacts are **not** built from the RC tag — pin to the tag manually to test, or wait for the `v4.0.0` stable tag.

@@ -2352,15 +2352,42 @@ video.play() / .pause() / .stop() / .seek(to: 30.0) / .volume(0.5)
 CameraNode().position(.init(x: 0, y: 1.5, z: 3)).lookAt(.zero).fieldOfView(60)
 ```
 
-**iOS deprecations (v4.0.10+ — RealityKit-incompatible, no-op):**
+**iOS parity status (#1036):**
 
-| Deprecated | Replacement |
-|---|---|
-| `CameraNode.depthOfField(...)` | Use `.cameraControls(.cinematic)` or attach `DepthOfFieldEffect` via the underlying `ARView.cameraMode` — RealityKit lacks per-camera DoF. |
-| `CameraNode.exposure(_:)` | Use `ARSceneView(cameraExposure:)` (AR) or `.environment(...)` intensity (3D). |
-| `LightNode.shadowColor(_:)` | Removed — RealityKit shadow color is fixed. Tune ambient/IBL tint via `SceneEnvironment.custom(...)` instead. |
+Full canonical reference in `docs/docs/cheatsheet-ios.md`. Three buckets:
 
-These three modifiers compile with a `@available(*, deprecated)` warning and silently no-op at runtime. Migrate before the v4.1 hard removal.
+### Deprecated on iOS (v4.0.10+ — compile-warning, no-op runtime)
+
+These three APIs ship as `@available(*, deprecated, message: …)` factories and silently no-op when called. Migrate to the alternative listed.
+
+| Deprecated | Why iOS can't | Replacement |
+|---|---|---|
+| `CameraNode.depthOfField(...)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process (out of scope) |
+| `CameraNode.exposure(_:)` | `PerspectiveCameraComponent` has no `exposureCompensation` (verified Xcode 26.x build, #1019) | `ARSceneView(cameraExposure:)` (AR) or `.renderQuality(_:)` IBL tune (3D) |
+| `LightNode.shadowColor(_:)` | `DirectionalLightComponent.Shadow` has no `color` property | `.castsShadow(_:)` + `.shadowMaximumDistance(_:)` |
+
+### Android-only — no port planned or pending
+
+These symbols do not exist on iOS (no `@available(*, deprecated)` factory — they have no Swift declaration at all). Code targeting cross-platform must guard with `#if !os(iOS) && !os(macOS) && !os(visionOS)`.
+
+| Symbol | Why iOS can't | iOS path |
+|---|---|---|
+| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | Record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
+| `SurfaceType.texture` | RealityKit always renders to `MTKView` | N/A — no port needed |
+| `StreetscapeGeometry` | ARGeoTrackingConfiguration exists but no mesh equivalent | iOS-skip with doc warning |
+| `TerrainAnchor / RooftopAnchor` | `ARGeoAnchor` only does ground; rooftop has no ARKit equivalent | iOS-skip with doc warning |
+
+### Approximated — iOS implements via different mechanism
+
+Same public API name on both platforms; the iOS render path differs but the factories are NOT deprecated. Use as you would on Android; expect minor visual differences.
+
+| Symbol | Android renderer | iOS approximation |
+|---|---|---|
+| `FogNode.linear / .exponential / .heightBased` | Filament fog modes | Translucent-sphere shader |
+| `ReflectionProbeNode.box(...) / .sphere(...)` | Volumetric Filament probe | Unbounded `ImageBasedLightReceiverComponent` (volume scope is best-effort) |
+| `CustomMaterial.subsurface(...)` | Filament SSS | PBR `metallic` + `roughness` tuning |
+
+When generating SceneViewSwift code: treat the Deprecated row as no-ops to avoid, Android-only entries as iOS-not-implemented, Approximated entries as fine to use as-is.
 
 **PhysicsNode** — rigid body:
 ```swift
@@ -2914,6 +2941,7 @@ View modifiers (chainable):
 .mainLight(_ slot: LightSlot) -> SceneView                  // v4.2.0+ — see LightSlot below
 .fillLight(_ slot: LightSlot) -> SceneView                  // v4.2.0+ — Android-parity 2-light setup
 .renderQuality(_ preset: RenderQuality) -> SceneView        // v4.2.0+ — .cinematic / .default / .performance
+.autoCenterContent(_ enabled: Bool) -> SceneView            // v4.3.0+ — default true; translates content so its centroid lands at the orbit pivot
 ```
 
 ### Render defaults (v4.2.0+)
@@ -3348,9 +3376,9 @@ public protocol EntityProvider {
 
 ```swift
 public enum CameraControlMode: Sendable {
-    case orbit         // drag to rotate, pinch to zoom (default)
-    case pan           // drag to pan, pinch to zoom
-    case firstPerson   // drag to look around
+    case orbit         // drag rotates the scene around the orbit pivot, pinch dollies (default)
+    case pan           // drag translates the target laterally, pinch dollies
+    case firstPerson   // drag rotates the view (no orbit translation), pinch adjusts FOV
 }
 
 public struct CameraControls: Sendable {
@@ -3364,6 +3392,11 @@ public struct CameraControls: Sendable {
     public var sensitivity: Float = 0.005
     public var isAutoRotating: Bool = false
     public var autoRotateSpeed: Float = 0.3
+    // firstPerson FOV controls (#1034)
+    public var fov: Float = 60.0
+    public var minFov: Float = 10.0
+    public var maxFov: Float = 120.0
+    public var pinchFovSpeed: Float = 0.05
 }
 ```
 

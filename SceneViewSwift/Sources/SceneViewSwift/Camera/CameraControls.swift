@@ -4,15 +4,37 @@ import RealityKit
 
 /// Camera interaction mode for the 3D scene.
 ///
-/// Mirrors SceneView Android's camera manipulator modes.
+/// Mirrors SceneView Android's camera manipulator modes
+/// (`CameraGestureDetector` + `FovZoomCameraManipulator`).
 public enum CameraControlMode: Sendable {
-    /// Orbit around a target point. Drag to rotate, pinch to zoom.
+    /// Orbit around a target point. Drag rotates the scene around the orbit
+    /// pivot; pinch dollies in/out by scaling the scene root.
     case orbit
 
-    /// Pan the camera in the view plane. Drag to move, pinch to zoom.
+    /// Pan the camera in the view plane. Drag translates the orbit target
+    /// laterally (the scene appears to slide), pinch keeps dollying in/out.
+    /// Rotation is preserved so callers can pan first then orbit.
+    ///
+    /// **Gesture divergence from Android (#1034)**: Android disambiguates
+    /// pan with a 2-finger strafe drag (see `CameraGestureDetector.kt`'s
+    /// `isPanGesture()` confidence test); iOS uses a 1-finger drag here
+    /// because SwiftUI's `DragGesture` does not expose multi-pointer state
+    /// the same way as `MotionEvent`. Switch via `.cameraControls(.pan)`
+    /// rather than expecting 2-finger detection.
     case pan
 
-    /// First-person camera. Drag to look around, pinch to move forward/back.
+    /// First-person look-around. Drag rotates the scene content around the
+    /// world origin (the default perspective camera at `[0, 0.3, 2]` stays
+    /// fixed); pinch adjusts the camera's field of view — mirrors
+    /// Android's `FovZoomCameraManipulator`.
+    ///
+    /// **Limitation (#1034)**: true first-person look — rotating the
+    /// camera *about its own position* instead of rotating world content —
+    /// is not yet implemented because the orbit pivot is shared with
+    /// ``orbit`` mode. The visual effect is a tight orbit at radius `2`
+    /// rather than a stationary look-around; this is good enough for
+    /// inspection demos but not for FPS-style navigation. Tracked as a
+    /// v4.4.0 follow-up.
     case firstPerson
 }
 
@@ -81,6 +103,20 @@ public struct CameraControls: Sendable {
 
     /// First-person move speed (first-person mode only).
     public var moveSpeed: Float = 0.1
+
+    /// Field-of-view in degrees for ``CameraControlMode/firstPerson`` (pinch zoom).
+    /// Mirrors Android's `FovZoomCameraManipulator` (default range 10°..120°).
+    public var fov: Float = 60.0
+
+    /// Minimum FOV in degrees (firstPerson pinch-in limit).
+    public var minFov: Float = 10.0
+
+    /// Maximum FOV in degrees (firstPerson pinch-out limit).
+    public var maxFov: Float = 120.0
+
+    /// Per-pixel FOV delta in degrees (firstPerson pinch sensitivity).
+    /// Mirrors Android `FovZoomCameraManipulator.DEFAULT_PINCH_FOV_SPEED`.
+    public var pinchFovSpeed: Float = 0.05
 
     /// Whether touch/drag interaction is enabled.
     public var isEnabled: Bool = true
@@ -194,13 +230,33 @@ public struct CameraControls: Sendable {
 
     /// Updates orbit radius from a magnification gesture.
     ///
+    /// In ``CameraControlMode/orbit`` and ``CameraControlMode/pan`` this scales
+    /// the dolly radius (zoom). In ``CameraControlMode/firstPerson`` it
+    /// adjusts the perspective camera's field-of-view instead — mirrors
+    /// Android's `FovZoomCameraManipulator`.
+    ///
     /// - Parameter scale: The pinch gesture magnification factor.
     public mutating func handlePinch(_ scale: CGFloat) {
-        orbitRadius /= Float(scale)
-        orbitRadius = min(max(orbitRadius, minRadius), maxRadius)
+        guard isEnabled else { return }
+        switch mode {
+        case .orbit, .pan:
+            orbitRadius /= Float(scale)
+            orbitRadius = Swift.min(Swift.max(orbitRadius, minRadius), maxRadius)
+        case .firstPerson:
+            // Pinch out (scale > 1) ⇒ user wants to zoom IN ⇒ smaller FOV.
+            fov /= Float(scale)
+            fov = Swift.min(Swift.max(fov, minFov), maxFov)
+        }
     }
 
     /// Applies inertia deceleration. Call this on each frame after drag ends.
+    ///
+    /// Mode-gated so `.pan` doesn't see ghost rotation from the last drag's
+    /// stored `inertiaVelocity` (drag in `.pan` mutates `target`, not
+    /// `azimuth`/`elevation`, but the velocity is captured unconditionally
+    /// at `handleDrag`'s tail; this guard prevents that velocity from
+    /// leaking into rotation when the user releases a pan drag). Closes the
+    /// Agent 1 MAJOR finding on PR #1038.
     ///
     /// - Returns: `true` while inertia is still active.
     @discardableResult
@@ -212,9 +268,20 @@ public struct CameraControls: Sendable {
             return false
         }
 
-        azimuth -= Float(inertiaVelocity.width) * sensitivity
-        elevation += Float(inertiaVelocity.height) * sensitivity
-        clampElevation()
+        switch mode {
+        case .orbit, .firstPerson:
+            azimuth -= Float(inertiaVelocity.width) * sensitivity
+            elevation += Float(inertiaVelocity.height) * sensitivity
+            clampElevation()
+        case .pan:
+            // Inertia in pan mode keeps translating the target so the scene
+            // continues to glide after release — same semantics as
+            // `handleDrag(.pan)`.
+            let right = SIMD3<Float>(cos(azimuth), 0, -sin(azimuth))
+            let up = SIMD3<Float>(0, 1, 0)
+            target += right * Float(inertiaVelocity.width) * panSpeed
+            target += up * Float(-inertiaVelocity.height) * panSpeed
+        }
 
         inertiaVelocity.width *= CGFloat(inertiaDamping)
         inertiaVelocity.height *= CGFloat(inertiaDamping)

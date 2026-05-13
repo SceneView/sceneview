@@ -43,9 +43,13 @@ SceneView { root in
     root.addChild(model.entity)
 }
 .environment(.studio)              // IBL lighting preset
-.cameraControls(.orbit)            // orbit / pan / zoom gestures
+.cameraControls(.orbit)            // .orbit (default) | .pan | .firstPerson (v4.3.0+)
 .onEntityTapped { entity in }      // tap handler
 .autoRotate(speed: 0.3)            // turntable auto-rotation
+.autoCenterContent(true)           // v4.3.0+ — library translates content centroid to orbit pivot (default true; pass false to keep explicit placements)
+.mainLight(.systemDefault)         // v4.2.0+ — see LightSlot
+.fillLight(.systemDefault)         // v4.2.0+
+.renderQuality(.default)           // v4.2.0+ — .cinematic | .default | .performance
 ```
 
 ---
@@ -318,6 +322,48 @@ model?.stopAllAnimations()
 | `rememberCameraManipulator()` | `.cameraControls(.orbit)` view modifier |
 | `AnchorNode(anchor)` | `AnchorNode.world(position:)` |
 | `PhysicsNode(node, mass)` | `PhysicsNode.dynamic(entity, mass:)` |
+
+---
+
+## iOS parity status (#1036)
+
+Some Android APIs map imperfectly to iOS because RealityKit / ARKit do
+not expose the underlying feature. They fall into three buckets — keep
+this table at hand before re-attacking a deprecated API as if it were a
+silent stub.
+
+### Deprecated on iOS (compile-warning, no-op at runtime)
+
+| Symbol | Why iOS can't | Working alternative |
+|---|---|---|
+| `CameraNode.depthOfField(...)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process required (out of scope) |
+| `CameraNode.exposure(_:)` | No `exposureCompensation` on `PerspectiveCameraComponent` (verified Xcode 26.x compile failure in #1019) | `ARSceneView(cameraExposure:)` for AR; `SceneView.renderQuality(_:)` to tune IBL for 3D |
+| `LightNode.shadowColor(_:)` | `DirectionalLightComponent.Shadow` has no `color` property | Use `castsShadow(_:)` + `shadowMaximumDistance(_:)` |
+
+### Android-only — no port planned (or pending)
+
+| Symbol | Why iOS can't | iOS path |
+|---|---|---|
+| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | Record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
+| `SurfaceType.texture` | RealityKit always renders to `MTKView` | N/A — no port needed |
+| `StreetscapeGeometry` | ARGeoTrackingConfiguration exists but no mesh equivalent | iOS-skip with doc warning |
+| `TerrainAnchor / RooftopAnchor` (geo-anchored to terrain or rooftop) | `ARGeoAnchor` only does ground; rooftop has no ARKit equivalent | iOS-skip with doc warning |
+
+### Approximated — iOS implements via different mechanism
+
+Same public API name on both platforms, but the iOS render path differs.
+Use as you would on Android; expect minor visual differences.
+
+| Symbol | Android renderer | iOS approximation |
+|---|---|---|
+| `FogNode.linear / .exponential / .heightBased` | Filament fog modes | Translucent-sphere shader (visual approximation; same factory API) |
+| `ReflectionProbeNode.box(...) / .sphere(...)` | Volumetric Filament probe | Unbounded `ImageBasedLightReceiverComponent` (volume scope is best-effort) |
+| `CustomMaterial.subsurface(...)` | Filament SSS | PBR `metallic` + `roughness` tuning |
+
+**Why this matters for AI assistants:** when generating SceneViewSwift
+code, treat the Deprecated row as no-ops to avoid; Android-only entries
+as iOS-not-implemented; Approximated entries are fine to use as-is and
+will compile + render with visual fidelity differences only.
 
 ---
 
