@@ -2352,27 +2352,42 @@ video.play() / .pause() / .stop() / .seek(to: 30.0) / .volume(0.5)
 CameraNode().position(.init(x: 0, y: 1.5, z: 3)).lookAt(.zero).fieldOfView(60)
 ```
 
-**iOS deprecations — RealityKit-impossible parity gaps (#1036):**
+**iOS parity status (#1036):**
 
-Full canonical table lives in `docs/docs/cheatsheet-ios.md` — these symbols cannot
-be implemented on iOS because RealityKit does not expose the underlying feature.
-They compile with `@available(*, deprecated, message: …)` so the call site warns
-the consumer and the alternative is always available, type-safe, and in the same module.
+Full canonical reference in `docs/docs/cheatsheet-ios.md`. Three buckets:
+
+### Deprecated on iOS (v4.0.10+ — compile-warning, no-op runtime)
+
+These three APIs ship as `@available(*, deprecated, message: …)` factories and silently no-op when called. Migrate to the alternative listed.
 
 | Deprecated | Why iOS can't | Replacement |
 |---|---|---|
 | `CameraNode.depthOfField(...)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process (out of scope) |
-| `CameraNode.exposure(_:)` | `PerspectiveCameraComponent` has no `exposureCompensation` (verified Xcode 26.x build) | `ARSceneView(cameraExposure:)` (AR) or `.renderQuality(_:)` IBL tune (3D) |
+| `CameraNode.exposure(_:)` | `PerspectiveCameraComponent` has no `exposureCompensation` (verified Xcode 26.x build, #1019) | `ARSceneView(cameraExposure:)` (AR) or `.renderQuality(_:)` IBL tune (3D) |
 | `LightNode.shadowColor(_:)` | `DirectionalLightComponent.Shadow` has no `color` property | `.castsShadow(_:)` + `.shadowMaximumDistance(_:)` |
-| `CustomMaterial.subsurface(...)` | No subsurface scattering in RealityKit | Approximate via `metallic` + `roughness` PBR tuning |
-| `ReflectionProbeNode.box(...) / .sphere(...)` (volumetric) | `ImageBasedLightReceiverComponent` is unbounded — no volume | Single global IBL via `SceneView.environment(...)` |
-| `FogNode.linear / .exponential / .heightBased` | RealityKit has no fog | Single fog mode kept; variant deprecated |
-| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
+
+### Android-only — no port planned or pending
+
+These symbols do not exist on iOS (no `@available(*, deprecated)` factory — they have no Swift declaration at all). Code targeting cross-platform must guard with `#if !os(iOS) && !os(macOS) && !os(visionOS)`.
+
+| Symbol | Why iOS can't | iOS path |
+|---|---|---|
+| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | Record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
 | `SurfaceType.texture` | RealityKit always renders to `MTKView` | N/A — no port needed |
-| `StreetscapeGeometry` | ARGeoTrackingConfiguration has no mesh equivalent of ARCore | iOS-skip with doc warning |
+| `StreetscapeGeometry` | ARGeoTrackingConfiguration exists but no mesh equivalent | iOS-skip with doc warning |
 | `TerrainAnchor / RooftopAnchor` | `ARGeoAnchor` only does ground; rooftop has no ARKit equivalent | iOS-skip with doc warning |
 
-These modifiers compile with deprecation warnings and silently no-op at runtime; do not regenerate code that calls them.
+### Approximated — iOS implements via different mechanism
+
+Same public API name on both platforms; the iOS render path differs but the factories are NOT deprecated. Use as you would on Android; expect minor visual differences.
+
+| Symbol | Android renderer | iOS approximation |
+|---|---|---|
+| `FogNode.linear / .exponential / .heightBased` | Filament fog modes | Translucent-sphere shader |
+| `ReflectionProbeNode.box(...) / .sphere(...)` | Volumetric Filament probe | Unbounded `ImageBasedLightReceiverComponent` (volume scope is best-effort) |
+| `CustomMaterial.subsurface(...)` | Filament SSS | PBR `metallic` + `roughness` tuning |
+
+When generating SceneViewSwift code: treat the Deprecated row as no-ops to avoid, Android-only entries as iOS-not-implemented, Approximated entries as fine to use as-is.
 
 **PhysicsNode** — rigid body:
 ```swift

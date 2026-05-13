@@ -43,9 +43,13 @@ SceneView { root in
     root.addChild(model.entity)
 }
 .environment(.studio)              // IBL lighting preset
-.cameraControls(.orbit)            // orbit / pan / zoom gestures
+.cameraControls(.orbit)            // .orbit (default) | .pan | .firstPerson (v4.3.0+)
 .onEntityTapped { entity in }      // tap handler
 .autoRotate(speed: 0.3)            // turntable auto-rotation
+.autoCenterContent(true)           // v4.3.0+ — library translates content centroid to orbit pivot (default true; pass false to keep explicit placements)
+.mainLight(.systemDefault)         // v4.2.0+ — see LightSlot
+.fillLight(.systemDefault)         // v4.2.0+
+.renderQuality(.default)           // v4.2.0+ — .cinematic | .default | .performance
 ```
 
 ---
@@ -321,32 +325,45 @@ model?.stopAllAnimations()
 
 ---
 
-## RealityKit-impossible APIs — parity gaps (#1036)
+## iOS parity status (#1036)
 
-A handful of Android APIs cannot be implemented on iOS because RealityKit
-does not expose the underlying feature. They stay deprecated with a clear
-redirect to a working alternative — `@available(*, deprecated, message: …)`
-fires at call site so consumers see the right path. This table is the
-canonical reference; consult it before re-attacking a deprecated API as if
-it were a silent stub.
+Some Android APIs map imperfectly to iOS because RealityKit / ARKit do
+not expose the underlying feature. They fall into three buckets — keep
+this table at hand before re-attacking a deprecated API as if it were a
+silent stub.
+
+### Deprecated on iOS (compile-warning, no-op at runtime)
 
 | Symbol | Why iOS can't | Working alternative |
 |---|---|---|
+| `CameraNode.depthOfField(...)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process required (out of scope) |
+| `CameraNode.exposure(_:)` | No `exposureCompensation` on `PerspectiveCameraComponent` (verified Xcode 26.x compile failure in #1019) | `ARSceneView(cameraExposure:)` for AR; `SceneView.renderQuality(_:)` to tune IBL for 3D |
 | `LightNode.shadowColor(_:)` | `DirectionalLightComponent.Shadow` has no `color` property | Use `castsShadow(_:)` + `shadowMaximumDistance(_:)` |
-| `CustomMaterial.subsurface(...)` | RealityKit has no subsurface scattering | Approximate with `metallic` + `roughness` PBR tuning |
-| `ReflectionProbeNode.box(...) / .sphere(...)` (volumetric) | `ImageBasedLightReceiverComponent` is unbounded — no volume | Use a single global IBL via `SceneView.environment(...)` |
-| `FogNode.linear / .exponential / .heightBased` | RealityKit has no fog | Single fog mode kept; variant deprecated |
-| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | iOS gets record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
+
+### Android-only — no port planned (or pending)
+
+| Symbol | Why iOS can't | iOS path |
+|---|---|---|
+| `ARSceneView(playbackDataset:)` | ARKit has no deterministic recording playback | Record-only via [#1032 ReplayKit](https://github.com/sceneview/sceneview/issues/1032); replay stays Android-only |
 | `SurfaceType.texture` | RealityKit always renders to `MTKView` | N/A — no port needed |
-| `CameraNode.depthOfField(focusDistance:aperture:)` | `PerspectiveCameraComponent` has no DOF | Custom Metal post-process required (out of scope) |
-| `CameraNode.exposure(_:)` | `PerspectiveCameraComponent` has no `exposureCompensation` (verified Xcode 26.x compile failure in #1019) | `ARSceneView(cameraExposure:)` for AR; `SceneView.renderQuality(_:)` to tune IBL for 3D |
-| `StreetscapeGeometry` | ARGeoTrackingConfiguration exists but no mesh equivalent of ARCore's | iOS-skip with doc warning |
+| `StreetscapeGeometry` | ARGeoTrackingConfiguration exists but no mesh equivalent | iOS-skip with doc warning |
 | `TerrainAnchor / RooftopAnchor` (geo-anchored to terrain or rooftop) | `ARGeoAnchor` only does ground; rooftop has no ARKit equivalent | iOS-skip with doc warning |
 
-**Why this matters for AI assistants:** when generating SceneViewSwift code,
-treat the symbols in the left column as deprecated-only. Suggesting them
-will surface a compile-time warning and the alternative listed in the
-right column is always available, type-safe, and ships in the same module.
+### Approximated — iOS implements via different mechanism
+
+Same public API name on both platforms, but the iOS render path differs.
+Use as you would on Android; expect minor visual differences.
+
+| Symbol | Android renderer | iOS approximation |
+|---|---|---|
+| `FogNode.linear / .exponential / .heightBased` | Filament fog modes | Translucent-sphere shader (visual approximation; same factory API) |
+| `ReflectionProbeNode.box(...) / .sphere(...)` | Volumetric Filament probe | Unbounded `ImageBasedLightReceiverComponent` (volume scope is best-effort) |
+| `CustomMaterial.subsurface(...)` | Filament SSS | PBR `metallic` + `roughness` tuning |
+
+**Why this matters for AI assistants:** when generating SceneViewSwift
+code, treat the Deprecated row as no-ops to avoid; Android-only entries
+as iOS-not-implemented; Approximated entries are fine to use as-is and
+will compile + render with visual fidelity differences only.
 
 ---
 

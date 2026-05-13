@@ -137,5 +137,98 @@ final class CameraControlsModeTests: XCTestCase {
             XCTAssertEqual(c.fov, fov, "disabled pinch must no-op (mode=\(mode))")
         }
     }
+
+    // MARK: - rotated-camera pan
+
+    /// Pan should translate `target` along the camera-aligned right + up
+    /// vectors, NOT the world-aligned x/y axes. Tests Agent 3's pinning
+    /// gap: previous `testDragPanMode_translatesTarget` only covered
+    /// azimuth=0 (trivial case where camera right vector == world x).
+    func testDragPanMode_rotatedCamera_translatesAlongCameraRight() {
+        var c = CameraControls(mode: .pan)
+        c.azimuth = .pi / 2  // 90° — camera looks along +X axis
+        let initialTarget = c.target
+
+        c.handleDrag(CGSize(width: 100, height: 0))
+
+        // With azimuth=π/2: right = (cos(π/2), 0, -sin(π/2)) = (0, 0, -1).
+        // Width = 100 px × panSpeed 0.01 ⇒ +1 along right.
+        // So target.z should DECREASE by 1, x and y unchanged.
+        XCTAssertEqual(c.target.x, initialTarget.x, accuracy: 0.001)
+        XCTAssertEqual(c.target.y, initialTarget.y, accuracy: 0.001)
+        XCTAssertEqual(c.target.z, initialTarget.z - 1.0, accuracy: 0.01,
+                       "rotated-camera pan must follow camera-aligned right vector")
+    }
+
+    // MARK: - autoRotation works in all modes
+
+    func testApplyAutoRotation_orbitMode_rotatesAzimuth() {
+        var c = CameraControls(mode: .orbit)
+        c.isAutoRotating = true
+        c.autoRotateSpeed = 1.0
+        let initialAz = c.azimuth
+
+        c.applyAutoRotation(dt: 0.5)
+        XCTAssertEqual(c.azimuth, initialAz + 0.5, accuracy: 0.001)
+    }
+
+    func testApplyAutoRotation_firstPersonMode_rotatesAzimuth() {
+        // FirstPerson uses the same azimuth/elevation rotation as orbit
+        // (the visual difference is in `applyCamera`'s scale + position
+        // handling, not in the rotation math). Auto-rotation must still
+        // tick azimuth so the demo's turntable mode works.
+        var c = CameraControls(mode: .firstPerson)
+        c.isAutoRotating = true
+        c.autoRotateSpeed = 1.0
+        let initialAz = c.azimuth
+
+        c.applyAutoRotation(dt: 0.5)
+        XCTAssertEqual(c.azimuth, initialAz + 0.5, accuracy: 0.001)
+    }
+
+    // MARK: - applyInertia mode-gated
+
+    func testApplyInertia_orbitMode_rotatesAzimuthAndElevation() {
+        var c = CameraControls(mode: .orbit)
+        c.inertiaVelocity = CGSize(width: 100, height: 50)
+        let initialAz = c.azimuth
+        let initialEl = c.elevation
+        let initialTarget = c.target
+
+        let active = c.applyInertia()
+
+        XCTAssertTrue(active)
+        XCTAssertNotEqual(c.azimuth, initialAz, "orbit inertia must rotate yaw")
+        XCTAssertNotEqual(c.elevation, initialEl, "orbit inertia must rotate pitch")
+        XCTAssertEqual(c.target, initialTarget, "orbit inertia must NOT translate target")
+    }
+
+    func testApplyInertia_panMode_translatesTarget_notAzimuthElevation() {
+        // The Agent 1 MAJOR — applyInertia previously always rotated,
+        // injecting ghost rotation when a `.pan` drag ended. Now mode-gated.
+        var c = CameraControls(mode: .pan)
+        c.inertiaVelocity = CGSize(width: 100, height: 0)
+        let initialAz = c.azimuth
+        let initialEl = c.elevation
+        let initialTarget = c.target
+
+        let active = c.applyInertia()
+
+        XCTAssertTrue(active)
+        XCTAssertEqual(c.azimuth, initialAz, "pan inertia must NOT rotate yaw")
+        XCTAssertEqual(c.elevation, initialEl, "pan inertia must NOT rotate pitch")
+        XCTAssertNotEqual(c.target, initialTarget, "pan inertia must glide target")
+    }
+
+    func testApplyInertia_firstPersonMode_rotatesAzimuthAndElevation() {
+        var c = CameraControls(mode: .firstPerson)
+        c.inertiaVelocity = CGSize(width: 100, height: 50)
+        let initialAz = c.azimuth
+
+        let active = c.applyInertia()
+
+        XCTAssertTrue(active)
+        XCTAssertNotEqual(c.azimuth, initialAz, "firstPerson inertia must rotate yaw")
+    }
 }
 #endif

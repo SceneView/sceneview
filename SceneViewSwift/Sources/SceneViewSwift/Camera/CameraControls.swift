@@ -14,12 +14,27 @@ public enum CameraControlMode: Sendable {
     /// Pan the camera in the view plane. Drag translates the orbit target
     /// laterally (the scene appears to slide), pinch keeps dollying in/out.
     /// Rotation is preserved so callers can pan first then orbit.
+    ///
+    /// **Gesture divergence from Android (#1034)**: Android disambiguates
+    /// pan with a 2-finger strafe drag (see `CameraGestureDetector.kt`'s
+    /// `isPanGesture()` confidence test); iOS uses a 1-finger drag here
+    /// because SwiftUI's `DragGesture` does not expose multi-pointer state
+    /// the same way as `MotionEvent`. Switch via `.cameraControls(.pan)`
+    /// rather than expecting 2-finger detection.
     case pan
 
-    /// First-person look-around. Drag rotates the scene with no orbit
-    /// translation (camera stays put visually), pinch adjusts the
-    /// perspective camera's field of view — mirrors Android's
-    /// `FovZoomCameraManipulator`.
+    /// First-person look-around. Drag rotates the scene content around the
+    /// world origin (the default perspective camera at `[0, 0.3, 2]` stays
+    /// fixed); pinch adjusts the camera's field of view — mirrors
+    /// Android's `FovZoomCameraManipulator`.
+    ///
+    /// **Limitation (#1034)**: true first-person look — rotating the
+    /// camera *about its own position* instead of rotating world content —
+    /// is not yet implemented because the orbit pivot is shared with
+    /// ``orbit`` mode. The visual effect is a tight orbit at radius `2`
+    /// rather than a stationary look-around; this is good enough for
+    /// inspection demos but not for FPS-style navigation. Tracked as a
+    /// v4.4.0 follow-up.
     case firstPerson
 }
 
@@ -236,6 +251,13 @@ public struct CameraControls: Sendable {
 
     /// Applies inertia deceleration. Call this on each frame after drag ends.
     ///
+    /// Mode-gated so `.pan` doesn't see ghost rotation from the last drag's
+    /// stored `inertiaVelocity` (drag in `.pan` mutates `target`, not
+    /// `azimuth`/`elevation`, but the velocity is captured unconditionally
+    /// at `handleDrag`'s tail; this guard prevents that velocity from
+    /// leaking into rotation when the user releases a pan drag). Closes the
+    /// Agent 1 MAJOR finding on PR #1038.
+    ///
     /// - Returns: `true` while inertia is still active.
     @discardableResult
     public mutating func applyInertia() -> Bool {
@@ -246,9 +268,20 @@ public struct CameraControls: Sendable {
             return false
         }
 
-        azimuth -= Float(inertiaVelocity.width) * sensitivity
-        elevation += Float(inertiaVelocity.height) * sensitivity
-        clampElevation()
+        switch mode {
+        case .orbit, .firstPerson:
+            azimuth -= Float(inertiaVelocity.width) * sensitivity
+            elevation += Float(inertiaVelocity.height) * sensitivity
+            clampElevation()
+        case .pan:
+            // Inertia in pan mode keeps translating the target so the scene
+            // continues to glide after release — same semantics as
+            // `handleDrag(.pan)`.
+            let right = SIMD3<Float>(cos(azimuth), 0, -sin(azimuth))
+            let up = SIMD3<Float>(0, 1, 0)
+            target += right * Float(inertiaVelocity.width) * panSpeed
+            target += up * Float(-inertiaVelocity.height) * panSpeed
+        }
 
         inertiaVelocity.width *= CGFloat(inertiaDamping)
         inertiaVelocity.height *= CGFloat(inertiaDamping)

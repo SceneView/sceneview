@@ -263,6 +263,14 @@ public struct SceneView: View {
     /// `ModelNode(centerOrigin: …)` work either way — the centring is
     /// idempotent and reverses an off-centre placement to origin.
     ///
+    /// **iOS-only behaviour vs Android (#1026)**: Android achieves the
+    /// same effect per-demo via `ModelNode(centerOrigin = Position.ZERO)`
+    /// and there is no library-level auto-centre on Android. Cross-platform
+    /// code that ports Android scenes verbatim will see iOS implicitly
+    /// re-centre content that was laid out with explicit positions —
+    /// pass `false` here to disable the library-level pass and restore
+    /// strict Android-parity placement semantics.
+    ///
     /// ```swift
     /// SceneView { root in
     ///     // Hero piece placed deliberately off-centre for a horizon-line shot
@@ -567,17 +575,30 @@ private struct SceneViewRepresentation: View {
     ///
     /// Opt-out via ``SceneView/autoCenterContent(_:)`` for scenes that
     /// rely on intentional off-centre placement.
+    /// Smallest mesh extent (in meters) the auto-centre pass will accept
+    /// as "content has loaded enough to be centred". Below this threshold
+    /// the bounds are assumed to come from an async load that hasn't
+    /// populated yet, and the pass is deferred to the next frame.
+    private static let minVisualExtent: Float = 0.001
+
     @MainActor
     private func refreshContentCentering() {
         guard !didCenterContent else { return }
-        let bounds = entities.contentRoot.visualBounds(relativeTo: entities.root)
+        // Query bounds in contentRoot-local space so they're invariant of
+        // `entities.root`'s rotation + scale (applied every frame by
+        // `applyCamera()`). Sampling `relativeTo: entities.root` would
+        // rescale extents with pinch-zoom, opening a race where an
+        // early-pinch + slow-loading model flips the `minVisualExtent`
+        // gate true/false between frames and centres at the wrong moment.
+        let bounds = entities.contentRoot.visualBounds(relativeTo: entities.contentRoot)
         let extents = bounds.extents
         // Skip empty / degenerate bounds — async loads not done yet.
-        // `BoundingBox` defaults to (.init(repeating: -.infinity), .init(repeating: .infinity))
-        // for empty entities; the resulting extents are NaN/Inf.
+        // RealityKit's empty `BoundingBox` returns `min = +∞`, `max = -∞`
+        // so the `max - min` extents are non-finite (or zero for a
+        // zero-extent placeholder); both cases are caught here.
         guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite else { return }
         let extentMax = max(extents.x, extents.y, extents.z)
-        guard extentMax > 0.001 else { return }
+        guard extentMax > Self.minVisualExtent else { return }
         entities.contentRoot.position = -bounds.center
         didCenterContent = true
     }
@@ -641,16 +662,21 @@ private struct SceneViewRepresentation: View {
             entities.root.position = -camera.target * zoomScale
 
         case .firstPerson:
-            // First-person: no scale change (pinch mutates FOV instead — see
-            // pinchGesture). Rotation makes the scene yaw/pitch around the
-            // user as if they were standing still and looking around.
+            // First-person inspection: no scale change (pinch mutates FOV
+            // instead — see pinchGesture). Rotation makes the scene
+            // yaw/pitch around the world origin while the camera stays
+            // fixed at `[0, 0.3, 2]`. NB: this is NOT a true "stand still
+            // and look around" camera-orientation rotation — see the
+            // `firstPerson` enum doc-comment for the v4.4.0 follow-up.
             entities.root.scale = SIMD3<Float>(repeating: 1)
             entities.root.position = .zero
             #if os(iOS) || os(macOS)
             // Sync the perspective camera FOV to the camera-controls state.
-            // Done every frame so external mutations of `camera.fov` also
-            // take effect; cheap enough that the cost is negligible.
-            entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
+            // Skip the property write when nothing changed so RealityKit
+            // doesn't re-evaluate the projection matrix on idle frames.
+            if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
+                entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
+            }
             #endif
         }
     }
