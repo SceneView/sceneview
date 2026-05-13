@@ -3,19 +3,26 @@ import Foundation
 import ReplayKit
 import SwiftUI
 
-/// Records the screen (and optionally microphone) during an AR session via
-/// ReplayKit's `RPScreenRecorder`. iOS port of Android's
+/// Records the screen during an AR session via ReplayKit's
+/// `RPScreenRecorder`. iOS port of Android's
 /// `io.github.sceneview.ar.recording.ARRecorder` — record-only because
 /// ARKit, unlike ARCore, does not expose a deterministic playback dataset.
 ///
 /// ### What this records
 ///
 /// `RPScreenRecorder.shared()` captures the screen pixels at native
-/// resolution into an MP4. It is NOT an ARSession dataset (no IMU, no
-/// depth, no per-frame anchors) — the resulting clip is replayable in
-/// the Photos app but cannot be fed back into `ARSession` for
-/// deterministic replay. See `docs/docs/cheatsheet-ios.md` parity table
-/// (#1036) for the rationale.
+/// resolution into a QuickTime `.mov` file. It is NOT an ARSession
+/// dataset (no IMU, no depth, no per-frame anchors) — the resulting
+/// clip is replayable in the Photos app but cannot be fed back into
+/// `ARSession` for deterministic replay. See `docs/docs/cheatsheet-ios.md`
+/// parity table (#1036) for the rationale.
+///
+/// **Microphone capture** is not exposed in this initial v4.3.0 port —
+/// `RPScreenRecorder.isMicrophoneEnabled` would require the host app to
+/// declare `NSMicrophoneUsageDescription` in `Info.plist` and surface a
+/// permission gate. Callers who need it can mutate
+/// `RPScreenRecorder.shared().isMicrophoneEnabled = true` before
+/// `startRecording()`; tracked as a v4.4.0 follow-up.
 ///
 /// ### Usage
 ///
@@ -67,17 +74,17 @@ public final class ARRecorder: ObservableObject {
     @Published public private(set) var state: State = .idle
     @Published public private(set) var lastOutputURL: URL? = nil
 
-    /// `true` while ReplayKit reports it is actively recording. Distinct
-    /// from `state == .recording` because `state` follows the call
-    /// site's intent while this property mirrors the underlying recorder.
-    public var isRecording: Bool {
-        recorder.isRecording
-    }
+    /// `true` between successful `startRecording()` and `stopRecording(_:)`.
+    /// `@Published` so SwiftUI views observing this `ObservableObject`
+    /// repaint when recording starts/stops. Equivalent to checking
+    /// `state == .recording` — kept as a separate property for the
+    /// common case of binding a button label to it.
+    public var isRecording: Bool { state == .recording }
 
-    /// `true` if ReplayKit is available on this device (always true on
-    /// iOS hardware, `false` in the simulator until iOS 17.4+ when
-    /// `RPScreenRecorder` finally became simulator-supported for the
-    /// non-microphone code paths).
+    /// `true` if ReplayKit reports the device can record at all.
+    /// Returns `false` on Mac Catalyst / older simulators where
+    /// `RPScreenRecorder` is not wired up. Checked at every
+    /// `startRecording()` so callers may also gate their UI off it.
     public var isAvailable: Bool {
         recorder.isAvailable
     }
@@ -115,12 +122,17 @@ public final class ARRecorder: ObservableObject {
             recorder.startRecording { [weak self] error in
                 Task { @MainActor in
                     guard let self else {
-                        continuation.resume()
+                        if let error {
+                            continuation.resume(throwing: ARRecorderError.from(error))
+                        } else {
+                            continuation.resume()
+                        }
                         return
                     }
                     if let error {
-                        self.state = .error(error.localizedDescription)
-                        continuation.resume(throwing: error)
+                        let mapped = ARRecorderError.from(error)
+                        self.state = .error(mapped.errorDescription ?? error.localizedDescription)
+                        continuation.resume(throwing: mapped)
                     } else {
                         self.state = .recording
                         continuation.resume()
@@ -159,15 +171,16 @@ public final class ARRecorder: ObservableObject {
                 Task { @MainActor in
                     guard let self else {
                         if let error {
-                            continuation.resume(throwing: error)
+                            continuation.resume(throwing: ARRecorderError.from(error))
                         } else {
                             continuation.resume(returning: destination)
                         }
                         return
                     }
                     if let error {
-                        self.state = .error(error.localizedDescription)
-                        continuation.resume(throwing: error)
+                        let mapped = ARRecorderError.from(error)
+                        self.state = .error(mapped.errorDescription ?? error.localizedDescription)
+                        continuation.resume(throwing: mapped)
                     } else {
                         self.state = .idle
                         self.lastOutputURL = destination
@@ -179,14 +192,19 @@ public final class ARRecorder: ObservableObject {
     }
 
     /// Default destination for a recording when no `outputURL` is
-    /// passed to ``stopRecording(outputURL:)``. Lives under
-    /// `NSTemporaryDirectory()` so the OS reclaims the file
-    /// automatically — the caller is expected to move it to a
-    /// persistent location (e.g. via `PHPhotoLibrary`) if they want to
-    /// keep it.
+    /// passed to ``stopRecording(outputURL:)``. Lives under the
+    /// app's caches directory (`URLs(for: .cachesDirectory)`) — the OS
+    /// may reclaim it under memory pressure but it survives normal app
+    /// launches, giving the user time to share / preview / save to
+    /// `PHPhotoLibrary` before disposal.
+    ///
+    /// Returns a path under `<caches>/ARRecorder/ARRecording-<uuid>.mov`.
     public static func defaultOutputURL() -> URL {
-        let filename = "ARRecording-\(UUID().uuidString).mov"
-        return URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(filename)
+        let caches = FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)
+            .first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let folder = caches.appendingPathComponent("ARRecorder", isDirectory: true)
+        return folder.appendingPathComponent("ARRecording-\(UUID().uuidString).mov")
     }
 }
 
@@ -195,11 +213,41 @@ public enum ARRecorderError: LocalizedError, Equatable {
     case unavailable(String)
     case alreadyRecording(String)
     case notRecording(String)
+    /// The user dismissed the system "Allow screen recording?" sheet on
+    /// `startRecording()`. Maps to `RPRecordingErrorCode.userDeclined`.
+    case permissionDenied(String)
+    /// `RPRecordingErrorCode.disabled` — the device administrator (e.g.
+    /// MDM profile, Screen Time restriction, parental controls) has
+    /// disabled screen recording.
+    case disabled(String)
+    /// Any other `RPRecordingError` not matched above. The underlying
+    /// `NSError.code` is preserved in the message for support reports.
+    case other(String, code: Int)
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable(let msg), .alreadyRecording(let msg), .notRecording(let msg):
+        case .unavailable(let msg),
+             .alreadyRecording(let msg),
+             .notRecording(let msg),
+             .permissionDenied(let msg),
+             .disabled(let msg),
+             .other(let msg, _):
             return msg
+        }
+    }
+
+    /// Maps an `NSError` from `RPScreenRecorder`'s completion handler
+    /// to a typed `ARRecorderError` so callers can switch on the case
+    /// instead of string-matching `errorDescription`.
+    static func from(_ error: Error) -> ARRecorderError {
+        let nsErr = error as NSError
+        // `RPRecordingErrorCode` values are defined in `<ReplayKit/RPError.h>`.
+        // We can't `case let .userDeclined` switch because the type is
+        // not exposed as a Swift enum in all SDK levels; match by raw int.
+        switch nsErr.code {
+        case -5803: return .permissionDenied(error.localizedDescription)
+        case -5801: return .disabled(error.localizedDescription)
+        default:    return .other(error.localizedDescription, code: nsErr.code)
         }
     }
 }

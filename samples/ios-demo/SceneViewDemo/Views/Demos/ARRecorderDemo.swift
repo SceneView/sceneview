@@ -16,6 +16,10 @@ struct ARRecorderDemo: View {
     @StateObject private var recorder = ARRecorder()
     @State private var statusMessage: String? = nil
     @State private var lastFileSize: Int? = nil
+    /// Holds the currently-running record/stop Task so the view can
+    /// cancel it on disappear and avoid mutating `statusMessage` on a
+    /// disposed view. Closes Agent A MAJOR finding on PR #1042.
+    @State private var activeTask: Task<Void, Never>? = nil
 
     var body: some View {
         ZStack {
@@ -35,6 +39,14 @@ struct ARRecorderDemo: View {
             }
         }
         .background(Color.black)
+        .onDisappear {
+            // Cancel any in-flight Task on disappear so awaited
+            // continuations don't try to mutate `statusMessage` /
+            // `lastFileSize` on a destroyed view. The recorder itself
+            // continues; `ARRecorder.stopRecording()` must be called
+            // explicitly to stop capture (closes Agent A MAJOR).
+            activeTask?.cancel()
+        }
     }
 
     // MARK: - AR view
@@ -115,9 +127,22 @@ struct ARRecorderDemo: View {
             }
 
             if let url = recorder.lastOutputURL {
-                Text("Saved → \(url.lastPathComponent)")
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.white.opacity(0.7))
+                HStack(spacing: 10) {
+                    Text(url.lastPathComponent)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    ShareLink(item: url) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.white.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
             }
 
             Text("iOS records the screen only (no deterministic playback). The MP4 opens in Photos.")
@@ -134,14 +159,19 @@ struct ARRecorderDemo: View {
     // MARK: - Actions
 
     private func toggleRecording() {
-        Task {
+        // Cancel any prior in-flight task so we don't end up with two
+        // overlapping start/stop hops mutating state on a disposed view.
+        activeTask?.cancel()
+        activeTask = Task {
             if recorder.isRecording {
                 do {
                     let url = try await recorder.stopRecording()
+                    if Task.isCancelled { return }
                     let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
                     lastFileSize = size
                     statusMessage = "Recording saved (\(humanFileSize(size)))"
                 } catch {
+                    if Task.isCancelled { return }
                     statusMessage = "Stop failed: \(error.localizedDescription)"
                 }
             } else {
@@ -149,6 +179,7 @@ struct ARRecorderDemo: View {
                 do {
                     try await recorder.startRecording()
                 } catch {
+                    if Task.isCancelled { return }
                     statusMessage = "Start failed: \(error.localizedDescription)"
                 }
             }

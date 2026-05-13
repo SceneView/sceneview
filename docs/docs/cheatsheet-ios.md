@@ -72,25 +72,32 @@ ARSceneView(
 
 ## ARRecorder (v4.3.0+, record-only)
 
+Inside a SwiftUI `View` body:
+
 ```swift
 @StateObject private var recorder = ARRecorder()
 
-Button(recorder.isRecording ? "Stop" : "Record") {
-    Task {
-        if recorder.isRecording {
-            let url = try await recorder.stopRecording()
-            // url → MP4 in NSTemporaryDirectory(); move to PHPhotoLibrary to keep
-        } else {
-            try await recorder.startRecording()
+var body: some View {
+    Button(recorder.isRecording ? "Stop" : "Record") {
+        Task {
+            if recorder.isRecording {
+                let url = try await recorder.stopRecording()
+                // url → .mov under <caches>/ARRecorder/. Share with
+                // ShareLink(item: url) or save to PHPhotoLibrary.
+            } else {
+                try await recorder.startRecording()
+            }
         }
     }
 }
 ```
 
 iOS port of Android `ARRecorder`. Uses ReplayKit's `RPScreenRecorder` to
-capture screen pixels (NOT an ARKit session dataset). The MP4 plays back
-in Photos / QuickTime; it **cannot** be replayed into `ARSession` (ARKit
-has no deterministic playback API — replay stays Android-only). See the
+capture screen pixels (NOT an ARKit session dataset). The `.mov` plays
+back in Photos / QuickTime; it **cannot** be replayed into `ARSession`
+(ARKit has no deterministic playback API — replay stays Android-only).
+Typed errors via `ARRecorderError.{permissionDenied, disabled,
+unavailable, alreadyRecording, notRecording, other(code:)}`. See the
 parity table below.
 
 ---

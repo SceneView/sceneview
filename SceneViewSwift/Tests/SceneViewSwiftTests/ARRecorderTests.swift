@@ -75,11 +75,31 @@ final class ARRecorderTests: XCTestCase {
 
     // MARK: - Default output URL
 
-    func testDefaultOutputURLIsUnderTempDirectory() {
+    func testDefaultOutputURLIsUnderCachesDirectory() {
+        let url = ARRecorder.defaultOutputURL()
+        let caches = FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)
+            .first
+        if let caches {
+            XCTAssertTrue(
+                url.path.hasPrefix(caches.path),
+                "expected default URL to be under \(caches.path); got \(url.path)"
+            )
+        } else {
+            // Fallback path used when .cachesDirectory is unavailable —
+            // accept either location so the test is robust on CI runners.
+            XCTAssertTrue(
+                url.path.hasPrefix(NSTemporaryDirectory()),
+                "expected default URL to fall back to NSTemporaryDirectory(); got \(url.path)"
+            )
+        }
+    }
+
+    func testDefaultOutputURLContainsARRecorderFolder() {
         let url = ARRecorder.defaultOutputURL()
         XCTAssertTrue(
-            url.path.hasPrefix(NSTemporaryDirectory()),
-            "expected default URL to be under NSTemporaryDirectory(); got \(url.path)"
+            url.path.contains("/ARRecorder/"),
+            "expected default URL to live under an /ARRecorder/ subfolder; got \(url.path)"
         )
     }
 
@@ -104,6 +124,38 @@ final class ARRecorderTests: XCTestCase {
             b.lastPathComponent,
             "two consecutive defaultOutputURL() calls should return unique UUID-based names"
         )
+    }
+
+    // MARK: - Error code mapping
+
+    func testErrorMapperUserDeclinedMapsToPermissionDenied() {
+        let err = NSError(domain: "com.apple.replaykit", code: -5803, userInfo: nil)
+        let mapped = ARRecorderError.from(err)
+        if case .permissionDenied = mapped {
+            // OK
+        } else {
+            XCTFail("expected .permissionDenied for code -5803, got \(mapped)")
+        }
+    }
+
+    func testErrorMapperDisabledMapsToDisabled() {
+        let err = NSError(domain: "com.apple.replaykit", code: -5801, userInfo: nil)
+        let mapped = ARRecorderError.from(err)
+        if case .disabled = mapped {
+            // OK
+        } else {
+            XCTFail("expected .disabled for code -5801, got \(mapped)")
+        }
+    }
+
+    func testErrorMapperUnknownCodeMapsToOther() {
+        let err = NSError(domain: "com.apple.replaykit", code: -999999, userInfo: nil)
+        let mapped = ARRecorderError.from(err)
+        if case .other(_, let code) = mapped {
+            XCTAssertEqual(code, -999999, "expected .other to preserve the underlying NSError.code")
+        } else {
+            XCTFail("expected .other for unknown error code, got \(mapped)")
+        }
     }
 
     // MARK: - rememberARRecorder factory
