@@ -67,3 +67,35 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
             -skipMacroValidation \
             | xcpretty --color 2>/dev/null || cat
+
+      # Build the iOS sample demo so a missing pbxproj registration on a new
+      # demo file fails the PR instead of slipping into main. Caught by
+      # Thomas's "tester visuellement impérativement" rule on PR #1042 (file
+      # added but not in pbxproj → main broken until 74dccb56). Closes #1044.
+      - name: Cache iOS demo Swift Package dependencies
+        uses: actions/cache@v5
+        with:
+          path: samples/ios-demo/SourcePackages
+          key: spm-${{ runner.os }}-demo-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-demo-
+
+      - name: Resolve iOS demo dependencies
+        working-directory: samples/ios-demo
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme SceneViewDemo \
+            -project SceneViewDemo.xcodeproj \
+            -clonedSourcePackagesDirPath SourcePackages
+
+      - name: Build iOS sample demo (catches missing pbxproj entries)
+        working-directory: samples/ios-demo
+        run: |
+          xcodebuild build \
+            -project SceneViewDemo.xcodeproj \
+            -scheme SceneViewDemo \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            | xcpretty --color 2>/dev/null || cat
