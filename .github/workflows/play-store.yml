@@ -79,14 +79,19 @@ jobs:
       - run: chmod +x ./gradlew
 
       # Auto-versioning:
-      #   versionCode = run_number (always increasing)
+      #   versionCode base = run_number × 10 (leaves [+0…+9] room for per-track
+      #     offsets in multi-track tag pushes — see the "Calculate per-track
+      #     versionCodes" step below). Multiplying by 10 means every workflow
+      #     run reserves 10 contiguous codes, so two tracks built in the same
+      #     run can both upload without colliding, and the next run's range
+      #     always starts above the previous run's highest.
       #   versionName = - "X.Y.Z" when HEAD is exactly on a release tag (clean public version)
       #                 - "X.Y.Z-<short_sha>" when on main past the latest tag (snapshot)
       #                 - "YYYY.MM.DD-<short_sha>" when there is no tag yet
       - name: Calculate version
         id: version
         run: |
-          VERSION_CODE=${{ github.run_number }}
+          VERSION_CODE_BASE=$(( ${{ github.run_number }} * 10 ))
           EXACT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
           if [ -n "$EXACT_TAG" ]; then
             VERSION_NAME="${EXACT_TAG#v}"
@@ -98,26 +103,27 @@ jobs:
               VERSION_NAME="$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
             fi
           fi
-          echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          # `code` is the BASE (production) versionCode — see per-track step
+          # for the actual codes each track ships under.
+          echo "code=$VERSION_CODE_BASE" >> $GITHUB_OUTPUT
           echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION_NAME ($VERSION_CODE)"
+          echo "Version: $VERSION_NAME (base versionCode=$VERSION_CODE_BASE)"
 
       # Track selection logic for the matrix in the publish job:
-      #   - tag push (v*.*.*)                          → ["production"]
+      #   - tag push (v*.*.*)                          → ["internal","production"]
       #   - branch push (snapshot)                     → ["internal"]
       #   - manual dispatch with explicit single track → that track only
-      #   - manual dispatch with `internal+production` → both (with separate version codes
-      #                                                  required — see workflow guide)
+      #   - manual dispatch with `internal+production` → both
       #   - manual dispatch with `auto`                → falls back to push semantics
       #
-      # Why tag pushes only target production: Google Play tracks each `versionCode` as
-      # globally-unique within the app, and the SAME versionCode cannot be uploaded to
-      # two different tracks in a single matrix run (`r0adkll/upload-google-play` fails
-      # the second matrix entry with "Version code N has already been used"). Branch
-      # pushes always hit internal first; the eventual tag push that promotes the same
-      # build to production has the same versionCode, so we'd hit the conflict on every
-      # tag. Limiting tags to production alone avoids the dup, and the prior internal
-      # release made by an earlier branch push remains available to testers anyway.
+      # Tag pushes target BOTH internal AND production so internal testers (the
+      # release author's phone, beta partners) get the clean release on their
+      # device the moment the tag is pushed — instead of waiting 1-3 days for
+      # the Google review of the production track to complete. Each track
+      # uploads a SEPARATE AAB with a track-specific versionCode (base+offset)
+      # because Google Play's Edits API rejects re-uploads of the same
+      # versionCode to a second track. See the `Build release AAB` step for
+      # the offset table.
       - name: Compute target tracks
         id: tracks
         run: |
@@ -129,7 +135,7 @@ jobs:
               TRACKS="[\"$INPUT_TRACK\"]"
             fi
           elif [[ '${{ github.ref }}' == refs/tags/v* ]]; then
-            TRACKS='["production"]'
+            TRACKS='["internal","production"]'
           else
             TRACKS='["internal"]'
           fi
@@ -150,7 +156,18 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > samples/android-demo/release.keystore
 
-      - name: Build release AAB
+      # Build one AAB per target track. Each track gets a distinct versionCode
+      # via the base+offset scheme:
+      #
+      #   production  → base + 0   (the canonical release code)
+      #   internal    → base + 1
+      #   alpha       → base + 2
+      #   beta        → base + 3
+      #
+      # The 2nd gradle invocation is a near-no-op (incremental compile) — only
+      # the AAB packaging step re-runs because manifestPlaceholders.versionCode
+      # changed. Typical extra wall time per additional track: 20-40 s.
+      - name: Build release AABs (one per track)
         env:
           SCENEVIEW_DEMO_KEYSTORE_FILE: release.keystore
           SCENEVIEW_DEMO_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
@@ -164,15 +181,45 @@ jobs:
           # samples/android-demo/.../sketchfab/ for the BuildConfig wiring.
           SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
-          ./gradlew :samples:android-demo:bundleRelease \
-            -PversionCode=${{ steps.version.outputs.code }} \
-            -PversionName=${{ steps.version.outputs.name }}
+          BASE_CODE=${{ steps.version.outputs.code }}
+          TRACKS_JSON='${{ steps.tracks.outputs.tracks }}'
+          # Parse the JSON array into a bash list. Use jq when available
+          # (preinstalled on ubuntu-latest); fall back to python3 if not.
+          TRACKS=$(echo "$TRACKS_JSON" | jq -r '.[]' 2>/dev/null || \
+                   python3 -c "import sys,json; print('\n'.join(json.loads(sys.argv[1])))" "$TRACKS_JSON")
+          mkdir -p aabs
 
-      - name: Upload AAB artifact
+          for TRACK in $TRACKS; do
+            case "$TRACK" in
+              production) OFFSET=0 ;;
+              internal)   OFFSET=1 ;;
+              alpha)      OFFSET=2 ;;
+              beta)       OFFSET=3 ;;
+              *)
+                echo "::error::Unknown track '$TRACK' — refusing to guess an offset."
+                exit 1
+                ;;
+            esac
+            CODE=$(( BASE_CODE + OFFSET ))
+            echo "::group::Build AAB for track=$TRACK (versionCode=$CODE)"
+            ./gradlew :samples:android-demo:bundleRelease \
+              -PversionCode=$CODE \
+              -PversionName=${{ steps.version.outputs.name }}
+            # Each bundleRelease run overwrites the output path, so move the
+            # AAB out immediately and name it after the track.
+            mv samples/android-demo/build/outputs/bundle/release/*.aab \
+               "aabs/sceneview-demo-${TRACK}.aab"
+            echo "::endgroup::"
+          done
+
+          echo "Built AABs:"
+          ls -lh aabs/
+
+      - name: Upload AAB artifacts (one per track)
         uses: actions/upload-artifact@v7
         with:
-          name: sceneview-demo-${{ steps.version.outputs.name }}
-          path: samples/android-demo/build/outputs/bundle/release/*.aab
+          name: sceneview-demo-${{ steps.version.outputs.name }}-aabs
+          path: aabs/*.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -203,17 +250,18 @@ jobs:
         track: ${{ fromJSON(needs.build.outputs.tracks) }}
 
     steps:
-      - name: Download AAB artifact
+      - name: Download AAB artifacts
         uses: actions/download-artifact@v7
         with:
-          name: sceneview-demo-${{ needs.build.outputs.version_name }}
-          path: aab
+          name: sceneview-demo-${{ needs.build.outputs.version_name }}-aabs
+          path: aabs
 
       - name: Publish to Play Store (${{ matrix.track }})
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
           packageName: io.github.sceneview.demo
-          releaseFiles: aab/*.aab
+          # The build job produces one AAB per track, named after the track.
+          releaseFiles: aabs/sceneview-demo-${{ matrix.track }}.aab
           track: ${{ matrix.track }}
           status: completed

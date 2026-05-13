@@ -14,10 +14,16 @@ name: Deploy iOS App to App Store
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths:
       - 'SceneViewSwift/**'
       - 'samples/ios-demo/**'
       - '.github/workflows/app-store.yml'
+      # The `paths` filter applies to BOTH branch and tag pushes. In practice
+      # every release tag is created from a commit that bumps versions across
+      # many files including `SceneViewSwift/Package.swift` and the
+      # `.podspec` (per the Version Location Map in CLAUDE.md), so the
+      # filter naturally accepts every clean release tag.
   workflow_dispatch:
     inputs:
       submit_for_review:
@@ -201,7 +207,19 @@ jobs:
             -authenticationKeyIssuerID $APP_STORE_CONNECT_API_ISSUER_ID
 
       - name: Submit build for App Store review
-        if: github.event_name == 'workflow_dispatch' && inputs.submit_for_review == 'true'
+        # Auto-submit on:
+        #   - explicit workflow_dispatch with submit_for_review=true (legacy
+        #     manual gate)
+        #   - tag push starting with `v` (new — aligns with Android
+        #     play-store.yml's tag-push behaviour that auto-publishes to
+        #     production track + matches the implicit "tag = release"
+        #     semantics across the whole repo)
+        #
+        # Branch pushes to `main` still upload to TestFlight only — Apple
+        # review-submission is reserved for explicit release tags.
+        if: |
+          (github.event_name == 'workflow_dispatch' && inputs.submit_for_review == 'true') ||
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         env:
           ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
