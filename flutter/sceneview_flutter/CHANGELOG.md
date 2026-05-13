@@ -1,10 +1,6 @@
-## 4.1.1
+## 4.1.2
 
-- Version alignment with SceneView v4.1.1. **Critical hotfix**: native Android Filament binary version mismatch (matVer 71 packages vs 1.70.2 runtime) caused `SIGABRT` on every demo using bundled materials in v4.1.0. Now resolved — all consumers MUST upgrade. See root `CHANGELOG.md`.
-
-## 4.1.0
-
-- Version alignment with SceneView v4.1.0. ⚠️ Native Android renderer defaults changed: main light intensity 100k → 10k lux, shadows on, fill light, SSAO + bloom, neutral exposure. Existing apps embedding `sceneview_flutter` will render with the new RealityKit-equivalent look. See root `CHANGELOG.md`.
+- Version alignment with SceneView v4.1.2. ⚠️ Native Android renderer defaults changed: main light intensity 100k → 10k lux, shadows on, fill light, SSAO + bloom, neutral exposure. Existing apps embedding `sceneview_flutter` will render with the new RealityKit-equivalent look. See root `CHANGELOG.md`.
 
 ## 4.0.9
 

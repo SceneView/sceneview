@@ -95,14 +95,14 @@ No engine boilerplate. No lifecycle callbacks. The runtime handles everything.
 **Android** (3D + AR):
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.1.1")     // 3D
-    implementation("io.github.sceneview:arsceneview:4.1.1")   // AR (includes 3D)
+    implementation("io.github.sceneview:sceneview:4.1.2")     // 3D
+    implementation("io.github.sceneview:arsceneview:4.1.2")   // AR (includes 3D)
 }
 ```
 
 **iOS / macOS / visionOS** (Swift Package Manager):
 ```
-https://github.com/sceneview/sceneview.git  (from: 4.1.0)
+https://github.com/sceneview/sceneview.git  (from: 4.0.9)
 ```
 
 **Web** (sceneview.js — friendly DSL, two `<script>` tags):
@@ -288,7 +288,7 @@ ARSceneView(planeDetection: .horizontal) { position, arView in
 
 Plus the **iOS `RerunBridge`** with the same wire format as Android, and a `NodeBuilder` DSL for declarative composition outside SwiftUI.
 
-**Install:** `https://github.com/sceneview/sceneview.git` (SPM, from 4.1.0)
+**Install:** `https://github.com/sceneview/sceneview.git` (SPM, from 4.0.9)
 
 ---
 

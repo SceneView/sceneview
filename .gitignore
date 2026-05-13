@@ -150,3 +150,7 @@ mcp-strategy-report.md
 # fully audit content before promoting to a tracked file.
 samples/android-demo/src/androidTest/assets/ar-recordings/*.mp4
 samples/screenshots/qa_log*.txt
+
+# QA / device-test artifacts (transient screenshots)
+tools/qa-screenshots/
+
