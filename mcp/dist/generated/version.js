@@ -4,5 +4,5 @@
 // build time so the MCP server, telemetry, and the install-snippet
 // generators all report the actually-published versions instead of
 // stale hardcoded constants. See #941.
-export const PACKAGE_VERSION = "4.0.11";
-export const LATEST_SCENEVIEW_RELEASE = "4.0.9";
+export const PACKAGE_VERSION = "4.0.12";
+export const LATEST_SCENEVIEW_RELEASE = "4.1.1";

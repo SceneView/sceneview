@@ -69,7 +69,6 @@ private data class Planet(
 // When more GLBs are bundled, swap in the variety here.
 private val ORBITAL_PLANETS = listOf(
     Planet("models/khronos_damaged_helmet.glb", 0.20f, 0f,                 0.08f, 0.7f,  0.0f),
-    Planet("models/khronos_avocado.glb",        0.15f, Math.PI.toFloat() / 4 * 1, 0.12f, 0.5f,  0.3f),
     Planet("models/khronos_fox.glb",            0.25f, Math.PI.toFloat() / 4 * 2, 0.20f, 1.6f, -0.2f),
     Planet("models/khronos_lantern.glb",        0.20f, Math.PI.toFloat() / 4 * 3, 0.06f, 0.9f,  0.4f),
     Planet("models/animated_dragon.glb",        0.25f, Math.PI.toFloat() / 4 * 4, 0.15f, 1.2f, -0.4f),

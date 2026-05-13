@@ -964,7 +964,6 @@ internal data class PlacedAr(
 
 private val AR_MODELS = listOf(
     ArModel("Damaged Helmet", "models/khronos_damaged_helmet.glb", 0.3f),
-    ArModel("Avocado", "models/khronos_avocado.glb", 0.15f),
     ArModel("Fox", "models/khronos_fox.glb", 0.3f),
     ArModel("Lantern", "models/khronos_lantern.glb", 0.3f),
     ArModel("Toy Car", "models/khronos_toy_car.glb", 0.3f),
