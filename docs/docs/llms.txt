@@ -2909,8 +2909,75 @@ View modifiers (chainable):
 ```swift
 .environment(_ environment: SceneEnvironment) -> SceneView  // IBL lighting
 .cameraControls(_ mode: CameraControlMode) -> SceneView     // .orbit (default), .pan, .firstPerson
-.onEntityTapped(_ handler: @escaping (Entity) -> Void) -> SceneView
+.onEntityTapped(_ handler: @escaping (Entity) -> Void) -> SceneView   // real entity hit-test (v4.2.0+)
 .autoRotate(speed: Float = 0.3) -> SceneView                // radians/s, default 0.3
+.mainLight(_ slot: LightSlot) -> SceneView                  // v4.2.0+ — see LightSlot below
+.fillLight(_ slot: LightSlot) -> SceneView                  // v4.2.0+ — Android-parity 2-light setup
+.renderQuality(_ preset: RenderQuality) -> SceneView        // v4.2.0+ — .cinematic / .default / .performance
+```
+
+### Render defaults (v4.2.0+)
+
+iOS now ships the Android-parity 2-light setup out of the box (matches the v4.1.0 BREAKING render-defaults change finally landing on iOS):
+
+- **Main / key light**: `LightNode.directional(intensity: 10_000, castsShadow: true)` pointing straight down (`(0, -1, 0)`)
+- **Fill light**: `LightNode.fill(intensity: 3_000, castsShadow: false)` from `(0.5, -0.5, 0.5)` (upper-back-left → down-front-right) — 30% of main intensity, lifts the shadow side without flattening
+- **Defaults applied via `.systemDefault` slot value** — overridable per-slot
+
+```swift
+public enum LightSlot {
+    case systemDefault   // built-in default (Android-parity)
+    case disabled        // remove the slot — single-light setup with .fillLight(.disabled)
+    case custom(LightNode)
+}
+```
+
+Examples:
+```swift
+SceneView { /* ... */ }
+  .fillLight(.disabled)                                // single-light hard-shadow look
+
+SceneView { /* ... */ }
+  .mainLight(.custom(LightNode.directional(intensity: 5_000)))   // dimmer key
+  .fillLight(.custom(LightNode.fill(intensity: 6_000)))          // brighter fill
+
+SceneView { /* ... */ }
+  .renderQuality(.cinematic)         // shadows on, IBL ≥ 1.0
+SceneView { /* ... */ }
+  .renderQuality(.performance)       // shadows off, IBL halved (low-end devices)
+```
+
+### Per-entity gestures (v4.2.0+)
+
+`NodeGesture` lets you scope tap / drag / scale / rotate / longPress handlers per-entity (mirrors Android's gesture detection). Enabled automatically when `SceneView` is in the view hierarchy — `targetedToAnyEntity()` ensures empty-space gestures keep driving the camera.
+
+```swift
+let cube = GeometryNode.cube(size: 0.3, color: .blue)
+cube.entity
+    .onTap { print("Cube tapped!") }
+    .onDrag { translation in cube.position += translation }
+    .onScale { magnification in cube.scale *= magnification }
+    .onRotate { angle in cube.rotation = simd_quatf(angle: angle, axis: [0, 1, 0]) }
+    .onLongPress { print("Cube held 0.5s") }
+```
+
+Or via the imperative API:
+```swift
+NodeGesture.onTap(cube.entity) { print("Tapped!") }
+NodeGesture.removeAll(from: cube.entity)   // cleanup when content unloads
+```
+
+### AR Anchors (v4.2.0+)
+
+`AnchorNode` factories cover all ARKit anchor types:
+
+```swift
+AnchorNode.world(position: SIMD3<Float>) -> AnchorNode             // world-space pose
+AnchorNode.plane(alignment: .horizontal | .vertical,               // detected plane
+                 minimumBounds: SIMD2<Float>) -> AnchorNode
+AnchorNode.image(group: String, name: String) -> AnchorNode        // detected reference image
+AnchorNode.face() -> AnchorNode                                    // front-camera face (pose only)
+AnchorNode.body() -> AnchorNode                                    // rear-camera body root joint
 ```
 
 Minimal usage:
