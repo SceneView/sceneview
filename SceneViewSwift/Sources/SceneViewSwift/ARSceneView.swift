@@ -429,6 +429,46 @@ public struct AnchorNode: Sendable {
         return AnchorNode(entity: anchor)
     }
 
+    /// Creates an anchor that tracks a detected reference image.
+    ///
+    /// Mirrors SceneView Android's `AugmentedImageNode`. The image must already be
+    /// registered via `ARSceneView(imageTrackingDatabase:)` so ARKit knows what to
+    /// look for. Once the image is detected, content added to this anchor renders
+    /// at the image's pose in the real world.
+    ///
+    /// - Parameters:
+    ///   - group: AR Resource group name in the asset catalog (e.g. `"AR Resources"`).
+    ///   - name: Reference image name within the group.
+    public static func image(group: String, name: String) -> AnchorNode {
+        let anchor = AnchorEntity(.image(group: group, name: name))
+        return AnchorNode(entity: anchor)
+    }
+
+    /// Creates an anchor that tracks a detected face (front-camera).
+    ///
+    /// Mirrors SceneView Android's `AugmentedFaceNode` (closes part of #894).
+    /// Requires `ARFaceTrackingConfiguration` to be active — set via
+    /// `ARSceneView(faceTracking: true)` (when wired). Content added to this
+    /// anchor renders attached to the user's face at runtime.
+    ///
+    /// **Limitation**: RealityKit's `AnchorEntity(.face)` provides face-pose
+    /// tracking but no `ARSCNFaceGeometry`-equivalent mesh. For the morphing
+    /// face-mesh overlay seen in Android's AugmentedFaceDemo, drop down to a
+    /// raw `ARFaceAnchor` + custom mesh entity.
+    public static func face() -> AnchorNode {
+        let anchor = AnchorEntity(.face)
+        return AnchorNode(entity: anchor)
+    }
+
+    /// Creates an anchor that tracks a detected body (rear-camera, iOS 13+).
+    ///
+    /// Requires `ARBodyTrackingConfiguration` to be active. Content added to
+    /// this anchor renders at the detected human body's root joint.
+    public static func body() -> AnchorNode {
+        let anchor = AnchorEntity(.body)
+        return AnchorNode(entity: anchor)
+    }
+
     /// Adds a child entity to this anchor.
     public func add(_ child: Entity) {
         entity.addChild(child)
