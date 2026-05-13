@@ -168,13 +168,10 @@ fun ExploreTabScreen(
         // grid below — no dev-flavored "set SKETCHFAB_API_KEY" placeholder
         // ever reaches a real user.
         if (SketchfabConfig.apiKey != null) {
-            if (feedsError != null) {
-                Text(
-                    text = feedsError.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+            // No `feedsError` Text — when the API is unreachable each empty
+            // FeedSection self-hides and the page falls back to the "Try a
+            // sample" carousel + Categories grid silently. A red dev-style
+            // error banner here was the v4.1.0 "horrible UI" complaint.
             FeedSection(
                 title = "Trending models",
                 models = mostLiked,
@@ -288,6 +285,12 @@ private fun FeedSection(
     loading: Boolean,
     onModelClick: (SketchfabModel) -> Unit,
 ) {
+    // Hide the entire section when the feed is empty and we're not still
+    // loading — better than telling users "Nothing here yet" when the
+    // Sketchfab request failed silently or is rate-limited. Avoids three
+    // ghost sections stacking under each other in the offline path.
+    if (models.isEmpty() && !loading) return
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -304,17 +307,9 @@ private fun FeedSection(
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             }
         }
-        if (models.isEmpty() && !loading) {
-            Text(
-                text = "Nothing here yet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(models, key = { it.uid }) { m ->
-                    FeaturedSketchfabCard(model = m, onClick = { onModelClick(m) })
-                }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(models, key = { it.uid }) { m ->
+                FeaturedSketchfabCard(model = m, onClick = { onModelClick(m) })
             }
         }
     }
@@ -322,43 +317,72 @@ private fun FeedSection(
 
 @Composable
 private fun SampleCard(sample: DemoEntry, onClick: () -> Unit) {
-    Column(
+    val accent = remember(sample.category) { sampleAccent(sample.category) }
+    androidx.compose.material3.Surface(
         modifier = Modifier
-            .width(180.dp)
+            .width(168.dp)
+            .height(168.dp)
             .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
     ) {
-        Box(
-            modifier = Modifier
-                .width(180.dp)
-                .height(120.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.tertiaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = sample.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.padding(12.dp),
-            )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(88.dp)
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.32f),
+                                accent.copy(alpha = 0.14f),
+                            ),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = sample.icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = sample.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Text(
+                    text = sample.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+            }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = sample.category,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        Text(
-            text = sample.subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
     }
 }
+
+private fun sampleAccent(category: String): androidx.compose.ui.graphics.Color =
+    when (category) {
+        "3D Basics" -> androidx.compose.ui.graphics.Color(0xFF6446CD)
+        "Lighting & Environment" -> androidx.compose.ui.graphics.Color(0xFFE6A23C)
+        "Content" -> androidx.compose.ui.graphics.Color(0xFF42A5F5)
+        "Interaction" -> androidx.compose.ui.graphics.Color(0xFFEC407A)
+        "Advanced" -> androidx.compose.ui.graphics.Color(0xFF26A69A)
+        "Augmented Reality" -> androidx.compose.ui.graphics.Color(0xFF66BB6A)
+        else -> androidx.compose.ui.graphics.Color(0xFF6446CD)
+    }
 
 @Composable
 private fun CategoriesSection(onCategoryClick: (SketchfabCategory) -> Unit) {

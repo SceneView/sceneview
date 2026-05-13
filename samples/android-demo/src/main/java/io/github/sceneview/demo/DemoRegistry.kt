@@ -115,7 +115,19 @@ val ALL_DEMOS = listOf(
     DemoEntry("camera-controls", "Camera Controls", "Orbit, fly, and free camera modes", "Interaction", Icons.Filled.PhotoCamera),
     DemoEntry("gesture-editing", "Gesture Editing", "Move, scale, rotate with gestures", "Interaction", Icons.Filled.Gesture),
     DemoEntry("collision", "Collision & Hit Test", "Hit testing and collision detection", "Interaction", Icons.Filled.DragIndicator),
-    DemoEntry("view-node", "ViewNode", "Compose UI embedded in 3D space", "Interaction", Icons.Filled.Dashboard),
+    DemoEntry(
+        // Marked KnownIssue 2026-05-13: regression of #801 — viewport stays
+        // black and gestures don't reach the embedded Compose tree. Surfaced
+        // by the v3 device audit (29 KB screenshot, then a libfilament panic
+        // on the next QA pass). A real fix needs a session on hardware with
+        // a hot ViewNode window manager instance.
+        "view-node",
+        "ViewNode",
+        "Compose UI embedded in 3D space",
+        "Interaction",
+        Icons.Filled.Dashboard,
+        DemoStatus.KnownIssue,
+    ),
     // Advanced
     DemoEntry("physics", "Physics", "Gravity, collisions, rigid bodies", "Advanced", Icons.Filled.Stars),
     DemoEntry("post-processing", "Post Processing", "SSAO, anti-aliasing, tone mapping", "Advanced", Icons.Filled.Tune),
