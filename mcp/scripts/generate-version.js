@@ -77,9 +77,17 @@ console.error(
 // accidentally rewrite the unrelated `versionName "1.0"` line of the app
 // fixture itself. A single `implementation("io.github.sceneview:sceneview:X.Y.Z")`
 // is the only line we touch. The version pattern matches everything up to
-// the closing quote, so pre-release suffixes like `-rc.1` or `-beta.2`
-// round-trip correctly (an earlier `[\d.]+` regex truncated suffixes and
-// left the previous tail behind on the revert path).
+// the closing quote OR single-quote OR closing paren (Groovy and Kotlin
+// gradle DSLs are both covered), so pre-release suffixes like `-rc.1` or
+// `-beta.2` round-trip correctly (an earlier `[\d.]+` regex truncated
+// suffixes and left the previous tail behind on the revert path).
+//
+// IMPORTANT — only `android-ok/` is auto-synced. The sister fixtures
+// `android-with-warnings/build.gradle.kts` (pinned at `2.2.1`) and
+// `ios-outdated/Package.swift` (pinned at `3.0.0`) are *intentionally
+// stale* — `analyze-project.test.ts` asserts `isOutdated === true` and
+// the exact version against those values. Broadening the sync target
+// would flip those tests to false-positive.
 const fixturePath = resolve(
   mcpRoot,
   "src/__fixtures__/analyze-project/android-ok/build.gradle.kts",
@@ -87,7 +95,7 @@ const fixturePath = resolve(
 try {
   const current = readFileSync(fixturePath, "utf8");
   const updated = current.replace(
-    /(io\.github\.sceneview:sceneview:)[^"\s]+/,
+    /(io\.github\.sceneview:sceneview:)[^"'\s)]+/,
     `$1${sdkVersion}`,
   );
   if (updated !== current) {
