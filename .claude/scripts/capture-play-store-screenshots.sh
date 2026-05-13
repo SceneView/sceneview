@@ -10,6 +10,8 @@
 #   bash .claude/scripts/capture-play-store-screenshots.sh \
 #     [--demos model-viewer,ar-pose,reflection-probes,environment] \
 #     [--out samples/android-demo/play/listings/en-US/graphics] \
+#     [--status-bar-px N | auto] \
+#     [--variance-threshold N] \
 #     [--no-build]
 #
 # Requirements:
@@ -35,27 +37,42 @@ DEMOS_DEFAULT="model-viewer,ar-pose,reflection-probes,environment"
 OUT_DIR_DEFAULT="samples/android-demo/play/listings/en-US/graphics"
 PKG="io.github.sceneview.demo"
 APK_PATH="samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk"
-STATUS_BAR_PX=96
+STATUS_BAR_PX_DEFAULT=96
 # Pixel_7a AVD natural resolution = 1080×2400. Crop 96 px → 1080×2304 = 9:19.2.
 TARGET_HEIGHT=2304
 SETTLE_SECONDS=8
-VARIANCE_THRESHOLD=100
+# Default 100 keeps small-footprint hero shots (model fills only the centre
+# 1/9 of the frame, variance ~60-80) from being false-rejected. The
+# `--variance-threshold N` flag exists as an escape hatch for known-noisy
+# captures (e.g. raise to 300 when QA finds a Material 3 splash sneaking
+# through at variance ~110-150). #975.
+VARIANCE_THRESHOLD_DEFAULT=100
 
 DEMOS=""
 OUT_DIR=""
+STATUS_BAR_PX=""
+VARIANCE_THRESHOLD=""
 SKIP_BUILD=0
+require_value() {
+  # Guard against `--flag` with no following value under `set -u`.
+  [[ $# -ge 2 ]] || { echo "[capture] missing value for $1" >&2; exit 2; }
+}
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --demos) DEMOS="$2"; shift 2 ;;
-    --out)   OUT_DIR="$2"; shift 2 ;;
+    --demos) require_value "$@"; DEMOS="$2"; shift 2 ;;
+    --out)   require_value "$@"; OUT_DIR="$2"; shift 2 ;;
+    --status-bar-px) require_value "$@"; STATUS_BAR_PX="$2"; shift 2 ;;
+    --variance-threshold) require_value "$@"; VARIANCE_THRESHOLD="$2"; shift 2 ;;
     --no-build) SKIP_BUILD=1; shift ;;
     -h|--help)
-      sed -n '2,30p' "$0"; exit 0 ;;
+      sed -n '2,32p' "$0"; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 DEMOS="${DEMOS:-$DEMOS_DEFAULT}"
 OUT_DIR="${OUT_DIR:-$OUT_DIR_DEFAULT}"
+STATUS_BAR_PX="${STATUS_BAR_PX:-$STATUS_BAR_PX_DEFAULT}"
+VARIANCE_THRESHOLD="${VARIANCE_THRESHOLD:-$VARIANCE_THRESHOLD_DEFAULT}"
 
 # ── 1. Recover an offline AVD if needed ──────────────────────────────────────
 if ! adb devices | grep -qE "^emulator-|^[0-9A-F]{8}.*device$"; then
@@ -69,10 +86,54 @@ if ! adb devices | grep -qE "^emulator-|^[0-9A-F]{8}.*device$"; then
   fi
 fi
 
-# Reject multiple devices — Play screenshots must come from one stable surface.
-DEVICE_LINES=$(adb devices | grep -cE "device$" || true)
-if [[ "$DEVICE_LINES" -ne 1 ]]; then
-  echo "[capture] $DEVICE_LINES devices visible to adb; targeting one with ANDROID_SERIAL is recommended" >&2
+# Reject multiple devices unless ANDROID_SERIAL pins one — Play screenshots must
+# come from one stable surface. Without this, the script ran against a
+# non-deterministic adb default device → non-reproducible output (#975).
+ALL_DEVICES_OUT=$(adb devices)
+DEVICE_LINES=$(echo "$ALL_DEVICES_OUT" | grep -cE "device$" || true)
+if [[ "$DEVICE_LINES" -ne 1 ]] && [[ -z "${ANDROID_SERIAL:-}" ]]; then
+  echo "[capture] $DEVICE_LINES devices in 'device' state visible to adb." >&2
+  echo "[capture] Set ANDROID_SERIAL=<serial> to pick one explicitly:" >&2
+  echo "$ALL_DEVICES_OUT" >&2
+  exit 1
+fi
+# If ANDROID_SERIAL is set, verify it matches a device-state entry — otherwise
+# `adb install` / `screencap` later fail with cryptic errors after the gradle
+# build has already burned ~90 s.
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  if ! echo "$ALL_DEVICES_OUT" | awk '$2 == "device" {print $1}' | grep -qx "$ANDROID_SERIAL"; then
+    echo "[capture] ANDROID_SERIAL='$ANDROID_SERIAL' is not in 'device' state. adb sees:" >&2
+    echo "$ALL_DEVICES_OUT" >&2
+    exit 1
+  fi
+fi
+# Diagnostic when one device is targeted but others are visible (offline /
+# unauthorized) — the user may not realise the second slot exists.
+if [[ "$DEVICE_LINES" -lt $(echo "$ALL_DEVICES_OUT" | grep -cE "^[A-Za-z0-9._-]+\s" || true) ]]; then
+  echo "[capture] Note: extra devices visible (offline/unauthorized). adb sees:" >&2
+  echo "$ALL_DEVICES_OUT" >&2
+fi
+
+# Resolve --status-bar-px auto. Reads `dumpsys window` and parses the
+# `InsetsSource ... type=statusBars frame=[0,0][W,H]` line — H is the statusbar
+# height in pixels (173 on a Pixel_7a AVD @ 480dpi, NOT 96 — confirmed live).
+# The header-line + h=NNN approach the 2-agent review of #975 first tried did
+# not work because (a) `Window{...}` precedes `StatusBar`, not the other way,
+# and (b) h=NNN lives in a different InsetsSource block on Android 13+. The
+# `InsetsSource ... type=statusBars frame=` form is stable across Android 11-15.
+if [[ "$STATUS_BAR_PX" = "auto" ]]; then
+  DETECTED=$(adb shell 'dumpsys window' 2>/dev/null \
+    | grep -E 'type=statusBars.*frame=\[' \
+    | head -1 \
+    | sed -E 's/.*frame=\[[0-9]+,[0-9]+\]\[[0-9]+,([0-9]+)\].*/\1/' \
+    || true)
+  if [[ -n "${DETECTED:-}" ]] && [[ "$DETECTED" =~ ^[0-9]+$ ]] && [[ "$DETECTED" -gt 0 ]]; then
+    STATUS_BAR_PX="$DETECTED"
+    echo "[capture] --status-bar-px auto → $STATUS_BAR_PX" >&2
+  else
+    STATUS_BAR_PX="$STATUS_BAR_PX_DEFAULT"
+    echo "[capture] --status-bar-px auto: detection failed, using default $STATUS_BAR_PX" >&2
+  fi
 fi
 
 # ── 2. Build a fresh debug APK ───────────────────────────────────────────────
