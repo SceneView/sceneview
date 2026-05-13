@@ -59,7 +59,9 @@ fun BillboardDemo(onBack: () -> Unit) {
                 FilterChip(
                     showBillboard,
                     onClick = { showBillboard = !showBillboard },
-                    label = { Text("Billboard") }
+                    // Distinct from the AppBar title "Billboard" so test
+                    // matchers and screen readers can disambiguate (#1040).
+                    label = { Text("Billboard Panel") }
                 )
                 FilterChip(
                     showFixed,

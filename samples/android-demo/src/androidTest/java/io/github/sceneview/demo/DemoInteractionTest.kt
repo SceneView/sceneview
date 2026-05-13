@@ -606,7 +606,7 @@ class DemoInteractionTest {
     fun billboard_visibilityChips() {
         openDemo("billboard", "Billboard")
         screenshot("49_billboard_both_visible")
-        tap("Billboard"); screenshot("50_billboard_only_fixed")
+        tap("Billboard Panel"); screenshot("50_billboard_only_fixed")
         tap("Fixed Image"); screenshot("51_billboard_none")
     }
 

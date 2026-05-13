@@ -15,7 +15,7 @@
 // product `SceneViewSwift` points at `SceneViewSwift/Sources/SceneViewSwift`
 // via the `path` parameter, so Xcode users can now do:
 //
-//     .package(url: "https://github.com/sceneview/sceneview", from: "4.1.0")
+//     .package(url: "https://github.com/sceneview/sceneview", from: "4.2.0")
 //
 // and pin to any tag the monorepo has cut, no manual mirroring required.
 // The `SceneViewSwift/Package.swift` sub-manifest is left in place so the
