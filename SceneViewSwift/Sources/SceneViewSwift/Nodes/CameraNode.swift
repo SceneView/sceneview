@@ -158,20 +158,34 @@ public struct CameraNode: Sendable {
 
     // MARK: - Exposure
 
-    /// Sets the exposure compensation value.
+    /// Sets the exposure compensation value (no-op on iOS today).
     ///
-    /// - Important: **This method is a no-op on iOS.** RealityKit's `PerspectiveCameraComponent`
-    ///   does not expose exposure settings as of Xcode 26.x. The method is kept for Android API
-    ///   parity but performs no operation. Use `ARSceneView(cameraExposure:)` for AR scenes, or
-    ///   adjust scene lighting intensity to control overall brightness.
+    /// - Important: **This method is a no-op on iOS.** RealityKit's
+    ///   `PerspectiveCameraComponent` does not expose an exposure or
+    ///   exposure-compensation property as of Xcode 26.x (the closest available
+    ///   knob is `ImageBasedLightComponent.intensityExponent` on the IBL receiver,
+    ///   which `SceneView.renderQuality(_:)` already tunes per-preset — see
+    ///   `RenderQuality.swift`). The method is kept for Android API parity.
+    ///
+    /// For control over scene brightness on iOS, use one of:
+    /// - `ARSceneView(cameraExposure:)` for AR scenes (real exposure)
+    /// - `SceneView { ... }.renderQuality(.cinematic / .performance)` to tune IBL intensity
+    /// - Per-light `LightNode.directional(intensity:)` to adjust the key/fill ratio
+    ///
+    /// Investigated as part of the #928 silent-stub batch. Confirmed via direct build
+    /// against Xcode 26.x that no `PerspectiveCameraComponent.exposureCompensation`
+    /// property exists despite an earlier audit suggestion otherwise.
     ///
     /// - Parameter value: Exposure compensation in EV stops (ignored).
     /// - Returns: Self for chaining.
-    @available(*, deprecated, message: "No-op on iOS — RealityKit's PerspectiveCameraComponent does not support exposure. Use ARSceneView(cameraExposure:) for AR, or adjust lighting intensity for 3D scenes.")
+    @available(*, deprecated, message: "No-op on iOS — PerspectiveCameraComponent does not expose exposure. Use ARSceneView(cameraExposure:) for AR, SceneView.renderQuality(_:) to tune IBL, or per-light intensity for 3D scenes.")
     @discardableResult
     public func exposure(_ value: Float) -> CameraNode {
-        // PerspectiveCameraComponent does not have an `exposure` property in current RealityKit.
-        // This method is reserved for future use when the API becomes available.
+        // PerspectiveCameraComponent does not have an `exposure` property in current
+        // RealityKit. Investigation note: verified via direct Xcode 26.x build that
+        // `camera.exposureCompensation` is not a member. The IBL receiver's
+        // `ImageBasedLightComponent.intensityExponent` is the practical knob and is
+        // already tuned per RenderQuality preset.
         return self
     }
 }

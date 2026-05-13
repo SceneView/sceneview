@@ -464,9 +464,18 @@ private struct SceneViewRepresentation: View {
     }
 
     private var tapGesture: some Gesture {
+        // Wire real entity hit-testing via SwiftUI's `targetedToAnyEntity()` — the
+        // SpatialTapGesture's `value.entity` is the actual RealityKit entity at the
+        // tap location, not the scene root. Closes part of #928 (this used to pass
+        // `entities.root` unconditionally regardless of where the user tapped, which
+        // made the callback useless for picking objects in the scene).
+        //
+        // Requires iOS 17+ / macOS 14+ / visionOS 1+ (RealityKit 2.x). All current
+        // SceneViewSwift platforms already require those baselines.
         SpatialTapGesture()
-            .onEnded { _ in
-                onEntityTapped?(entities.root)
+            .targetedToAnyEntity()
+            .onEnded { value in
+                onEntityTapped?(value.entity)
             }
     }
 }
