@@ -8,7 +8,7 @@ import SceneViewSwift
 /// and ``CameraControlMode/firstPerson`` to feel the difference in gesture
 /// handling. Closes #1034 (last #928 silent-stub item).
 struct CameraControlsDemo: View {
-    @State private var mode: CameraControlMode = .firstPerson
+    @State private var mode: CameraControlMode = .orbit
 
     var body: some View {
         ZStack {
