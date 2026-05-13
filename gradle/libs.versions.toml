@@ -39,7 +39,7 @@ arCore = "1.53.0"
 
 # Networking
 fuel = "2.3.1"
-okhttp = "5.0.0"
+okhttp = "5.3.2"
 kotlinxSerialization = "1.8.0"
 
 # UI
