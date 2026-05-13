@@ -165,7 +165,33 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-13, session cool-wescoff-28cd9c — v4.1.2 demo recovery)
+### Current state (last updated: 2026-05-13 evening, session upbeat-kare-a31ed4 — iOS parity v4.2.0-WIP sprint, post-restart)
+
+- 🚀 **iOS parity sprint shipping toward v4.2.0** ([umbrella #1004](https://github.com/sceneview/sceneview/issues/1004)). Cumulative today **15 PRs landed by upbeat-kare** + 7 PRs by cool-wescoff (v4.1.2 Android demo recovery). All on top of v4.1.2 (`50145a78` → +12 commits).
+- ✅ **iOS parity items shipped this evening (post-restart)**:
+  - [#1016 LightSlot enum + LightNode.fill factory + .mainLight/.fillLight modifiers](https://github.com/sceneview/sceneview/pull/1016) — addresses every Agent 1+2 finding from the previous review (LightSlot vs Optional<LightNode?>, @MainActor vs Sendable, drop circular v4.2.0 docs, castsShadow param, no baked orientation, bump fallback defaults to Android-parity 10_000/3_000 lux + (0.5,-0.5,0.5) direction).
+  - [#1018 RenderQuality preset + .renderQuality(_:) modifier](https://github.com/sceneview/sceneview/pull/1018) — `.cinematic` / `.default` / `.performance`, walks DirectionalLight children + adjusts IBL `intensityExponent`. RealityKit-vs-Filament parity gap documented in enum doc-comment (no SSAO/MSAA/HDR-buffer/bloom on iOS).
+  - [#1019 onEntityTapped real hit-test + CameraNode.exposure docs (#928)](https://github.com/sceneview/sceneview/pull/1019) — `SpatialTapGesture().targetedToAnyEntity()` so callback gets actual tapped entity (was always `entities.root`). CameraNode.exposure stays deprecated no-op with clear redirect to working alternatives (verified `PerspectiveCameraComponent.exposureCompensation` does NOT exist despite Agent 4's claim — direct Xcode 26.x build confirmed).
+  - [#1020 deep-link routing model-viewer + multi-model](https://github.com/sceneview/sceneview/pull/1020) — closes [#1015](https://github.com/sceneview/sceneview/issues/1015). Both ids now route to `SceneGalleryDemo` instead of "Coming soon" placeholder.
+  - [#1024 NodeGesture wire to SwiftUI gestures (#928)](https://github.com/sceneview/sceneview/pull/1024) — last big "fixable" #928 item. 5 new `.simultaneousGesture(...).targetedToAnyEntity()` route to `NodeGesture.dispatch{Tap,Drag,Scale,Rotate,LongPress}`. Empty-space gestures still drive camera.
+  - [#1025 AnchorNode.image / .face / .body factories](https://github.com/sceneview/sceneview/pull/1025) — closes 3 of the iOS AR parity gaps (#1004 + #894 partial). 1-line wrappers around RealityKit's existing `AnchorEntity(...)` cases.
+  - [#1027 llms.txt + 11 SPM refs bump to 4.1.2](https://github.com/sceneview/sceneview/pull/1027) — exposes the new v4.2.0 iOS API surface to MCP consumers.
+- ✅ **Visual smoke test on iPhone 16e simulator confirmed SHIP for all 4 v4.2.0-WIP PRs** (#1016 / #1018 / #1019 / #1020). 5 demos captured, no regression. Side-finding (off-center camera framing in all iOS demos — pre-existing, not regression) filed as [#1026](https://github.com/sceneview/sceneview/issues/1026).
+- 🔵 **Follow-up issues filed**: [#1017 reactive light update](https://github.com/sceneview/sceneview/issues/1017) (Android `prevFillLightRef` swap pattern → iOS `RealityView.update:`), [#1026 camera framing off-center](https://github.com/sceneview/sceneview/issues/1026).
+- 📦 **#928 silent-stub batch FIXABLE items COMPLETE** for v4.2.0: sessionInterruptionEnded full re-apply (#1013), spot innerAngle clamp (#1013), onEntityTapped real hit-test (#1019), NodeGesture dispatch wire (#1024), CameraNode.exposure docs (#1019, negative result). Remaining stubs are RealityKit-impossible and stay deprecated with clear redirect docs.
+
+### Followups for next session
+
+1. **Cut v4.2.0** — major iOS parity wins shipped (LightSlot + RenderQuality + #928 fixable batch + AR anchors). Acceptance criteria of #1004 mostly met; remaining items (CloudAnchorNode, ARRecorder via ReplayKit, sceneview-core XCFramework, reactive light update #1017) can ship in v4.3.0.
+2. **Continue iOS parity** if not cutting v4.2.0 yet:
+   - **ARRecorder record-only via ReplayKit** (M, MED, no playback)
+   - **sceneview-core XCFramework** + Swift bridge for NodeAnimator/Spring/Property (M, MED)
+   - **Reactive light update** (M, fixes #1017 limitation in #1016)
+   - **Camera framing centering** (#1026, M, library-level vs per-demo)
+3. **Wait for cool-wescoff** — she shipped v4.1.2 + #1021 fixture autosync; check if she's still active before touching shared zones.
+4. **Daily metrics 2026-05-13** captured at memory `metrics_2026-05-13.md`.
+
+### Previous state (last updated: 2026-05-13, session cool-wescoff-28cd9c — v4.1.2 demo recovery)
 
 - 🚀 **v4.1.2 SHIPPED** end-to-end:
   - PR [#1010](https://github.com/sceneview/sceneview/pull/1010) merged to main as commit `d16dc9b9`
