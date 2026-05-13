@@ -61,6 +61,11 @@ is_whitelisted() {
     samples/ios-demo/SceneViewDemo/SceneViewDemoApp.swift) return 0 ;;
     SceneViewSwift/Examples/SceneViewDemo/SceneViewDemo/SceneViewDemoApp.swift) return 0 ;;
 
+    # CLAUDE.md describes the rename rule itself in prose
+    # (e.g. "validator catches the `Scene { } → SceneView { }` rename") —
+    # the file is metadata about the detector, not consumer-facing code.
+    CLAUDE.md) return 0 ;;
+
     # Session notes, historical reports — not user-facing
     .claude/branding.md | .claude/handoff.md | .claude/website-review-report.md) return 0 ;;
     .claude/active-branches.md) return 0 ;;
