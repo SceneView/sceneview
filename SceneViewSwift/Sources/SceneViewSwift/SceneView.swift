@@ -93,6 +93,13 @@ public struct SceneView: View {
     // Default `.default` preserves the scene's loaded settings.
     var renderQualityPreset: RenderQuality = .default
 
+    // Auto-centre user content the first frame the bounds are non-empty so
+    // demos placing objects at e.g. `z = -2` show up visually centred in
+    // the viewport. Mirrors Android's per-demo `ModelNode(centerOrigin: …)`
+    // pattern but at the library level. Default `true`; opt out via
+    // `.autoCenterContent(false)`. Closes #1026.
+    var autoCenterContentEnabled: Bool = true
+
     /// Creates a 3D scene with imperative content setup.
     ///
     /// - Parameter content: A closure that populates the scene. Receives a root
@@ -132,7 +139,8 @@ public struct SceneView: View {
             autoRotateSpeed: autoRotateSpeed,
             mainLightSlot: mainLightSlot,
             fillLightSlot: fillLightSlot,
-            renderQualityPreset: renderQualityPreset
+            renderQualityPreset: renderQualityPreset,
+            autoCenterContentEnabled: autoCenterContentEnabled
         )
     }
 
@@ -243,6 +251,38 @@ public struct SceneView: View {
         copy.renderQualityPreset = preset
         return copy
     }
+
+    /// Controls whether the library translates the user-content root entity
+    /// so its centroid lands at the orbit pivot on the first frame the
+    /// scene's `visualBounds` is non-empty. Default `true`. Closes #1026.
+    ///
+    /// Pass `false` for scenes that rely on intentional off-centre
+    /// placement (e.g. carousels, narrative dioramas, story-mode demos
+    /// where the camera is meant to look down on content placed below).
+    /// All existing demos and code that previously called
+    /// `ModelNode(centerOrigin: …)` work either way — the centring is
+    /// idempotent and reverses an off-centre placement to origin.
+    ///
+    /// **iOS-only behaviour vs Android (#1026)**: Android achieves the
+    /// same effect per-demo via `ModelNode(centerOrigin = Position.ZERO)`
+    /// and there is no library-level auto-centre on Android. Cross-platform
+    /// code that ports Android scenes verbatim will see iOS implicitly
+    /// re-centre content that was laid out with explicit positions —
+    /// pass `false` here to disable the library-level pass and restore
+    /// strict Android-parity placement semantics.
+    ///
+    /// ```swift
+    /// SceneView { root in
+    ///     // Hero piece placed deliberately off-centre for a horizon-line shot
+    ///     root.addChild(model.entity)
+    /// }
+    /// .autoCenterContent(false)
+    /// ```
+    public func autoCenterContent(_ enabled: Bool) -> SceneView {
+        var copy = self
+        copy.autoCenterContentEnabled = enabled
+        return copy
+    }
 }
 
 // MARK: - Scene entities holder
@@ -252,8 +292,25 @@ public struct SceneView: View {
 /// or recreated across SwiftUI re-renders — critical because @State on a
 /// reference type does not guarantee identity stability in all SwiftUI versions.
 private final class SceneEntities: ObservableObject {
+    /// The orbit / scale pivot. Receives the camera-controls rotation and
+    /// scale every frame so the scene appears to orbit / zoom around its
+    /// origin. Lights are added here so the auto-centering translation
+    /// applied to ``contentRoot`` does not move them.
     let root = Entity()
+    /// Holds user-supplied content. Translated by the auto-center helper
+    /// on the first frame where ``Entity/visualBounds(relativeTo:)`` is
+    /// non-empty, so demos placing objects at e.g. `z = -2` show up
+    /// visually centred in the viewport without each demo having to
+    /// `centerOrigin` itself. Closes #1026.
+    let contentRoot = Entity()
     let ibl = Entity()
+    #if os(iOS) || os(macOS)
+    /// Holds the perspective camera so gesture handlers can mutate its
+    /// field-of-view directly. Used by ``CameraControlMode/firstPerson``
+    /// pinch — see #1034. visionOS renders through the headset, no manual
+    /// camera entity exists.
+    let perspCamera = PerspectiveCamera()
+    #endif
 }
 
 // MARK: - Internal implementation
@@ -269,12 +326,26 @@ private struct SceneViewRepresentation: View {
     let mainLightSlot: LightSlot
     let fillLightSlot: LightSlot
     let renderQualityPreset: RenderQuality
+    /// When true (default), the first frame where the user content's
+    /// `visualBounds` is non-empty triggers a one-time translation of
+    /// `entities.contentRoot` so the scene's centroid lands at the orbit
+    /// pivot. Closes #1026.
+    let autoCenterContentEnabled: Bool
 
     @State private var camera = CameraControls(mode: .orbit)
     @StateObject private var entities = SceneEntities()
     @State private var lastDragTranslation: CGSize = .zero
     @State private var initialPinchRadius: Float? = nil
+    /// Snapshotted FOV when a pinch begins in ``CameraControlMode/firstPerson``
+    /// — kept separate from `initialPinchRadius` so the orbit/pan dolly path
+    /// stays untouched. Closes #1034.
+    @State private var initialPinchFov: Float? = nil
     @State private var isDragging = false
+
+    /// Set to `true` once ``refreshContentCentering()`` has translated
+    /// `entities.contentRoot` so subsequent frames are a cheap no-op.
+    /// Closes #1026.
+    @State private var didCenterContent = false
 
     // Reactive light-slot caches — compared in `update:` closure to detect when the
     // caller mutated `.mainLight(_:)` / `.fillLight(_:)` so the corresponding entity
@@ -334,6 +405,13 @@ private struct SceneViewRepresentation: View {
             // pattern in `Scene.kt:287-305` ported to iOS).
             refreshLightSlot(.main, slot: mainLightSlot)
             refreshLightSlot(.fill, slot: fillLightSlot)
+            // Auto-center user content the first frame where `visualBounds`
+            // becomes non-empty (i.e. async-loaded models have populated).
+            // No-op once centered; opt-out via `.autoCenterContent(false)`.
+            // Closes #1026.
+            if autoCenterContentEnabled {
+                refreshContentCentering()
+            }
         }
         #else
         // RealityView requires macOS 15.0+; fall back to a placeholder on older SDKs
@@ -360,14 +438,20 @@ private struct SceneViewRepresentation: View {
         // simulate orbit. The slight Y elevation gives a natural bird's-eye angle.
         // look(at:from:) handles both position and orientation — in RealityKit,
         // entities face +Z by default so explicit orientation is required.
-        let perspCamera = PerspectiveCamera()
-        perspCamera.camera.fieldOfViewInDegrees = 60
-        perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
-        realityContent.add(perspCamera)
+        // We keep a ref on the SceneEntities holder so `.firstPerson` pinch can
+        // mutate the FOV at runtime (#1034).
+        entities.perspCamera.camera.fieldOfViewInDegrees = 60
+        entities.perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
+        realityContent.add(entities.perspCamera)
         #endif
 
         // Root entity holds all user content
         realityContent.add(entities.root)
+        // Intermediate contentRoot — user content goes here so the
+        // auto-center pass (refreshContentCentering, called from the
+        // RealityView.update: closure) can translate it independently of
+        // lights, IBL, and camera. Closes #1026.
+        entities.root.addChild(entities.contentRoot)
 
         // IBL entity (will be configured when environment loads)
         realityContent.add(entities.ibl)
@@ -381,8 +465,11 @@ private struct SceneViewRepresentation: View {
         appliedMainSlot = mainLightSlot
         appliedFillSlot = fillLightSlot
 
-        // Populate user content
-        content(entities.root)
+        // Populate user content. Goes into `contentRoot` (a child of root)
+        // instead of `root` directly so the auto-center translation in
+        // `refreshContentCentering()` only affects user content, not the
+        // lights provisioned just above.
+        content(entities.contentRoot)
 
         // Apply RenderQuality preset to all directional lights + the IBL receiver entity.
         // Runs AFTER lights + content are added so the preset walks the full scene tree.
@@ -472,6 +559,50 @@ private struct SceneViewRepresentation: View {
         }
     }
 
+    // MARK: - Auto-center content (#1026)
+
+    /// Translates ``SceneEntities/contentRoot`` so the centroid of its
+    /// `visualBounds` lands at the parent (`entities.root`) origin. Runs
+    /// once on the first frame the bounds are non-empty — most async
+    /// model loads complete within a handful of frames after `setupScene`.
+    ///
+    /// Without this, iOS demos placing content at e.g. `z = -2` render
+    /// in the bottom-third of the viewport: the default perspective
+    /// camera at `[0, 0.3, 2]` looks at world origin, but content is far
+    /// from origin. Android achieves the same effect via the per-demo
+    /// `ModelNode(centerOrigin = …)` parameter; iOS now does it at the
+    /// library level so every demo benefits without per-demo plumbing.
+    ///
+    /// Opt-out via ``SceneView/autoCenterContent(_:)`` for scenes that
+    /// rely on intentional off-centre placement.
+    /// Smallest mesh extent (in meters) the auto-centre pass will accept
+    /// as "content has loaded enough to be centred". Below this threshold
+    /// the bounds are assumed to come from an async load that hasn't
+    /// populated yet, and the pass is deferred to the next frame.
+    private static let minVisualExtent: Float = 0.001
+
+    @MainActor
+    private func refreshContentCentering() {
+        guard !didCenterContent else { return }
+        // Query bounds in contentRoot-local space so they're invariant of
+        // `entities.root`'s rotation + scale (applied every frame by
+        // `applyCamera()`). Sampling `relativeTo: entities.root` would
+        // rescale extents with pinch-zoom, opening a race where an
+        // early-pinch + slow-loading model flips the `minVisualExtent`
+        // gate true/false between frames and centres at the wrong moment.
+        let bounds = entities.contentRoot.visualBounds(relativeTo: entities.contentRoot)
+        let extents = bounds.extents
+        // Skip empty / degenerate bounds — async loads not done yet.
+        // RealityKit's empty `BoundingBox` returns `min = +∞`, `max = -∞`
+        // so the `max - min` extents are non-finite (or zero for a
+        // zero-extent placeholder); both cases are caught here.
+        guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite else { return }
+        let extentMax = max(extents.x, extents.y, extents.z)
+        guard extentMax > Self.minVisualExtent else { return }
+        entities.contentRoot.position = -bounds.center
+        didCenterContent = true
+    }
+
     // MARK: - Environment IBL
 
     @MainActor
@@ -500,12 +631,54 @@ private struct SceneViewRepresentation: View {
     // MARK: - Camera
 
     private func applyCamera() {
+        // Sync the camera state's mode with the modifier-provided value. Done
+        // every frame because the modifier propagates as a `let` while the
+        // camera state is `@State` — without this, calling
+        // `.cameraControls(.pan)` would be silently ignored. Closes #1034.
+        if camera.mode != cameraControlMode {
+            camera.mode = cameraControlMode
+        }
+
         let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
         let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
         entities.root.orientation = yaw * pitch
 
-        let zoomScale = 5.0 / camera.orbitRadius
-        entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+        // Per-mode application of zoom + translation. Mirrors Android's
+        // `CameraGestureDetector` modes (ORBIT / PAN / FREE_FLIGHT) — closes
+        // #1034 (last #928 silent-stub item).
+        switch camera.mode {
+        case .orbit:
+            // Standard orbit: pinch scales scene; no translation.
+            let zoomScale = 5.0 / camera.orbitRadius
+            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+            entities.root.position = .zero
+
+        case .pan:
+            // Pan: pinch still dollies, drag translates `target` laterally.
+            // Visually the scene slides in screen space — equivalent to
+            // moving the camera in the opposite direction.
+            let zoomScale = 5.0 / camera.orbitRadius
+            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+            entities.root.position = -camera.target * zoomScale
+
+        case .firstPerson:
+            // First-person inspection: no scale change (pinch mutates FOV
+            // instead — see pinchGesture). Rotation makes the scene
+            // yaw/pitch around the world origin while the camera stays
+            // fixed at `[0, 0.3, 2]`. NB: this is NOT a true "stand still
+            // and look around" camera-orientation rotation — see the
+            // `firstPerson` enum doc-comment for the v4.4.0 follow-up.
+            entities.root.scale = SIMD3<Float>(repeating: 1)
+            entities.root.position = .zero
+            #if os(iOS) || os(macOS)
+            // Sync the perspective camera FOV to the camera-controls state.
+            // Skip the property write when nothing changed so RealityKit
+            // doesn't re-evaluate the projection matrix on idle frames.
+            if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
+                entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
+            }
+            #endif
+        }
     }
 
     // MARK: - Gestures
@@ -528,21 +701,40 @@ private struct SceneViewRepresentation: View {
     }
 
     private var pinchGesture: some Gesture {
+        // Mode-aware pinch: orbit/pan dollies the radius, firstPerson scales
+        // the perspective camera's FOV (#1034). We snapshot the value at
+        // gesture start so the delta is applied to a stable base — same
+        // pattern as Android's `Manipulator.scrollBegin / scrollUpdate`.
         MagnifyGesture()
             .onChanged { value in
-                if initialPinchRadius == nil {
-                    initialPinchRadius = camera.orbitRadius
-                }
-                if let initial = initialPinchRadius {
-                    let newRadius = initial / Float(value.magnification)
-                    camera.orbitRadius = min(
-                        max(newRadius, camera.minRadius),
-                        camera.maxRadius
-                    )
+                switch camera.mode {
+                case .orbit, .pan:
+                    if initialPinchRadius == nil {
+                        initialPinchRadius = camera.orbitRadius
+                    }
+                    if let initial = initialPinchRadius {
+                        let newRadius = initial / Float(value.magnification)
+                        camera.orbitRadius = min(
+                            max(newRadius, camera.minRadius),
+                            camera.maxRadius
+                        )
+                    }
+                case .firstPerson:
+                    if initialPinchFov == nil {
+                        initialPinchFov = camera.fov
+                    }
+                    if let initial = initialPinchFov {
+                        let newFov = initial / Float(value.magnification)
+                        camera.fov = min(
+                            max(newFov, camera.minFov),
+                            camera.maxFov
+                        )
+                    }
                 }
             }
             .onEnded { _ in
                 initialPinchRadius = nil
+                initialPinchFov = nil
             }
     }
 

@@ -253,10 +253,10 @@ struct SamplesTab: View {
                 PhysicsDemo()
             },
 
-            // MARK: Interaction (mostly coming soon — Android-only today)
-            // Note: "Camera Controls" itself ships in the .advanced section via
-            // CameraControlsDemo (orbit + grid). The advanced pan/fly/first-person
-            // modes are tracked separately as Android-only for now.
+            // MARK: Interaction
+            // CameraControlsDemo ships in the .advanced section with the full
+            // 3-way mode picker (orbit / pan / firstPerson) since v4.3.0 (#1034).
+            // Gesture-editing demos below are still pending iOS port.
 
             DemoItem(
                 comingSoonTitle: "Gesture Editing",
