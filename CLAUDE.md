@@ -165,6 +165,29 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
+### Current state (last updated: 2026-05-13, session cool-wescoff-28cd9c — v4.1.2 demo recovery)
+
+- 🚀 **v4.1.2 SHIPPED** end-to-end:
+  - PR [#1010](https://github.com/sceneview/sceneview/pull/1010) merged to main as commit `d16dc9b9`
+  - Tag `v4.1.2` pushed → `release.yml` (Maven Central + GitHub Release + Dokka) + `play-store.yml` (internal + production tracks) firing
+  - 7 commits on branch: AR launcher fix, Samples M3 Expressive grid, Explore polish, .filamat revert (superseded by main's v4.1.1 1.71 bump on merge), matc 1.70.2 recompile (also superseded), 5-agent review fixes, version bump 4.1.0 → 4.1.2
+- 🩹 **Demo app recovery** (Thomas: "ya rien qui va… horrible UI/UX… moitié des samples qui marchent pas"):
+  - **AR View tab** no longer crashes the app. New launcher screen gates the live `ARSceneView` behind an explicit "Start AR Camera" CTA + `ArCoreApk.checkAvailability()` status pill + 2×3 grid of headline AR demos. `runCatching` around the availability check; CTA hard-disabled on `UNSUPPORTED_DEVICE_NOT_CAPABLE` / `UNKNOWN_*`. Top-right exit button for back affordance. `sessionStarted` is `rememberSaveable` for process-death survival.
+  - **Samples tab** replaces the plain `ListItem` text list with a 2-col M3 Expressive grid. Compact accent-tinted icon tile (36% of card, was 55%), per-category accent hues (3D Basics purple, Lighting amber, Content blue, Interaction pink, Advanced teal, AR green), per-demo semantic Material icon. `DemoEntry` carries `icon: ImageVector` and `status: DemoStatus` (Working / KnownIssue / ComingSoon); non-Working demos surface an outlined "Preview" chip (not red alarm).
+  - **Explore tab** drops the dev-flavored "Set SKETCHFAB_API_KEY" placeholder that was leaking to end-user Play Store builds. `SampleCard` rebuilt to match `DemoCard` styling. Empty `FeedSection`s self-hide instead of stacking three "Nothing here yet." headers under each other.
+- 🛡️ **5-agent Opus independent review** ran in parallel before merge — 2 BLOCKER + 6 MAJOR + N MINOR all addressed in commit `2556c467`:
+  - `ArCoreApk.checkAvailability` now wrapped in `runCatching` (BLOCKER — could silently die on OEMs without Play Services).
+  - Permission-denied path now flips `sessionStarted = false` (BLOCKER — was stranding users on a dead placeholder).
+  - `rememberTopAppBarState` for the Samples scroll behavior (MAJOR — collapse offset reset on every recomposition).
+  - Grid item keys namespaced `"demo-${id}"` (MAJOR — guarded against id collision).
+  - Dark-mode accent palette: each category resolves to a desaturated hue on dark theme so tinted tiles don't burn at >9:1 contrast (MAJOR).
+  - 4 better semantic icons (gesture-editing → OpenWith, collision → CenterFocusStrong, shape → Pentagon, physics → ScatterPlot).
+  - **Holistic agent caught the real Filament .filamat ABI root cause** — `efd296f1` bumped blobs to matc 1.71 but `4a31b579` reverted runtime to 1.70.2 without recompiling blobs. Two opposite fixes shipped in parallel: this branch reverted blobs back to 1.70.x + recompiled the 2 unlit_color ones with matc 1.70.2 (downloaded from upstream v1.70.2 release tarball); main's v4.1.1 hotfix went the other way and bumped the runtime to 1.71 to match the existing 1.71 blobs. On merge we took main's 1.71 truth.
+- ✅ **25 / 25 non-AR demos pass** on Pixel_7a `-gpu host` emulator (was 14 / 25 in the v4.1.0 audit). Previously crashing: `lighting`, `movable-light`, `fog`, `environment`, `text`, `lines-paths`, `image`, `billboard`, `view-node`, `debug-overlay` — all now render.
+- 🛑 **Memory rule rewritten** — `feedback_stitch_mandatory.md` now drops Google Stitch as the mandated UI source for SceneView demo. Reference-driven (Sketchfab mobile / Polycam / Reality Composer) + `DESIGN.md` tokens is the new workflow. Figma reserved for marketing surfaces only.
+- 🗝️ Sketchfab API key now supported in `local.properties` (`sketchfab.api.key=...`) for developer builds. CI flow unchanged (still sources from the GitHub Secret `SKETCHFAB_API_KEY`). Verified the key never appears in any committed file via `git grep`.
+- 📋 Next session follow-ups: 5-agent review left a few MINOR items (extract shared `DemoCard` to `samples/android-demo/.../ui/common/`, monitor `tools/qa-screenshots/` cleanup, document the "Filament version + matc must match" invariant in `CONTRIBUTING.md`). All non-blocking.
+
 ### Current state (last updated: 2026-05-11, session elegant-wright-b9cd6f — audit-sweep + 5-agent review)
 
 - 🚀 **40 commits / 22 issues fermées / 5 follow-ups filés** (#971–#975) in a single session.
