@@ -38,10 +38,27 @@ import RealityKit
 ///   .fillLight(.custom(LightNode.fill(intensity: 5_000)))   // user override
 /// ```
 ///
-/// Note: today the slot is read once during scene setup. Reactive replacement
-/// (`SceneView(...).fillLight(.custom(newLight))` mid-frame) is tracked as a
-/// follow-up — the current `RealityView.update:` closure does not yet diff lights.
-public enum LightSlot {
+/// Slot values are diffed reactively: `SceneView(...).fillLight(.custom(newLight))`
+/// from a `@State` mutation triggers a swap on the next render frame (the
+/// `RealityView.update:` closure walks the scene root for tagged entities and
+/// replaces them when the slot value changes). Closes #1017.
+public enum LightSlot: Equatable {
+
+    /// Equatable conformance compares cases, with `.custom` cases compared by
+    /// `Entity` reference identity (`===`) — sufficient because a single
+    /// `LightNode` instance owns a single `Entity` and the slot is the only
+    /// retainer of interest here.
+    public static func == (lhs: LightSlot, rhs: LightSlot) -> Bool {
+        switch (lhs, rhs) {
+        case (.systemDefault, .systemDefault), (.disabled, .disabled):
+            return true
+        case (.custom(let a), .custom(let b)):
+            return a.entity === b.entity
+        default:
+            return false
+        }
+    }
+
     /// Use the built-in default for this light slot.
     /// - Main slot default: directional at `10_000` lux, oriented straight down, casts shadows.
     /// - Fill slot default: directional at `3_000` lux, oriented from `(0.5, -0.5, 0.5)`, no shadow.
@@ -259,6 +276,12 @@ private struct SceneViewRepresentation: View {
     @State private var initialPinchRadius: Float? = nil
     @State private var isDragging = false
 
+    // Reactive light-slot caches — compared in `update:` closure to detect when the
+    // caller mutated `.mainLight(_:)` / `.fillLight(_:)` so the corresponding entity
+    // can be swapped in-place without a full RealityView teardown. Closes #1017.
+    @State private var appliedMainSlot: LightSlot? = nil
+    @State private var appliedFillSlot: LightSlot? = nil
+
     var body: some View {
         realityViewContent
             .gesture(dragGesture)
@@ -306,6 +329,11 @@ private struct SceneViewRepresentation: View {
             setupScene(&realityContent)
         } update: { _ in
             applyCamera()
+            // Diff light slots and swap entities when the caller's modifier value
+            // changed since last frame. Closes #1017 (Android `prevFillLightRef`
+            // pattern in `Scene.kt:287-305` ported to iOS).
+            refreshLightSlot(.main, slot: mainLightSlot)
+            refreshLightSlot(.fill, slot: fillLightSlot)
         }
         #else
         // RealityView requires macOS 15.0+; fall back to a placeholder on older SDKs
@@ -344,46 +372,14 @@ private struct SceneViewRepresentation: View {
         // IBL entity (will be configured when environment loads)
         realityContent.add(entities.ibl)
 
-        // Main / key directional light slot. Defaults to Android-parity 10 000 lux
-        // pointing straight down with shadow casting — matches the v4.1.0 BREAKING
-        // render-defaults change that finally reaches iOS in v4.2.0.
-        // Lights are added as children of `entities.root` so `applyRenderQuality(...)`
-        // can walk-and-tune them later in this same setup pass.
-        switch mainLightSlot {
-        case .systemDefault:
-            let main = LightNode.directional(
-                color: .white,
-                intensity: 10_000,
-                castsShadow: true
-            )
-            // RealityKit directional lights emit along the entity's -Z axis; lookAt
-            // origin from above so the light points straight down (Android default
-            // direction `(0, -1, 0)`).
-            main.entity.look(at: .zero, from: [0, 1, 0], relativeTo: nil)
-            entities.root.addChild(main.entity)
-        case .disabled:
-            break
-        case .custom(let node):
-            entities.root.addChild(node.entity)
-        }
-
-        // Fill light slot. Defaults to LightNode.fill() at 3 000 lux from the canonical
-        // Android direction `(0.5, -0.5, 0.5)` (upper-back-left → down-front-right),
-        // no shadow. 30 % of main intensity — the soft kick on the unlit side.
-        switch fillLightSlot {
-        case .systemDefault:
-            let fill = LightNode.fill(intensity: 3_000)
-            // Orient toward origin from the canonical Android fill direction's source
-            // point: the light travels from `(0.5, -0.5, 0.5)` direction → place the
-            // entity at the opposite point and look at origin so emission lands on the
-            // shadow side of objects centered at world origin.
-            fill.entity.look(at: .zero, from: [-0.5, 0.5, -0.5], relativeTo: nil)
-            entities.root.addChild(fill.entity)
-        case .disabled:
-            break
-        case .custom(let node):
-            entities.root.addChild(node.entity)
-        }
+        // Provision both light slots via the shared helper so the same code path runs
+        // on initial setup AND on reactive swap (refreshLightSlot below). Lights are
+        // tagged with `LightSlotMarker` so the diff in `update:` can locate + remove
+        // them when the caller's modifier value changes. Closes #1017.
+        provisionLightSlot(.main, slot: mainLightSlot)
+        provisionLightSlot(.fill, slot: fillLightSlot)
+        appliedMainSlot = mainLightSlot
+        appliedFillSlot = fillLightSlot
 
         // Populate user content
         content(entities.root)
@@ -400,6 +396,81 @@ private struct SceneViewRepresentation: View {
         )
     }
     #endif
+
+    // MARK: - Light slot reactive plumbing (#1017)
+
+    /// Tags entities provisioned by ``provisionLightSlot(_:slot:)`` so the
+    /// reactive diff in ``refreshLightSlot(_:slot:)`` can locate them on
+    /// subsequent renders and replace them when the caller's `LightSlot`
+    /// value changes.
+    fileprivate struct LightSlotMarker: Component {
+        enum Slot { case main, fill }
+        let slot: Slot
+    }
+
+    /// Provisions a light entity for the given slot under `entities.root`,
+    /// applying the per-slot defaults when `slot == .systemDefault` and
+    /// tagging the entity with `LightSlotMarker` for later diffing.
+    /// Mirrors the original setupScene logic but factored out so the
+    /// reactive swap path can re-use it.
+    @MainActor
+    private func provisionLightSlot(_ which: LightSlotMarker.Slot, slot: LightSlot) {
+        let entity: Entity?
+        switch slot {
+        case .systemDefault:
+            switch which {
+            case .main:
+                let main = LightNode.directional(
+                    color: .white,
+                    intensity: 10_000,
+                    castsShadow: true
+                )
+                main.entity.look(at: .zero, from: [0, 1, 0], relativeTo: nil)
+                entity = main.entity
+            case .fill:
+                let fill = LightNode.fill(intensity: 3_000)
+                fill.entity.look(at: .zero, from: [-0.5, 0.5, -0.5], relativeTo: nil)
+                entity = fill.entity
+            }
+        case .disabled:
+            entity = nil
+        case .custom(let node):
+            entity = node.entity
+        }
+        if let entity {
+            entity.components.set(LightSlotMarker(slot: which))
+            entities.root.addChild(entity)
+        }
+    }
+
+    /// Diffs the current slot value against the cached `applied{Main,Fill}Slot`
+    /// and swaps the tagged entity in-place when they differ. Called from the
+    /// `RealityView.update:` closure on every render. Closes #1017.
+    ///
+    /// Mirrors Android's `Scene.kt:287-305` `prevFillLightRef` pattern — the
+    /// idea is the same (cache the previously-applied value, diff on
+    /// recomposition / re-render, swap the scene-attached entity) but the
+    /// mechanism differs because RealityKit's `RealityViewContent` is
+    /// inout-only inside the `update:` closure (no explicit remove API on the
+    /// content; we go through the entity hierarchy via `removeFromParent()`).
+    @MainActor
+    private func refreshLightSlot(_ which: LightSlotMarker.Slot, slot: LightSlot) {
+        let applied: LightSlot? = (which == .main) ? appliedMainSlot : appliedFillSlot
+        guard applied != slot else { return }   // no change since last frame
+        // Remove the old tagged entity if present.
+        let toRemove = entities.root.children.first { entity in
+            entity.components[LightSlotMarker.self]?.slot == which
+        }
+        toRemove?.removeFromParent()
+        // Provision the new one (or none if the new slot is .disabled).
+        provisionLightSlot(which, slot: slot)
+        // Update the cache so the next frame's diff is a no-op.
+        if which == .main {
+            appliedMainSlot = slot
+        } else {
+            appliedFillSlot = slot
+        }
+    }
 
     // MARK: - Environment IBL
 
