@@ -154,3 +154,14 @@ samples/screenshots/qa_log*.txt
 # QA / device-test artifacts (transient screenshots)
 tools/qa-screenshots/
 
+# Google Drive / iCloud Drive sync-conflict duplicates.
+# When the same file is touched concurrently in two checkouts of a synced
+# folder, Drive creates "filename (1).ext" (and (2), (3)…) on disk. These
+# pollute `git status` and have caused build failures (duplicate Swift
+# symbols when xcodebuild scans the entire SceneViewDemo/ subtree) and
+# stash-pop conflicts on tracked files. They are NEVER source — drop them
+# on sight. Surfaced by the 2026-05-13 upbeat-kare iOS visual smoke test.
+**/* (1)*
+**/* (2)*
+**/* (3)*
+
