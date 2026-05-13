@@ -131,7 +131,9 @@ struct OrbitalARDemo: View {
                 guard let node = loadedNodes[index] else { continue }
                 node.entity.position = position(for: planet, time: Float(now))
                 // Local spin on Y — accumulates each tick so it loops naturally.
-                let spinAngle = planet.spinSpeed * Float(now)
+                // Same modulo guard as the orbital angle (#978).
+                let spinAngle = (planet.spinSpeed * Float(now))
+                    .truncatingRemainder(dividingBy: 2 * .pi)
                 node.entity.orientation = simd_quatf(angle: spinAngle, axis: .init(0, 1, 0))
             }
         }
@@ -140,7 +142,11 @@ struct OrbitalARDemo: View {
     }
 
     private func position(for planet: Planet, time: Float) -> SIMD3<Float> {
-        let angle = planet.initialAngle + planet.orbitSpeed * time
+        // Wrap the cumulative angle into [0, 2π) before passing to cos/sin so a
+        // long-running session (~290 h+) doesn't lose Float precision and stutter
+        // the orbit (#978).
+        let angle = (planet.initialAngle + planet.orbitSpeed * time)
+            .truncatingRemainder(dividingBy: 2 * .pi)
         return SIMD3<Float>(
             x: cos(angle) * Self.orbitRadius,
             y: planet.height,

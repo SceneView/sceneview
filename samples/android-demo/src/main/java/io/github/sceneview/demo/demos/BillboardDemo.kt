@@ -48,7 +48,7 @@ fun BillboardDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Billboard Node",
+        title = "Billboard",
         onBack = onBack,
         controls = {
             Text("Visible Nodes", style = MaterialTheme.typography.labelLarge)

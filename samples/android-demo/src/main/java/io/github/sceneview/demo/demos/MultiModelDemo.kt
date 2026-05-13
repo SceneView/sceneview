@@ -91,7 +91,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Multiple Models",
+        title = "Multi Model",
         onBack = onBack,
         controls = {
             Text("Visibility", style = MaterialTheme.typography.labelLarge)

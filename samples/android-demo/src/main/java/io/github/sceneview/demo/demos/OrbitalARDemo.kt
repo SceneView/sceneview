@@ -32,6 +32,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -155,7 +156,11 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                         ORBITAL_PLANETS.forEachIndexed { index, planet ->
                             val instance = rememberModelInstance(modelLoader, planet.assetPath)
                             if (instance != null) {
-                                val orbitAngle = planet.initialAngleRad + planet.orbitSpeed * orbitSeconds
+                                // Modulo before sin/cos so a long-running session
+                                // (~290 h+) doesn't lose Float precision (#978).
+                                val orbitAngle =
+                                    (planet.initialAngleRad + planet.orbitSpeed * orbitSeconds) %
+                                            (2f * PI.toFloat())
                                 val spinDegrees = Math.toDegrees(
                                     (planet.spinSpeed * orbitSeconds).toDouble()
                                 ).toFloat() % 360f

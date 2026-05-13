@@ -30,7 +30,7 @@ fun ImageDemo(onBack: () -> Unit) {
     val materialLoader = rememberMaterialLoader(engine)
 
     DemoScaffold(
-        title = "Image Node",
+        title = "Image Planes",
         onBack = onBack,
         controls = {
             Text(

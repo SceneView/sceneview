@@ -452,7 +452,7 @@ class DemoInteractionTest {
 
     @Test
     fun shape_allPolygons() {
-        openDemo("shape", "Shape Node")
+        openDemo("shape", "All Shapes")
         screenshot("23_shape_triangle_default")
 
         tap("Star")
@@ -469,7 +469,7 @@ class DemoInteractionTest {
 
     @Test
     fun multiModel_visibilityChips() {
-        openDemo("multi-model", "Multiple Models")
+        openDemo("multi-model", "Multi Model")
         screenshot("27_multiModel_all_visible")
 
         tap("Avocado")
@@ -532,7 +532,7 @@ class DemoInteractionTest {
 
     @Test
     fun animation_loopVsOnce() {
-        openDemo("animation", "Animation")
+        openDemo("animation", "Auto Rotate")
         screenshot("39_animation_loop_default")
 
         tap("Once")
@@ -604,7 +604,7 @@ class DemoInteractionTest {
             "BillboardNode / ImageNode teardown order is fixed in sceneview/. (#887)"
     )
     fun billboard_visibilityChips() {
-        openDemo("billboard", "Billboard Node")
+        openDemo("billboard", "Billboard")
         screenshot("49_billboard_both_visible")
         tap("Billboard"); screenshot("50_billboard_only_fixed")
         tap("Fixed Image"); screenshot("51_billboard_none")
@@ -732,7 +732,7 @@ class DemoInteractionTest {
 
     @Test
     fun image_scaleSlider() {
-        openDemo("image", "Image Node")
+        openDemo("image", "Image Planes")
         screenshot("79_image_default_scale")
 
         dragSlider("Scale:", fraction = 1.0f)

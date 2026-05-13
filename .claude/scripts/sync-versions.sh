@@ -273,6 +273,46 @@ if [ -d "$WEBSITE_DIR" ]; then
     fi
 fi
 
+# ─── 10b. SwiftPM `from:` install snippets (#990) ───────────────────────
+# Catches stale `.package(url: "…/sceneview-swift", from: "X.Y.Z")` clauses
+# scattered across docs / READMEs / marketing surfaces. The release-time
+# manual sweep that bumped 11 of these for v4.1.0 (#989) showed the cost
+# of keeping these out of band; this section closes the gap so future
+# bumps catch them via `--fix`.
+echo -e "${CYAN}--- SwiftPM Install Snippets ---${NC}"
+SPM_FILES=(
+    llms.txt
+    README.md
+    CLAUDE.md
+    .cursorrules
+    SceneViewSwift/README.md
+    docs/docs/cheatsheet-ios.md
+    docs/docs/index.md
+    docs/docs/platforms.md
+    docs/docs/samples-ios.md
+    docs/docs/quickstart-ios.md
+    docs/docs/llms.txt
+    website-static/llms.txt
+    website-static/.well-known/llms.txt
+    website-static/playground.html
+    .github/copilot-instructions.md
+    gpt/system-prompt.md
+)
+for spm_file in "${SPM_FILES[@]}"; do
+    F="$REPO_ROOT/$spm_file"
+    [ -f "$F" ] || continue
+    # Looser match: any line mentioning sceneview-swift AND from: "X.Y.Z"
+    # covers `.package(url: "…/sceneview-swift", from: "X.Y.Z")` AND
+    # comment-style `// SPM: …/sceneview-swift.git from: "X.Y.Z"`.
+    V=$(grep -E 'sceneview-swift' "$F" 2>/dev/null \
+        | grep -oE 'from: "[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' \
+        | head -1 \
+        | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || true)
+    if [ -n "$V" ]; then
+        add_check "$spm_file (SPM from:)" "$V"
+    fi
+done
+
 # ─── 11. Bug report template ────────────────────────────────────────────
 BUG_TEMPLATE="$REPO_ROOT/.github/ISSUE_TEMPLATE/bug_report.yml"
 if [ -f "$BUG_TEMPLATE" ]; then
@@ -395,6 +435,24 @@ with open('$PKG_JSON', 'w') as f:
             fi
         done
     fi
+
+    # Fix SwiftPM `from:` clauses (#990) — rewrites every stale snippet to
+    # match $SOURCE_VERSION, scoped to lines that mention sceneview-swift so
+    # we never touch unrelated `from: "..."` clauses (e.g. third-party deps).
+    for spm_file in "${SPM_FILES[@]}"; do
+        F="$REPO_ROOT/$spm_file"
+        [ -f "$F" ] || continue
+        # Use perl (not sed) for the in-line substitution: BSD sed is awkward
+        # at constraining the replacement to lines matching a pattern.
+        if grep -qE 'sceneview-swift.*from: "[0-9]+\.[0-9]+\.[0-9]+' "$F" 2>/dev/null; then
+            BEFORE=$(grep -E 'sceneview-swift.*from:' "$F" | grep -oE 'from: "[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | sort -u)
+            perl -i -pe 'if (/sceneview-swift/) { s/(from: ")[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(")/${1}'"$SOURCE_VERSION"'${3}/g }' "$F"
+            AFTER=$(grep -E 'sceneview-swift.*from:' "$F" | grep -oE 'from: "[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | sort -u)
+            if [ "$BEFORE" != "$AFTER" ]; then
+                echo -e "  Fixed: $spm_file (SPM from: -> $SOURCE_VERSION)"
+            fi
+        fi
+    done
 
     echo ""
     echo -e "${GREEN}Fixes applied. Re-run without --fix to verify.${NC}"

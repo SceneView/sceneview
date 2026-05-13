@@ -57,8 +57,7 @@ import io.github.sceneview.demo.sketchfab.SketchfabModel
 import io.github.sceneview.demo.sketchfab.SketchfabService
 import io.github.sceneview.demo.ui.explore.components.FeaturedSketchfabCard
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 
 /**
  * Curated 3D-model discovery feed. Mirrors the iOS `ExploreTab` so QA can
@@ -103,22 +102,22 @@ fun ExploreTabScreen(
         if (SketchfabConfig.apiKey == null) return@LaunchedEffect
         loadingFeeds = true
         val animatedParam: Boolean? = if (animatedOnly) true else null
-        val result = runCatching {
-            coroutineScope {
-                val a = async { sketchfabService.staffPicks(animated = animatedParam, limit = 10) }
-                val b = async { sketchfabService.featured(animated = animatedParam, limit = 10) }
-                val c = async { sketchfabService.recentlyAdded(animated = animatedParam, limit = 10) }
-                listOf(a, b, c).awaitAll()
+        // supervisorScope so a single feed failure (transient 429, network blip)
+        // doesn't cancel the other two — surviving feeds still render (#980).
+        supervisorScope {
+            val a = async {
+                runCatching { sketchfabService.staffPicks(animated = animatedParam, limit = 10) }
             }
+            val b = async {
+                runCatching { sketchfabService.featured(animated = animatedParam, limit = 10) }
+            }
+            val c = async {
+                runCatching { sketchfabService.recentlyAdded(animated = animatedParam, limit = 10) }
+            }
+            staffPicks = a.await().getOrDefault(emptyList())
+            mostLiked = b.await().getOrDefault(emptyList())
+            recent = c.await().getOrDefault(emptyList())
         }
-        result.fold(
-            onSuccess = { (s, l, r) ->
-                staffPicks = s
-                mostLiked = l
-                recent = r
-            },
-            onFailure = { /* swallow — empty FeedSection self-hides */ },
-        )
         loadingFeeds = false
     }
 

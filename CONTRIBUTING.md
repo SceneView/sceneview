@@ -105,6 +105,32 @@ After your changes are merged, the Discord bot will award you the **Contributor*
 
 Recompile Filament materials using the [current Filament version](https://github.com/google/filament/releases) if you modify them. Enable the [Filament plugin](https://github.com/sceneview/sceneview/blob/main/gradle.properties) and build.
 
+#### Filament runtime ↔ `.filamat` ABI invariant
+
+> **The Filament runtime version (in [`gradle/libs.versions.toml`](gradle/libs.versions.toml) → `filament = "X.Y.Z"`) and the `matc` toolchain that produced every committed `.filamat` blob MUST be the same major version.**
+
+Filament refuses any material whose binary version field does not match the runtime, with `Filament panic — material version N ≠ runtime M` on first frame. There is no compile-time check; the mismatch only manifests at runtime, demo by demo. v4.1.0 shipped with the runtime at 1.70.2 and blobs at 1.71 (two parallel branches each fixed half of the pair) — 10 demos crashed; v4.1.1 hot-fixed by realigning both sides to 1.71.
+
+**The 12 committed blobs that must be recompiled together** (under `sceneview/src/main/assets/materials/`):
+
+```
+image_texture.filamat                  transparent_colored.filamat
+opaque_colored.filamat                 transparent_textured.filamat
+opaque_textured.filamat                transparent_unlit_colored.filamat
+opaque_unlit_colored.filamat           video_texture.filamat
+view_renderable.filamat                video_texture_chroma_key.filamat
+view_texture_lit.filamat               view_texture_unlit.filamat
+```
+
+**How to recompile after a Filament version bump:**
+
+1. Download the matching `matc` from the Filament release tarball — `https://github.com/google/filament/releases/tag/vX.Y.Z` → `filament-vX.Y.Z-mac.tgz` (or `-linux.tgz`) → `./bin/matc`.
+2. Put `matc` on your `PATH` (or update [`tools/GenerateFilamat.sh`](tools/GenerateFilamat.sh) to point at it).
+3. Run `cd tools && bash GenerateFilamat.sh` — recompiles every `.filamat` from its `.mat` source.
+4. Commit **the runtime bump in `gradle/libs.versions.toml` AND the recompiled `.filamat` files in the SAME PR**. Never split them across commits — that's the failure mode that broke v4.1.0.
+
+If you bump the runtime without touching the blobs (or vice versa), CI will not catch it. The first signal is a runtime crash on whichever demo loads the affected material first.
+
 ---
 
 ## Issues and discussions

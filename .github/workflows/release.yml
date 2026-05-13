@@ -348,8 +348,10 @@ jobs:
           # written across multiple lines (`.library(\n    name: "X",\n    targets: ...)`)
           # so we flatten the file to one line before the regex check
           # (the previous single-line grep silently failed on v4.1.0).
+          # Anchoring on `targets:` after the name avoids matching a
+          # commented-out `// .library(name: "SceneViewSwift", ...)` line (#1007).
           for f in Package.swift SceneViewSwift/Package.swift; do
-            if ! tr '\n' ' ' < "$f" | grep -qE '\.library\(\s*name:\s*"SceneViewSwift"'; then
+            if ! tr '\n' ' ' < "$f" | grep -qE '\.library\(\s*name:\s*"SceneViewSwift"\s*,\s*targets'; then
               echo "::error::$f does not declare a SceneViewSwift product"
               exit 1
             fi
