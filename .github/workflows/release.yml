@@ -287,13 +287,10 @@ jobs:
         if: steps.check-rn.outputs.skip != 'true'
         working-directory: react-native/react-native-sceneview
         run: |
-          # react-native 0.84.x peer-deps require @types/react@^19 but the
-          # bridge's devDeps still pin @types/react@^18 (RN bridges scoped
-          # to RN 0.72.x consumers). The v4.1.0 release failed at this step
-          # with ERESOLVE; --legacy-peer-deps unblocks the publish without
-          # forcing a breaking @types/react bump on consumers. Real fix
-          # tracked in #909 (RN/Flutter bridges coverage).
-          npm install --no-audit --no-fund --legacy-peer-deps
+          # devDeps now align with peerDeps (RN 0.72.x line, react 18.2),
+          # so the publish runs without --legacy-peer-deps (#1003 closed
+          # the v4.1.0 ERESOLVE that #985 had bandaged).
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Publish to npm
