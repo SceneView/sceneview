@@ -262,6 +262,14 @@ fun SceneView(
         view.camera = cameraNode.camera
         cameraNode.collisionSystem = collisionSystem
         cameraNode.setView(view)
+    }
+    // Keyed `LaunchedEffect` so the preset is reapplied ONLY when `renderQuality`
+    // actually changes (#1078). The previous unkeyed `SideEffect` ran on every
+    // recomposition and silently overwrote any post-Scene `view.colorGrading`,
+    // `view.bloomOptions.strength`, etc. tweaks — breaking the contract documented
+    // at `RenderQuality.kt`'s "Apply additional View tweaks AFTER calling this —
+    // they will not be undone".
+    LaunchedEffect(view, renderQuality) {
         view.applyRenderQuality(renderQuality)
     }
 
