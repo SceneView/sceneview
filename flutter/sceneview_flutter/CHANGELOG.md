@@ -1,3 +1,7 @@
+## 4.3.3
+
+- Version alignment with SceneView v4.3.3. Hotfix: AR production blockers from Pixel 9 v4.3.0 audit — actionable Cloud Anchor `ERROR_NOT_AUTHORIZED` toast pointing at the Play App Signing key runbook ([#1177](https://github.com/sceneview/sceneview/issues/1177)), CI guard `verify-arcore-key.sh` for missing/dropped `ARCORE_API_KEY` wiring, plus verified-fixed closures for `spherePlaneResponse` ([#1097](https://github.com/sceneview/sceneview/issues/1097)), R8 strip of Fused Location Provider ([#1178](https://github.com/sceneview/sceneview/issues/1178)), and the AR rendering umbrella P0s/P1s ([#1061](https://github.com/sceneview/sceneview/issues/1061)). No public Flutter API change.
+
 ## 4.3.2
 
 - Version alignment with SceneView v4.3.2. Patch release: completes [#1152](https://github.com/sceneview/sceneview/issues/1152) Sketchfab streaming umbrella — Stage 1 `SketchfabAssetResolver` foundations, Stage 2 demo migrations (`OrbitalARDemo`, `SceneGalleryDemo`, `AnimationDemo`, `ModelViewerDemo`, `MaterialsDemo`, `MultiModelDemo`, `ARPlacementDemo`, `ARInstantPlacementDemo`, `PhysicsDemo`), Stage 3 polish (APK slim-down, Credits sheet, offline-source chip), Stage 4 docs + MCP resources. Also: `DemoScaffold` v2 modal-bottom-sheet (#1154), iOS `SKETCHFAB_API_KEY` injected into TestFlight + App Store binaries (#1157), instrumented regression pins for v4.3.0 fixes (#1120 extension), and Dependabot security fix (`fast-xml-parser` bumped to 5.7.0+ via npm overrides — dev-only transitive, GHSA-gh4j-gqv2-49f6). No public Android API change.
