@@ -100,6 +100,9 @@ class EnvironmentLoader(
         }
         val indirectLight = IndirectLight.Builder()
             .reflections(reflections)
+            // Sensible default — Filament's hardcoded 30k drowns the v4.1.0 main+fill
+            // (10k+3k) in ambient. Set BEFORE `apply` so callers can override (#1075).
+            .intensity(io.github.sceneview.DEFAULT_IBL_INTENSITY)
             .apply(indirectLightApply)
             .build(engine)
 
@@ -246,7 +249,13 @@ class EnvironmentLoader(
         iblBuffer: Buffer? = null,
         skyboxBuffer: Buffer? = null
     ) = createEnvironment(
-        indirectLight = iblBuffer?.let { KTX1Loader.createIndirectLight(engine, it).indirectLight },
+        // Apply the v4.1.0-balanced IBL intensity (#1075) so callers don't need to
+        // remember it; the KTX1Loader-built IBL otherwise inherits Filament's 30k
+        // default which dominates the 10k main + 3k fill light setup.
+        indirectLight = iblBuffer?.let {
+            KTX1Loader.createIndirectLight(engine, it).indirectLight
+                ?.also { ibl -> ibl.intensity = io.github.sceneview.DEFAULT_IBL_INTENSITY }
+        },
         skybox = skyboxBuffer?.let { KTX1Loader.createSkybox(engine, it).skybox },
         sphericalHarmonics = iblBuffer?.rewind()?.let { KTX1Loader.getSphericalHarmonics(it) }
     )
