@@ -54,6 +54,9 @@
     "react-native-builder-bob": "^0.23.0",
     "typescript": "^5.3.0"
   },
+  "overrides": {
+    "fast-xml-parser": "^5.7.0"
+  },
   "react-native-builder-bob": {
     "source": "src",
     "output": "lib",
