@@ -170,6 +170,9 @@
 
     <!-- Sample demo titles + subtitles (canonical keys consumed by DemoRegistry) -->
     <string name="demo_model_viewer_subtitle">Load and display 3D models</string>
+    <string name="demo_model_viewer_loading">Loading model…</string>
+    <string name="demo_model_viewer_surprise">Surprise me</string>
+    <string name="demo_model_viewer_surprise_loading">Finding…</string>
     <string name="demo_geometry_title">Geometry Primitives</string>
     <string name="demo_geometry_subtitle">Cube, Sphere, Cylinder, Plane</string>
     <string name="demo_animation_title">Auto Rotate</string>

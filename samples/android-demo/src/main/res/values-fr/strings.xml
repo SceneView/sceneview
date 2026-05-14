@@ -176,6 +176,9 @@
 
     <!-- Sample demo titles + subtitles (canonical keys consumed by DemoRegistry) -->
     <string name="demo_model_viewer_subtitle">Charger et afficher des modèles 3D</string>
+    <string name="demo_model_viewer_loading">Chargement du modèle…</string>
+    <string name="demo_model_viewer_surprise">Surprends-moi</string>
+    <string name="demo_model_viewer_surprise_loading">Recherche…</string>
     <string name="demo_geometry_title">Primitives géométriques</string>
     <string name="demo_geometry_subtitle">Cube, sphère, cylindre, plan</string>
     <string name="demo_animation_title">Rotation automatique</string>
