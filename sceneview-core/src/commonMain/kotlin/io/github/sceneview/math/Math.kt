@@ -23,6 +23,7 @@ import dev.romainguy.kotlin.math.translation
 import io.github.sceneview.collision.Matrix
 import io.github.sceneview.collision.Vector3
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 
 /** 2D position (x, y). */
@@ -161,15 +162,22 @@ fun normalToTangent(normal: Float3): Quaternion {
 }
 
 /**
- * ### Spherical Linear Interpolate a transform
+ * Spherical / linear interpolate a transform toward [end] with frame-rate-independent
+ * exponential decay.
  *
- * @epsilon Smooth Epsilon minimum equality limit
- * This is used to avoid very near positions/rotations/scale smooth modifications.
- * It prevents:
- * - The modifications from appearing too quick if the ranges are too close because of linearly
- * interpolation for upper dot products
- * - The end value to take to much time to be reached
- * - The end to never be reached because of matrices calculations floating points
+ * The interpolation factor is `1 - exp(-speed * deltaSeconds)`, which makes the result
+ * invariant to the time-step distribution: 30 ticks at 1/30 s and 120 ticks at 1/120 s
+ * produce the same trajectory over the same wall-clock total.
+ *
+ * Pre-#1126 this function used the linear approximation `clamp(speed * dt, 0, 1)` —
+ * correct only at high frame rates, with visible divergence (and outright snap-to-target
+ * when `speed * dt > 1`) at lower frame rates.
+ *
+ * @param start Current transform.
+ * @param end Target transform.
+ * @param deltaSeconds Time since last call. Negative values are clamped to 0.
+ * @param speed Convergence rate (s⁻¹). Higher = faster approach. The 63 % point is
+ * reached after `1 / speed` seconds regardless of the caller's tick rate.
  */
 fun slerp(
     start: Transform,
@@ -177,7 +185,11 @@ fun slerp(
     deltaSeconds: Double,
     speed: Float
 ): Transform {
-    val lerpFactor = clamp((deltaSeconds * speed).toFloat(), 0.0f, 1.0f)
+    val lerpFactor = if (deltaSeconds <= 0.0 || speed <= 0f) {
+        0f
+    } else {
+        (1.0 - exp(-speed.toDouble() * deltaSeconds)).toFloat().coerceIn(0f, 1f)
+    }
     return Transform(
         position = lerp(start.position, end.position, lerpFactor),
         quaternion = slerp(start.quaternion, end.quaternion, lerpFactor),
