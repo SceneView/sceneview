@@ -346,6 +346,16 @@ class LightEstimator(
                                 .levels(0xff)
                                 .sampler(Texture.Sampler.SAMPLER_CUBEMAP)
                                 .format(Texture.InternalFormat.R11F_G11F_B10F)
+                                // GEN_MIPMAPPABLE is REQUIRED — `iblPrefilter.specularFilter()`
+                                // below internally calls `Texture.generateMipmaps()`, which
+                                // Filament 1.70+ asserts on if the texture wasn't built with
+                                // this usage flag. Pre-PR #1086 the specular prefilter was off
+                                // by default so the missing flag was latent; flipping the
+                                // default to `true` then made every AR demo SIGABRT on the
+                                // first cubemap update (caught by CORR-D visual QA on
+                                // Pixel 9). Cross-reference: ImageTexture.kt:23-26 already
+                                // applies the same flag for the same reason.
+                                .usage(Texture.Usage.DEFAULT or Texture.Usage.GEN_MIPMAPPABLE)
                                 .build(engine)
                                 .also {
                                     cubeMapTexture = it
