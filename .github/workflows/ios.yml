@@ -105,6 +105,14 @@ jobs:
 
       - name: Build iOS sample demo (catches missing pbxproj entries)
         if: always()
+        # Inject `SKETCHFAB_API_KEY` so the `Info.plist` placeholder
+        # substitution path (introduced for #1157) is exercised on every CI
+        # build, not just on `xcodebuild archive` in `app-store.yml`. Forks
+        # without the secret get an empty string — `SketchfabConfig.swift`
+        # silently falls back to `nil`, matching the existing graceful
+        # degradation in `ExploreTab.swift`.
+        env:
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         working-directory: samples/ios-demo
         run: |
           xcodebuild build \
@@ -114,4 +122,5 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages \
             -skipPackagePluginValidation \
             -skipMacroValidation \
+            SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY" \
             | xcpretty --color 2>/dev/null || cat

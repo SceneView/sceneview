@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Fixed — iOS: `SKETCHFAB_API_KEY` never reached TestFlight + App Store binaries ([#1157](https://github.com/sceneview/sceneview/issues/1157))
+
+Every iOS app-store ship since v3.6 silently degraded the Explore tab to bundled fallback models because the Sketchfab API key never made it into the `.ipa`. Two compounding root causes:
+
+- **`SketchfabConfig.swift` read the key via `ProcessInfo.processInfo.environment["SKETCHFAB_API_KEY"]`** — that path only works under Xcode's "Run" scheme. CI env vars set on the runner don't survive `xcodebuild archive` into the shipped binary, so `SketchfabConfig.apiKey == nil` for every TestFlight + App Store build → `SketchfabError.missingApiKey` → `ExploreTab` `runCatching` swallow → empty / fallback results with no error banner.
+- **`.github/workflows/app-store.yml` and `ios.yml` never referenced `SKETCHFAB_API_KEY`** — confirmed by `grep`. The Android pipelines (`play-store.yml:170`, `build-apks.yml:47`) inject the secret correctly and Android's `BuildConfig.SKETCHFAB_API_KEY` bakes it in at compile time, which is why Play Store builds were unaffected.
+
+Fix (single PR, 4 files):
+
+- [`samples/ios-demo/SceneViewDemo/Services/SketchfabConfig.swift`](samples/ios-demo/SceneViewDemo/Services/SketchfabConfig.swift) — `apiKey` now resolves from `Bundle.main.object(forInfoDictionaryKey: "SketchfabAPIKey")` first, with a guard that rejects the unsubstituted `$(SKETCHFAB_API_KEY)` xcconfig token literal. Legacy `ProcessInfo` lookup stays as a fallback so the Xcode "Run" scheme env-var workflow keeps working for contributors.
+- [`samples/ios-demo/SceneViewDemo/Info.plist`](samples/ios-demo/SceneViewDemo/Info.plist) — added `SketchfabAPIKey = $(SKETCHFAB_API_KEY)` placeholder. `xcodebuild` substitutes it from the user-defined build setting at archive time.
+- [`.github/workflows/app-store.yml`](.github/workflows/app-store.yml) — both iOS and macOS `xcodebuild archive` steps now pass `SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"` (sourced from the `SKETCHFAB_API_KEY` repo secret).
+- [`.github/workflows/ios.yml`](.github/workflows/ios.yml) — same injection on the CI demo-build step so the `Info.plist` substitution path is exercised on every PR, not just on release tags.
+
+Verified locally on Xcode 26.3 / iPhone 16e simulator: `xcodebuild build … SKETCHFAB_API_KEY=dummy_key_for_test` produces a `SceneViewDemo.app/Info.plist` with `SketchfabAPIKey = dummy_key_for_test` (vs. the literal `$(SKETCHFAB_API_KEY)` placeholder without the build setting). Acceptance: next TestFlight build of v4.3.2+ surfaces non-empty `SketchfabConfig.apiKey` and `ExploreTab` shows live Sketchfab categories + search.
+
+Long-term proxy via `mcp-gateway` so end-user binaries don't ship the master key is tracked by the V1.1 TODO in `SketchfabConfig.swift` — this fix is the immediate "Explore tab works again" patch.
+
 ## v4.3.1 — CI hardening + iOS AR LightSlot parity + i18n migration (2026-05-14)
 
 CI hardening + docs accuracy + Android CLI migration + one v4.1.0-stale demo light tune,

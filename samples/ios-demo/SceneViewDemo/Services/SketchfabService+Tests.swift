@@ -4,8 +4,13 @@ import XCTest
 
 /// Unit tests for `SketchfabService`.
 ///
-/// Network-dependent tests are gated behind `SKETCHFAB_API_KEY` so they're
-/// skipped on machines/CI runners without the secret.
+/// Network-dependent tests are gated behind `SketchfabConfig.apiKey` (which
+/// resolves from `Info.plist`'s `SketchfabAPIKey` placeholder first, then
+/// falls back to the legacy `SKETCHFAB_API_KEY` env var — see
+/// `SketchfabConfig.swift`). The CI iOS workflow now injects the secret as a
+/// `xcodebuild` build setting, so this test actually executes on the SceneView
+/// repo CI; it stays skipped on forks without the secret + on contributor
+/// machines that haven't wired the env var in the Xcode scheme.
 final class SketchfabServiceTests: XCTestCase {
 
     /// Offline: verify the URL builder produces the expected `/v3/search?...`.
