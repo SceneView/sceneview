@@ -1,0 +1,195 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package io.github.sceneview.demo.ui
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import io.github.sceneview.demo.R
+import io.github.sceneview.demo.sketchfab.SampleAssets
+import io.github.sceneview.demo.sketchfab.SketchfabSlug
+
+/**
+ * Modal bottom sheet listing every streamed Sketchfab model the demo app
+ * may load, grouped by `SketchfabSlug.category`. Each row carries the model's
+ * display name, author, license, and a tap target that opens the original
+ * Sketchfab page so the user can verify the attribution.
+ *
+ * **Why this exists.** CC-BY 4.0 — the only Sketchfab license SceneView's
+ * registry accepts — requires *visible* attribution in the redistributed
+ * artefact. Without this sheet, shipping the streamed models would violate
+ * the license. The CC-BY clause is non-negotiable; this sheet is the
+ * mechanism that keeps us compliant for every Sketchfab model in
+ * [SampleAssets].
+ *
+ * The sheet is opened from the "Credits" card on the About tab and reads
+ * its data directly from [SampleAssets.all] — adding a new slug to the
+ * registry automatically lists it here, no separate maintenance burden.
+ *
+ * Bundled (non-streamed) assets are credited in
+ * `samples/android-demo/src/main/assets/CREDITS.md` (Khronos glTF Sample
+ * Assets + Poly Haven HDRIs, all CC-BY 4.0 or CC0).
+ */
+@Composable
+fun CreditsSheet(onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val context = LocalContext.current
+    val openUrl: (String) -> Unit = { url ->
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.credits_sheet_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.credits_sheet_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            val byCategory = SampleAssets.all.groupBy { it.category }
+            // Render in a stable, human-meaningful order rather than hash order.
+            val orderedCategories = listOf(
+                "solar", "gallery", "animation", "park",
+                "ar_placement", "physics", "materials",
+            )
+            val knownCategoryOrder = orderedCategories
+                .filter { it in byCategory.keys }
+                .plus(byCategory.keys - orderedCategories.toSet())
+
+            for (category in knownCategoryOrder) {
+                val slugs = byCategory[category].orEmpty()
+                if (slugs.isEmpty()) continue
+                Text(
+                    text = categoryLabel(category),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                for (slug in slugs) {
+                    CreditsRow(slug = slug, onOpen = { openUrl(slug.sketchfabUrl) })
+                }
+            }
+
+            // Footer — explicit CC-BY notice and link to bundled-assets credits.
+            Text(
+                text = stringResource(R.string.credits_sheet_footer),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreditsRow(slug: SketchfabSlug, onOpen: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(10.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Public,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = slug.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    // "by <Author> — CC-BY 4.0"
+                    text = stringResource(
+                        R.string.credits_row_subtitle,
+                        slug.author,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.OpenInNew,
+                contentDescription = stringResource(R.string.credits_row_open_cd),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/** Map an internal `SampleAssets` category key to a human-facing title. */
+private fun categoryLabel(category: String): String = when (category) {
+    "solar" -> "Solar (Orbital AR)"
+    "gallery" -> "Gallery"
+    "animation" -> "Animation"
+    "park" -> "Park (Multi-model)"
+    "ar_placement" -> "AR Placement"
+    "physics" -> "Physics"
+    "materials" -> "Materials"
+    else -> category.replaceFirstChar { it.titlecase() }
+}

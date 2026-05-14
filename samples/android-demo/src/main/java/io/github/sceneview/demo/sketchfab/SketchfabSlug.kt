@@ -57,6 +57,15 @@ data class SketchfabSlug(
     val category: String,
     val tags: List<String> = emptyList(),
 ) {
+    /**
+     * Canonical Sketchfab page URL for this model, used by the Credits sheet
+     * (CC-BY attribution requires a visible link back to the source). Built
+     * from [uid] only — Sketchfab tolerates a missing `<slug>` segment and
+     * 301-redirects to the canonical URL.
+     */
+    val sketchfabUrl: String
+        get() = "https://sketchfab.com/3d-models/$uid"
+
     init {
         require(uid.isNotBlank()) { "SketchfabSlug.uid must not be blank" }
         require(displayName.isNotBlank()) {

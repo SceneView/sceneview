@@ -136,12 +136,22 @@ extract_refs() {
                 continue
                 ;;
         esac
+        # Skip Swift `+Tests.swift` and Kotlin `*Test*.kt` files — they
+        # intentionally reference NOT-bundled paths (e.g. `Models/missing.usdz`)
+        # to assert fallback-failure mode. These are test fixtures, not
+        # static asset references.
+        case "$file" in
+            *+Tests.swift|*Tests.swift|*Test.kt|*Tests.kt|*/test/*|*/androidTest/*)
+                continue
+                ;;
+        esac
         # 1. Quoted literals with a known extension ("models/foo.glb", "bar.hdr")
-        # Skip strings containing `$` — those are Kotlin/Swift string templates
-        # (e.g. `"$uid.glb"` in SketchfabService.kt is a runtime cache filename,
-        # not a static asset reference).
+        # Skip strings containing `$` (Kotlin/Swift string templates), `\` (Swift
+        # `\(...)` interpolation prefix), or `<` (placeholder syntax in KDoc /
+        # Swift doc / inline comment examples). All three are runtime / docs
+        # patterns, not static asset references.
         # `|| true` so files with no match (grep exit 1) don't abort pipefail.
-        grep -oE "\"[^\"\$]*\.($ext_pattern)\"" "$file" 2>/dev/null |
+        grep -oE "\"[^\"\$\\\\<]*\.($ext_pattern)\"" "$file" 2>/dev/null |
             awk -v f="$file" '{ gsub(/"/, "", $0); printf "%s|%s\n", $0, f }' || true
 
         # 2. iOS Swift pattern — `asset: "name"` without extension. We emit the

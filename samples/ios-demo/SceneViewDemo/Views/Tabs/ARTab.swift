@@ -27,10 +27,11 @@ struct ARTab: View {
         HapticManager.mediumTap()
     }
 
+    // `animated_dragon.usdz` (8.6 MB) was dropped in #1152 Stage 3 (IPA
+    // slim-down). The "creature" role is covered by Butterfly + Phoenix.
     private let arModels: [(name: String, icon: String, asset: String, scale: Float)] = [
         ("Game Boy", "gamecontroller.fill", "game_boy_classic", 0.15),
         ("Red Car", "car.fill", "red_car", 0.2),
-        ("Dragon", "flame.fill", "animated_dragon", 0.12),
         ("Butterfly", "leaf.fill", "animated_butterfly", 0.15),
         ("Piano", "pianokeys", "retro_piano", 0.12),
         ("Nike Jordan", "shoe.fill", "nike_air_jordan", 0.15),

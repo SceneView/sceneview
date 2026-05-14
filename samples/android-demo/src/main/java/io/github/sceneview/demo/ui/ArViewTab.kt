@@ -968,12 +968,14 @@ internal data class PlacedAr(
     val scale: Float,
 )
 
+// `animated_dragon.glb` dropped from the bundle in #1152 Stage 3 (slim-down).
+// 8 MB GLB → replaced where canonical with `threejs_soldier.glb`, removed
+// from this list (Soldier covers the "animated character" role).
 private val AR_MODELS = listOf(
     ArModel("Damaged Helmet", "models/khronos_damaged_helmet.glb", 0.3f),
     ArModel("Fox", "models/khronos_fox.glb", 0.3f),
     ArModel("Lantern", "models/khronos_lantern.glb", 0.3f),
     ArModel("Toy Car", "models/khronos_toy_car.glb", 0.3f),
     ArModel("Shiba", "models/shiba.glb", 0.3f),
-    ArModel("Dragon", "models/animated_dragon.glb", 0.3f),
     ArModel("Soldier", "models/threejs_soldier.glb", 0.3f),
 )

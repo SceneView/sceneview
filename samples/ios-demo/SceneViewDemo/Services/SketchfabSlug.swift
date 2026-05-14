@@ -62,6 +62,16 @@ struct SketchfabSlug: Hashable, Sendable {
     /// `"low-poly"`, `"hard-surface"`).
     let tags: [String]
 
+    /// Canonical Sketchfab page URL for this model, used by the Credits sheet
+    /// (CC-BY attribution requires a visible link back to the source). Built
+    /// from `uid` only — Sketchfab tolerates a missing `<slug>` segment and
+    /// 301-redirects to the canonical URL.
+    var sketchfabURL: URL {
+        // Construction is total — `uid` is non-empty and the prefix is a
+        // hard-coded literal.
+        URL(string: "https://sketchfab.com/3d-models/\(uid)")!
+    }
+
     init(
         uid: String,
         displayName: String,
