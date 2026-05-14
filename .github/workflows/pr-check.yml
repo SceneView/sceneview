@@ -1,7 +1,12 @@
 name: PR Check
 
-# Fast feedback on every pull request — must pass before merge.
-# Full CI (ci.yml) also runs in parallel for deeper checks.
+# Fast pre-flight checks for every pull request.
+#
+# Slimmed in 2026-05-15 to remove duplication with ci.yml — the
+# `compile-android`, `lint`, `compile-web-demo`, and `build-flutter-demo`
+# jobs all duplicated work done by ci.yml's `build`, `web-desktop`, and
+# `flutter-demo` jobs respectively. Only checks NOT covered by ci.yml or
+# quality-gate.yml remain here. See CHANGELOG note for v4.3.4.
 
 on:
   pull_request:
@@ -17,78 +22,39 @@ permissions:
   contents: read
 
 jobs:
-  # ── Quick Android compile check ───────────────────────────────────────────
-  compile-android:
-    name: Compile Android (debug)
+  # ── Deprecated API regression detector ──────────────────────────────────
+  # Sub-second guard against AI sessions reintroducing the pre-v3.6
+  # Scene{}/ARScene{} composable names. quality-gate.yml runs the same
+  # check, but a standalone job here surfaces the failure to PR authors
+  # without waiting for the full gate to finish.
+  check-deprecated-api:
+    name: Check for deprecated SceneView API refs
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-
-      - name: Check for deprecated SceneView API refs
+      - name: Run check-deprecated-api.sh
         shell: bash
         run: bash .claude/scripts/check-deprecated-api.sh --all
 
-      - name: Check SceneView agent skill is in sync with source
-        # Catches hallucinated APIs in agents/sceneview/ (e.g. `rememberARSession`
-        # or `AnchorNode.image()`) BEFORE merge — see PR #1072 for the kind of
-        # drift this guard prevents. Sub-second; no JDK or Gradle needed.
+  # ── SceneView agent skill drift detector ────────────────────────────────
+  # Catches hallucinated APIs in agents/sceneview/ (e.g. `rememberARSession`
+  # or `AnchorNode.image()`) BEFORE merge — see PR #1072 for the kind of
+  # drift this guard prevents. Sub-second; no JDK or Gradle needed.
+  check-sceneview-skill:
+    name: Check SceneView agent skill is in sync with source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run check-sceneview-skill.sh
         shell: bash
         run: bash .claude/scripts/check-sceneview-skill.sh
 
-      - uses: ./.github/actions/setup-gradle
-      - uses: gradle/actions/wrapper-validation@v6
-
-      - name: Assemble all
-        env:
-          # Forks won't have this secret — demo runtime disables Geospatial gracefully.
-          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
-        run: |
-          ./gradlew assembleDebug --stacktrace
-
-      - name: Unit tests
-        # `:samples:android-demo:testDebugUnitTest` runs `ARBundledRecordingsTest`
-        # (the ftyp + avc1 + mett contract suite added by #1060, moved to the
-        # `testDebug/` sourceSet by #1100). Without it CI silently drops the
-        # bundled-recording regression suite. See #1130.
-        run: |
-          ./gradlew \
-            :sceneview:testDebugUnitTest \
-            :arsceneview:testDebugUnitTest \
-            :samples:android-demo:testDebugUnitTest \
-            --stacktrace
-
-  # ── Lint check ────────────────────────────────────────────────────────────
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/setup-gradle
-
-      - name: Run lint
-        run: |
-          ./gradlew \
-            :sceneview:lintDebug \
-            :arsceneview:lintDebug \
-            --stacktrace
-
-      - name: Upload lint reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: pr-lint-reports-${{ github.event.pull_request.number }}
-          path: |
-            sceneview/build/reports/lint-results-debug.html
-            arsceneview/build/reports/lint-results-debug.html
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # ── KMP core check ────────────────────────────────────────────────────────
+  # ── KMP core (all targets) ──────────────────────────────────────────────
+  # ci.yml's `web-desktop` job compiles `:sceneview-core:jsMainClasses` but
+  # not the full KMP `assemble` (which builds iosArm64/iosSimulatorArm64/
+  # iosX64/jvm too). Keep this job to protect every KMP target on PR.
   compile-kmp:
     name: Compile KMP core
     runs-on: ubuntu-latest
@@ -142,10 +108,8 @@ jobs:
 
   # ── Demo app asset integrity ────────────────────────────────────────────
   # Catches broken model/HDR references in any samples/* demo app, both
-  # for bundled file paths and for CDN URLs. This is the automated
-  # backstop for the class of bugs that reached main during sessions 19
-  # and 34 (TV demo models that were never bundled, web-demo 404 URLs).
-  # The script exits 1 on the first broken reference.
+  # for bundled file paths and for CDN URLs. quality-gate.yml runs the
+  # same check, but surfacing it as its own job gives fast PR feedback.
   validate-demo-assets:
     name: Validate demo app asset references
     runs-on: ubuntu-latest
@@ -162,77 +126,3 @@ jobs:
 
       - name: Run validate-demo-assets.sh (full, with CDN checks)
         run: bash .claude/scripts/validate-demo-assets.sh
-
-  # ── Web demo production build ───────────────────────────────────────────
-  # Protects the webpack.config.d/filament.js polyfill fix from session 34.
-  # filament.js imports node core modules (path, fs, crypto) unconditionally
-  # and webpack 5 no longer auto-polyfills them, so `jsBrowserProductionWebpack`
-  # fails hard without the resolve.fallback override.
-  compile-web-demo:
-    name: Build web-demo (Kotlin/JS + Filament.js)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/setup-gradle
-
-      - name: jsBrowserProductionWebpack
-        run: ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
-
-      - name: Upload bundle
-        uses: actions/upload-artifact@v7
-        if: success()
-        with:
-          name: web-demo-bundle
-          # Kotlin/JS webpack plugin writes to build/kotlin-webpack/js/productionExecutable/
-          # (not build/dist/js/productionExecutable/ — that path was a guess).
-          path: samples/web-demo/build/kotlin-webpack/js/productionExecutable/
-          retention-days: 7
-          if-no-files-found: warn
-
-  # ── Flutter demo APK ────────────────────────────────────────────────────
-  # Protects the Kotlin 2.0 Compose Compiler plugin wiring in
-  # flutter/sceneview_flutter/android/build.gradle. Without it, any PR that
-  # touches the plugin module silently breaks `flutter build apk`.
-  build-flutter-demo:
-    name: Build flutter-demo APK
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/setup-gradle
-        with:
-          # Flutter's Android build still uses AGP 7.x-era toolchain
-          # constraints — needs JDK 17 not 21.
-          java-version: "17"
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.41.6"
-          channel: stable
-          cache: true
-
-      - name: flutter pub get
-        working-directory: samples/flutter-demo
-        run: flutter pub get
-
-      - name: flutter analyze (infos allowed, errors fail)
-        working-directory: samples/flutter-demo
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-      - name: flutter build apk --debug
-        working-directory: samples/flutter-demo
-        run: flutter build apk --debug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v7
-        if: success()
-        with:
-          name: flutter-demo-apk
-          path: samples/flutter-demo/build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
-          if-no-files-found: warn

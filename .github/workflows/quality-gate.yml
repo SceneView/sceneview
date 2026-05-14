@@ -97,6 +97,16 @@ jobs:
         env:
           # Optional. Demo runtime disables Geospatial when unset.
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
+          # ci.yml's `build` job already runs `assembleDebug` + the same
+          # unit-test set + JaCoCo coverage in parallel with this gate.
+          # Skipping the duplicate Android build/test work here keeps the
+          # gate focused on what it owns uniquely: version sync, security
+          # scans, asset CDN integrity, website rules, MCP tests, agent
+          # skill drift. Trims ~5 min from every PR and push. The full
+          # build/test path still runs end-to-end locally
+          # (`bash .claude/scripts/quality-gate.sh`) — only the CI
+          # invocation skips it.
+          QUALITY_GATE_SKIP_ANDROID: "1"
         run: bash .claude/scripts/quality-gate.sh
 
       - name: Upload validate-demo-assets log

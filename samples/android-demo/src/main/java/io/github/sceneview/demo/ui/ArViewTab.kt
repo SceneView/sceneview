@@ -9,6 +9,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.view.MotionEvent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -273,6 +274,27 @@ fun ArViewTabContent(
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
 
+    // Shared exit path used by both the system back gesture (BackHandler) and
+    // the top-end Close button. Detaches every ARCore anchor first so the
+    // underlying session releases its native refs before the wrapper
+    // recomposes away.
+    val exitArSession: () -> Unit = {
+        placedAnchors.forEach { runCatching { it.anchor.detach() } }
+        placedAnchors.clear()
+        sessionStarted = false
+    }
+
+    // System back gesture exits the live AR session instead of dropping the
+    // user out of the tab. Combined with `android:enableOnBackInvokedCallback="true"`
+    // in AndroidManifest.xml, Android 13+ routes back via the new
+    // OnBackInvokedDispatcher (a prerequisite for any future
+    // PredictiveBackHandler upgrade); today the user still sees the system's
+    // default home-peek animation during the swipe rather than an in-app
+    // preview of the launcher screen — see #1206 follow-up.
+    BackHandler {
+        exitArSession()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Live ARSceneView — full bleed under the overlays.
         key(arSceneId) {
@@ -341,16 +363,10 @@ fun ArViewTabContent(
         }
 
         // Top-end exit button — back affordance from the live AR session.
-        // Flips `sessionStarted = false` so the user lands on the launcher
-        // again instead of being stuck with only the tab nav. Detaches every
-        // ARCore anchor first so the underlying session releases its native
-        // refs before the wrapper recomposes away.
+        // Mirrors the BackHandler above so users have a visible CTA in addition
+        // to the system gesture.
         FilledIconButton(
-            onClick = {
-                placedAnchors.forEach { runCatching { it.anchor.detach() } }
-                placedAnchors.clear()
-                sessionStarted = false
-            },
+            onClick = exitArSession,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
