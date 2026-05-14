@@ -155,9 +155,15 @@ jobs:
             # Block until the emulator finishes booting. The action waits for
             # device-online but not for package-manager readiness — `android run`
             # would otherwise race the PM during cold boot.
+            #
+            # POSIX-shell only: ReactiveCircus/android-emulator-runner runs this
+            # `script:` block under /usr/bin/sh (dash on Ubuntu runners), where
+            # `[[ ... ]]` is a syntax error. Use plain `[ ... ]` + `=`.
             adb wait-for-device
-            until [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]]; do
+            attempts=0
+            while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do
               sleep 2
+              attempts=$((attempts + 1))
             done
 
             # Install + launch atomically via the Android CLI.
