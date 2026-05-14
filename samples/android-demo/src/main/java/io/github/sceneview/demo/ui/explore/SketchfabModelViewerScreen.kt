@@ -1,14 +1,21 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 
 package io.github.sceneview.demo.ui.explore
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.SurfaceType
 import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.demo.sketchfab.SketchfabModel
@@ -104,11 +112,12 @@ fun SketchfabModelViewerScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var stage by remember(model.uid) { mutableStateOf<Stage>(Stage.Preview) }
 
-    // Hoist Engine + loaders ABOVE the Crossfade so the Filament engine survives
-    // stage transitions. Previously every Crossfade swap (Preview → Downloading
-    // → Rendering) tore down and recreated the Engine inside RenderContent
-    // (200-400 ms freeze + black flash). With the engine remembered here it
-    // outlives the crossfade tween and only releases when the sheet closes.
+    // Hoist Engine + loaders ABOVE the SharedTransitionLayout so the Filament
+    // engine survives stage transitions. Previously every Crossfade swap
+    // (Preview → Downloading → Rendering) tore down and recreated the Engine
+    // inside RenderContent (200-400 ms freeze + black flash). With the engine
+    // remembered here it outlives the transition tween and only releases when
+    // the sheet closes.
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
@@ -118,34 +127,69 @@ fun SketchfabModelViewerScreen(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
-        // Cross-fade between Preview → Downloading (Ken-Burns thumbnail) →
-        // Rendering (live SceneView). The 500 ms tween is just long enough
-        // to read as "the model came to life" rather than "the spinner jumped
-        // to a new screen". Stage.Preview is excluded from the fade so the
-        // initial tap-to-open still feels snappy.
-        Crossfade(
-            targetState = stage,
-            animationSpec = tween(durationMillis = 500),
-            label = "sketchfab-stage",
-        ) { s ->
-            when (s) {
-                Stage.Preview -> PreviewContent(
-                    model = model,
-                    onOpenInSceneView = { stage = Stage.Downloading },
-                )
-                Stage.Downloading -> DownloadingContent(
-                    model = model,
-                    onReady = { file -> stage = Stage.Rendering(file) },
-                    onError = { stage = Stage.Error(it) },
-                )
-                is Stage.Rendering -> RenderContent(
-                    file = s.file,
-                    model = model,
-                    engine = engine,
-                    modelLoader = modelLoader,
-                    environmentLoader = environmentLoader,
-                )
-                is Stage.Error -> ErrorContent(message = s.message, onRetry = { stage = Stage.Preview })
+        // SharedTransitionLayout + AnimatedContent so the hero thumbnail
+        // morphs smoothly between Preview (220 dp card) → Downloading
+        // (440 dp Ken-Burns) → Rendering (live SceneView surface). Each
+        // stage receives a `heroModifier` slot carrying `sharedBounds` +
+        // a matching `clip(RoundedCornerShape(24.dp))` so the corner
+        // radius stays consistent through the morph (without the clip
+        // baked into the shared modifier, Preview's rounded corners
+        // would snap to square corners at frame 1 of the animation).
+        // Stage.Error opts out — there is no hero so reusing the bounds
+        // would animate the error card sliding out of empty space.
+        val heroShape = RoundedCornerShape(24.dp)
+        val heroKey = "sketchfab-hero-${model.uid}"
+        SharedTransitionLayout {
+            AnimatedContent(
+                targetState = stage,
+                transitionSpec = {
+                    // Stages that share the hero (Preview / Downloading /
+                    // Rendering) opt out of fade so only `sharedBounds`
+                    // drives the morph — a parallel fadeIn/fadeOut would
+                    // wash the hero semi-transparent halfway through. Only
+                    // Stage.Error (no shared element) uses a real fade.
+                    val errorInvolved = initialState is Stage.Error || targetState is Stage.Error
+                    if (errorInvolved) {
+                        fadeIn(animationSpec = tween(300)) togetherWith
+                            fadeOut(animationSpec = tween(300))
+                    } else {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    }
+                },
+                label = "sketchfab-stage",
+            ) { s ->
+                val heroModifier: Modifier = when (s) {
+                    Stage.Preview, Stage.Downloading, is Stage.Rendering ->
+                        Modifier
+                            .sharedBounds(
+                                sharedContentState = rememberSharedContentState(key = heroKey),
+                                animatedVisibilityScope = this@AnimatedContent,
+                            )
+                            .clip(heroShape)
+                    is Stage.Error -> Modifier
+                }
+                when (s) {
+                    Stage.Preview -> PreviewContent(
+                        model = model,
+                        onOpenInSceneView = { stage = Stage.Downloading },
+                        heroModifier = heroModifier,
+                    )
+                    Stage.Downloading -> DownloadingContent(
+                        model = model,
+                        onReady = { file -> stage = Stage.Rendering(file) },
+                        onError = { stage = Stage.Error(it) },
+                        heroModifier = heroModifier,
+                    )
+                    is Stage.Rendering -> RenderContent(
+                        file = s.file,
+                        model = model,
+                        engine = engine,
+                        modelLoader = modelLoader,
+                        environmentLoader = environmentLoader,
+                        heroModifier = heroModifier,
+                    )
+                    is Stage.Error -> ErrorContent(message = s.message, onRetry = { stage = Stage.Preview })
+                }
             }
         }
     }
@@ -161,7 +205,11 @@ private sealed interface Stage {
 // ── Preview ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit) {
+private fun PreviewContent(
+    model: SketchfabModel,
+    onOpenInSceneView: () -> Unit,
+    heroModifier: Modifier = Modifier,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -171,7 +219,8 @@ private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit)
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .clip(RoundedCornerShape(24.dp)),
+                .clip(RoundedCornerShape(24.dp))
+                .then(heroModifier),
         ) {
             AsyncNetworkImage(
                 url = model.preferredThumbnailUrl(minWidth = 640, maxWidth = 1280),
@@ -290,14 +339,16 @@ private fun StatChip(label: String) {
 /**
  * Hero state while the GLB is downloading. Shows the Sketchfab thumbnail with a
  * slow Ken-Burns zoom (1.0 → 1.18) and a soft blur, so the screen feels like a
- * premium preview instead of a spinner. Cross-fades into the live SceneView via
- * the parent [Crossfade] when [RenderContent] takes over.
+ * premium preview instead of a spinner. Morphs into the live SceneView via
+ * the parent [SharedTransitionLayout] + [AnimatedContent] when [RenderContent]
+ * takes over — the 440 dp hero Box keeps its shared bounds across the swap.
  */
 @Composable
 private fun DownloadingContent(
     model: SketchfabModel,
     onReady: (File) -> Unit,
     onError: (String) -> Unit,
+    heroModifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     LaunchedEffect(model.uid) {
@@ -326,7 +377,8 @@ private fun DownloadingContent(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(440.dp),
+            .height(440.dp)
+            .then(heroModifier),
     ) {
         AsyncNetworkImage(
             url = model.preferredThumbnailUrl(minWidth = 640, maxWidth = 1280),
@@ -394,6 +446,7 @@ private fun RenderContent(
     engine: Engine,
     modelLoader: ModelLoader,
     environmentLoader: EnvironmentLoader,
+    heroModifier: Modifier = Modifier,
 ) {
     // `rememberModelInstance` accepts asset paths or URIs; we pass a `file://`
     // URI so Filament reads from the local on-disk cache without re-decoding
@@ -433,10 +486,18 @@ private fun RenderContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(440.dp),
+                .height(440.dp)
+                .then(heroModifier),
         ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                // TextureSurface so the live render respects the Compose layer
+                // alpha during the SharedTransitionLayout morph and the
+                // surrounding cinematic-vignette overlay. The default SurfaceView
+                // is a hardware overlay punched through the window and ignores
+                // Compose's fadeOut/fadeIn during the stage transition — the
+                // viewport would pop in opaque instead of morphing in.
+                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
