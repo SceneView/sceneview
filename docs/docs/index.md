@@ -61,7 +61,7 @@ No boilerplate. No manual cleanup. Just declare what you want.
 === "Kotlin (Android)"
 
     ```kotlin
-    // build.gradle: implementation("io.github.sceneview:sceneview:4.3.3")
+    // build.gradle: implementation("io.github.sceneview:sceneview:4.3.4")
 
     SceneView(modifier = Modifier.fillMaxSize()) {
         val model = rememberModelInstance(modelLoader, "models/helmet.glb")
@@ -83,7 +83,7 @@ No boilerplate. No manual cleanup. Just declare what you want.
 === "Swift (iOS / macOS / visionOS)"
 
     ```swift
-    // Package.swift: .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.3.3")
+    // Package.swift: .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.3.4")
 
     SceneView { root in
         let model = try? await ModelNode.load("helmet.usdz")
@@ -190,7 +190,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
     ```kotlin
     // build.gradle.kts
     dependencies {
-        implementation("io.github.sceneview:sceneview:4.3.3")
+        implementation("io.github.sceneview:sceneview:4.3.4")
     }
     ```
 
@@ -199,7 +199,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
     ```kotlin
     // build.gradle.kts
     dependencies {
-        implementation("io.github.sceneview:arsceneview:4.3.3")
+        implementation("io.github.sceneview:arsceneview:4.3.4")
     }
     ```
 
@@ -207,7 +207,7 @@ Rigid body physics with gravity, collisions, and restitution. Drop objects, boun
 
     ```swift
     // Package.swift or Xcode > Add Package Dependency
-    .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.3.3")
+    .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.3.4")
     ```
 
 === "Web"
