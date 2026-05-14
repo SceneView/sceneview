@@ -16,7 +16,7 @@ A quick reference for SceneViewSwift's most-used APIs. Print it, pin it, keep it
 
 ```swift
 // Package.swift or Xcode SPM
-.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.2.0")
+.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.3.0")
 ```
 
 ```swift
@@ -68,11 +68,23 @@ ARSceneView(
     }
 )
 .onSessionStarted { arView in }       // called when AR session begins
+.mainLight(.systemDefault)             // v4.3.0+ — see LightSlot (default 10 000-lux directional + shadow)
+.fillLight(.systemDefault)             // v4.3.0+ — Android-parity 3 000-lux fill on by default
 ```
 
 Environment texturing defaults to `.automatic` — RealityKit's equivalent of ARCore's
 `ENVIRONMENTAL_HDR` (which became the Android default in v4.3.0, `#1063`). PBR reflections
 are driven by runtime-built environment probes; no configuration knob is exposed.
+
+The dual-light setup matches the 3D ``SceneView`` defaults (issue [`#1138`](https://github.com/sceneview/sceneview/issues/1138)).
+ARKit has no equivalent of ARCore's directional-light estimation, so the explicit lights
+keep their baseline intensities each frame. Override or disable them via:
+
+```swift
+ARSceneView(planeDetection: .horizontal)
+  .mainLight(.custom(LightNode.directional(intensity: 5_000)))   // dimmer key light
+  .fillLight(.disabled)                                            // single-light AR
+```
 
 ## ARRecorder (v4.3.0+, record-only)
 
@@ -369,6 +381,9 @@ model?.stopAllAnimations()
 | `CubeNode(size, material)` | `GeometryNode.cube(size:color:)` |
 | `SphereNode(radius, material)` | `GeometryNode.sphere(radius:color:)` |
 | `LightNode(type, apply = { })` | `LightNode.directional(...)` / `.point(...)` / `.spot(...)` |
+| `Scene(mainLightNode = …, fillLightNode = …)` (3D) | `.mainLight(_:)` / `.fillLight(_:)` on `SceneView` (v4.2.0+) |
+| `ARSceneView(mainLightNode = …, fillLightNode = …)` (AR) | `.mainLight(_:)` / `.fillLight(_:)` on `ARSceneView` (v4.3.0+, `#1138`) |
+| `Config.LightEstimationMode.ENVIRONMENTAL_HDR` | `ARWorldTrackingConfiguration.environmentTexturing = .automatic` (on by default in `ARSceneView`) |
 | `rememberEnvironmentLoader` | `.environment(.studio)` view modifier |
 | `rememberCameraManipulator()` | `.cameraControls(.orbit)` view modifier |
 | `AnchorNode(anchor)` | `AnchorNode.world(position:)` |

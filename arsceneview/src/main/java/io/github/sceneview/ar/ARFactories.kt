@@ -48,13 +48,17 @@ fun createARCameraStream(materialLoader: MaterialLoader) = ARCameraStream(materi
  *
  * Prefer the [rememberAREnvironment] composable, which reads the bundled
  * `environments/neutral/neutral_ibl.ktx` automatically.
+ *
+ * Note: AR environments are inherently non-opaque — the camera feed is always behind the
+ * scene, and `skybox` is hard-coded to `null` so the camera passthrough shows through.
+ * `createEnvironment(isOpaque = …)` only feeds its default skybox alpha, which is bypassed
+ * here, so this factory does not expose an `isOpaque` parameter (#1121).
  */
 fun createAREnvironment(
     engine: Engine,
     iblBuffer: Buffer? = null,
 ) = createEnvironment(
     engine = engine,
-    isOpaque = true,
     // Apply DEFAULT_IBL_INTENSITY (10k lux) so the AR baseline IBL doesn't blow out
     // direct lighting once ARCore ENVIRONMENTAL_HDR replaces it (#1075). Same pattern
     // as the 3D `createEnvironment` path.
@@ -62,6 +66,10 @@ fun createAREnvironment(
         KTX1Loader.createIndirectLight(engine, it).indirectLight
             ?.also { ibl -> ibl.intensity = io.github.sceneview.DEFAULT_IBL_INTENSITY }
     },
+    // Skybox = null: camera feed passes through. `isOpaque` is intentionally omitted from
+    // the call — it only drives the default skybox alpha and is bypassed by this explicit
+    // null (#1121). The remaining `Skybox.Builder()` evaluation in the default-arg path is
+    // never reached because `skybox` is named and assigned `null` here.
     skybox = null,
 )
 

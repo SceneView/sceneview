@@ -1,3 +1,7 @@
+## 4.3.0
+
+- Version alignment with SceneView v4.3.0. Android rendering pipeline hardened: AR main light additive vs ARCore estimate (no more pitch-black scenes when ARCore dims), new AR fill light baseline + IBL, fixed Spring underdamped + Matrix.decomposeRotation thread-safety + slerp frame-rate independence + segment closest-points sign, LightEstimator robustness (destroy gate, toggle leak, buffer race), AR cubemap `GEN_MIPMAPPABLE` fix. iOS unchanged. See root `CHANGELOG.md` for full breakdown.
+
 ## 4.2.0
 
 - Version alignment with SceneView v4.2.0. ⚠️ **iOS render defaults now match Android** (main 1k → 10k lux, fill 300 → 3k lux, new key+fill setup) — existing iOS apps embedding `sceneview_flutter` will render brighter / more cinematic. See root `CHANGELOG.md` for the full migration recipe + new `LightSlot` / `RenderQuality` / `NodeGesture` / `AnchorNode` AR APIs.

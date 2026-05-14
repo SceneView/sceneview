@@ -10,8 +10,12 @@ import SceneViewSwift
 /// position. Loads 8 bundled USDZ assets at equirepartie angles (45° apart) on a
 /// ~1.5 m radius circle around the origin, each at a different height (between
 /// -0.5 m and +0.5 m relative to the user). A `Timer` ticks at 60 Hz and updates
-/// per-model orbital angles (planetary speeds, between 0.05 and 0.30 rad/s) and
-/// local spin (between 0.5 and 2.0 rad/s).
+/// per-model orbital angles (planetary speeds, between 0.05 and 0.30 rad/s).
+///
+/// Models with a baked animation (`animated_dragon`, `phoenix_bird`) face the
+/// orbit tangent so they "fly the orbit" naturally — their own animation does
+/// the wing flap / locomotion. Static models keep a local Y spin (between 0.5
+/// and 2.0 rad/s) so they don't look frozen.
 ///
 /// The user stays fixed in AR — turning the phone reveals each model as it
 /// passes through view.
@@ -31,19 +35,23 @@ struct OrbitalARDemo: View {
         let scale: Float
         let initialAngle: Float
         let orbitSpeed: Float       // rad/s around the user
-        let spinSpeed: Float        // rad/s local Y spin
+        let spinSpeed: Float        // rad/s local Y spin — ignored when hasBakedAnimation = true
         let height: Float           // y offset relative to user
+        // True when the USDZ ships its own baked animation (wing flap, etc.).
+        // For these we skip the Y spin and orient the model along the orbit
+        // tangent so it "flies the orbit" naturally — its own anim does the rest.
+        let hasBakedAnimation: Bool
     }
 
     private static let planets: [Planet] = [
-        Planet(asset: "red_car",          scale: 0.18, initialAngle: 0,                orbitSpeed: 0.08, spinSpeed: 0.7,  height:  0.0),
-        Planet(asset: "ferrari_f40",      scale: 0.15, initialAngle: .pi * 2 / 8 * 1,  orbitSpeed: 0.12, spinSpeed: 0.5,  height:  0.3),
-        Planet(asset: "game_boy_classic", scale: 0.12, initialAngle: .pi * 2 / 8 * 2,  orbitSpeed: 0.20, spinSpeed: 1.6,  height: -0.2),
-        Planet(asset: "retro_piano",      scale: 0.20, initialAngle: .pi * 2 / 8 * 3,  orbitSpeed: 0.06, spinSpeed: 0.9,  height:  0.4),
-        Planet(asset: "animated_dragon",  scale: 0.15, initialAngle: .pi * 2 / 8 * 4,  orbitSpeed: 0.15, spinSpeed: 1.2,  height: -0.4),
-        Planet(asset: "nintendo_switch",  scale: 0.18, initialAngle: .pi * 2 / 8 * 5,  orbitSpeed: 0.10, spinSpeed: 2.0,  height:  0.2),
-        Planet(asset: "tree_scene",       scale: 0.30, initialAngle: .pi * 2 / 8 * 6,  orbitSpeed: 0.05, spinSpeed: 0.6,  height: -0.5),
-        Planet(asset: "phoenix_bird",     scale: 0.20, initialAngle: .pi * 2 / 8 * 7,  orbitSpeed: 0.30, spinSpeed: 1.8,  height:  0.5),
+        Planet(asset: "red_car",          scale: 0.18, initialAngle: 0,                orbitSpeed: 0.08, spinSpeed: 0.7,  height:  0.0, hasBakedAnimation: false),
+        Planet(asset: "ferrari_f40",      scale: 0.15, initialAngle: .pi * 2 / 8 * 1,  orbitSpeed: 0.12, spinSpeed: 0.5,  height:  0.3, hasBakedAnimation: false),
+        Planet(asset: "game_boy_classic", scale: 0.12, initialAngle: .pi * 2 / 8 * 2,  orbitSpeed: 0.20, spinSpeed: 1.6,  height: -0.2, hasBakedAnimation: false),
+        Planet(asset: "retro_piano",      scale: 0.20, initialAngle: .pi * 2 / 8 * 3,  orbitSpeed: 0.06, spinSpeed: 0.9,  height:  0.4, hasBakedAnimation: false),
+        Planet(asset: "animated_dragon",  scale: 0.15, initialAngle: .pi * 2 / 8 * 4,  orbitSpeed: 0.15, spinSpeed: 0,    height: -0.4, hasBakedAnimation: true),
+        Planet(asset: "nintendo_switch",  scale: 0.18, initialAngle: .pi * 2 / 8 * 5,  orbitSpeed: 0.10, spinSpeed: 2.0,  height:  0.2, hasBakedAnimation: false),
+        Planet(asset: "tree_scene",       scale: 0.30, initialAngle: .pi * 2 / 8 * 6,  orbitSpeed: 0.05, spinSpeed: 0.6,  height: -0.5, hasBakedAnimation: false),
+        Planet(asset: "phoenix_bird",     scale: 0.20, initialAngle: .pi * 2 / 8 * 7,  orbitSpeed: 0.30, spinSpeed: 0,    height:  0.5, hasBakedAnimation: true),
     ]
 
     private static let orbitRadius: Float = 1.5
@@ -130,11 +138,23 @@ struct OrbitalARDemo: View {
             for (index, planet) in Self.planets.enumerated() {
                 guard let node = loadedNodes[index] else { continue }
                 node.entity.position = position(for: planet, time: Float(now))
-                // Local spin on Y — accumulates each tick so it loops naturally.
-                // Same modulo guard as the orbital angle (#978).
-                let spinAngle = (planet.spinSpeed * Float(now))
+                // Models with a baked animation (dragon, phoenix) face the tangent
+                // of the orbit (= direction of motion) instead of spinning on Y —
+                // a flying creature pirouetting on itself breaks the illusion.
+                // The orbit angle modulo 2π is the same precision guard as #978.
+                let orbitAngle = (planet.initialAngle + planet.orbitSpeed * Float(now))
                     .truncatingRemainder(dividingBy: 2 * .pi)
-                node.entity.orientation = simd_quatf(angle: spinAngle, axis: .init(0, 1, 0))
+                let yawAngle: Float
+                if planet.hasBakedAnimation {
+                    // For position (R·cos θ, h, R·sin θ) on a CCW orbit, the tangent
+                    // is (-sin θ, 0, cos θ). For a USDZ whose forward is -Z, that
+                    // maps to a Y-rotation of θ + π.
+                    yawAngle = orbitAngle + .pi
+                } else {
+                    yawAngle = (planet.spinSpeed * Float(now))
+                        .truncatingRemainder(dividingBy: 2 * .pi)
+                }
+                node.entity.orientation = simd_quatf(angle: yawAngle, axis: .init(0, 1, 0))
             }
         }
         RunLoop.main.add(timer, forMode: .common)

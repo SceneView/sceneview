@@ -285,14 +285,15 @@ fun SceneView(
     // is harmless. What matters is that nodeManager.addNode() wires onChildAdded → ::addNode so
     // any node parented to the camera (e.g. a compass arrow) is automatically added to the scene
     // and rendered in camera/HUD space via Filament's TransformManager hierarchy.
+    //
+    // DisposableEffect (NOT SideEffect) so the camera is removed from the Filament Scene
+    // both on (a) key change and (b) composition disposal. See #1143 — same leak shape as
+    // #1122 lights for the documented "share scene between views" use case.
 
-    val prevCameraNodeRef = remember { AtomicReference<CameraNode?>(null) }
-    SideEffect {
-        val prev = prevCameraNodeRef.get()
-        if (prev != cameraNode) {
-            prev?.let { nodeManager.removeNode(it) }
-            nodeManager.addNode(cameraNode)
-            prevCameraNodeRef.set(cameraNode)
+    DisposableEffect(cameraNode) {
+        nodeManager.addNode(cameraNode)
+        onDispose {
+            nodeManager.removeNode(cameraNode)
         }
     }
 

@@ -3,11 +3,11 @@
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
 **Android — Maven artifacts (version 4.1.2):**
-- 3D only: `io.github.sceneview:sceneview:4.2.0`
-- AR + 3D: `io.github.sceneview:arsceneview:4.2.0`
+- 3D only: `io.github.sceneview:sceneview:4.3.0`
+- AR + 3D: `io.github.sceneview:arsceneview:4.3.0`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
-- `https://github.com/sceneview/sceneview-swift.git` (from: "4.2.0")
+- `https://github.com/sceneview/sceneview-swift.git` (from: "4.3.0")
 
 **Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.20 | **Compose BOM compatible**
 
@@ -18,8 +18,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.2.0")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.2.0") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.3.0")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.3.0") // AR (includes sceneview)
 }
 ```
 
@@ -1060,10 +1060,16 @@ class EnvironmentLoader(engine: Engine, context: Context) {
     fun createHDREnvironment(
         assetFileLocation: String,
         indirectLightSpecularFilter: Boolean = true,
+        // v4.3.0 (#1124): override the v4.1.0-balanced 10k IBL default (#1075)
+        // without copying the buffer-loading boilerplate.
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         createSkybox: Boolean = true
     ): Environment?
 
     fun createHDREnvironment(buffer: Buffer, ...): Environment?
+    fun createHDREnvironment(rawResId: Int, ...): Environment?
+    fun createHDREnvironment(file: File, ...): Environment?
+    suspend fun loadHDREnvironment(url: String, ...): Environment?
 
     // KTX environment
     fun createKTXEnvironment(assetFileLocation: String): Environment
@@ -2221,7 +2227,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.2.0")
+    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.3.0")
 ]
 ```
 
@@ -2662,7 +2668,7 @@ npm install sceneview-web filament
 Script-tag usage (no bundler):
 ```html
 <script src="https://sceneview.github.io/js/filament/filament.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.2.0/sceneview-web.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sceneview-web@4.3.0/sceneview-web.js"></script>
 ```
 
 After loading, the library registers itself on `window.sceneview`.
@@ -2960,7 +2966,7 @@ Renderer: **RealityKit**. Requires iOS 17+ / macOS 14+ / visionOS 1+.
 
 SPM dependency (Package.swift or Xcode):
 ```swift
-.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.2.0")
+.package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.3.0")
 ```
 
 Import: `import SceneViewSwift`
@@ -3119,6 +3125,8 @@ View modifiers (chainable):
 .onSessionStarted(_ handler: @escaping (ARView) -> Void) -> ARSceneView
 .cameraExposure(_ ev: Float?) -> ARSceneView   // EV stops; iOS 15+ CIColorControls post-process
 .onFrame(_ handler: @escaping (ARFrame, ARView) -> Void) -> ARSceneView
+.mainLight(_ slot: LightSlot) -> ARSceneView   // v4.3.0+ — Android-parity directional key light (#1138)
+.fillLight(_ slot: LightSlot) -> ARSceneView   // v4.3.0+ — Android-parity dual-light AR baseline (#1138)
 ```
 
 `PlaneDetectionMode` values: `.none`, `.horizontal`, `.vertical`, `.both`
@@ -3127,6 +3135,13 @@ View modifiers (chainable):
 - Mirrors Android's `ARSceneView(cameraExposure: Float?)`.
 - Positive values brighten; negative values darken. One stop = ±0.5 brightness unit.
 - Implemented via `ARView.renderCallbacks.postProcess` (iOS 15+); no-op on earlier versions.
+
+`mainLight` / `fillLight` notes (v4.3.0+, `#1138` — iOS half of `#1063`):
+- Mirrors Android's `ARSceneView(mainLightNode = …, fillLightNode = …)` parameters.
+- Default `LightSlot.systemDefault` provisions a `10 000`-lux directional main + a `3 000`-lux fill (matches the Android v4.1.0 BREAKING render-defaults change). Same `LightSlot` enum as the 3D ``SceneView``.
+- ARKit has no equivalent of ARCore's `ENVIRONMENTAL_HDR` directional-light estimation; the explicit lights keep their baseline intensities each frame. `.automatic` environment texturing handles PBR cubemap reflections.
+- Pass `.disabled` on `fillLight` for a single-light AR setup (rare — looks harsh).
+- The light is added as a `AnchorEntity(world: .zero)` so it renders at session-start origin.
 
 Minimal AR usage:
 ```swift
@@ -3542,7 +3557,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.2.0
+  sceneview_flutter: ^4.3.0
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).

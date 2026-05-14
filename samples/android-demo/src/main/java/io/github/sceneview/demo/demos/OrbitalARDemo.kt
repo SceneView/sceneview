@@ -37,17 +37,20 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Personal-solar-system AR demo — 8 bundled GLB models orbit around the user.
+ * Personal-solar-system AR demo — 7 bundled GLB models orbit around the user.
  *
  * On the first tracked AR frame, an [Anchor] is created at world origin (the camera's
- * pose at session-start in ARCore — i.e. wherever the user is standing). Eight model
+ * pose at session-start in ARCore — i.e. wherever the user is standing). Seven model
  * instances are placed as children of an [AnchorNode] in a circle of radius 1.5 m,
- * at angles 360° / 8 = 45° apart. Each model has:
+ * at evenly-spaced angles (360° / 7 ≈ 51.4° apart). Each model has:
  *
  * - its own **orbital speed** (between 0.05 and 0.30 rad/s) — slow at the outer
  *   "planets", fast at the inner ones, so the formation looks like a solar system
  *   rather than a rigid ring;
- * - its own **local spin** (between 0.5 and 2.0 rad/s on the Y axis);
+ * - either a **baked animation** (dragon, soldier — auto-played, with the model
+ *   oriented along the orbit tangent so it "flies/walks the orbit") **or** a
+ *   **local Y spin** (between 0.6 and 2.0 rad/s) for static GLBs (helmet, lantern,
+ *   toy car) so they feel alive without their own rig;
  * - a **distinct height** between -0.5 m and +0.5 m relative to the user's eye level.
  *
  * The user stays fixed in AR and can turn around to watch each model pass by.
@@ -61,21 +64,28 @@ private data class Planet(
     val scaleToUnits: Float,
     val initialAngleRad: Float,
     val orbitSpeed: Float,   // rad/s around the user
-    val spinSpeed: Float,    // rad/s local Y axis
+    val spinSpeed: Float,    // rad/s local Y axis — ignored when hasBakedAnimation = true
     val height: Float,       // y offset, m
+    // True when the GLB has its own baked animation (wing flap, walk cycle, etc.).
+    // For these, we skip the local Y spin and instead orient the model along the
+    // orbit tangent so it "flies/walks the orbit" naturally — the baked animation
+    // does the rest of the movement.
+    val hasBakedAnimation: Boolean,
 )
 
-// Curated GLB list — only the 8 bundled assets we ship. Two of them are repeated to
-// reach 8 planets (with distinct speeds and heights so they read as different motion).
-// When more GLBs are bundled, swap in the variety here.
+// Curated GLB list — only the 7 bundled assets we ship. The two formerly-static
+// pets (khronos_fox + shiba) were replaced with a second instance of the animated
+// dragon and soldier so every "alive" looking model in the formation actually
+// moves. Each duplicate runs at a different height/speed/angle so the user reads
+// them as distinct planets rather than clones.
 private val ORBITAL_PLANETS = listOf(
-    Planet("models/khronos_damaged_helmet.glb", 0.20f, 0f,                 0.08f, 0.7f,  0.0f),
-    Planet("models/khronos_fox.glb",            0.25f, Math.PI.toFloat() / 4 * 2, 0.20f, 1.6f, -0.2f),
-    Planet("models/khronos_lantern.glb",        0.20f, Math.PI.toFloat() / 4 * 3, 0.06f, 0.9f,  0.4f),
-    Planet("models/animated_dragon.glb",        0.25f, Math.PI.toFloat() / 4 * 4, 0.15f, 1.2f, -0.4f),
-    Planet("models/khronos_toy_car.glb",        0.20f, Math.PI.toFloat() / 4 * 5, 0.10f, 2.0f,  0.2f),
-    Planet("models/shiba.glb",                  0.20f, Math.PI.toFloat() / 4 * 6, 0.05f, 0.6f, -0.5f),
-    Planet("models/threejs_soldier.glb",        0.40f, Math.PI.toFloat() / 4 * 7, 0.30f, 1.8f,  0.5f),
+    Planet("models/khronos_damaged_helmet.glb", 0.20f, 0f,                                0.08f, 0.7f,  0.0f, hasBakedAnimation = false),
+    Planet("models/animated_dragon.glb",        0.30f, 2f * PI.toFloat() / 7f * 1,        0.20f, 0f,   -0.2f, hasBakedAnimation = true),
+    Planet("models/khronos_lantern.glb",        0.20f, 2f * PI.toFloat() / 7f * 2,        0.06f, 0.9f,  0.4f, hasBakedAnimation = false),
+    Planet("models/animated_dragon.glb",        0.25f, 2f * PI.toFloat() / 7f * 3,        0.15f, 0f,   -0.4f, hasBakedAnimation = true),
+    Planet("models/khronos_toy_car.glb",        0.20f, 2f * PI.toFloat() / 7f * 4,        0.10f, 2.0f,  0.2f, hasBakedAnimation = false),
+    Planet("models/threejs_soldier.glb",        0.50f, 2f * PI.toFloat() / 7f * 5,        0.05f, 0f,   -0.5f, hasBakedAnimation = true),
+    Planet("models/threejs_soldier.glb",        0.40f, 2f * PI.toFloat() / 7f * 6,        0.30f, 0f,    0.5f, hasBakedAnimation = true),
 )
 
 private const val ORBIT_RADIUS = 1.5f
@@ -158,9 +168,19 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                                 val orbitAngle =
                                     (planet.initialAngleRad + planet.orbitSpeed * orbitSeconds) %
                                             (2f * PI.toFloat())
-                                val spinDegrees = Math.toDegrees(
-                                    (planet.spinSpeed * orbitSeconds).toDouble()
-                                ).toFloat() % 360f
+                                // Models with a baked animation (dragon, soldier) face the
+                                // tangent of the orbit (= direction of motion) instead of
+                                // spinning on Y — a flying dragon spinning on itself breaks
+                                // the illusion. For position (R·cos θ, h, R·sin θ) on a CCW
+                                // orbit, the tangent is (-sin θ, 0, cos θ); for a glTF model
+                                // whose forward is -Z, that maps to a Y-rotation of θ + π.
+                                val rotationY = if (planet.hasBakedAnimation) {
+                                    Math.toDegrees(orbitAngle.toDouble()).toFloat() + 180f
+                                } else {
+                                    Math.toDegrees(
+                                        (planet.spinSpeed * orbitSeconds).toDouble()
+                                    ).toFloat() % 360f
+                                }
                                 ModelNode(
                                     modelInstance = instance,
                                     scaleToUnits = planet.scaleToUnits,
@@ -170,7 +190,7 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                                         y = planet.height,
                                         z = sin(orbitAngle) * ORBIT_RADIUS,
                                     ),
-                                    rotation = Rotation(y = spinDegrees),
+                                    rotation = Rotation(y = rotationY),
                                     autoAnimate = true,
                                 )
                             }

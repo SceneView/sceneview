@@ -1,7 +1,7 @@
 [versions]
 # Build tools
 agp = "8.13.2"
-kotlin = "2.3.20"
+kotlin = "2.3.21"
 composeMultiplatform = "1.10.3"
 
 # AndroidX Core
@@ -10,10 +10,10 @@ appcompat = "1.7.1"
 fragmentKtx = "1.8.9"
 
 # Compose
-composeBom = "2026.03.00"
+composeBom = "2026.05.00"
 composeMaterial3Expressive = "1.5.0-alpha17"
 activityCompose = "1.13.0"
-navigationCompose = "2.9.7"
+navigationCompose = "2.9.8"
 lifecycleRuntimeCompose = "2.10.0"
 
 # Kotlin Libraries

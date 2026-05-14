@@ -175,5 +175,102 @@ final class ARSceneViewTests: XCTestCase {
         let anchor = AnchorNode.plane(alignment: .vertical)
         XCTAssertNotNil(anchor)
     }
+
+    // MARK: - LightSlot modifier wire-up (#1138)
+
+    /// Default `ARSceneView()` must initialise both light slots to
+    /// ``LightSlot/systemDefault`` so the Android-parity dual-light
+    /// (10 000-lux main + 3 000-lux fill) renders out of the box.
+    func testDefaultLightSlotsAreSystemDefault() {
+        let view = ARSceneView()
+        XCTAssertEqual(view.mainLightSlot, .systemDefault)
+        XCTAssertEqual(view.fillLightSlot, .systemDefault)
+    }
+
+    /// `.mainLight(_:)` returns a new view (value-type copy semantics).
+    func testMainLightModifierReturnsNewInstance() {
+        let original = ARSceneView()
+        let modified = original.mainLight(.disabled)
+        XCTAssertEqual(modified.mainLightSlot, .disabled)
+        // Original instance must NOT have been mutated.
+        XCTAssertEqual(original.mainLightSlot, .systemDefault)
+    }
+
+    /// `.fillLight(_:)` returns a new view (value-type copy semantics).
+    func testFillLightModifierReturnsNewInstance() {
+        let original = ARSceneView()
+        let modified = original.fillLight(.disabled)
+        XCTAssertEqual(modified.fillLightSlot, .disabled)
+        XCTAssertEqual(original.fillLightSlot, .systemDefault)
+    }
+
+    /// `.fillLight(.disabled)` is the canonical single-light AR setup. Verify
+    /// the slot value round-trips through the modifier.
+    func testFillLightDisabledRoundTrip() {
+        let view = ARSceneView()
+            .fillLight(.disabled)
+        XCTAssertEqual(view.fillLightSlot, .disabled)
+    }
+
+    /// `.mainLight(.custom(LightNode))` stores the caller's node reference.
+    ///
+    /// `@MainActor` because ``LightNode/directional(color:intensity:castsShadow:)``
+    /// and ``LightNode/entity`` are MainActor-isolated (RealityKit
+    /// `DirectionalLight` lives on the main actor).
+    @MainActor
+    func testMainLightCustomLightNode() {
+        let custom = LightNode.directional(intensity: 5_000)
+        let view = ARSceneView()
+            .mainLight(.custom(custom))
+        // Equatable on .custom compares entity identity (===), so verify both
+        // the variant and the underlying entity reference.
+        if case .custom(let stored) = view.mainLightSlot {
+            XCTAssertTrue(stored.entity === custom.entity)
+        } else {
+            XCTFail("Expected .custom slot, got \(view.mainLightSlot)")
+        }
+    }
+
+    /// `.fillLight(.custom(LightNode))` stores the caller's node reference.
+    @MainActor
+    func testFillLightCustomLightNode() {
+        let brighterFill = LightNode.fill(intensity: 6_000)
+        let view = ARSceneView()
+            .fillLight(.custom(brighterFill))
+        if case .custom(let stored) = view.fillLightSlot {
+            XCTAssertTrue(stored.entity === brighterFill.entity)
+        } else {
+            XCTFail("Expected .custom slot, got \(view.fillLightSlot)")
+        }
+    }
+
+    /// Calling `.mainLight(_:)` twice — the last value wins (copy semantics).
+    func testMainLightModifierLastWins() {
+        let view = ARSceneView()
+            .mainLight(.disabled)
+            .mainLight(.systemDefault)
+        XCTAssertEqual(view.mainLightSlot, .systemDefault)
+    }
+
+    /// Calling `.fillLight(_:)` twice — the last value wins (copy semantics).
+    func testFillLightModifierLastWins() {
+        let view = ARSceneView()
+            .fillLight(.disabled)
+            .fillLight(.systemDefault)
+        XCTAssertEqual(view.fillLightSlot, .systemDefault)
+    }
+
+    /// Chaining `.mainLight` + `.fillLight` + `.cameraExposure` + `.onSessionStarted`
+    /// must all return a valid view (no compile errors, no crashes).
+    @MainActor
+    func testLightModifiersChainWithOtherModifiers() {
+        let view = ARSceneView(planeDetection: .horizontal)
+            .mainLight(.custom(LightNode.directional(intensity: 5_000)))
+            .fillLight(.disabled)
+            .cameraExposure(0.5)
+            .onSessionStarted { _ in }
+        XCTAssertNotNil(view)
+        XCTAssertEqual(view.fillLightSlot, .disabled)
+    }
 }
 #endif // os(iOS)
