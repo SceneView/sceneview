@@ -457,19 +457,29 @@ private fun InstantPlacementScene(
         }
 
         // Clear-all control at the bottom-left.
-        OutlinedButton(
-            onClick = {
-                placedModels.forEach { runCatching { it.anchor.detach() } }
-                placedModels.clear()
-                trackingMethods.clear()
-                lostAnchors.clear()
-                cycleIndex = 0
-            },
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
+        // Only show Clear All when there's something to clear. The Pixel 9 audit
+        // (#1199) caught a startup screenshot where the empty Clear All button
+        // sat semi-transparent under the "Initializing camera" pill, producing a
+        // confusing stacked-buttons visual. Hiding it until the first tap lands
+        // also matches what the user expects: no action button for a no-op action.
+        AnimatedVisibility(
+            visible = placedModels.isNotEmpty(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomStart),
         ) {
-            Text("Clear All")
+            OutlinedButton(
+                onClick = {
+                    placedModels.forEach { runCatching { it.anchor.detach() } }
+                    placedModels.clear()
+                    trackingMethods.clear()
+                    lostAnchors.clear()
+                    cycleIndex = 0
+                },
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text("Clear All")
+            }
         }
 
         // Scanning indicator overlay
