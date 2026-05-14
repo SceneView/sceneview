@@ -1060,10 +1060,16 @@ class EnvironmentLoader(engine: Engine, context: Context) {
     fun createHDREnvironment(
         assetFileLocation: String,
         indirectLightSpecularFilter: Boolean = true,
+        // v4.3.0 (#1124): override the v4.1.0-balanced 10k IBL default (#1075)
+        // without copying the buffer-loading boilerplate.
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         createSkybox: Boolean = true
     ): Environment?
 
     fun createHDREnvironment(buffer: Buffer, ...): Environment?
+    fun createHDREnvironment(rawResId: Int, ...): Environment?
+    fun createHDREnvironment(file: File, ...): Environment?
+    suspend fun loadHDREnvironment(url: String, ...): Environment?
 
     // KTX environment
     fun createKTXEnvironment(assetFileLocation: String): Environment

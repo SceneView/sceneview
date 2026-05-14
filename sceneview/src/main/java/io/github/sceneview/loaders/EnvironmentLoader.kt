@@ -65,6 +65,9 @@ class EnvironmentLoader(
      * @param indirectLightSpecularFilter Generates a prefiltered indirect light cubemap.
      * SpecularFilter is a GPU based implementation of the specular probe pre-integration filter.
      * ** Launch the heavier computation. Expect 100-200ms on the GPU.**
+     * @param indirectLightApply Builder hook applied AFTER the v4.1.0-balanced 10k default
+     * (see #1075). Use it to override the IBL intensity (e.g. bright outdoor HDRIs may want
+     * 30k+) or rotation without copying the buffer-loading boilerplate.
      * @param textureOptions texture loader options
      * @param createSkybox Disable the skybox creation if you don't need it.
      *

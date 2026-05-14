@@ -102,22 +102,17 @@ class EnvironmentLoaderIndirectLightApplyContractTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────────────────────
 
-    private fun Method.hasBuilderLambdaParam(): Boolean =
-        parameterTypes.any { paramType ->
-            // Kotlin emits the receiver-style `Builder.() -> Unit` as a Function1 carrying the
-            // IndirectLight.Builder erased type. Tying the check to the parameter raw type
-            // (Function1) + the presence of any `IndirectLight.Builder` arg on the method
-            // signature is sufficient for the regression pin.
-            paramType.name == "kotlin.jvm.functions.Function1"
-        } && parameterTypes.any {
-            // The IndirectLight.Builder type isn't directly on the lambda's erased parameter
-            // (it appears via generic metadata). But the @Metadata annotation is read by
-            // kotlin-reflect and isn't available here, so we settle for a stricter check
-            // that the Function1 lives alongside the canonical HDR signature shape (the
-            // method takes the buffer/asset/file/etc. PLUS a boolean specularFilter PLUS the
-            // Function1 PLUS HDRLoader.Options PLUS a Boolean createSkybox).
-            it.name == "kotlin.jvm.functions.Function1"
+    private fun Method.hasBuilderLambdaParam(): Boolean {
+        // Kotlin compiles `IndirectLight.Builder.() -> Unit` to a `Function1` whose generic
+        // arg is `IndirectLight$Builder` — the generic info is preserved on the method's
+        // `genericParameterTypes` so we can pin both the raw type AND the receiver, which
+        // rejects unrelated future Function1 params (e.g. an `onProgress: (Float) -> Unit`).
+        return genericParameterTypes.any { generic ->
+            val generic = generic.typeName
+            generic.startsWith("kotlin.jvm.functions.Function1") &&
+                generic.contains("IndirectLight\$Builder")
         }
+    }
 
     private fun Method.hasHdrLoaderOptionsParam(): Boolean =
         parameterTypes.any { it.simpleName == "Options" && it.canonicalName?.contains("HDRLoader") == true }

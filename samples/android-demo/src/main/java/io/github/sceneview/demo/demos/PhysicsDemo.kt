@@ -88,11 +88,11 @@ fun PhysicsDemo(onBack: () -> Unit) {
                     orbitHomePosition = cameraNode.worldPosition
                 )
             ) {
-                // Accent fill light angled from the front-right to throw soft shadows on
-                // the falling spheres. The 5k lux value pairs with the v4.1.0 default
-                // main (10k) + fill (3k) + IBL (10k); pre-v4.1.0 this was 100k to mimic
-                // the old hardcoded main light, but stacking 100k on top of the new
-                // 10k main blew the scene out (#1125).
+                // Left-side counter-fill (opposite of the library's default 3k fill, which
+                // angles from the front-right) to throw soft shadows on the falling spheres.
+                // The 5k lux value pairs with the v4.1.0 default main (10k) + fill (3k) +
+                // IBL (10k); pre-v4.1.0 this was 100k to mimic the old hardcoded main light,
+                // but stacking 100k on top of the new 10k main blew the scene out (#1125).
                 LightNode(
                     type = LightManager.Type.DIRECTIONAL,
                     direction = io.github.sceneview.math.Direction(-0.3f, -1f, -0.5f),
