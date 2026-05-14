@@ -157,6 +157,14 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages
 
       - name: Build archive
+        env:
+          # Optional. When unset (e.g. forks), the demo's Explore tab falls
+          # back to the bundled featured Sketchfab models and disables search.
+          # Threaded as an `xcodebuild` build setting so the Info.plist
+          # `SketchfabAPIKey` `$(SKETCHFAB_API_KEY)` placeholder gets
+          # substituted into the shipped .ipa — env vars alone don't survive
+          # `xcodebuild archive`. See issue #1157 and SketchfabConfig.swift.
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           xcodebuild archive \
             -project SceneViewDemo.xcodeproj \
@@ -172,7 +180,8 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=5G3DZ3TH45 \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
-            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
+            SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"
 
       - name: Export IPA and upload to TestFlight
         env:
@@ -420,6 +429,10 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages
 
       - name: Build archive
+        env:
+          # See deploy-ios job above — same Info.plist substitution channel
+          # is required on macOS archives. Issue #1157.
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           xcodebuild archive \
             -project SceneViewDemo.xcodeproj \
@@ -434,7 +447,8 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=5G3DZ3TH45 \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
-            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
+            SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"
 
       - name: Export and upload to App Store
         env:

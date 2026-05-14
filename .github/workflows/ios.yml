@@ -106,6 +106,15 @@ jobs:
       - name: Build iOS sample demo (catches missing pbxproj entries)
         if: always()
         working-directory: samples/ios-demo
+        env:
+          # Optional. When unset (forks, PRs from forks), the demo's
+          # Explore tab falls back to the bundled featured Sketchfab
+          # models. Threaded as an `xcodebuild` build setting so the
+          # `Info.plist` `SketchfabAPIKey` `$(SKETCHFAB_API_KEY)`
+          # placeholder gets substituted at build time — env vars alone
+          # don't survive `xcodebuild` into the bundled `Info.plist`.
+          # See issue #1157 and SketchfabConfig.swift.
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           xcodebuild build \
             -project SceneViewDemo.xcodeproj \
@@ -114,4 +123,5 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages \
             -skipPackagePluginValidation \
             -skipMacroValidation \
+            SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY" \
             | xcpretty --color 2>/dev/null || cat

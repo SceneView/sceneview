@@ -44,6 +44,11 @@ jobs:
         env:
           # Forks won't have this secret — demo runtime disables Geospatial gracefully.
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
+          # Optional. When unset (forks, PRs from forks), the demo's Sketchfab
+          # gallery falls back to the bundled featured models and disables
+          # search. Matches the wiring in build-apks.yml / play-store.yml.
+          # See issue #1157.
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           ./gradlew assembleDebug --stacktrace
 

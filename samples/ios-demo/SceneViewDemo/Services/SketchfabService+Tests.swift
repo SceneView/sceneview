@@ -4,8 +4,14 @@ import XCTest
 
 /// Unit tests for `SketchfabService`.
 ///
-/// Network-dependent tests are gated behind `SKETCHFAB_API_KEY` so they're
-/// skipped on machines/CI runners without the secret.
+/// Network-dependent tests are gated behind `SketchfabConfig.apiKey`, which
+/// resolves from either the `Info.plist` `SketchfabAPIKey` substitution
+/// (release / archive builds) or the `SKETCHFAB_API_KEY` process environment
+/// variable (Xcode dev scheme + CI test runs). When the key is present in CI
+/// — both `ios.yml`'s demo build step and `app-store.yml`'s archive step now
+/// inject the GitHub secret — the live `testSearchReturnsResults` round-trip
+/// actually executes; without the secret (forks, fork PRs) it skips
+/// gracefully. See issue #1157.
 final class SketchfabServiceTests: XCTestCase {
 
     /// Offline: verify the URL builder produces the expected `/v3/search?...`.

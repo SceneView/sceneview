@@ -4,6 +4,18 @@
 
 CI hardening + docs accuracy + one v4.1.0-stale demo light tune. No public API change.
 
+### Fixed — iOS App Store builds ship without `SKETCHFAB_API_KEY`, breaking the Explore tab ([#1157](https://github.com/sceneview/sceneview/issues/1157))
+
+Every TestFlight + App Store iOS build since v3.6 was shipped *without* the Sketchfab Data API key, so the demo's Explore tab silently fell back to bundled featured models — search and category feeds returned empty results, no error banner. Two compounding defects, both fixed in the same PR:
+
+- **[`SketchfabConfig.swift`](samples/ios-demo/SceneViewDemo/Services/SketchfabConfig.swift)** read the key via `ProcessInfo.processInfo.environment["SKETCHFAB_API_KEY"]`. Environment variables do *not* survive `xcodebuild archive` into the shipped `.ipa` (they only work under Xcode's "Run" scheme), so `SketchfabConfig.apiKey` was always `nil` on store builds. Resolver now reads `Bundle.main.object(forInfoDictionaryKey: "SketchfabAPIKey")` first — substituted from the `SKETCHFAB_API_KEY` build setting at archive time — with the `ProcessInfo` lookup retained as a fallback so the Xcode dev workflow keeps working. The unsubstituted `$(SKETCHFAB_API_KEY)` xcconfig literal is filtered out so a missing build setting doesn't get treated as a valid bearer token.
+- **[`Info.plist`](samples/ios-demo/SceneViewDemo/Info.plist)** gained a `SketchfabAPIKey` entry with the `$(SKETCHFAB_API_KEY)` placeholder for Xcode to substitute.
+- **[`app-store.yml`](.github/workflows/app-store.yml)** (both iOS + macOS `xcodebuild archive` steps) and **[`ios.yml`](.github/workflows/ios.yml)** (CI demo build) now inject `SKETCHFAB_API_KEY` from the GitHub secret as both an env var *and* an `xcodebuild` build setting, so the Info.plist placeholder gets substituted into the archive.
+
+Bonus: **[`pr-check.yml`](.github/workflows/pr-check.yml)** and **[`ci.yml`](.github/workflows/ci.yml)** also gained the secret on their Android `assembleDebug` step, matching the wiring that already shipped in `build-apks.yml` / `play-store.yml`. Forks still build green (the demo's Android `BuildConfig.SKETCHFAB_API_KEY` runtime check disables the gallery gracefully when the secret is absent).
+
+Android was unaffected — `play-store.yml` injects both keys correctly and `BuildConfig.SKETCHFAB_API_KEY` bakes the value at compile time. The fix unblocks [#1152](https://github.com/sceneview/sceneview/issues/1152) (Sketchfab streaming on iOS — no point migrating demos to streaming when the key never reaches the binary).
+
 ### Fixed — release.yml: Dokka config-cache crash + GitHub Release decoupled from Dokka ([#1150](https://github.com/sceneview/sceneview/issues/1150))
 
 The v4.3.0 cut surfaced two latent `release.yml` issues that skipped the `Create GitHub Release` job (recovered manually):

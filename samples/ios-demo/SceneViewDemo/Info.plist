@@ -52,6 +52,19 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<!--
+		Sketchfab Data API v3 key. Substituted at build time from the
+		`SKETCHFAB_API_KEY` xcconfig / `xcodebuild` build setting (which the
+		CI workflows source from the `SKETCHFAB_API_KEY` GitHub secret).
+
+		Environment variables do NOT survive `xcodebuild archive` into the
+		shipped `.ipa`, so this Info.plist substitution is the only reliable
+		channel for App Store / TestFlight builds — see SketchfabConfig.swift
+		and issue #1157. The literal `$(SKETCHFAB_API_KEY)` placeholder is
+		filtered out at runtime if the build setting is missing.
+	-->
+	<key>SketchfabAPIKey</key>
+	<string>$(SKETCHFAB_API_KEY)</string>
+	<!--
 		Deep-link entry: scan a QR code on sceneview.github.io / README /
 		docs and land directly on the matching demo screen. Custom scheme
 		mirrors the Android intent-filter (`AndroidManifest.xml`).
