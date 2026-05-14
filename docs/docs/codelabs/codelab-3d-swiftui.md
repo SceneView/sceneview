@@ -37,7 +37,7 @@ This mirrors the Android [3D with Compose codelab](codelab-3d-compose.md), built
 2. Enter the URL:
 
 ```
-https://github.com/sceneview/sceneview-swift.git
+https://github.com/sceneview/sceneview.git
 ```
 
 3. Set the version rule to **Up to Next Major** from `4.0.0`.

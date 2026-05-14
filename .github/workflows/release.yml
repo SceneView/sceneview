@@ -323,11 +323,11 @@ jobs:
           #   1. Root (./Package.swift) — what SPM consumers point at:
           #      `https://github.com/sceneview/sceneview.git`. Added in #920
           #      so iOS users don't need the separate `sceneview-swift` mirror
-          #      repo that historically got stuck on v4.0.0.
+          #      repo that historically got stuck on v4.0.0 (now archived).
           #   2. Sub-manifest (./SceneViewSwift/Package.swift) — kept in place
-          #      so the legacy `sceneview-swift` mirror repo (a flat copy of
-          #      the SceneViewSwift/ subtree) continues to build for any
-          #      consumer that hasn't migrated yet.
+          #      for internal `swift test --package-path SceneViewSwift` runs
+          #      and for any consumer still resolving the archived mirror's
+          #      frozen v4.0.0 tag.
           # Both must point at the SceneViewSwift target so a malformed tag
           # doesn't quietly poison `.package(url:from:)` resolution.
           missing=()

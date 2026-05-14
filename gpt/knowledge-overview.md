@@ -103,7 +103,7 @@ dependencies {
 In Xcode: File > Add Package Dependencies, enter:
 
 ```
-https://github.com/sceneview/sceneview-swift.git
+https://github.com/sceneview/sceneview.git
 ```
 
 Set version rule: from "3.6.0"

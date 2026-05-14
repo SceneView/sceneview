@@ -332,7 +332,15 @@ private struct SceneViewRepresentation: View {
     /// pivot. Closes #1026.
     let autoCenterContentEnabled: Bool
 
-    @State private var camera = CameraControls(mode: .orbit)
+    /// Default orbit radius `2.0` matches the camera distance of the
+    /// previous fake-orbit setup (`look(at: .zero, from: [0, 0.3, 2])`
+    /// + `scene scale = 5.0 / radius` ⇒ apparent size 0.5 at radius 5).
+    /// Now that orbit physically moves the camera (`cameraPosition()`),
+    /// the radius is the literal camera-to-target distance — so a 2m
+    /// default preserves the on-screen size of all existing demos.
+    /// `CameraControls.orbitRadius` keeps its 5.0 public-API default
+    /// for direct users who construct the struct themselves.
+    @State private var camera = CameraControls(mode: .orbit).withRadius(2.0)
     @StateObject private var entities = SceneEntities()
     @State private var lastDragTranslation: CGSize = .zero
     @State private var initialPinchRadius: Float? = nil
@@ -352,6 +360,13 @@ private struct SceneViewRepresentation: View {
     // can be swapped in-place without a full RealityView teardown. Closes #1017.
     @State private var appliedMainSlot: LightSlot? = nil
     @State private var appliedFillSlot: LightSlot? = nil
+
+    /// Loaded HDR resource cached for the `RealityView.update:` closure so
+    /// it can apply `content.environment = .skybox(resource)` every frame
+    /// when the scene environment has `showSkybox == true`. Stays `nil`
+    /// when the IBL should light the scene but not render as a background.
+    /// Ported from Eliott Radcliffe's sceneview-swift PR #1.
+    @State private var loadedSkyboxResource: EnvironmentResource? = nil
 
     var body: some View {
         realityViewContent
@@ -386,8 +401,11 @@ private struct SceneViewRepresentation: View {
                     }
                 }
             }
-            .task(id: sceneEnvironment?.name) {
-                // Load and apply IBL environment when it changes
+            .task(id: "\(sceneEnvironment?.name ?? "")|\(sceneEnvironment?.showSkybox == true)") {
+                // Load and apply IBL environment when it changes. The id
+                // also tracks `showSkybox` so toggling the skybox flag on
+                // the same environment re-runs the loader and updates
+                // `loadedSkyboxResource` for the update: closure.
                 guard let env = sceneEnvironment else { return }
                 await loadEnvironment(env)
             }
@@ -398,7 +416,7 @@ private struct SceneViewRepresentation: View {
         #if os(iOS) || os(visionOS) || os(macOS)
         RealityView { realityContent in
             setupScene(&realityContent)
-        } update: { _ in
+        } update: { content in
             applyCamera()
             // Diff light slots and swap entities when the caller's modifier value
             // changed since last frame. Closes #1017 (Android `prevFillLightRef`
@@ -412,6 +430,20 @@ private struct SceneViewRepresentation: View {
             if autoCenterContentEnabled {
                 refreshContentCentering()
             }
+            // Apply the HDR resource as a skybox background when the scene
+            // environment has `showSkybox = true`. Without this the IBL
+            // affects lighting but the background stays default — visible
+            // as the same neutral void regardless of environment chosen.
+            // visionOS uses passthrough by default and ignores the
+            // RealityKit `environment` API; gate to iOS + macOS only.
+            // Ported from Eliott Radcliffe's sceneview-swift PR #1.
+            #if os(iOS) || os(macOS)
+            if let loadedSkyboxResource {
+                content.environment = .skybox(loadedSkyboxResource)
+            } else {
+                content.environment = .default
+            }
+            #endif
         }
         #else
         // RealityView requires macOS 15.0+; fall back to a placeholder on older SDKs
@@ -621,10 +653,17 @@ private struct SceneViewRepresentation: View {
             entities.root.components.set(
                 ImageBasedLightReceiverComponent(imageBasedLight: entities.ibl)
             )
+            // Cache the resource for the update: closure when the caller
+            // asked for the IBL to also render as a skybox background. Set
+            // to `nil` when `showSkybox = false` so the update: closure
+            // reverts to `.default` and the background goes neutral again.
+            // Ported from Eliott Radcliffe's sceneview-swift PR #1.
+            loadedSkyboxResource = env.showSkybox ? resource : nil
             #endif
         } catch {
             // Environment loading failed — scene continues with default lighting
             print("[SceneViewSwift] Failed to load environment '\(env.name)': \(error)")
+            loadedSkyboxResource = nil
         }
     }
 
@@ -639,41 +678,70 @@ private struct SceneViewRepresentation: View {
             camera.mode = cameraControlMode
         }
 
-        let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
-        let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
-        entities.root.orientation = yaw * pitch
-
-        // Per-mode application of zoom + translation. Mirrors Android's
-        // `CameraGestureDetector` modes (ORBIT / PAN / FREE_FLIGHT) — closes
-        // #1034 (last #928 silent-stub item).
+        // Per-mode application of orientation, zoom, and translation.
+        // Mirrors Android's `CameraGestureDetector` modes
+        // (ORBIT / PAN / FREE_FLIGHT) — closes #1034 (last #928 silent-stub
+        // item).
+        //
+        // History (Eliott Radcliffe, sceneview-swift PR #1): orbit + pan
+        // used to "fake" the camera move by rotating + scaling the scene
+        // root while the perspective camera stayed pinned at `[0, 0.3, 2]`.
+        // That made a globally-applied skybox appear stationary while the
+        // content visually orbited around the user — wrong from the
+        // camera's POV. The fix moves the actual perspective camera in
+        // world-space via `cameraPosition()` so the skybox correctly wraps
+        // and content stays still. visionOS has no manual camera entity
+        // (the headset is the camera), so it retains the rotate-root path.
         switch camera.mode {
-        case .orbit:
-            // Standard orbit: pinch scales scene; no translation.
-            let zoomScale = 5.0 / camera.orbitRadius
-            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
-            entities.root.position = .zero
-
-        case .pan:
-            // Pan: pinch still dollies, drag translates `target` laterally.
-            // Visually the scene slides in screen space — equivalent to
-            // moving the camera in the opposite direction.
-            let zoomScale = 5.0 / camera.orbitRadius
-            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
-            entities.root.position = -camera.target * zoomScale
-
-        case .firstPerson:
-            // First-person inspection: no scale change (pinch mutates FOV
-            // instead — see pinchGesture). Rotation makes the scene
-            // yaw/pitch around the world origin while the camera stays
-            // fixed at `[0, 0.3, 2]`. NB: this is NOT a true "stand still
-            // and look around" camera-orientation rotation — see the
-            // `firstPerson` enum doc-comment for the v4.4.0 follow-up.
+        case .orbit, .pan:
+            // True orbit / pan: position the camera in world-space; the
+            // scene root stays at origin with identity transform so the
+            // skybox wraps correctly. `cameraPosition()` already encodes
+            // `camera.target`, so pan's lateral target drift propagates
+            // directly into the camera position. Pinch in/out changes
+            // `camera.orbitRadius`, which is now the camera's literal
+            // distance to the target (vs. the previous `5.0 / radius`
+            // scene-scale hack).
+            entities.root.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
             entities.root.scale = SIMD3<Float>(repeating: 1)
             entities.root.position = .zero
             #if os(iOS) || os(macOS)
-            // Sync the perspective camera FOV to the camera-controls state.
-            // Skip the property write when nothing changed so RealityKit
-            // doesn't re-evaluate the projection matrix on idle frames.
+            let pos = camera.cameraPosition()
+            entities.perspCamera.look(at: camera.target, from: pos, relativeTo: nil)
+            // Reset FOV to the controls' baseline when leaving firstPerson —
+            // pinch in orbit/pan dollies the radius, not the FOV.
+            if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
+                entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
+            }
+            #else
+            // visionOS fallback: rotate the scene root since there's no
+            // manual camera entity to move. Skybox wrap correctness is
+            // moot under passthrough.
+            let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
+            let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
+            entities.root.orientation = yaw * pitch
+            let zoomScale = 2.0 / max(camera.orbitRadius, camera.minRadius)
+            entities.root.scale = SIMD3<Float>(repeating: zoomScale)
+            entities.root.position = camera.mode == .pan ? -camera.target * zoomScale : .zero
+            #endif
+
+        case .firstPerson:
+            // First-person inspection: pinch mutates FOV (see pinchGesture)
+            // rather than the orbit radius. Currently rotates the scene
+            // root around world origin while the camera stays at a fixed
+            // eye — visually a tight orbit at radius `2`. NOT a true
+            // "stand still and look around" camera-orientation rotation;
+            // tracked as a v4.4.0 follow-up in ``CameraControlMode/firstPerson``.
+            let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
+            let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
+            entities.root.orientation = yaw * pitch
+            entities.root.scale = SIMD3<Float>(repeating: 1)
+            entities.root.position = .zero
+            #if os(iOS) || os(macOS)
+            // Pin the camera at a fixed eye and reset to look at origin
+            // so a mode switch from orbit doesn't strand the camera at
+            // the last orbit position. Sync FOV to the controls state.
+            entities.perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
             if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
                 entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
             }

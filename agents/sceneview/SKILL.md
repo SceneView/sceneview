@@ -31,8 +31,8 @@ SceneView is a declarative 3D and AR SDK. One mental model across every platform
   Filament renderer. Artifacts: `io.github.sceneview:sceneview:4.3.1` and
   `io.github.sceneview:arsceneview:4.3.1`.
 - **Apple (iOS / macOS / visionOS)** — `SceneView { }` and `ARSceneView { }` SwiftUI
-  views from the [`sceneview-swift`](https://github.com/sceneview/sceneview-swift)
-  package (tag `4.3.1`). RealityKit renderer.
+  views from the [`sceneview`](https://github.com/sceneview/sceneview) monorepo
+  via Swift Package Manager (tag `4.3.1`). RealityKit renderer.
 - **Web** — `sceneview-web@4.3.1` on npm (Filament.js + WebXR).
 - **Flutter** — `sceneview_flutter` plugin (PlatformView bridge).
 - **React Native** — `@sceneview-sdk/react-native@4.3.1` (Fabric bridge).
