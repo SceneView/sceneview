@@ -122,8 +122,83 @@ class LightEstimator(
             field = value
         }
 
+    /**
+     * Set to `true` by [destroy]; checked at the top of [update] so the render
+     * loop early-returns instead of touching native resources after teardown.
+     *
+     * Why `@Volatile` (CORR-B audit, acceptance #2 of umbrella #1094): [destroy] is invoked from
+     * `DisposableEffect.onDispose` (Compose main thread, [ARScene.kt:373]),
+     * while a stray late frame could still drive [update] (Filament render
+     * thread, same engine but different lifecycle). Marking the flag volatile
+     * gives the render thread a happens-before guarantee on the teardown
+     * write without taking a lock on the hot path. Reads are a single
+     * `getfield_volatile`, the cheapest synchronisation primitive that
+     * works here.
+     *
+     * Also gated: the public toggles (`environmentalHdrXxx`) are already
+     * `@Volatile`, so toggling after `destroy()` is a no-op via the same
+     * early-return.
+     */
+    @Volatile
+    private var isDestroyed = false
+
+    /**
+     * Acts as a 1-bit semaphore between the AR thread (which fills
+     * [cubeMapBuffer] frame N and hands it to Filament) and the Filament
+     * render thread (which drains the buffer to the GPU asynchronously).
+     *
+     * Set to `true` immediately before [Texture.setImage]; reset to `false`
+     * by the [Texture.PixelBufferDescriptor] callback, which Filament fires
+     * on its render thread once the upload has completed. While true, the
+     * AR thread skips the cubemap update — see the long-form comment on
+     * the callback site for the rationale.
+     *
+     * @Volatile is mandatory: the writer (AR thread) and reader (AR thread
+     * again, on the next frame) ARE on the same thread today, but the
+     * resetter (Filament render thread) is NOT — without volatile, the AR
+     * thread could observe a stale `true` indefinitely.
+     */
+    @Volatile
+    private var uploadInFlight = false
+
     fun update(session: Session, frame: Frame, camera: Camera): Estimation? {
-        if (!isEnabled || session.config.lightEstimationMode == LightEstimationMode.DISABLED) {
+        // Fix 1 (CORR-B, #1094 acceptance #2): a late render frame raced with `destroy()` from
+        // `DisposableEffect.onDispose` could NPE on `engine.destroyTexture`
+        // (engine torn down) or use-after-free a freed cubemap. Early return
+        // is the smallest fix that survives the race.
+        if (isDestroyed) return null
+
+        val mode = session.config.lightEstimationMode
+        val enabled = isEnabled && mode != LightEstimationMode.DISABLED
+
+        // Fix 2 (CORR-B, #1094 acceptance #2): free reflection resources as soon as
+        // their feature flag flips false, so toggles don't leak.
+        //
+        // Before this guard, toggling `environmentalHdrReflections false →
+        // true → false` left `cubeMapTextureSpecular` (and the parent
+        // `cubeMapTexture`) alive in native heap forever — neither was
+        // reassigned on the second `false` transition, so the setter's
+        // built-in destroy-on-reassign never fired.
+        //
+        // The setters are null-safe (`field?.let { destroy }`) and idempotent,
+        // so repeated null-assignments after teardown cost nothing. Free the
+        // direct ByteBuffer too — DirectByteBuffer relies on a cleaner that
+        // may not run for a long time under low GC pressure.
+        if (!enabled || mode != LightEstimationMode.ENVIRONMENTAL_HDR ||
+            !environmentalHdrReflections
+        ) {
+            cubeMapTexture = null
+            cubeMapTextureSpecular = null
+            // Drop the staging buffer too once reflections are off; a future
+            // re-enable will allocate a fresh one inside the HDR branch.
+            cubeMapBuffer = null
+        } else if (!environmentalHdrSpecularFilter) {
+            // Reflections on but prefilter off: only the specular texture
+            // is dead weight.
+            cubeMapTextureSpecular = null
+        }
+
+        if (!enabled) {
             return null
         }
 
@@ -133,7 +208,7 @@ class LightEstimator(
 
         timestamp = lightEstimate.timestamp
 
-        return when (session.config.lightEstimationMode) {
+        return when (mode) {
             LightEstimationMode.AMBIENT_INTENSITY -> Estimation().apply {
                 val colorCorrections = FloatArray(4).apply {
                     // The float array the 4 component color correction values are written to.
@@ -193,7 +268,18 @@ class LightEstimator(
                     }
                 }
 
-                if (environmentalHdrReflections) {
+                // Fix 3 (CORR-B, #1094 acceptance #2): skip the whole cubemap pipeline while the
+                // previous upload is still in flight. Without this guard, the
+                // next-frame `cubeMapBuffer.clear() + put(rgbBytes)` path
+                // (see below) could partially overwrite a ByteBuffer that
+                // Filament's render thread is still draining to the GPU,
+                // producing a smeared cubemap or a single-frame flash of
+                // garbage HDR colors. ARCore updates the HDR cubemap at
+                // roughly 1 Hz; skipping 1–2 frames here is invisible. We
+                // also bail BEFORE `acquireEnvironmentalHdrCubeMap()` so we
+                // don't pay the acquire cost and don't leak Images we can't
+                // process.
+                if (environmentalHdrReflections && !uploadInFlight) {
                     lightEstimate.acquireEnvironmentalHdrCubeMap()?.let { arImages ->
                         val (width, height) = arImages[0].width to arImages[0].height
                         val faceOffsets = IntArray(arImages.size)
@@ -241,24 +327,65 @@ class LightEstimator(
                             .also {
                                 cubeMapTexture = it
                             }
+                        // Latch the in-flight flag BEFORE handing the buffer
+                        // to Filament — the callback below will reset it once
+                        // the GPU upload has consumed the bytes. The set →
+                        // setImage → callback sequence MUST be in this order
+                        // so an extra-fast Filament backend cannot fire the
+                        // callback before we've observed the latched `true`.
+                        uploadInFlight = true
                         @Suppress("DEPRECATION")
                         cubeMapTexture.setImage(
                             engine,
                             0,
-                            // No-op callback — `arImages` were already closed synchronously
-                            // by `image.use {}` above (line 209), and the next reuse cycle
-                            // calls `cubeMapBuffer.clear()` at line ≈200. The previous
-                            // callback `{ arImages.forEach { it.close() }; buffer.clear() }`
-                            // was dead code that double-closed already-closed Images
-                            // (silently swallowed by Filament today, but a Filament SDK
-                            // upgrade that surfaces callback errors would explode), AND
-                            // raced with the next-frame buffer reuse path (#1090).
+                            // The callback IS load-bearing — DO NOT no-op it.
+                            //
+                            // Filament `setImage()` uploads the buffer
+                            // asynchronously: it returns immediately, then the
+                            // render thread reads from `buffer` on a later
+                            // tick. Until the GPU has finished reading, the
+                            // AR thread MUST NOT clear/overwrite the buffer
+                            // or we corrupt the in-flight upload (smeared
+                            // cubemap, 1-frame flash of garbage HDR colors).
+                            //
+                            // `uploadInFlight = true` is latched immediately
+                            // above. Filament invokes this Runnable from its
+                            // render thread once the upload is done; the
+                            // `@Volatile` write publishes the reset to the
+                            // AR thread, which gates the next cubemap update
+                            // via `if (!uploadInFlight)`.
+                            //
+                            // History — DO NOT no-op this again:
+                            //   #1090 / PR #1091 made this callback a no-op to
+                            //   remove a bug where the previous closure
+                            //   double-closed `arImages` and re-`clear()`ed
+                            //   the buffer. That fix was correct for the
+                            //   resource-cleanup path, BUT the *synchronisation
+                            //   semantics* of the callback were collateral
+                            //   damage — there was no longer any signal back
+                            //   from Filament telling the AR thread when the
+                            //   buffer was safe to mutate.
+                            //
+                            //   CORR-B (#1094 acceptance #2) restores the callback as a
+                            //   pure synchronisation hook. The body does NOT
+                            //   touch `arImages` (already closed by
+                            //   `image.use {}` above) and does NOT clear
+                            //   `buffer` (that happens at the top of the
+                            //   next frame inside `cubeMapBuffer?.takeIf
+                            //   {...}?.apply { clear() }`). Only the volatile
+                            //   flag flips.
+                            //
+                            // If a future refactor is tempted to remove this
+                            // callback again: ADD an instrumented test
+                            // before doing so, and verify the cubemap stays
+                            // pixel-stable across 60 frames of rapid
+                            // `acquireEnvironmentalHdrCubeMap` cycles.
                             Texture.PixelBufferDescriptor(
                                 buffer,
                                 Texture.Format.RGB,
                                 Texture.Type.HALF,
                                 1, 0, 0, 0, null,
-                                Runnable { /* no-op — see comment above */ }
+                                Runnable { uploadInFlight = false }
                             ),
                             faceOffsets
                         )
@@ -285,10 +412,31 @@ class LightEstimator(
         }
     }
 
+    /**
+     * Releases all Filament-owned resources and flips the [isDestroyed] gate
+     * so any in-flight [update] call from the render thread early-returns
+     * instead of touching freed natives.
+     *
+     * Safe to call multiple times — the [Texture] setters are null-safe
+     * (`field?.let { destroy }`) and idempotent; the volatile flag write
+     * provides the happens-before to a concurrent reader.
+     *
+     * Idempotency is required by [ARScene.kt:373]'s `DisposableEffect`
+     * semantics: the lambda can re-run if the keys change before the
+     * previous teardown finishes.
+     */
     fun destroy() {
-        cubeMapBuffer?.clear()
-        cubeMapTexture?.let { engine.destroyTexture(it) }
-        cubeMapTextureSpecular?.let { engine.destroyTexture(it) }
+        // Latch the gate BEFORE freeing the textures so a render-thread
+        // late frame observes the destroyed state and skips its use of
+        // `cubeMapTexture` / `cubeMapTextureSpecular` instead of racing
+        // with `engine.destroyTexture` below.
+        isDestroyed = true
+        // Routed through the setters so the `field?.let { engine.destroyTexture }`
+        // teardown runs and `field` is nulled afterwards — keeping the two in
+        // sync and tolerating repeated `destroy()` calls.
+        cubeMapTexture = null
+        cubeMapTextureSpecular = null
+        cubeMapBuffer = null
     }
 
     companion object {
