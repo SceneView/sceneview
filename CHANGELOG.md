@@ -2,6 +2,18 @@
 
 ## Unreleased — v4.3.5 hotfix (in progress)
 
+### Changed — CI workflow deduplication (~20 min saved per PR)
+
+- **Workflows trimmed** — Audit of `.github/workflows/` showed `assembleDebug` compiling 4× per PR (across CI, PR Check, quality-gate, Build sample APKs) and unit tests running 3×. Every duplicate removed while keeping every distinct check:
+  - `pr-check.yml` — dropped `compile-android`, `lint`, `compile-web-demo`, `build-flutter-demo` (all already covered by `ci.yml`'s `build`, `web-desktop`, `flutter-demo` jobs). Kept only the unique fast guards: `check-deprecated-api`, `check-sceneview-skill`, `compile-kmp` (KMP all-targets, beyond `ci.yml`'s JS-only build), `check-workflow-scripts`, `validate-demo-assets`. Also mirrored the `paths-ignore` block from `ci.yml` so docs-only PRs no longer spin up the ~5 min Gradle KMP compile.
+  - `build-apks.yml` — dropped the `pull_request` trigger. APKs were already built twice on every PR by `ci.yml` + `pr-check.yml`; this workflow's unique value (artifact upload, GitHub Release attachment) only matters on `push` / tag.
+  - `quality-gate.yml` + `.claude/scripts/quality-gate.sh` — added `QUALITY_GATE_SKIP_ANDROID=1` env var, set in the CI workflow so the gate no longer re-runs `assembleDebug` + the same Android unit tests that `ci.yml`'s `build` job already executes (with JaCoCo coverage). Local invocations of `quality-gate.sh` still run the full path. MCP tests, version sync, security scans, asset CDN checks, website rules, and agent skill drift detection all still run on every PR and push.
+  - `render-tests.yml` — dropped the `pull_request` trigger. Tests are non-blocking (`continue-on-error: true`) and produce screenshots rarely consulted by reviewers; the signal is still captured on every push to main, with `workflow_dispatch` available for ad-hoc feature-branch vetting.
+
+- **Supply-chain guard centralised** — Moved `gradle/actions/wrapper-validation@v6` from the (now removed) `pr-check.yml:compile-android` step into `.github/actions/setup-gradle/action.yml` so every workflow that calls `./gradlew` (CI, PR Check, quality-gate, build-apks, render-tests, release, docs) inherits the validation. Catches any tampered `gradle/wrapper/gradle-wrapper.jar` regardless of which workflow consumes it first.
+
+Validated by 4 independent Opus reviewers before merge. Branch protection on `main` confirmed to have zero required status checks, so no renamed job blocks merges. No downstream `workflow_run`, `needs:`, Renovate, Codecov, or contributor doc reference was broken (verified via `grep -rn workflow_run .github/workflows/` and a sweep of the last 20 merged PRs for artifact-name references).
+
 ### Fixed — Pixel 9 v4.3.0 production audit follow-ups ([umbrella #1176](https://github.com/sceneview/sceneview/issues/1176))
 
 Five demo polish bugs caught in the Pixel 9 production audit. All are scoped to `samples/android-demo/` and `samples/android-demo/src/main/res/values-fr/strings.xml` — no library APIs change.
@@ -17,6 +29,7 @@ Five demo polish bugs caught in the Pixel 9 production audit. All are scoped to 
 - **Debug Overlay — single-sphere case spawned off-screen at (-0.9, -0.9, 0) ([#1212](https://github.com/sceneview/sceneview/issues/1212))** — `DebugOverlayDemo.kt` now computes the grid footprint from the *actual* node count: `cols = min(10, count)`, `rows = min(10, ceil(count / cols))`, `layers = ceil(count / (cols × rows))`, then offsets each sphere by `-(axisLen - 1) / 2 × NODE_SPACING` so the cluster mean is *always* at origin. At count=1 → cols=rows=layers=1 → offsets all zero → sphere lands at (0, 0, 0) where the camera is looking. At count=100..1000 the new formula collapses to the same 10×10×N centered footprint as before. The previous formula `(i % 10) - 5` baked in a "10 wide" assumption that put count=1 at (-0.9, -0.9, 0) — 3.6× outside the camera frustum at the SINGLE_SPHERE_DISTANCE = 0.8 m camera distance. `autoFitDistance(...)` updated to read the new grid footprint so framing stays consistent.
 
 
+## v4.3.4 — Pixel 9 production hotfix: AR Face Mesh + Instant Placement UX + UTF-8 + iOS LightingDemo (2026-05-15)
 
 ### Fixed — Sketchfab Explore cosmetic & iOS demo gaps
 
