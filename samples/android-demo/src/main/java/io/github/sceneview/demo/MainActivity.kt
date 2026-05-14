@@ -63,8 +63,8 @@ import io.github.sceneview.demo.demos.ARImageStabilizationDemo
 import io.github.sceneview.demo.demos.OrbitalARDemo
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
 import io.github.sceneview.demo.ui.RootScreen
-import io.github.sceneview.demo.update.InAppUpdateManager
-import io.github.sceneview.demo.update.UpdateBanner
+import io.github.sceneview.sample.common.update.InAppUpdateManager
+import io.github.sceneview.sample.common.update.UpdateBanner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme

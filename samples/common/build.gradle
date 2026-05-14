@@ -23,6 +23,11 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -64,4 +69,19 @@ dependencies {
     // declaring it here keeps :samples:common's surface complete on its own).
     api project(":sceneview")
     api libs.filament.android
+
+    // Google Play In-App Updates — `api` so every Android-host sample
+    // (android-demo, android-tv-demo, …) picks up the same flexible-update
+    // wiring via `io.github.sceneview.sample.common.update.InAppUpdateManager`
+    // without re-declaring the dep.
+    api libs.play.app.update
+    api libs.play.app.update.ktx
+
+    // InAppUpdateManager unit tests — `FakeAppUpdateManager` ships INSIDE the
+    // runtime `app-update` artefact (Play Core ≥2.0 doesn't publish a separate
+    // `app-update-testing` jar). Robolectric so the Compose `mutableStateOf`
+    // properties can be read on the JVM without an emulator.
+    testImplementation libs.robolectric
+    testImplementation libs.androidx.test.junit
+    testImplementation "junit:junit:4.13.2"
 }
