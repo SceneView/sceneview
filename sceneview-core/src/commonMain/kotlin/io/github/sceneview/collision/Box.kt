@@ -82,7 +82,7 @@ class Box : CollisionShape {
         var e = Vector3.dot(axis, delta)
         var f = Vector3.dot(rayDirection, axis)
 
-        if (!MathHelper.almostEqualRelativeAndAbs(f, 0.0f)) {
+        if (kotlin.math.abs(f) >= 1.0E-6f) {
             var t1 = (e + min.x) / f
             var t2 = (e + max.x) / f
 
@@ -104,7 +104,7 @@ class Box : CollisionShape {
         e = Vector3.dot(axis, delta)
         f = Vector3.dot(rayDirection, axis)
 
-        if (!MathHelper.almostEqualRelativeAndAbs(f, 0.0f)) {
+        if (kotlin.math.abs(f) >= 1.0E-6f) {
             var t1 = (e + min.y) / f
             var t2 = (e + max.y) / f
 
@@ -126,7 +126,7 @@ class Box : CollisionShape {
         e = Vector3.dot(axis, delta)
         f = Vector3.dot(rayDirection, axis)
 
-        if (!MathHelper.almostEqualRelativeAndAbs(f, 0.0f)) {
+        if (kotlin.math.abs(f) >= 1.0E-6f) {
             var t1 = (e + min.z) / f
             var t2 = (e + max.z) / f
 

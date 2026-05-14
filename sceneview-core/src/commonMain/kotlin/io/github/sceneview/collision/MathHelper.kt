@@ -14,7 +14,17 @@ object MathHelper {
     /** Machine epsilon for single-precision IEEE 754 floats. */
     internal const val FLT_EPSILON = 1.19209290E-07f
 
-    /** Absolute tolerance for near-zero comparisons. */
+    /**
+     * Absolute tolerance for near-zero comparisons.
+     *
+     * Note: deliberately small because `almostEqualRelativeAndAbs` is also called with
+     * SQUARED magnitudes (e.g. `lengthSquared` in [Vector3.normalized]). Bumping this
+     * higher would cause small-but-non-zero vectors (length ≈ 1e-4 → length² ≈ 1e-8)
+     * to be classified as zero. Call sites that need a coarser epsilon for non-squared
+     * floats (e.g. ray-direction parallelism in `Box.rayIntersection`) should use a
+     * direct `abs(x) < epsilon` check at the call site instead of widening this
+     * constant. See #1096.
+     */
     internal const val MAX_DELTA = 1.0E-10f
 
     /**
