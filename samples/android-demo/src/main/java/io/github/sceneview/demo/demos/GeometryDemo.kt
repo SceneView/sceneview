@@ -157,14 +157,19 @@ fun GeometryDemo(onBack: () -> Unit) {
                 targetPosition = Position(0f, 0f, -1.5f),
             ),
         ) {
-            // Key light — gives each primitive a clear shaded/lit side so the 3D form
-            // reads as depth rather than flat color silhouettes.
+            // Accent fill — a warm low-intensity rim that complements the v4.1.0
+            // SceneView defaults (10_000-lux main + 3_000-lux fill + IBL). Pre-v4.1.0
+            // this was stacked at 80_000 lux on top of the legacy hardcoded 100k
+            // main and read sanely; with the new defaults that combination blew
+            // out the metallic/rough sweep — primitives saturated to white and the
+            // material slider became visually inert. Re-tuned to 5_000 to match
+            // PhysicsDemo's PR #1144 retune (sibling of #1125). See #1146.
             LightNode(
                 engine = engine,
                 type = LightManager.Type.DIRECTIONAL,
                 apply = {
                     color(1.0f, 0.95f, 0.9f)
-                    intensity(80_000f)
+                    intensity(5_000f)
                     direction(0.3f, -1f, -0.5f)
                     castShadows(false)
                 },

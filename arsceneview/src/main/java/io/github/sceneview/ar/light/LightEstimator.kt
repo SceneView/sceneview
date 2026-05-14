@@ -114,9 +114,12 @@ class LightEstimator(
      * lookup samples mip 0, so reflections are mirror-like at any roughness slider
      * value, highlights oversaturate, and metallic/glossy materials look wrong.
      *
-     * Cost: a one-time prefilter pass per cubemap update (~5–15 ms on a Pixel 9).
-     * ARCore updates the HDR cubemap roughly once per second, so the cost is
-     * amortised.
+     * Cost: a one-time prefilter pass per cubemap update (~5–15 ms on a Pixel 9
+     * for ARCore's 16×16×6 cubemap). ARCore updates the HDR cubemap roughly once
+     * per second, so the cost is amortised. The 100–200 ms figure quoted in
+     * [io.github.sceneview.environment.IBLPrefilter.specularFilter] refers to a
+     * full-resolution skybox build (1024×1024×6 HDR), not this per-frame AR path —
+     * the cost scales with face count + resolution, see that KDoc for the matrix.
      *
      * Set `false` only on perf-budget-constrained devices where the materials are
      * known not to use roughness > 0 (e.g. unlit-only scenes).
