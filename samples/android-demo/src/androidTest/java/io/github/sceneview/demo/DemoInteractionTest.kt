@@ -150,7 +150,32 @@ class DemoInteractionTest {
         Thread.sleep(10000)
     }
 
+    /**
+     * Since DemoScaffold v2 (#1154), per-demo controls live inside a ModalBottomSheet
+     * launched by a "demo-settings-fab" FloatingActionButton anchored bottom-end of the
+     * screen. Tests that drive these controls must open the sheet first so the chips /
+     * sliders / toggles are in the visible UI tree.
+     *
+     * Targeted by the stable test-tag (TestTag("demo-settings-fab")) which avoids relying
+     * on the icon's contentDescription string.
+     *
+     * Returns silently if the FAB is not present (demos with `controls = null`).
+     */
+    private fun openSettingsSheet() {
+        val fab = device.findObject(By.res("demo-settings-fab"))
+            ?: device.findObject(By.desc("Demo settings"))
+            ?: return
+        fab.click()
+        // Sheet slide-in animation ~300 ms + first composition of controls ~200 ms.
+        Thread.sleep(700)
+    }
+
     private fun tap(text: String) {
+        // DemoScaffold v2 (#1154): controls live inside a ModalBottomSheet that
+        // we must open first. Try opening it if the target isn't already visible.
+        if (!device.wait(Until.hasObject(By.text(text)), 1500)) {
+            openSettingsSheet()
+        }
         // First try without scrolling (most controls are above the fold). If the target
         // isn't visible, scroll the controls panel up — the controls Column wraps demos
         // with many controls and the bottom rows (e.g. AnimationDemo's Loop/Once chips)
@@ -233,6 +258,14 @@ class DemoInteractionTest {
      * them. The underlying `IconButton` is already clickable so no ancestor walk is needed.
      */
     private fun tapByDesc(desc: String) {
+        // DemoScaffold v2 (#1154): if the icon button lives inside the controls
+        // sheet, the sheet must be open. The settings FAB is also targeted via
+        // contentDescription "Demo settings" — never confuse it for a demo icon.
+        if (desc != "Demo settings" &&
+            !device.wait(Until.hasObject(By.desc(desc)), 1500)
+        ) {
+            openSettingsSheet()
+        }
         device.wait(Until.hasObject(By.desc(desc)), timeout)
         val node = device.findObject(By.desc(desc))
             ?: error("Element with contentDescription '$desc' not found on screen")
@@ -251,6 +284,10 @@ class DemoInteractionTest {
      * that followed was dispatched to an unfocused surface.
      */
     private fun typeInto(currentValue: String, text: String) {
+        // DemoScaffold v2 (#1154): text fields live inside the controls sheet.
+        if (!device.hasObject(By.text(currentValue))) {
+            openSettingsSheet()
+        }
         val field = device.wait(Until.findObject(By.text(currentValue)), timeout)
             ?: error("Text field with current value '$currentValue' not found")
         field.text = text
@@ -315,6 +352,10 @@ class DemoInteractionTest {
     }
 
     private fun dragSlider(labelPrefix: String, fraction: Float) {
+        // DemoScaffold v2 (#1154): slider labels live inside the controls sheet.
+        if (!device.hasObject(By.textStartsWith(labelPrefix))) {
+            openSettingsSheet()
+        }
         val labelNode = device.findObject(By.textStartsWith(labelPrefix))
             ?: error("Slider label starting with '$labelPrefix' not found on screen")
         val b = labelNode.visibleBounds

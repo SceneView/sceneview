@@ -63,6 +63,14 @@ struct MovableLightDemo: View {
     private let modelOffset = SIMD3<Float>(0, 0, -2)
 
     var body: some View {
+        sceneContent
+            .demoSettingsSheet {
+                controlsSheet
+            }
+    }
+
+    @ViewBuilder
+    private var sceneContent: some View {
         ZStack {
             // 3D scene — no .cameraControls() so the orbit gestures are not
             // consumed; we attach our own DragGesture as a SwiftUI overlay below
@@ -165,9 +173,8 @@ struct MovableLightDemo: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
-            // Controls overlay
+            // Top hint — sits above the SceneView but must NOT eat drag events.
             VStack {
-                // Top hint
                 HStack {
                     Image(systemName: "hand.draw.fill")
                     Text("Drag anywhere to move the light")
@@ -179,40 +186,34 @@ struct MovableLightDemo: View {
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
                 .padding(.top, 12)
-                // Hint sits above the SceneView but must NOT eat drag events —
-                // allowsHitTesting(false) lets gestures flow straight through.
                 .allowsHitTesting(false)
 
                 Spacer()
-
-                // Bottom panel — slider + toggle
-                VStack(spacing: 14) {
-                    HStack {
-                        Image(systemName: "sun.max")
-                        Slider(value: $intensity, in: 1_000...100_000)
-                            .tint(.yellow)
-                            .accessibilityLabel("Light intensity")
-                            .accessibilityValue("\(Int(intensity)) lumens")
-                        Image(systemName: "sun.max.fill")
-                    }
-                    .foregroundStyle(.white)
-
-                    Toggle(isOn: $showLightSource) {
-                        Label("Show light source", systemImage: "circle.dotted")
-                            .foregroundStyle(.white)
-                    }
-                    .tint(.yellow)
-                    .accessibilityHint("Toggles the yellow marker sphere at the light position")
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding()
             }
         }
         .background(Color.black)
         .task {
             await loadFerrari()
+        }
+    }
+
+    @ViewBuilder
+    private var controlsSheet: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Image(systemName: "sun.max")
+                Slider(value: $intensity, in: 1_000...100_000)
+                    .tint(.yellow)
+                    .accessibilityLabel("Light intensity")
+                    .accessibilityValue("\(Int(intensity)) lumens")
+                Image(systemName: "sun.max.fill")
+            }
+
+            Toggle(isOn: $showLightSource) {
+                Label("Show light source", systemImage: "circle.dotted")
+            }
+            .tint(.yellow)
+            .accessibilityHint("Toggles the yellow marker sphere at the light position")
         }
     }
 
