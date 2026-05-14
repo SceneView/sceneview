@@ -1,25 +1,36 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.SurfaceType
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
-import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
@@ -27,14 +38,18 @@ import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
 /**
- * Demonstrates snapping the CAMERA to four named viewing angles around a fixed helmet.
+ * Secondary camera (picture-in-picture) demo.
  *
- * The chip row picks a preset (Top / Side / Front / Corner); each preset parks the
- * `CameraManipulator` at a different orbit home so lighting, reflections and shadows
- * stay stable on the model while the viewer's vantage point changes. This is the
- * correct "camera preset" interpretation — the previous implementation rotated the
- * helmet itself, which contradicted the demo's name and left IBL reflections static
- * regardless of the selected "angle".
+ * Two [SceneView]s share the same engine/loaders/model and render the helmet
+ * simultaneously:
+ *  - the main view uses the default orbital camera (user-interactive),
+ *  - the small PiP overlay binds a dedicated [rememberCameraNode] driven by the
+ *    selected preset chip (Top / Side / Front / Corner), so switching chips
+ *    actually changes what the PiP shows (top-down, side profile, front-on, 3/4).
+ *
+ * The PiP SceneView uses [SurfaceType.TextureSurface] so it composites
+ * correctly over the main [SurfaceType.Surface] view with rounded corners and
+ * a translucent background.
  */
 @Composable
 fun SecondaryCameraDemo(onBack: () -> Unit) {
@@ -45,14 +60,23 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
-    var cameraPreset by remember { mutableStateOf(CameraPreset.FRONT) }
+    var cameraPreset by remember { mutableStateOf(CameraPreset.TOP) }
     val target = remember { Position(0f, 0f, 0f) }
+
+    val pipCameraNode = rememberCameraNode(engine) {
+        position = CameraPreset.TOP.eye
+        lookAt(target)
+    }
+    LaunchedEffect(cameraPreset) {
+        pipCameraNode.position = cameraPreset.eye
+        pipCameraNode.lookAt(target)
+    }
 
     DemoScaffold(
         title = stringResource(R.string.demo_secondary_camera_title),
         onBack = onBack,
         controls = {
-            Text("Camera Angle", style = MaterialTheme.typography.labelLarge)
+            Text("PiP Camera Angle", style = MaterialTheme.typography.labelLarge)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -67,25 +91,39 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             }
         }
     ) {
-        // key(cameraPreset) forces a fresh rememberCameraManipulator each time the
-        // user picks a chip — the creator lambda captures the preset's orbit-home
-        // position, so the camera snaps to that vantage point. Without the key the
-        // manipulator would ignore `orbitHomePosition` changes (it's only read on
-        // build) and the preset toggle would have no effect.
-        androidx.compose.runtime.key(cameraPreset) {
-            val manipulator = androidx.compose.runtime.remember {
-                CameraGestureDetector.DefaultCameraManipulator(
-                    orbitHomePosition = cameraPreset.eye,
-                    targetPosition = target,
+        SceneView(
+            modifier = Modifier.fillMaxSize(),
+            engine = engine,
+            modelLoader = modelLoader,
+            materialLoader = materialLoader,
+            environmentLoader = environmentLoader,
+        ) {
+            modelInstance?.let { instance ->
+                ModelNode(
+                    modelInstance = instance,
+                    scaleToUnits = 0.5f,
+                    centerOrigin = Position(0f, 0f, 0f),
                 )
             }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .size(160.dp, 120.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(2.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .background(Color.Black.copy(alpha = 0.3f))
+        ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
-                cameraManipulator = manipulator,
+                cameraNode = pipCameraNode,
             ) {
                 modelInstance?.let { instance ->
                     ModelNode(

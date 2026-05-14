@@ -226,7 +226,7 @@
     <string name="demo_shape_subtitle">Extruded 2D polygons</string>
     <string name="demo_reflection_probes_title">Reflection Probes</string>
     <string name="demo_reflection_probes_subtitle">Local cubemap reflections</string>
-    <string name="demo_secondary_camera_title">Camera Presets</string>
+    <string name="demo_secondary_camera_title">Secondary Camera (PiP)</string>
     <string name="demo_secondary_camera_subtitle">Picture-in-picture camera view</string>
     <string name="demo_debug_overlay_title">Debug Overlay</string>
     <string name="demo_debug_overlay_subtitle">Performance stats overlay</string>
