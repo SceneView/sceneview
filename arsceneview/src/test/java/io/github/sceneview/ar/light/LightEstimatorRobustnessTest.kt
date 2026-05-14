@@ -351,6 +351,15 @@ class LightEstimatorRobustnessTest {
      * reading from it for GPU upload. Result: cubemap face N gets bytes
      * intended for face N+1, producing a smeared cubemap / 1-frame flash.
      */
+    /**
+     * Algorithmic model: the `IntArray` here stands in for the production
+     * `ByteBuffer.allocateDirect(bufferSize)` reused via
+     * `cubeMapBuffer?.takeIf { it.capacity() == bufferSize }?.apply { clear() }`
+     * at [LightEstimator.kt:303–311]. The test asserts shared-identity
+     * mutation, not ByteBuffer-level ABI — per Reviewer 5 HOLD-COMMENT,
+     * this is a deliberate algorithmic mirror rather than a buffer
+     * compatibility test.
+     */
     @Test
     fun `pre-fix concurrent buffer write corrupts in-flight upload`() {
         val buffer = AtomicReference<IntArray>(IntArray(0))
@@ -521,9 +530,13 @@ class LightEstimatorRobustnessTest {
             // Filament drains 1 upload per 2 AR frames → ~30 uploads expected.
             if (it % 2 == 1) filamentTick()
         }
-        assertTrue(
-            "Gate must permit roughly half the rapid frames (saw ${uploaded.get()})",
-            uploaded.get() in 25..35,
+        // Deterministic JVM model: 60 frames, gate-through every other tick,
+        // exactly 30 uploads. Tight assertion catches a subtle gate-leak
+        // (e.g. flag reset between iterations) that a wide tolerance would
+        // mask. Per Reviewer 5 FIX-MERGE.
+        assertEquals(
+            "Gate must permit exactly half the rapid frames under steady cadence",
+            30, uploaded.get(),
         )
         assertTrue(
             "Pending queue must drain cleanly under steady cadence",
@@ -549,9 +562,12 @@ class LightEstimatorRobustnessTest {
 
         // AR thread latches the gate.
         uploadInFlight.set(true)
-        // Filament render thread resets the gate after a short delay.
+        // Filament render thread resets the gate. No artificial sleep —
+        // the `CountDownLatch.await(1, SECONDS)` provides the publish
+        // guarantee, the `set/countDown` ordering provides happens-before.
+        // Per Reviewer 5 FIX-MERGE — skipping the 50ms sleep saves
+        // wall-time without weakening the test.
         Thread {
-            Thread.sleep(50)
             uploadInFlight.set(false)
             latch.countDown()
         }.start()
