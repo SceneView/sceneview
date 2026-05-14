@@ -63,6 +63,11 @@ jobs:
     outputs:
       version_code: ${{ steps.version.outputs.code }}
       version_name: ${{ steps.version.outputs.name }}
+      # 'true' iff `versionName` matches a clean `X.Y.0` (major or minor
+      # bump). Drives the `sync-listing` job's gate so we don't push the
+      # store-listing copy on every patch release. Snapshots (`X.Y.Z-sha`)
+      # and patches (`X.Y.1+`) both come out 'false'.
+      is_minor_bump: ${{ steps.version.outputs.is_minor_bump }}
       tracks: ${{ steps.tracks.outputs.tracks }}
 
     steps:
@@ -94,6 +99,15 @@ jobs:
           fi
           echo "code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "name=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+          # Detect a clean minor/major bump (`X.Y.0`). `endsWith(ref, '.0')`
+          # in a GHA `if:` expression mis-matches `v4.3.10` — using a real
+          # bash regex here closes that hole.
+          if [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
+            echo "is_minor_bump=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_minor_bump=false" >> $GITHUB_OUTPUT
+          fi
           echo "Version: $VERSION_NAME ($VERSION_CODE)"
 
       # Track selection logic for the matrix in the publish job:
@@ -213,11 +227,69 @@ jobs:
         track: ${{ fromJSON(needs.build.outputs.tracks) }}
 
     steps:
+      - name: Checkout (for CHANGELOG.md → whatsnew extraction)
+        uses: actions/checkout@v6
+
       - name: Download AAB artifact
         uses: actions/download-artifact@v7
         with:
           name: sceneview-demo-${{ needs.build.outputs.version_name }}
           path: aab
+
+      # Populate Play Store's "What's new in this version" from the matching
+      # `## vX.Y.Z` section in CHANGELOG.md. Writes a single
+      # `whatsnew/whatsnew-en-US` file consumed by `r0adkll/upload-google-play`
+      # via `whatsNewDirectory:`. Snapshot builds (version_name like
+      # `4.4.0-abcd1234`) strip the suffix to find the base release section.
+      #
+      # Google Play caps "What's new" at 500 characters per locale — we truncate
+      # with a trailing ellipsis if longer. If the section isn't found (e.g.
+      # release-cut hasn't moved `## Unreleased` to `## vX.Y.Z` yet), we leave
+      # the file absent so the action skips notes rather than uploading the
+      # version string only.
+      - name: Extract release notes for Play Store
+        id: notes
+        env:
+          VERSION_NAME: ${{ needs.build.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          # Strip the snapshot suffix (`4.4.0-abcd1234` → `4.4.0`) — only the
+          # canonical release lives in CHANGELOG.md.
+          BASE_VERSION="${VERSION_NAME%-*}"
+          mkdir -p whatsnew
+          awk -v ver="## v$BASE_VERSION" '
+            $0 ~ "^"ver"( |$)"   { found=1; next }
+            found && /^## v[0-9]/ { exit }
+            found                 { print }
+          ' CHANGELOG.md > whatsnew/raw.md || true
+
+          if [ ! -s whatsnew/raw.md ]; then
+            echo "::warning::No '## v$BASE_VERSION' section in CHANGELOG.md — Play Store 'What's new' will be left empty"
+            rm -rf whatsnew
+            echo "extracted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Strip markdown → plain text (stores render literally). Order matters:
+          # links first (`[label](url)` → `label`), then bold/italic/code, then
+          # heading hashes, then squeeze blank-line runs.
+          python3 - << 'PYEOF' > whatsnew/whatsnew-en-US
+          import re, sys
+          text = open('whatsnew/raw.md').read()
+          text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)   # [label](url) → label
+          text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)         # **bold** → bold
+          text = re.sub(r'`([^`]+)`', r'\1', text)               # `code` → code
+          text = re.sub(r'^#{1,6}\s*', '', text, flags=re.M)     # leading ###
+          text = re.sub(r'\n{3,}', '\n\n', text)                 # squeeze blank lines
+          text = text.strip()
+          if len(text) > 500:
+              text = text[:497].rstrip() + '…'
+          sys.stdout.write(text)
+          PYEOF
+          rm -f whatsnew/raw.md
+          echo "extracted=true" >> "$GITHUB_OUTPUT"
+          echo "What's new payload ($(wc -c < whatsnew/whatsnew-en-US) chars):"
+          cat whatsnew/whatsnew-en-US
 
       # Two-mode publish:
       #
@@ -246,6 +318,11 @@ jobs:
           releaseFiles: aab/*.aab
           track: ${{ matrix.track }}
           status: completed
+          # `whatsNewDirectory` is read at action time — passing the literal
+          # path is safe even when the dir is missing (the action skips notes).
+          # The promote step downstream re-reads `releaseNotes` from the source
+          # track, so populating internal once propagates to production.
+          whatsNewDirectory: ${{ steps.notes.outputs.extracted == 'true' && 'whatsnew' || '' }}
 
       - name: Promote internal release to ${{ matrix.track }}
         if: matrix.track != 'internal' && contains(needs.build.outputs.tracks, '"internal"')
@@ -328,6 +405,123 @@ jobs:
           except Exception:
               # Best-effort rollback so a failed promote doesn't leave a dangling
               # edit. Errors during cleanup are non-fatal.
+              try:
+                  sess.delete(f"{BASE}/edits/{edit_id}")
+              except Exception:
+                  pass
+              raise
+          PYEOF
+
+  # ── Sync app-listing text (title / shortDescription / fullDescription).
+  #
+  # Apple-side equivalent lives in app-store.yml. Trigger logic mirrors it:
+  # ONLY on tag pushes matching `vX.Y.0` (major / minor releases) — patch
+  # releases (`vX.Y.1+`) leave the listing untouched. Rationale:
+  #
+  #   - Listing text rarely changes between patches; pushing identical
+  #     copy on every `vX.Y.1` would clutter the Play Console's "Recent
+  #     changes" tab with no signal.
+  #   - The `whatsnew-en-US` payload (set above by the publish job)
+  #     remains the per-release surface for "what changed".
+  #
+  # Runs as a separate job (not a publish-matrix step) so it fires
+  # exactly once regardless of how many tracks the publish covered.
+  # Uses its own Edit — independent of the upload + promote Edits — so
+  # a listing-sync failure cannot block the AAB rollout.
+  sync-listing:
+    name: Sync Play Store listing (en-US)
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Match `vX.Y.0` exactly — drops `4.0.0-rc.1` (pre-release), `4.3.1`
+    # (patch), AND `4.3.10` (would slip past a naive `endsWith('.0')`
+    # check). The gate is computed via bash regex on `VERSION_NAME` in
+    # the build job's `is_minor_bump` output.
+    if: needs.build.outputs.is_minor_bump == 'true'
+    steps:
+      - name: Checkout (for distribution/play-store/* files)
+        uses: actions/checkout@v6
+
+      - name: Push listing to Play Console
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          PACKAGE_NAME: io.github.sceneview.demo
+          LISTING_DIR: samples/android-demo/distribution/play-store
+        run: |
+          python3 -m venv /tmp/listing-venv
+          /tmp/listing-venv/bin/pip install --quiet google-auth requests
+
+          /tmp/listing-venv/bin/python3 << 'PYEOF'
+          import json, os, sys, pathlib, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import AuthorizedSession
+
+          PKG = os.environ["PACKAGE_NAME"]
+          ROOT = pathlib.Path(os.environ["LISTING_DIR"])
+          creds = service_account.Credentials.from_service_account_info(
+              json.loads(os.environ["SERVICE_ACCOUNT_JSON"]),
+              scopes=["https://www.googleapis.com/auth/androidpublisher"],
+          )
+          sess = AuthorizedSession(creds)
+          BASE = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PKG}"
+
+          # Per-locale field caps enforced by Google Play. Truncate with `…`
+          # if a file exceeds the cap (a `printf` in a localized terminal
+          # may have inserted hard line breaks that pad the byte count).
+          CAPS = {"title": 30, "shortDescription": 80, "fullDescription": 4000}
+          FILE_MAP = {
+              "title": "title.txt",
+              "shortDescription": "short_description.txt",
+              "fullDescription": "full_description.txt",
+          }
+
+          locales = [d.name for d in ROOT.iterdir() if d.is_dir()]
+          if not locales:
+              print(f"::warning::No locale subdirectories under {ROOT} — nothing to sync")
+              sys.exit(0)
+
+          # 1. Open a new Edit (independent of any other edits already
+          #    committed by the publish or promote steps).
+          r = sess.post(f"{BASE}/edits")
+          r.raise_for_status()
+          edit_id = r.json()["id"]
+          print(f"[listing] edit_id={edit_id}")
+
+          try:
+              for locale in locales:
+                  ldir = ROOT / locale
+                  body = {}
+                  for field, fname in FILE_MAP.items():
+                      f = ldir / fname
+                      if not f.exists():
+                          print(f"[listing] {locale}: skip {field} ({fname} missing)")
+                          continue
+                      text = f.read_text().strip()
+                      cap = CAPS[field]
+                      if len(text) > cap:
+                          text = text[: cap - 1].rstrip() + "…"
+                          print(f"::warning::{locale}/{fname} exceeded {cap} chars — truncated")
+                      body[field] = text
+
+                  if not body:
+                      print(f"[listing] {locale}: empty payload, skipping")
+                      continue
+
+                  r = sess.put(
+                      f"{BASE}/edits/{edit_id}/listings/{locale}",
+                      json=body,
+                  )
+                  r.raise_for_status()
+                  fields = ", ".join(f"{k}={len(v)}c" for k, v in body.items())
+                  print(f"[listing] {locale}: {fields}")
+
+              # 2. Commit the edit.
+              r = sess.post(f"{BASE}/edits/{edit_id}:commit")
+              r.raise_for_status()
+              print(f"[listing] commit OK")
+          except Exception:
+              # Best-effort rollback — abandon the edit so we don't leave a
+              # dangling Edit ID in Play Console.
               try:
                   sess.delete(f"{BASE}/edits/{edit_id}")
               except Exception:
