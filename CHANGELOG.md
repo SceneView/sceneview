@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — v4.3.4 hotfix (in progress)
+
+### Fixed — Pixel 9 v4.3.0 production audit follow-ups ([umbrella #1176](https://github.com/sceneview/sceneview/issues/1176))
+
+These two findings carried over from the v4.3.0 production audit and were not blocking enough to require a v4.3.3 cut, but accumulate for the next hotfix.
+
+- **AR Face Mesh — full black surface on Pixel 9 ([#1179](https://github.com/sceneview/sceneview/issues/1179))** — `samples/android-demo/.../ARFaceDemo.kt` no longer passes `cameraExposure = -1.5f`. The author had intended a "-1.5 EV bias", but Filament's single-arg `CameraComponent.setExposure(Float)` is an **absolute linear exposure scaling** (1.0 ≈ ISO 100 ≈ EV 0), not a signed EV-stop bias as the prior KDoc misleadingly hinted. A negative scaling clamps the framebuffer to zero, hence the fully-black scene on Pixel 9 v4.3.0 production. The front-camera AR session already force-DISABLES light estimation (see [`ArSession.kt`](arsceneview/src/main/java/io/github/sceneview/ar/arcore/ArSession.kt#L77)) and the new `ARDefaultCameraNode` defaults (f/12, 1/200 s, ISO 200 ≈ EV 11.6 — after [PR #1088](https://github.com/sceneview/sceneview/pull/1088)) + 10k+3k lux main+fill lights give a correctly exposed selfie preview on every device tested. Also rewrote the `cameraExposure` parameter KDoc in [`ARScene.kt`](arsceneview/src/main/java/io/github/sceneview/ar/ARScene.kt) so future contributors don't repeat the misinterpretation. Pinned by `ARCompletenessDefaultsTest.ARFaceDemo no longer passes a negative cameraExposure value` so any grep-and-paste regression gets caught.
+
+- **AR Instant Placement — anchors silently floating after `STOPPED` ([#1184](https://github.com/sceneview/sceneview/issues/1184))** — `samples/android-demo/.../ARInstantPlacementDemo.kt` now reconciles each placed anchor's `TrackingState` every frame. When ARCore drops a placed `InstantPlacementPoint`'s underlying `Anchor` to `STOPPED` (the user typically panned the camera away from where the point was approximated), we now detach the dead anchor, hide its `ModelNode` (which previously froze at the last good pose, visually "floating off into space"), and surface "Lost — tap to re-place" on the per-model badge. The top status pill gains a "N lost" segment when relevant. The per-model badge column iterates `placedModels` rather than `trackingMethods` so anchors that flip to `STOPPED` before their first `trackingMethod` ever fires still surface as Lost.
+
 ## v4.3.3 — AR production hotfix: actionable Cloud Anchor error + CI key guard (2026-05-14)
 
 ### Fixed — AR production blockers (Pixel 9 v4.3.0 audit umbrella [#1176](https://github.com/sceneview/sceneview/issues/1176))

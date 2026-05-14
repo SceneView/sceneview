@@ -171,13 +171,13 @@ import java.util.concurrent.atomic.AtomicReference
  *                                 ARCore light estimation still drives `mainLightNode`; `fillLightNode`
  *                                 keeps its baseline color/intensity untouched (#1063).
  * @param cameraNode               AR camera node. Use [rememberARCameraNode].
- * @param cameraExposure           Optional exposure override for the AR camera, in EV (exposure
- *                                 value). When non-null, overrides the default ARCore-tuned exposure
- *                                 set by [ARDefaultCameraNode]. Useful to correct a washed-out or
- *                                 too-dark camera preview when ARCore's auto-exposure does not match
- *                                 Camera2's output on a given device. A value of `0f` corresponds to
- *                                 the standard middle-grey exposure; negative values darken the
- *                                 preview, positive values brighten it.
+ * @param cameraExposure           Optional **absolute exposure scaling** for the AR camera
+ *                                 (Filament's single-`Float` `setExposure` overload — 1.0 ≈ ISO 100 ≈
+ *                                 EV 0). **Not a signed EV-stop bias**: negative values clamp to zero
+ *                                 (full black, #1179). Realistic range ~0.05 - ~16. Prefer leaving
+ *                                 `null` — the [ARDefaultCameraNode] default (f/12, 1/200 s, ISO 200 ≈
+ *                                 EV 11.6) is correct for both back- and front-camera sessions after
+ *                                 the #1088 + #1067 + #1063 / #1075 realignment.
  * @param collisionSystem          Hit-testing and collision system. Use [rememberCollisionSystem].
  * @param viewNodeWindowManager    Off-screen window manager required for [SceneScope.ViewNode].
  * @param onSessionCreated         Called once when the ARCore [Session] is ready.
@@ -302,14 +302,26 @@ fun ARSceneView(
     fillLightNode: LightNode? = rememberFillLightNode(engine),
     cameraNode: ARCameraNode = rememberARCameraNode(engine),
     /**
-     * Optional exposure override applied to the AR camera, in EV (exposure value).
+     * Optional **absolute exposure scaling** applied to the AR camera.
      *
-     * When non-null, this value is passed to [ARCameraNode.setExposure] each recomposition,
-     * overriding the default exposure set by [ARDefaultCameraNode] (aperture 16, shutter 1/125s,
-     * ISO 100). Set this when the camera preview looks washed out or too dark because ARCore's
-     * auto-exposure differs from Camera2 on the target device.
+     * When non-null, this value is forwarded to Filament's
+     * [io.github.sceneview.components.CameraComponent.setExposure] (single-`Float`
+     * overload), which sets the aperture to 1.0, the shutter speed to 1.2 s, and
+     * derives the sensitivity to match the requested **linear exposure value**
+     * (1.0 ≈ ISO 100 ≈ EV 0). This is **not** a signed EV-stop bias — negative
+     * values clamp the framebuffer to zero (full black, see #1179). Realistic
+     * values land between ~0.05 (very dark) and ~16 (very bright).
      *
-     * Leave `null` (the default) to keep the ARCore-tuned default exposure.
+     * In practice, prefer leaving this `null`. The default exposure set by
+     * [ARDefaultCameraNode] (f/12, 1/200 s, ISO 200 ≈ EV 11.6, after #1088)
+     * matches the v4.1.0 main+fill light setup (10k + 3k lux) and is correct
+     * for both back- and front-camera sessions on every device tested through
+     * Pixel 9. Override only when porting a legacy AR scene that depends on
+     * the linear-gain form.
+     *
+     * To darken / brighten by a number of stops instead, build a fresh
+     * [ARCameraNode] and call the 3-arg `setExposure(aperture, shutter, ISO)`
+     * on it (see [ARDefaultCameraNode] for the parity-correct values).
      */
     cameraExposure: Float? = null,
     /**

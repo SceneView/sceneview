@@ -20,7 +20,8 @@ import java.io.File
  * 5. The baseline-cache is keyed on `mainLightNode` identity (so swapping light resets baseline).
  * 6. `onARFrame` only touches `mainLightNode` — `fillLightNode` never gets multiplied.
  * 7. Every back-camera AR demo dropped the post-#1088 `cameraExposure = -1.0f` workaround.
- * 8. `ARFaceDemo` (front camera, AE-bias workaround) PRESERVES its `cameraExposure = -1.5f`.
+ * 8. `ARFaceDemo` no longer carries a negative `cameraExposure` value (#1179) — the prior
+ *    `-1.5f` was an absolute linear gain (not signed EV) and rendered the scene fully black.
  *
  * Cheapest pin available — `ARSceneView` is a Composable, so reflection over its generated
  * synthetic parameters is brittle. Strings + regex it is.
@@ -211,17 +212,37 @@ class ARCompletenessDefaultsTest {
     }
 
     @Test
-    fun `ARFaceDemo preserves front-camera cameraExposure workaround`() {
-        // Reviewer #5 M1: deliberately preserved front-camera AE-bias workaround. Future
-        // grep-and-delete cleanup must NOT remove it without a per-facing AE strategy.
+    fun `ARFaceDemo no longer passes a negative cameraExposure value`() {
+        // #1179 — the prior `cameraExposure = -1.5f` (intended as "negative EV bias")
+        // rendered the entire scene fully black on Pixel 9 v4.3.0 production. Filament's
+        // single-arg `setExposure(Float)` is an absolute LINEAR scaling (1.0 = ISO 100),
+        // NOT a signed EV-stop bias as the prior KDoc misleadingly hinted. Any negative
+        // value clamps the framebuffer to zero.
+        //
+        // ARSession force-DISABLES light estimation for front-camera sessions, so the new
+        // `ARDefaultCameraNode` defaults (f/12 1/200 ISO 200 ≈ EV 11.6, after #1088) +
+        // 10k+3k lux main+fill lights produce a correctly exposed selfie preview on every
+        // device tested through Pixel 9. No per-demo override is needed.
+        //
+        // This test pins the FIX: ARFaceDemo MUST NOT carry a negative `cameraExposure`
+        // value. Future grep-and-paste regressions get caught here.
         val arFaceDemo = File(demosDir, "demos/ARFaceDemo.kt")
         if (!arFaceDemo.exists()) return // shard without samples — fall back gracefully
+        // Strip Kotlin line comments before scanning — the in-source rationale block
+        // intentionally cites the prior `cameraExposure = -1.5f` value verbatim so the
+        // bug history stays grep-able. Without this filter, the regex would match its
+        // own warning comment and the test would self-fail.
         val src = arFaceDemo.readText()
-        assertTrue(
-            "ARFaceDemo MUST keep `cameraExposure = -1.5f` (front-camera AE bias workaround). " +
-                "Light estimation is forced DISABLED for front cam, so the post-#1088 EV11.6 " +
-                "default cannot compensate. Remove this only with a per-facing AE strategy.",
-            Regex("""cameraExposure\s*=\s*-1\.5f""").containsMatchIn(src)
+            .lineSequence()
+            .map { it.substringBefore("//") }
+            .joinToString("\n")
+        val negativeExposure = Regex("""cameraExposure\s*=\s*-\d""")
+        assertFalse(
+            "ARFaceDemo carries a negative `cameraExposure` value again. The single-arg " +
+                "`setExposure(Float)` is a linear gain (not signed EV) — negative values " +
+                "produce a fully-black framebuffer (#1179). Drop the override; the v4.3+ " +
+                "EV11.6 default is correct for front-camera sessions.",
+            negativeExposure.containsMatchIn(src)
         )
     }
 }

@@ -81,13 +81,28 @@ fun ARFaceDemo(onBack: () -> Unit) {
                 materialLoader = materialLoader,
                 planeRenderer = false,
                 sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
-                // Front-camera-only workaround. After #1088 realigned `ARDefaultCameraNode`
-                // to f/12 1/200 ISO 200 and #1101 removed `cameraExposure = -1.0f` from the
-                // 11 back-camera demos, the selfie camera's auto-exposure still runs hotter
-                // than Camera2's baseline on Pixel 9 (light estimation is forced DISABLED
-                // for the front camera, so the AR baseline can't compensate). Keep the
-                // negative bias here until a per-facing AE strategy lands.
-                cameraExposure = -1.5f,
+                // No `cameraExposure` override — issue #1179. The previous
+                // `cameraExposure = -1.5f` rendered the entire scene fully black on
+                // Pixel 9 v4.3.0 production.
+                //
+                // Root cause: `cameraExposure` calls Filament's single-arg
+                // `CameraComponent.setExposure(Float)`, which is an **absolute exposure
+                // scaling** (1.0 = ISO 100, EV 0), NOT a signed EV stop bias as the
+                // KDoc misleadingly hints. A negative scaling clamps the framebuffer to
+                // zero ⇒ full black. The original intent ("dial the over-bright selfie
+                // preview down by ~1.5 EV") needs the 3-arg `setExposure(aperture,
+                // shutter, ISO)` form on a fresh `ARCameraNode`, not the linear-gain
+                // overload. Filed as #1101 (closed, partial) → re-tracking in the AR
+                // exposure realignment after #1067 + #1088.
+                //
+                // ARSession force-DISABLES light estimation for front-camera sessions
+                // (see ArSession.kt:77-81), so the new `ARDefaultCameraNode` defaults
+                // (f/12, 1/200 s, ISO 200 ≈ EV 11.6) + 10k+3k lux main/fill lights
+                // give a correctly exposed selfie preview on Pixel 9 without any
+                // per-demo override. If the preview ever shows up over-bright again on
+                // a new device, fix via a per-facing AE strategy in `arsceneview/`
+                // (e.g. front-camera-specific `ARDefaultCameraNode`), not a per-demo
+                // linear-gain hack.
                 sessionConfiguration = { _: Session, config: Config ->
                     config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D
                     config.planeFindingMode = Config.PlaneFindingMode.DISABLED

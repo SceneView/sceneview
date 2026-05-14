@@ -117,7 +117,7 @@ fun ARSceneView(
     cameraStream: ARCameraStream? = rememberARCameraStream(materialLoader),
     view: View = rememberARView(engine),
     isOpaque: Boolean = true,
-    cameraExposure: Float? = null,
+    cameraExposure: Float? = null,  // Filament absolute exposure scale (1.0 ≈ ISO 100). NOT EV stops; negative = black framebuffer (#1179). Prefer null.
     renderer: Renderer = rememberRenderer(engine),
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberAREnvironment(engine),
