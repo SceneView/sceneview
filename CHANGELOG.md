@@ -24,6 +24,14 @@ Documentation-only — no behavioral change.
 
 Sibling of [#1125](https://github.com/sceneview/sceneview/issues/1125) (PhysicsDemo). [`samples/android-demo/.../GeometryDemo.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/GeometryDemo.kt) added a 80 000-lux directional light on top of the v4.1.0 SceneView defaults (10 000-lux main + 3 000-lux fill + IBL @ 10 000), so the metallic/roughness sweep saturated to white at every slider value. Re-tuned to 5 000 lux to match PhysicsDemo's PR [#1144](https://github.com/sceneview/sceneview/pull/1144) retune — accent fill that complements the v4.1.0 defaults without dominating them. Acceptance #1125 only scanned for `100_000`, so 80 000 slipped through; this closes the gap.
 
+### Fixed — CI: `android-demo-screenshots` job unblocked + workflow validator hardened ([#1153](https://github.com/sceneview/sceneview/issues/1153))
+
+The v4.3.0 cut commit `efc168bc` introduced a multi-line backslash continuation in `.github/workflows/render-tests.yml` (the `android run \\ --apks=…` block under the `Capture demo screenshots` step). The `ReactiveCircus/android-emulator-runner@v2` action exec's each line of `with.script:` via `sh -c <line>`, so the trailing `\` survives as a literal argv token and `android run` died with `Unmatched argument at index 2: '\\'`. Every push to `main` since `efc168bc` failed that screenshot job, forcing chip PRs ([#1145](https://github.com/sceneview/sceneview/pull/1145) / [#1147](https://github.com/sceneview/sceneview/pull/1147) / [#1148](https://github.com/sceneview/sceneview/pull/1148) / [#1149](https://github.com/sceneview/sceneview/pull/1149)) to merge with `--admin` and hiding any genuine screenshot regression.
+
+- **Fix**: collapse the `android --no-metrics run …` invocation onto a single physical line, matching the documented per-line slicing rule already followed by the `attempts=0; while …; done` loop above it.
+- **Validator extension**: `.claude/scripts/check-workflow-scripts.sh` (shipped by [#1145](https://github.com/sceneview/sceneview/pull/1145)) now runs a per-line slicing simulation on every `with.script:` block — `dash -n` passes a `\<EOL>` because the whole-file parser splices continuations together first, but the runtime action does not. The new pass flags any trailing-backslash continuation and fails the PR check, so this class of bug can no longer ship to `main` undetected. Sanity-tested by reintroducing the original break locally — validator exits `1` with a pointed error message.
+- **Backwards compatibility**: `run:` blocks (which GitHub Actions defaults to `bash -e {0}`, executed as one script) are untouched; backslash continuations remain valid there. Only `with.script:` blocks (per-line `sh -c` semantics) are checked.
+
 ## Unreleased
 
 ### Added — iOS parity: `LightSlot` + `.fillLight(_:)` on `ARSceneView` ([#1138](https://github.com/sceneview/sceneview/issues/1138))

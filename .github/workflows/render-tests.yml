@@ -165,10 +165,13 @@ jobs:
             adb wait-for-device
             attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
 
-            # Install + launch atomically via the Android CLI.
-            android --no-metrics run \
-              --apks=samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk \
-              --activity=io.github.sceneview.demo/.MainActivity || true
+            # Install + launch atomically via the Android CLI. MUST live on a
+            # single physical line — see #1153: ReactiveCircus runs each line
+            # via `sh -c <line>`, so a trailing `\` becomes a literal argv
+            # token under POSIX `sh` and the second line ships standalone.
+            # The whole loop above (`attempts=0; while ...; done`) follows
+            # the same one-line rule and is documented at line 160-164.
+            android --no-metrics run --apks=samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk --activity=io.github.sceneview.demo/.MainActivity || true
             sleep 10
 
             mkdir -p demo-screenshots

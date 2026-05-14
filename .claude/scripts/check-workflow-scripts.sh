@@ -17,17 +17,27 @@
 #    as informational only (warnings, not gate failures), so the existing
 #    `run:` corpus stays green.
 #
-# Two real-world bugs that this gate would have caught at #1 time:
+# Three real-world bugs that this gate would have caught at #1 time:
 #   - PR #1068 used `[[ ... ]]` inside a `with.script:` block — shipped to
 #     main as a silent syntax error under dash; fixed by PR #1087.
 #   - PR #1068 used a multi-line `while ... done` block — sliced by the
 #     emulator runner's per-line `sh -c`; fixed by PR #1104.
+#   - HOTFIX-V430 (commit efc168bc) used a multi-line `android run \`
+#     backslash continuation — `dash -n` accepts a `\<EOL>` because the
+#     parser sees the whole file as one script, but the runner ships each
+#     line through `sh -c`, so the trailing `\` becomes a literal argv
+#     token (`Unmatched argument at index 2: '\\'`). Fixed by #1153, and
+#     the per-line slicing check below now catches the same class of bug.
 #
-# Both were validated locally on macOS, where `sh` is bash-backed, so the
-# original author saw zero failures. This script prevents that whole class
-# of bug by running the actual `dash` parser on every `with.script:` block.
+# All three were validated locally on macOS, where `sh` is bash-backed, so
+# the original authors saw zero failures. This script prevents that whole
+# class of bug by:
+#   - running the actual `dash` parser on every `with.script:` block, AND
+#   - simulating the per-line `sh -c` slicing the action does at runtime
+#     (catches trailing-backslash continuations + multi-line constructs
+#     that pass a whole-file syntax check but break under per-line exec).
 #
-# Closes #1114.
+# Closes #1114, #1153.
 
 set -euo pipefail
 
@@ -154,6 +164,34 @@ for f in "$TMPDIR_SCRIPTS/with-script"/*.sh; do
             sed 's/^/    /' "$f.sc.err"
             EXIT=1
         fi
+    fi
+
+    # Per-line slicing simulation. The ReactiveCircus runner exec's each
+    # logical line via `sh -c`, so trailing-backslash continuations are
+    # FATAL — the second physical line ships as its own command and the
+    # first one keeps a literal `\` in argv. `dash -n` above passes them
+    # because the whole-file parser glues continuations together first.
+    # awk handles inline `\` followed by EOL, ignoring quoted/escaped
+    # forms with a previous `\\` (rare in our corpus, but conservative).
+    if awk '
+        /\\[[:space:]]*$/ {
+            # A pure trailing `\` at EOL. Skip lines that are clearly
+            # comments (`#…\`) — those degrade to noise but not failures.
+            line = $0
+            sub(/^[[:space:]]+/, "", line)
+            if (substr(line, 1, 1) == "#") next
+            print NR ": " $0
+            found = 1
+        }
+        END { exit found ? 1 : 0 }
+    ' "$f" > "$f.bslash.err"; then
+        : # no continuations found, OK
+    else
+        echo "::error::trailing-backslash continuation in $rel (line-by-line sh -c will mangle it)"
+        sed 's/^/    /' "$f.bslash.err"
+        echo "    Fix: collapse the multi-line invocation onto a single physical line,"
+        echo "    or split the action invocation across separate steps. See #1153."
+        EXIT=1
     fi
 done
 echo "  checked $SCRIPT_COUNT with.script: block(s)"
