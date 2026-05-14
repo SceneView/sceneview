@@ -30,6 +30,7 @@ import io.github.sceneview.math.Size
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 
 /**
  * AR pose placement demo.
@@ -69,22 +70,20 @@ fun ARPoseDemo(onBack: () -> Unit) {
     //
     // Two materials so cube and sphere read as distinct objects, not a single white
     // blob — matches the same brand-ramp split used elsewhere in the demos.
-    val cubeMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = SceneViewColors.Accent,
-            metallic = 0.0f,
-            roughness = 0.85f,
-            reflectance = 0.1f
-        )
-    }
-    val sphereMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = SceneViewColors.Primary,
-            metallic = 0.0f,
-            roughness = 0.85f,
-            reflectance = 0.1f
-        )
-    }
+    val cubeMaterial = rememberMaterialInstance(
+        materialLoader = materialLoader,
+        color = SceneViewColors.Accent,
+        metallic = 0.0f,
+        roughness = 0.85f,
+        reflectance = 0.1f,
+    )
+    val sphereMaterial = rememberMaterialInstance(
+        materialLoader = materialLoader,
+        color = SceneViewColors.Primary,
+        metallic = 0.0f,
+        roughness = 0.85f,
+        reflectance = 0.1f,
+    )
 
     DemoScaffold(
         title = "Pose Placement",

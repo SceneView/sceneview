@@ -25,6 +25,7 @@ import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.sample.rememberUnlitMaterialInstance
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -91,12 +92,8 @@ fun LinesPathsDemo(onBack: () -> Unit) {
             // path polyline. Same hero gradient as the product. Unlit because lines have ~0
             // surface area (lighting contributes nothing useful) and we want crisp readable
             // strokes regardless of scene illumination.
-            val lineMaterial = remember(materialLoader) {
-                materialLoader.createUnlitColorInstance(SceneViewColors.Primary)
-            }
-            val pathMaterial = remember(materialLoader) {
-                materialLoader.createUnlitColorInstance(SceneViewColors.Accent)
-            }
+            val lineMaterial = rememberUnlitMaterialInstance(materialLoader, SceneViewColors.Primary)
+            val pathMaterial = rememberUnlitMaterialInstance(materialLoader, SceneViewColors.Accent)
 
             // Single line segment — 1 px on most GPUs, so we also draw a pair of spheres at the
             // endpoints (scaled by lineWidth) to give the line a visible thickness.

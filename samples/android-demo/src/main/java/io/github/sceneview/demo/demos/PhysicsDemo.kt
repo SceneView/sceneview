@@ -28,6 +28,7 @@ import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 
 /**
  * Demonstrates [PhysicsNode] — drop spheres that fall under gravity and bounce off the floor.
@@ -97,9 +98,9 @@ fun PhysicsDemo(onBack: () -> Unit) {
                         intensity(100_000f)
                     }
                 )
-                val groundMaterial = remember(materialLoader) {
-                    materialLoader.createColorInstance(SceneViewColors.SurfaceDim)
-                }
+                val groundMaterial = rememberMaterialInstance(
+                    materialLoader, SceneViewColors.SurfaceDim
+                )
                 val sphereMaterials = remember(materialLoader) {
                     SceneViewColors.Ramp4.map { materialLoader.createColorInstance(it) }
                 }

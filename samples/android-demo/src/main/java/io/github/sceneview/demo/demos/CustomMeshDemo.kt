@@ -31,6 +31,7 @@ import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberOnGestureListener
+import io.github.sceneview.sample.rememberMaterialInstance
 
 /**
  * Demonstrates custom geometry using built-in geometry nodes composed together.
@@ -49,12 +50,8 @@ fun CustomMeshDemo(onBack: () -> Unit) {
 
     // Atom spheres in SceneView primary blue, bonds in the accent purple — the same hero
     // gradient the brand palette uses.
-    val sphereMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(SceneViewColors.Primary)
-    }
-    val bondMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(SceneViewColors.Accent)
-    }
+    val sphereMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Primary)
+    val bondMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Accent)
 
     // Hero yaw auto-pauses on first camera gesture so orbit/pinch don't fight the spin.
     // Triggered by the user's Auto-Rotate switch.
