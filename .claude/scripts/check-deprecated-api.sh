@@ -87,9 +87,12 @@ is_whitelisted() {
 
     # The detector script documents the patterns it matches; the
     # quality-gate workflow file has an explanatory header comment
-    # that necessarily contains "Scene{}/ARScene{}" as prose.
+    # that necessarily contains "Scene{}/ARScene{}" as prose. Same
+    # for pr-check.yml which runs the standalone "Check deprecated"
+    # job and its header documents the role.
     .claude/scripts/check-deprecated-api.sh) return 0 ;;
     .github/workflows/quality-gate.yml) return 0 ;;
+    .github/workflows/pr-check.yml) return 0 ;;
 
     # Marketing drafts — intentionally reference third-party APIs (ArFragment etc.)
     marketing/*.md | marketing/**/*.md) return 0 ;;

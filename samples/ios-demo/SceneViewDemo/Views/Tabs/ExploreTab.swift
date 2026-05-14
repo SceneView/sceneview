@@ -210,8 +210,15 @@ final class RecentSearches {
 struct ExploreTab: View {
     @State private var searchText = ""
     @State private var selectedModel: ModelItem?
-    @State private var selectedSketchfabModel: SketchfabModel?
     @State private var viewingSketchfabModel: SketchfabModel?
+    /// Which carousel the user tapped from — set together with
+    /// `viewingSketchfabModel` so the destination's `.navigationTransition
+    /// (.zoom(sourceID:))` builds the same ID as the source card. Without this
+    /// prefix the matched source ID would be `"sketchfab-hero-\(uid)"` on both
+    /// the Staff Picks card and the Most Liked card for the same model (the
+    /// Sketchfab API returns overlapping uids across feeds), giving SwiftUI two
+    /// matched sources with the same key in the same namespace.
+    @State private var viewingFeedID: String?
     @State private var selectedCategory: SketchfabCategory?
     @State private var recentSearches = RecentSearches()
     @State private var sketchfabStaffPicks: [SketchfabModel] = []
@@ -221,6 +228,10 @@ struct ExploreTab: View {
     @State private var feedsError: String?
     /// When `true`, all three carousels filter to `animated=true` (skeletal rigs).
     @State private var animatedOnly = false
+    /// Shared namespace for the iOS 18 zoom transition: the carousel card's
+    /// thumbnail morphs into the SketchfabModelViewerScreen hero when the
+    /// navigation pushes the viewer.
+    @Namespace private var heroNamespace
     private let favoritesManager = FavoritesManager.shared
 
     /// Curated featured set — first 6 bundled models, picked for visual variety.
@@ -247,9 +258,9 @@ struct ExploreTab: View {
                     if sketchfabStaffPicks.isEmpty && sketchfabMostLiked.isEmpty && sketchfabRecent.isEmpty {
                         bundledFeaturedSection
                     } else {
-                        feedSection(title: "Staff Picks",   models: sketchfabStaffPicks)
-                        feedSection(title: "Most Liked",    models: sketchfabMostLiked)
-                        feedSection(title: "Recently Added", models: sketchfabRecent)
+                        feedSection(title: "Staff Picks",   feedID: "staff", models: sketchfabStaffPicks)
+                        feedSection(title: "Most Liked",    feedID: "liked", models: sketchfabMostLiked)
+                        feedSection(title: "Recently Added", feedID: "recent", models: sketchfabRecent)
                     }
                     categoriesSection
                     if !recentSearches.items.isEmpty {
@@ -282,23 +293,17 @@ struct ExploreTab: View {
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
             }
-            .sheet(item: $selectedSketchfabModel) { model in
-                SketchfabModelSheet(model: model) { picked in
-                    viewingSketchfabModel = picked
-                }
-                .presentationDetents([.medium, .large])
-                #if os(iOS)
-                .presentationBackground(.regularMaterial)
-                .presentationCornerRadius(28)
-                #endif
+            .navigationDestination(item: $viewingSketchfabModel) { model in
+                SketchfabModelViewerScreen(model: model)
+                    // iOS 18 zoom navigation transition — the source thumbnail
+                    // matchedTransitionSource lives on the FeaturedSketchfabCard
+                    // identified by `(viewingFeedID, model.uid)` since the same
+                    // Sketchfab model can appear in more than one carousel.
+                    .navigationTransition(.zoom(
+                        sourceID: "sketchfab-hero-\(viewingFeedID ?? "any")-\(model.uid)",
+                        in: heroNamespace
+                    ))
             }
-            #if os(iOS)
-            .fullScreenCover(item: $viewingSketchfabModel) { model in
-                NavigationStack {
-                    SketchfabModelViewerScreen(model: model)
-                }
-            }
-            #endif
             .sheet(item: $selectedCategory) { category in
                 CategorySheet(category: category) { query in
                     searchText = query
@@ -417,7 +422,7 @@ struct ExploreTab: View {
     // MARK: - Feed section helpers (Staff Picks / Most Liked / Recently Added)
 
     /// One horizontal carousel of Sketchfab models, used three times in the body.
-    private func feedSection(title: String, models: [SketchfabModel]) -> some View {
+    private func feedSection(title: String, feedID: String, models: [SketchfabModel]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
@@ -432,8 +437,18 @@ struct ExploreTab: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(models) { model in
-                        FeaturedSketchfabCard(model: model) {
-                            selectedSketchfabModel = model
+                        FeaturedSketchfabCard(
+                            model: model,
+                            transitionNamespace: heroNamespace,
+                            transitionFeedID: feedID,
+                        ) {
+                            // Push directly to the viewer. The viewer's initial
+                            // state is `Stage.Preview` (description / tags /
+                            // CTA), mirroring Android's `Stage.Preview` in
+                            // SketchfabModelViewerScreen.kt — the download only
+                            // fires after the user taps the CTA.
+                            viewingFeedID = feedID
+                            viewingSketchfabModel = model
                             #if os(iOS)
                             HapticManager.lightTap()
                             #endif
@@ -576,6 +591,16 @@ private struct FeaturedCard: View {
 
 private struct FeaturedSketchfabCard: View {
     let model: SketchfabModel
+    /// Namespace used by iOS 18's `.navigationTransition(.zoom(sourceID:in:))`
+    /// to animate the card thumbnail into the SketchfabModelViewerScreen's hero
+    /// when the parent NavigationStack pushes it. Optional so the card stays
+    /// usable in contexts that don't wire up the zoom transition (e.g. future
+    /// list views that present via .sheet).
+    var transitionNamespace: Namespace.ID? = nil
+    /// Carousel id used in the matched source key so a model appearing in two
+    /// feeds (Staff Picks + Most Liked) doesn't collide on the same namespace
+    /// key. Pairs with `viewingFeedID` on ExploreTab.
+    var transitionFeedID: String? = nil
     let onTap: () -> Void
 
     /// Pick a thumbnail close to the card's render size (≥320 wide, ≤640) to avoid
@@ -618,6 +643,10 @@ private struct FeaturedSketchfabCard: View {
                     .frame(width: 200, height: 160)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .modifier(MatchedSourceModifier(
+                        id: "sketchfab-hero-\(transitionFeedID ?? "any")-\(model.uid)",
+                        namespace: transitionNamespace
+                    ))
 
                     // Top-left "Animated" pill (when applicable)
                     if model.isAnimated {
@@ -657,6 +686,23 @@ private struct FeaturedSketchfabCard: View {
     }
 }
 
+/// Conditionally applies `.matchedTransitionSource(id:in:)` when a namespace is
+/// provided. iOS 18+ wires this into `.navigationTransition(.zoom(...))` so
+/// the card thumbnail morphs into the SketchfabModelViewerScreen's hero on push.
+/// Returns the unmodified view when no namespace is passed.
+private struct MatchedSourceModifier: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            content
+        }
+    }
+}
+
 // MARK: - Helpers on SketchfabModel for card / sheet display
 
 private extension SketchfabModel {
@@ -682,118 +728,11 @@ private extension SketchfabModel {
 
 // Sketchfab models render through `SketchfabModelViewerScreen` (SceneView SDK),
 // not via Sketchfab's web iframe viewer. The whole point of this demo app is to
-// showcase SceneView's renderer.
-
-// MARK: - Sketchfab model detail sheet
-
-private struct SketchfabModelSheet: View {
-    let model: SketchfabModel
-    let onOpenInSceneView: (SketchfabModel) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    private var largeThumbnailURL: URL? {
-        let images = model.thumbnails.images
-        let preferred = images.max(by: { $0.width < $1.width }) ?? images.first
-        return preferred.flatMap { URL(string: $0.url) }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    thumbnailHero
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(model.name)
-                            .font(.title2.weight(.bold))
-                        if let desc = model.description, !desc.isEmpty {
-                            Text(desc.trimmingCharacters(in: .whitespacesAndNewlines))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(8)
-                        }
-                    }
-
-                    if let tags = model.tags, !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(tags.prefix(10), id: \.name) { tag in
-                                    Text(tag.name)
-                                        .font(.caption)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 4)
-                                        .background(.tint.opacity(0.12), in: Capsule())
-                                        .foregroundStyle(.tint)
-                                }
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    // Primary CTA — open the model in SceneView. This downloads the GLB
-                    // via SketchfabService and renders it through SceneViewSwift's native
-                    // renderer (RealityKit). The Sketchfab web viewer is intentionally
-                    // NOT used — this demo app exists to showcase SceneView.
-                    Button {
-                        let captured = model
-                        dismiss()
-                        // Small delay so the sheet finishes dismissing before the
-                        // fullScreenCover presents — avoids "trying to present X on Y
-                        // while another presentation is in progress" warnings.
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(250))
-                            onOpenInSceneView(captured)
-                        }
-                    } label: {
-                        Label(model.downloadable ? "Open in SceneView" : "Preview in SceneView",
-                              systemImage: "cube.transparent.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(.tint, in: Capsule())
-                            .foregroundStyle(.white)
-                    }
-                    .disabled(!model.downloadable)
-                    .opacity(model.downloadable ? 1.0 : 0.5)
-
-                    if !model.downloadable {
-                        Text("This model is not downloadable on the Sketchfab free tier and can't be rendered in SceneView yet.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                }
-                .padding(20)
-            }
-            .navigationTitle(model.name)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var thumbnailHero: some View {
-        AsyncImage(url: largeThumbnailURL) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fit)
-            default:
-                Rectangle().fill(.tint.opacity(0.08))
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .overlay { ProgressView() }
-            }
-        }
-        .frame(maxHeight: 280)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
+// showcase SceneView's renderer. The previous intermediate `SketchfabModelSheet`
+// (preview state with description + "Open in SceneView" CTA) was removed in
+// favour of a direct card → viewer push so iOS 18's
+// `.navigationTransition(.zoom)` can fire — matches the Android UX added in
+// #1203 (single tap → modal viewer that starts loading immediately).
 
 // MARK: - Sample promo card (compact entry-point to a Scenes tab demo)
 
@@ -1332,6 +1271,11 @@ struct SketchfabModelViewerScreen: View {
     /// cross-fade once the SceneView is ready.
     @State private var thumbnailZoom: CGFloat = 1.0
     @State private var sceneRevealed = false
+    /// Mirrors Android's `Stage.Preview` initial state — gates the network
+    /// download behind an explicit "Open in SceneView" CTA so the user sees
+    /// the description / tags / non-downloadable warning before committing.
+    /// Flips to `true` on CTA tap (or on retry from the error state).
+    @State private var hasUserOpened = false
     @Environment(\.dismiss) private var dismiss
 
     /// Largest Sketchfab thumbnail (for the during-download Ken-Burns hero).
@@ -1353,65 +1297,63 @@ struct SketchfabModelViewerScreen: View {
             )
             .ignoresSafeArea()
 
-            sceneView
-                .ignoresSafeArea()
-                .opacity(sceneRevealed ? 1 : 0)
-
-            // Thumbnail cross-fade overlay — shows the Sketchfab image with a slow
-            // Ken-Burns zoom during download. Fades out (over 0.6 s) once the
-            // SceneView has had time to mount the loaded ModelNode, producing the
-            // "come to life" transition.
-            if !sceneRevealed {
-                thumbnailHero
+            if hasUserOpened {
+                // Downloading / Rendering stages — mirrors Android's
+                // `Stage.Downloading` + `Stage.Rendering`.
+                sceneView
                     .ignoresSafeArea()
-                    .transition(.opacity)
-            }
+                    .opacity(sceneRevealed ? 1 : 0)
 
-            // Cinematic vignette — radial dark gradient at the corners, invisible
-            // in the centre. Costs nothing to render and gives the viewer the
-            // "Apple Store hero" framing without obscuring the model.
-            vignette
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-
-            if isLoading {
-                VStack(spacing: 14) {
-                    ProgressView(value: max(0.05, downloadProgress))
-                        .progressViewStyle(.linear)
-                        .tint(.white)
-                        .frame(width: 220)
-                    Text("Loading \(model.name)\u{2026}")
-                        .font(.subheadline)
-                        .foregroundStyle(.white)
-                    Text("Streaming from Sketchfab \u{00B7} rendering in SceneView")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                // Thumbnail cross-fade overlay — shows the Sketchfab image with a
+                // slow Ken-Burns zoom during download. Fades out (over 0.6 s)
+                // once the SceneView has had time to mount the loaded ModelNode,
+                // producing the "come to life" transition.
+                if !sceneRevealed {
+                    thumbnailHero
+                        .ignoresSafeArea()
+                        .transition(.opacity)
                 }
-                .padding(20)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            }
 
-            if let errorMessage {
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.title)
-                        .foregroundStyle(.yellow)
-                    Text("Failed to load model").font(.headline).foregroundStyle(.white)
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                // Cinematic vignette — radial dark gradient at the corners,
+                // invisible in the centre. Costs nothing to render and gives the
+                // viewer the "Apple Store hero" framing without obscuring the
+                // model.
+                vignette
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                if isLoading {
+                    VStack(spacing: 14) {
+                        ProgressView(value: max(0.05, downloadProgress))
+                            .progressViewStyle(.linear)
+                            .tint(.white)
+                            .frame(width: 220)
+                        Text("Loading \(model.name)\u{2026}")
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                        Text("Streaming from Sketchfab \u{00B7} rendering in SceneView")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding()
-            }
 
-            VStack {
-                Spacer()
-                controlsOverlay
+                if let errorMessage {
+                    errorOverlay(message: errorMessage)
+                }
+
+                VStack {
+                    Spacer()
+                    controlsOverlay
+                }
+            } else {
+                // `Stage.Preview` — show description / tags / "Open in SceneView"
+                // CTA before committing to the download. Matches Android's
+                // `Stage.Preview` `PreviewContent`. The non-downloadable warning
+                // is surfaced here so the user is not pushed into a viewer that
+                // can't render the model on the Sketchfab free tier.
+                previewContent
             }
         }
         .navigationTitle(model.name)
@@ -1419,9 +1361,6 @@ struct SketchfabModelViewerScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Close") { dismiss() }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     autoRotate.toggle()
@@ -1432,9 +1371,15 @@ struct SketchfabModelViewerScreen: View {
                     Image(systemName: autoRotate ? "rotate.3d.fill" : "rotate.3d")
                 }
                 .accessibilityLabel(autoRotate ? "Stop rotation" : "Start rotation")
+                .disabled(!hasUserOpened || loadedNode == nil)
             }
         }
-        .task { await loadFromSketchfab() }
+        // The download is gated behind the user's CTA tap (`hasUserOpened`) so
+        // the .task only fires once they've consented from the preview state.
+        .task(id: hasUserOpened) {
+            guard hasUserOpened else { return }
+            await loadFromSketchfab()
+        }
         .onAppear {
             // Start the Ken-Burns slow zoom on the thumbnail the moment the screen
             // appears, so it's already animating when the user reads the title.
@@ -1454,6 +1399,109 @@ struct SketchfabModelViewerScreen: View {
                 #endif
             }
         }
+    }
+
+    /// `Stage.Preview` parallel to Android's `PreviewContent`. Description +
+    /// tag chips + "Open in SceneView" CTA. Disables the CTA when the model
+    /// is not downloadable on the user's Sketchfab tier (carries the warning
+    /// the dropped `SketchfabModelSheet` used to surface).
+    @ViewBuilder
+    private var previewContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                AsyncImage(url: heroThumbnailURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().aspectRatio(contentMode: .fit)
+                    default:
+                        Rectangle().fill(.tint.opacity(0.08))
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .overlay { ProgressView() }
+                    }
+                }
+                .frame(maxHeight: 280)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                if let desc = model.description, !desc.isEmpty {
+                    Text(desc.trimmingCharacters(in: .whitespacesAndNewlines))
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(8)
+                }
+
+                if let tags = model.tags, !tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(tags.prefix(10), id: \.name) { tag in
+                                Text(tag.name)
+                                    .font(.caption)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(.white.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                    }
+                }
+
+                Divider().overlay(.white.opacity(0.2))
+
+                Button {
+                    hasUserOpened = true
+                    #if os(iOS)
+                    HapticManager.selectionChanged()
+                    #endif
+                } label: {
+                    Label(model.downloadable ? "Open in SceneView" : "Not downloadable",
+                          systemImage: "cube.transparent.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(.tint, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .disabled(!model.downloadable)
+                .opacity(model.downloadable ? 1.0 : 0.5)
+
+                if !model.downloadable {
+                    Text("This model is not downloadable on the Sketchfab free tier and can't be rendered in SceneView yet.")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .padding(20)
+        }
+    }
+
+    /// Error overlay extracted for re-use from both Downloading/Rendering and
+    /// future Retry flows.
+    @ViewBuilder
+    private func errorOverlay(message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title)
+                .foregroundStyle(.yellow)
+            Text("Failed to load model").font(.headline).foregroundStyle(.white)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Button("Retry") {
+                errorMessage = nil
+                hasUserOpened = false
+                #if os(iOS)
+                HapticManager.lightTap()
+                #endif
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 4)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding()
     }
 
     private func loadFromSketchfab() async {
