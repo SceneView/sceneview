@@ -41,12 +41,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,19 +103,20 @@ fun ExploreTabScreen(
     var mostLiked by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var recent by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var loadingFeeds by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     val sketchfabService = SketchfabService.getInstance(LocalContext.current)
+    val scope = rememberCoroutineScope()
 
-    /** (re)load the three feeds when the animated toggle flips or on first composition. */
-    LaunchedEffect(animatedOnly) {
-        if (SketchfabConfig.apiKey == null) return@LaunchedEffect
+    suspend fun loadSketchfabFeeds() {
+        if (SketchfabConfig.apiKey == null) return
         loadingFeeds = true
         val animatedParam: Boolean? = if (animatedOnly) true else null
         // supervisorScope so a single feed failure (transient 429, network blip)
         // doesn't cancel the other two — surviving feeds still render (#980).
-        // Each catch re-throws CancellationException so the parent
-        // LaunchedEffect cancellation (toggle re-keys, navigation away) still
-        // tears down the in-flight requests cleanly. `runCatching` swallows
+        // Each catch re-throws CancellationException so the parent scope
+        // cancellation (toggle re-keys, navigation away) still tears down
+        // the in-flight requests cleanly. `runCatching` swallows
         // CancellationException, which would break structured concurrency.
         supervisorScope {
             val a = async { catchingFeed { sketchfabService.staffPicks(animated = animatedParam, limit = 10) } }
@@ -125,6 +129,78 @@ fun ExploreTabScreen(
         loadingFeeds = false
     }
 
+    /** (re)load the three feeds when the animated toggle flips or on first composition. */
+    LaunchedEffect(animatedOnly) {
+        loadSketchfabFeeds()
+    }
+
+    val body = @Composable {
+        ExploreBody(
+            scroll = scroll,
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            onSearchSubmit = { q -> if (q.isNotBlank()) recentSearches.push(q) },
+            animatedOnly = animatedOnly,
+            onToggleAnimated = { animatedOnly = !animatedOnly },
+            curatedSamples = curatedSamples,
+            onSampleClick = onSampleClick,
+            mostLiked = mostLiked,
+            staffPicks = staffPicks,
+            recent = recent,
+            loadingFeeds = loadingFeeds,
+            onModelClick = { selectedModel = it },
+            onCategoryClick = onCategoryClick,
+            recentSearches = recentSearches,
+        )
+    }
+
+    // Pull-to-refresh is only wired when the Sketchfab carousels are visible —
+    // without an API key there's nothing dynamic to refresh and pulling would
+    // spin a spinner that immediately settles, which is worse than no affordance
+    // at all.
+    if (SketchfabConfig.apiKey != null) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                scope.launch {
+                    try {
+                        loadSketchfabFeeds()
+                    } finally {
+                        isRefreshing = false
+                    }
+                }
+            },
+        ) {
+            body()
+        }
+    } else {
+        body()
+    }
+
+    selectedModel?.let { model ->
+        SketchfabModelViewerScreen(model = model, onDismiss = { selectedModel = null })
+    }
+}
+
+@Composable
+private fun ExploreBody(
+    scroll: androidx.compose.foundation.ScrollState,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchSubmit: (String) -> Unit,
+    animatedOnly: Boolean,
+    onToggleAnimated: () -> Unit,
+    curatedSamples: List<DemoEntry>,
+    onSampleClick: (DemoEntry) -> Unit,
+    mostLiked: List<SketchfabModel>,
+    staffPicks: List<SketchfabModel>,
+    recent: List<SketchfabModel>,
+    loadingFeeds: Boolean,
+    onModelClick: (SketchfabModel) -> Unit,
+    onCategoryClick: (SketchfabCategory) -> Unit,
+    recentSearches: RecentSearchesState,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -142,14 +218,12 @@ fun ExploreTabScreen(
 
         SearchField(
             value = searchQuery,
-            onValueChange = { searchQuery = it },
-            onSubmit = { q ->
-                if (q.isNotBlank()) recentSearches.push(q)
-            },
+            onValueChange = onSearchQueryChange,
+            onSubmit = onSearchSubmit,
         )
 
         if (SketchfabConfig.apiKey != null) {
-            FiltersBar(animatedOnly = animatedOnly, onToggle = { animatedOnly = !animatedOnly })
+            FiltersBar(animatedOnly = animatedOnly, onToggle = onToggleAnimated)
         }
 
         if (curatedSamples.isNotEmpty()) {
@@ -189,19 +263,19 @@ fun ExploreTabScreen(
                 title = stringResource(R.string.explore_trending_models),
                 models = mostLiked,
                 loading = loadingFeeds && mostLiked.isEmpty(),
-                onModelClick = { selectedModel = it },
+                onModelClick = onModelClick,
             )
             FeedSection(
                 title = stringResource(R.string.explore_staff_picks),
                 models = staffPicks,
                 loading = loadingFeeds && staffPicks.isEmpty(),
-                onModelClick = { selectedModel = it },
+                onModelClick = onModelClick,
             )
             FeedSection(
                 title = stringResource(R.string.explore_recently_added),
                 models = recent,
                 loading = loadingFeeds && recent.isEmpty(),
-                onModelClick = { selectedModel = it },
+                onModelClick = onModelClick,
             )
         }
 
@@ -211,16 +285,12 @@ fun ExploreTabScreen(
             RecentSearchesSection(
                 items = recentSearches.items,
                 onClear = { recentSearches.clear() },
-                onClick = { searchQuery = it },
+                onClick = { onSearchQueryChange(it) },
                 onRemove = { recentSearches.remove(it) },
             )
         }
 
         Spacer(Modifier.height(16.dp))
-    }
-
-    selectedModel?.let { model ->
-        SketchfabModelViewerScreen(model = model, onDismiss = { selectedModel = null })
     }
 }
 

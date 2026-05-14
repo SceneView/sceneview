@@ -1,14 +1,19 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 
 package io.github.sceneview.demo.ui.explore
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -118,34 +123,52 @@ fun SketchfabModelViewerScreen(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
-        // Cross-fade between Preview → Downloading (Ken-Burns thumbnail) →
-        // Rendering (live SceneView). The 500 ms tween is just long enough
-        // to read as "the model came to life" rather than "the spinner jumped
-        // to a new screen". Stage.Preview is excluded from the fade so the
-        // initial tap-to-open still feels snappy.
-        Crossfade(
-            targetState = stage,
-            animationSpec = tween(durationMillis = 500),
-            label = "sketchfab-stage",
-        ) { s ->
-            when (s) {
-                Stage.Preview -> PreviewContent(
-                    model = model,
-                    onOpenInSceneView = { stage = Stage.Downloading },
-                )
-                Stage.Downloading -> DownloadingContent(
-                    model = model,
-                    onReady = { file -> stage = Stage.Rendering(file) },
-                    onError = { stage = Stage.Error(it) },
-                )
-                is Stage.Rendering -> RenderContent(
-                    file = s.file,
-                    model = model,
-                    engine = engine,
-                    modelLoader = modelLoader,
-                    environmentLoader = environmentLoader,
-                )
-                is Stage.Error -> ErrorContent(message = s.message, onRetry = { stage = Stage.Preview })
+        // SharedTransitionLayout + AnimatedContent so the hero thumbnail
+        // morphs smoothly between Preview (220 dp card) → Downloading
+        // (440 dp Ken-Burns) → Rendering (live SceneView surface). Each
+        // stage opts in via the `heroModifier` slot. Stage.Error stays
+        // a hard fade because it has no hero — re-using the bounds would
+        // animate the error card sliding out of the now-empty hero.
+        SharedTransitionLayout {
+            AnimatedContent(
+                targetState = stage,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(500)) togetherWith
+                        fadeOut(animationSpec = tween(500))
+                },
+                label = "sketchfab-stage",
+            ) { s ->
+                val heroKey = "sketchfab-hero-${model.uid}"
+                val heroModifier: Modifier = when (s) {
+                    Stage.Preview, Stage.Downloading, is Stage.Rendering ->
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState(key = heroKey),
+                            animatedVisibilityScope = this@AnimatedContent,
+                        )
+                    is Stage.Error -> Modifier
+                }
+                when (s) {
+                    Stage.Preview -> PreviewContent(
+                        model = model,
+                        onOpenInSceneView = { stage = Stage.Downloading },
+                        heroModifier = heroModifier,
+                    )
+                    Stage.Downloading -> DownloadingContent(
+                        model = model,
+                        onReady = { file -> stage = Stage.Rendering(file) },
+                        onError = { stage = Stage.Error(it) },
+                        heroModifier = heroModifier,
+                    )
+                    is Stage.Rendering -> RenderContent(
+                        file = s.file,
+                        model = model,
+                        engine = engine,
+                        modelLoader = modelLoader,
+                        environmentLoader = environmentLoader,
+                        heroModifier = heroModifier,
+                    )
+                    is Stage.Error -> ErrorContent(message = s.message, onRetry = { stage = Stage.Preview })
+                }
             }
         }
     }
@@ -161,7 +184,11 @@ private sealed interface Stage {
 // ── Preview ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit) {
+private fun PreviewContent(
+    model: SketchfabModel,
+    onOpenInSceneView: () -> Unit,
+    heroModifier: Modifier = Modifier,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -171,7 +198,8 @@ private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit)
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-                .clip(RoundedCornerShape(24.dp)),
+                .clip(RoundedCornerShape(24.dp))
+                .then(heroModifier),
         ) {
             AsyncNetworkImage(
                 url = model.preferredThumbnailUrl(minWidth = 640, maxWidth = 1280),
@@ -298,6 +326,7 @@ private fun DownloadingContent(
     model: SketchfabModel,
     onReady: (File) -> Unit,
     onError: (String) -> Unit,
+    heroModifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     LaunchedEffect(model.uid) {
@@ -326,7 +355,8 @@ private fun DownloadingContent(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(440.dp),
+            .height(440.dp)
+            .then(heroModifier),
     ) {
         AsyncNetworkImage(
             url = model.preferredThumbnailUrl(minWidth = 640, maxWidth = 1280),
@@ -394,6 +424,7 @@ private fun RenderContent(
     engine: Engine,
     modelLoader: ModelLoader,
     environmentLoader: EnvironmentLoader,
+    heroModifier: Modifier = Modifier,
 ) {
     // `rememberModelInstance` accepts asset paths or URIs; we pass a `file://`
     // URI so Filament reads from the local on-disk cache without re-decoding
@@ -433,7 +464,8 @@ private fun RenderContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(440.dp),
+                .height(440.dp)
+                .then(heroModifier),
         ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
