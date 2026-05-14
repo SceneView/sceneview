@@ -3119,6 +3119,8 @@ View modifiers (chainable):
 .onSessionStarted(_ handler: @escaping (ARView) -> Void) -> ARSceneView
 .cameraExposure(_ ev: Float?) -> ARSceneView   // EV stops; iOS 15+ CIColorControls post-process
 .onFrame(_ handler: @escaping (ARFrame, ARView) -> Void) -> ARSceneView
+.mainLight(_ slot: LightSlot) -> ARSceneView   // v4.3.0+ — Android-parity directional key light (#1138)
+.fillLight(_ slot: LightSlot) -> ARSceneView   // v4.3.0+ — Android-parity dual-light AR baseline (#1138)
 ```
 
 `PlaneDetectionMode` values: `.none`, `.horizontal`, `.vertical`, `.both`
@@ -3127,6 +3129,13 @@ View modifiers (chainable):
 - Mirrors Android's `ARSceneView(cameraExposure: Float?)`.
 - Positive values brighten; negative values darken. One stop = ±0.5 brightness unit.
 - Implemented via `ARView.renderCallbacks.postProcess` (iOS 15+); no-op on earlier versions.
+
+`mainLight` / `fillLight` notes (v4.3.0+, `#1138` — iOS half of `#1063`):
+- Mirrors Android's `ARSceneView(mainLightNode = …, fillLightNode = …)` parameters.
+- Default `LightSlot.systemDefault` provisions a `10 000`-lux directional main + a `3 000`-lux fill (matches the Android v4.1.0 BREAKING render-defaults change). Same `LightSlot` enum as the 3D ``SceneView``.
+- ARKit has no equivalent of ARCore's `ENVIRONMENTAL_HDR` directional-light estimation; the explicit lights keep their baseline intensities each frame. `.automatic` environment texturing handles PBR cubemap reflections.
+- Pass `.disabled` on `fillLight` for a single-light AR setup (rare — looks harsh).
+- The light is added as a `AnchorEntity(world: .zero)` so it renders at session-start origin.
 
 Minimal AR usage:
 ```swift

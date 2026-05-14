@@ -36,6 +36,21 @@ public struct ARSceneView: UIViewRepresentable {
     private var onImageDetected: ((String, AnchorNode, ARView) -> Void)?
     private var onFrame: ((ARFrame, ARView) -> Void)?
 
+    // Light slot overrides — read once during scene setup and re-applied via
+    // `updateUIView` when the caller mutates the modifier value. Defaults to
+    // `.systemDefault` which provisions Android-parity 10 000-lux main + 3 000-lux
+    // fill (matches PR #1136 / #1063 — `ARSceneView` Android exposes
+    // `mainLightNode` + `fillLightNode` parameters with the same defaults).
+    //
+    // ARCore's `ENVIRONMENTAL_HDR` light estimation only drives `mainLightNode`
+    // on Android (it returns SH coefficients and main-light direction/intensity).
+    // ARKit's `.automatic` environment texturing is the closest equivalent — it
+    // populates a runtime cubemap on `ARView` for PBR reflections — but does NOT
+    // mutate any explicit directional light. The fill light therefore keeps its
+    // baseline intensity each frame on both platforms.
+    var mainLightSlot: LightSlot = .systemDefault
+    var fillLightSlot: LightSlot = .systemDefault
+
     /// Plane detection modes matching Android's ARCore config.
     public enum PlaneDetectionMode: Sendable {
         case none
@@ -143,6 +158,60 @@ public struct ARSceneView: UIViewRepresentable {
         return copy
     }
 
+    /// Configures the main / key directional light slot for the AR scene.
+    ///
+    /// Mirrors SceneView Android's `ARSceneView(mainLightNode = ...)`
+    /// composable parameter (`ARScene.kt:294`). Default (`.systemDefault`):
+    /// directional light at `10 000` lux pointing straight down (`-Y`),
+    /// shadow casting enabled — same baseline as the 3D ``SceneView``.
+    ///
+    /// On Android, ARCore's `ENVIRONMENTAL_HDR` light estimation mutates
+    /// the main light's color + intensity each frame. ARKit has no
+    /// equivalent on the explicit-light side; instead `.automatic`
+    /// environment texturing populates the IBL cubemap for PBR reflections.
+    /// The directional light therefore keeps its baseline values unless
+    /// you override them via `.custom(LightNode...)`.
+    ///
+    /// ```swift
+    /// ARSceneView(planeDetection: .horizontal)
+    ///   .mainLight(.custom(LightNode.directional(intensity: 5_000)))  // dimmer key
+    ///
+    /// ARSceneView(planeDetection: .horizontal)
+    ///   .mainLight(.disabled)                                          // IBL-only AR
+    /// ```
+    public func mainLight(_ slot: LightSlot) -> ARSceneView {
+        var copy = self
+        copy.mainLightSlot = slot
+        return copy
+    }
+
+    /// Configures the secondary fill directional light slot for the AR scene.
+    ///
+    /// Mirrors SceneView Android's `ARSceneView(fillLightNode = ...)`
+    /// composable parameter shipped in PR #1136 (closes the iOS half of
+    /// `#1063`). Default (`.systemDefault`): ``LightNode/fill(color:intensity:castsShadow:)``
+    /// at `3 000` lux, no shadow, oriented along the canonical Android
+    /// direction `(0.5, -0.5, 0.5)` (upper-back-left → down-front-right)
+    /// so the unlit side of objects gets a soft kick without flattening
+    /// the AR shading.
+    ///
+    /// Pair with ``mainLight(_:)`` to fully override the dual-light setup.
+    /// Pass `.disabled` for a single-light AR scene (rare — most demos
+    /// look harsh with a single hard directional light + no fill).
+    ///
+    /// ```swift
+    /// ARSceneView(planeDetection: .horizontal)
+    ///   .fillLight(.custom(LightNode.fill(intensity: 6_000)))   // brighter fill
+    ///
+    /// ARSceneView(planeDetection: .horizontal)
+    ///   .fillLight(.disabled)                                    // single-light AR
+    /// ```
+    public func fillLight(_ slot: LightSlot) -> ARSceneView {
+        var copy = self
+        copy.fillLightSlot = slot
+        return copy
+    }
+
     // MARK: - UIViewRepresentable
 
     public func makeUIView(context: Context) -> ARView {
@@ -152,6 +221,12 @@ public struct ARSceneView: UIViewRepresentable {
         // Configure AR session
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = planeDetection.arPlaneDetection
+        // RealityKit's `.automatic` environment texturing is the functional
+        // equivalent of ARCore's `Config.LightEstimationMode.ENVIRONMENTAL_HDR`
+        // (Android default since v4.3.0 / `#1063`) — ARKit auto-builds the
+        // runtime cubemap that drives PBR reflections on metallic + glossy
+        // materials. There is no enum to toggle: it's on by default, off when
+        // unsupported. Closes the env-texturing half of #1138.
         config.environmentTexturing = .automatic
 
         // Image tracking
@@ -192,6 +267,17 @@ public struct ARSceneView: UIViewRepresentable {
         // Store reference for coordinator
         context.coordinator.arView = arView
 
+        // Provision both light slots BEFORE the host app's session-started callback
+        // runs, so user-supplied content sees the dual-light baseline already in
+        // place. Mirrors Android's `ARSceneView { content }` ordering where the
+        // composable's `mainLightNode` / `fillLightNode` parameters are added to
+        // the scene before the trailing `content` lambda. Closes the iOS half
+        // of #1063 / #1138.
+        provisionARLightSlot(.main, slot: mainLightSlot, in: arView, coordinator: context.coordinator)
+        provisionARLightSlot(.fill, slot: fillLightSlot, in: arView, coordinator: context.coordinator)
+        context.coordinator.appliedMainSlot = mainLightSlot
+        context.coordinator.appliedFillSlot = fillLightSlot
+
         // Initial content callback
         onSessionStarted?(arView)
 
@@ -207,6 +293,107 @@ public struct ARSceneView: UIViewRepresentable {
         // Converts the EV value to a CIColorControls brightness offset and installs
         // (or removes) a post-process render callback on the ARView.
         applyExposure(cameraExposure, to: arView)
+
+        // Diff light slots and swap entities when the caller's modifier value
+        // changed since last frame. Mirrors the reactive light path in
+        // ``SceneView`` (#1017) and Android's `prevFillLightRef` pattern in
+        // `ARScene.kt:540`. Closes #1138.
+        refreshARLightSlot(.main, slot: mainLightSlot, in: arView, coordinator: context.coordinator)
+        refreshARLightSlot(.fill, slot: fillLightSlot, in: arView, coordinator: context.coordinator)
+    }
+
+    // MARK: - Light slot provisioning (#1138)
+
+    /// Identifies the active light anchor in `arView.scene.anchors` so the
+    /// reactive diff can locate it on subsequent renders.
+    fileprivate enum LightSlotKind { case main, fill }
+
+    /// Provisions a directional light anchor on `arView.scene` for the given
+    /// slot, applying the per-slot defaults when `slot == .systemDefault`.
+    /// The anchor reference is cached on the coordinator so the reactive
+    /// diff in ``refreshARLightSlot(_:slot:in:coordinator:)`` can replace it
+    /// when the caller's `LightSlot` value changes.
+    ///
+    /// Lights are added as `AnchorEntity(world: .zero)` children of
+    /// `arView.scene` — RealityKit AR scenes are rooted in `AnchorEntity`s,
+    /// not bare `Entity`s, so this is the only way to inject a fixed-pose
+    /// directional light. The light still renders relative to the world
+    /// origin (which is where ARKit sets the session origin at session start).
+    @MainActor
+    private func provisionARLightSlot(
+        _ which: LightSlotKind,
+        slot: LightSlot,
+        in arView: ARView,
+        coordinator: Coordinator
+    ) {
+        let lightEntity: Entity?
+        switch slot {
+        case .systemDefault:
+            switch which {
+            case .main:
+                let main = LightNode.directional(
+                    color: .white,
+                    intensity: 10_000,
+                    castsShadow: true
+                )
+                main.entity.look(at: .zero, from: [0, 1, 0], relativeTo: nil)
+                lightEntity = main.entity
+            case .fill:
+                let fill = LightNode.fill(intensity: 3_000)
+                fill.entity.look(at: .zero, from: [-0.5, 0.5, -0.5], relativeTo: nil)
+                lightEntity = fill.entity
+            }
+        case .disabled:
+            lightEntity = nil
+        case .custom(let node):
+            lightEntity = node.entity
+        }
+        guard let lightEntity = lightEntity else { return }
+        // Wrap in a fixed world anchor so RealityKit accepts it at the scene
+        // root (an AR scene's `anchors` collection only takes AnchorEntities).
+        let anchor = AnchorEntity(world: .zero)
+        anchor.addChild(lightEntity)
+        arView.scene.addAnchor(anchor)
+        switch which {
+        case .main: coordinator.mainLightAnchor = anchor
+        case .fill: coordinator.fillLightAnchor = anchor
+        }
+    }
+
+    /// Diffs the current slot value against the cached `applied{Main,Fill}Slot`
+    /// stored on the coordinator and swaps the anchored light in-place when
+    /// they differ. Called from `updateUIView(_:context:)`. Closes #1138.
+    @MainActor
+    private func refreshARLightSlot(
+        _ which: LightSlotKind,
+        slot: LightSlot,
+        in arView: ARView,
+        coordinator: Coordinator
+    ) {
+        let applied: LightSlot? = (which == .main)
+            ? coordinator.appliedMainSlot
+            : coordinator.appliedFillSlot
+        guard applied != slot else { return }   // no change since last frame
+        // Remove the old tagged anchor if present.
+        let cachedAnchor: AnchorEntity?
+        switch which {
+        case .main: cachedAnchor = coordinator.mainLightAnchor
+        case .fill: cachedAnchor = coordinator.fillLightAnchor
+        }
+        if let cached = cachedAnchor {
+            arView.scene.removeAnchor(cached)
+        }
+        switch which {
+        case .main: coordinator.mainLightAnchor = nil
+        case .fill: coordinator.fillLightAnchor = nil
+        }
+        // Provision the new one (or none if the new slot is .disabled).
+        provisionARLightSlot(which, slot: slot, in: arView, coordinator: coordinator)
+        // Update the cache so the next frame's diff is a no-op.
+        switch which {
+        case .main: coordinator.appliedMainSlot = slot
+        case .fill: coordinator.appliedFillSlot = slot
+        }
     }
 
     // MARK: - Exposure helpers
@@ -298,6 +485,16 @@ public struct ARSceneView: UIViewRepresentable {
         var environmentTexturing: ARWorldTrackingConfiguration.EnvironmentTexturing = .automatic
         weak var arView: ARView?
         private var detectedImageNames: Set<String> = []
+
+        // Light-slot reactive plumbing — same pattern as ``SceneView`` (#1017)
+        // adapted for AR. The anchor refs let the diff in `refreshARLightSlot`
+        // tear down the previous light's `AnchorEntity` before adding a new one.
+        // `applied{Main,Fill}Slot` is the cached previous value; the diff is a
+        // no-op when it equals the current `LightSlot`.
+        var mainLightAnchor: AnchorEntity?
+        var fillLightAnchor: AnchorEntity?
+        var appliedMainSlot: LightSlot?
+        var appliedFillSlot: LightSlot?
 
         init(
             onTapOnPlane: ((SIMD3<Float>, ARView) -> Void)?,

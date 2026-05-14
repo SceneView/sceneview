@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added — iOS parity: `LightSlot` + `.fillLight(_:)` on `ARSceneView` ([#1138](https://github.com/sceneview/sceneview/issues/1138))
+
+Port the second half of Android v4.3.0's `#1063` (dual-light AR baseline + `ENVIRONMENTAL_HDR` default) to `SceneViewSwift.ARSceneView`. The 3D `SceneView` already shipped these in v4.2.0 (`#1016`); AR was the missing surface.
+
+- **`.mainLight(_:)` / `.fillLight(_:)` modifiers on `ARSceneView`** — same `LightSlot` enum as the 3D `SceneView`. Default `.systemDefault` provisions a `10 000`-lux directional main + a `3 000`-lux fill, matching Android's `ARSceneView(mainLightNode = …, fillLightNode = …)` defaults.
+- **Reactive swap path** — when the caller mutates the modifier value, the previous light's `AnchorEntity` is removed from `arView.scene` and a new one is added in its place. Mirrors `Scene.kt:540`'s `prevFillLightRef` diff pattern. No full RealityView teardown.
+- **`ENVIRONMENTAL_HDR` parity documented** — `config.environmentTexturing = .automatic` (already set, now annotated) is the ARKit equivalent of ARCore's `Config.LightEstimationMode.ENVIRONMENTAL_HDR`. Both drive PBR cubemap reflections for runtime-built environment probes; neither exposes a per-frame directional light estimate on `fillLight`.
+- **Tests**: 9 pinning tests in `ARSceneViewTests.swift` (default slots, modifier copy-semantics, `.disabled` round-trip, `.custom(LightNode)` entity-identity retention, last-modifier-wins, chaining with `.cameraExposure` + `.onSessionStarted`).
+- **Docs sync**: `docs/docs/cheatsheet-ios.md` AR section + Android↔Apple mapping table; `llms.txt` (root + `docs/docs`) ARSceneView signature + LightSlot notes.
+
 ## v4.3.0 — Android rendering pipeline overhaul + iOS CameraControls.pan/.firstPerson + ARRecorder + parity table (2026-05-14)
 
 **Status**: shipped. 14-PR Android rendering audit (#1062 → #1142) hardens AR + 3D
