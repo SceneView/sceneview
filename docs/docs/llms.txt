@@ -1653,7 +1653,8 @@ Every published sample checks for a newer build on app resume and surfaces a ban
 - **Android (`samples/android-demo`, `samples/android-tv-demo`)** — `io.github.sceneview.sample.common.update.InAppUpdateManager` (factored into `:samples:common`) wraps Play Core's `AppUpdateManager.startUpdateFlow(FLEXIBLE)`. The `UpdateBanner` composable renders during `DOWNLOADING` and `READY_TO_INSTALL` only. Plug it from your `Activity.onResume()`:
   ```kotlin
   class MainActivity : ComponentActivity() {
-      private lateinit var updateManager: InAppUpdateManager
+      // `internal` (not `private`) so the Compose root below can read it via `activity.updateManager`.
+      internal lateinit var updateManager: InAppUpdateManager
       override fun onCreate(b: Bundle?) { super.onCreate(b); updateManager = InAppUpdateManager(this) }
       override fun onResume() { super.onResume(); updateManager.checkForStalledUpdate(); updateManager.checkForUpdate() }
       override fun onDestroy() { super.onDestroy(); updateManager.destroy() }
