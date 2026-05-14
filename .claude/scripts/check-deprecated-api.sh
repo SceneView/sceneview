@@ -46,6 +46,9 @@ is_whitelisted() {
     docs/docs/migration.md | docs/docs/migration-v4.md) return 0 ;;
     docs/docs/changelog.md | docs/docs/comparison.md) return 0 ;;
     docs/v3.6.0-roadmap.md | docs/ios-swift-package-design.md) return 0 ;;
+    # SceneView agent skill migration guide — same role as the public
+    # docs/docs/migration.md: necessarily quotes the deprecated names.
+    agents/sceneview/references/migration.md) return 0 ;;
     # nodes.md line 149 legitimately mentions the Filament class Scene;
     # we allow the whole file since the composable refs were already fixed
     docs/docs/nodes.md) return 0 ;;

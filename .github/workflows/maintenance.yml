@@ -118,7 +118,50 @@ jobs:
           exempt-issue-labels: 'pinned,roadmap,in-progress'
           exempt-pr-labels: 'pinned'
 
-  # ── 3. CI health summary ──────────────────────────────────────────────────
+  # ── 3. SceneView agent skill drift ────────────────────────────────────────
+  # Catches the case where a library API was renamed/removed between releases
+  # without updating `agents/sceneview/` (the published agent skill). Daily
+  # cadence is enough — the same check also runs on every PR via pr-check.yml.
+  skill-drift:
+    name: SceneView agent skill drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run skill drift check
+        id: drift
+        shell: bash
+        run: |
+          if bash .claude/scripts/check-sceneview-skill.sh > skill-drift.log 2>&1; then
+            echo "drift=0" >> $GITHUB_OUTPUT
+          else
+            echo "drift=1" >> $GITHUB_OUTPUT
+            cat skill-drift.log
+          fi
+
+      - name: Open or update tracking issue
+        if: steps.drift.outputs.drift == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --state open --search "Agent skill drift detected" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          BODY=$'Daily maintenance detected drift between `agents/sceneview/` and the SceneView library source.\n\n```\n'"$(cat skill-drift.log)"$'\n```\n\nRun `bash .claude/scripts/check-sceneview-skill.sh` locally and update the skill from real demos / `llms.txt`.'
+          if [ -z "$EXISTING" ]; then
+            gh issue create \
+              --title "Agent skill drift detected — $(date +%Y-%m-%d)" \
+              --body "$BODY" \
+              --label "agent-skill,maintenance" \
+              || echo "::warning::Could not create skill drift issue"
+          else
+            gh issue comment "$EXISTING" --body "$BODY" \
+              || echo "::warning::Could not comment on existing skill drift issue #$EXISTING"
+          fi
+
+  # ── 4. CI health summary ──────────────────────────────────────────────────
   ci-health:
     name: CI health check
     runs-on: ubuntu-latest

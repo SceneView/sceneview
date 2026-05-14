@@ -513,6 +513,7 @@ Hooks trigger automatically on specific Claude Code actions:
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |
 | `android-env-check.sh` | Sanity check for the Android dev env — `--fix` installs the CLI + SceneView skill |
 | `install-sceneview-skill.sh` | Copies `agents/sceneview/` to `~/.android/cli/skills/xr/sceneview/` |
+| `check-sceneview-skill.sh` | Verifies `agents/sceneview/` content (API identifiers, demo refs, frontmatter) is in sync with the library source. Runs in `quality-gate.sh`, `pr-check.yml`, and daily via `maintenance.yml` |
 
 ### Version location map
 
