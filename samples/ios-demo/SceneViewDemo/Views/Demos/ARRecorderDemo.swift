@@ -20,6 +20,11 @@ struct ARRecorderDemo: View {
     /// cancel it on disappear and avoid mutating `statusMessage` on a
     /// disposed view. Closes Agent A MAJOR finding on PR #1042.
     @State private var activeTask: Task<Void, Never>? = nil
+    /// Disables the "Save to Photos" button while a save is in flight
+    /// — `PHPhotoLibrary.performChanges` can't be cancelled mid-call so
+    /// a double-tap would enqueue two concurrent saves of the same URL
+    /// (two duplicate assets in Photos). Closes reviewer MAJOR on PR #1048.
+    @State private var isSavingToPhotos: Bool = false
 
     var body: some View {
         ZStack {
@@ -135,15 +140,17 @@ struct ARRecorderDemo: View {
                         .truncationMode(.middle)
                     HStack(spacing: 10) {
                         Button(action: { saveToPhotos(url) }) {
-                            Label("Save to Photos", systemImage: "photo.on.rectangle.angled")
+                            Label(isSavingToPhotos ? "Saving…" : "Save to Photos",
+                                  systemImage: "photo.on.rectangle.angled")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(Color.accentColor)
+                                .background(isSavingToPhotos ? Color.accentColor.opacity(0.5) : Color.accentColor)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .disabled(isSavingToPhotos)
 
                         ShareLink(item: url) {
                             Label("Share", systemImage: "square.and.arrow.up")
@@ -206,9 +213,18 @@ struct ARRecorderDemo: View {
     /// Wraps `ARRecorder.saveToPhotoLibrary` with a status-banner update
     /// so the user knows whether the save succeeded, was denied, or
     /// failed. Tied to the view's `activeTask` so disappear cancels it.
+    /// The `isSavingToPhotos` gate prevents a double-tap from enqueueing
+    /// two concurrent saves of the same URL (closes reviewer MAJOR on
+    /// PR #1048 — `PHPhotoLibrary.performChanges` is uncancellable
+    /// mid-flight, so the button-disable is the only safety net).
     private func saveToPhotos(_ url: URL) {
+        // Defensive: extra guard in case @State race lets the action
+        // fire while the button is mid-transition to disabled.
+        guard !isSavingToPhotos else { return }
         activeTask?.cancel()
+        isSavingToPhotos = true
         activeTask = Task {
+            defer { isSavingToPhotos = false }
             statusMessage = "Saving to Photos…"
             do {
                 try await ARRecorder.saveToPhotoLibrary(url)

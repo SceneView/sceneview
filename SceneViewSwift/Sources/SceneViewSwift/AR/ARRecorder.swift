@@ -252,7 +252,17 @@ public final class ARRecorder: ObservableObject {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             PHPhotoLibrary.shared().performChanges {
                 let request = PHAssetCreationRequest.forAsset()
-                request.addResource(with: .video, fileURL: url, options: nil)
+                // `shouldMoveFile = true`: Photos moves the source out of our
+                // caches directory into the system-managed photo library
+                // (atomically — if the save fails, Photos preserves the
+                // original per Apple docs). Without this, the default
+                // behaviour COPIES the file and the caches copy keeps
+                // taking disk space until the OS reclaims it, which for
+                // AR session recordings of hundreds of MB is a real
+                // problem across multi-recording sessions.
+                let options = PHAssetResourceCreationOptions()
+                options.shouldMoveFile = true
+                request.addResource(with: .video, fileURL: url, options: options)
             } completionHandler: { success, error in
                 if success {
                     continuation.resume()
