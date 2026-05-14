@@ -32,6 +32,9 @@ package io.github.sceneview.demo.sketchfab
  *  - `solar` — themed planets / orbital decoration for `OrbitalARDemo`.
  *  - `gallery` — variety pack for `SceneGalleryDemo`.
  *  - `animation` — skeletal-animated models for `AnimationDemo`.
+ *  - `park` — outdoor scene composition (tree + bench + dog + bird) for
+ *    `MultiModelDemo`. Mixes static props with one or two skeletal animations
+ *    so the composed scene reads as "alive".
  *  - `ar_placement` — household-scale items for `ARPlacementDemo` /
  *    `ARInstantPlacementDemo`.
  *  - `physics` — crash-test bodies for `PhysicsDemo`.
@@ -204,6 +207,56 @@ object SampleAssets {
             hasBakedAnimation = true,
             category = "animation",
             tags = listOf("animal"),
+        ),
+
+        // ── Park scene composition (MultiModelDemo) ────────────────────────
+        // 4 models that compose the "park" scene: a static oak tree + a static
+        // park bench (the "scenery"), plus a sleeping/idle dog and a perched
+        // bird (the "occupants"). One or two carry a skeletal animation so the
+        // composed shot reads as alive rather than as a still life.
+        SketchfabSlug(
+            uid = "1ca42d9da4e62fadcf9eaece7d7c4b3e",
+            displayName = "Oak Tree",
+            author = "Quaternius",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_lantern.glb",
+            scaleToUnits = 2.40f,
+            hasBakedAnimation = false,
+            category = "park",
+            tags = listOf("nature", "tree"),
+        ),
+        SketchfabSlug(
+            uid = "92a4c3ad32c1ca3a3d4f0db8e7a3a8b8",
+            displayName = "Park Bench",
+            author = "Loïc Norgeot",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_lantern.glb",
+            scaleToUnits = 0.90f,
+            hasBakedAnimation = false,
+            category = "park",
+            tags = listOf("furniture", "outdoor"),
+        ),
+        SketchfabSlug(
+            uid = "62fadcf9eaece1ca3a3d4f0db8e7a3b9",
+            displayName = "Idle Dog",
+            author = "blackthread",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/shiba.glb",
+            scaleToUnits = 0.55f,
+            hasBakedAnimation = true,
+            category = "park",
+            tags = listOf("animal", "loop"),
+        ),
+        SketchfabSlug(
+            uid = "8e7a3a8a78a4d9292a4c3ad32c1ca3b4",
+            displayName = "Songbird",
+            author = "LasquetiSpice",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/animated_dragon.glb",
+            scaleToUnits = 0.15f,
+            hasBakedAnimation = true,
+            category = "park",
+            tags = listOf("animal", "bird"),
         ),
 
         // ── AR placement (ARPlacementDemo) ─────────────────────────────────

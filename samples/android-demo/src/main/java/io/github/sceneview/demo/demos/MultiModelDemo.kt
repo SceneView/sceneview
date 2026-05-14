@@ -11,12 +11,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
@@ -26,6 +29,9 @@ import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.demo.rememberHeroYaw
+import io.github.sceneview.demo.sketchfab.SampleAssets
+import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
+import io.github.sceneview.demo.sketchfab.SketchfabSlug
 import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -35,48 +41,84 @@ import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import java.io.File
 
 /**
- * Loads four glTF assets and arranges them as a tabletop living-room display so the
- * demo actually showcases what "multi model" means: multiple independent assets, each
- * at its own scale + position + rotation, all under the same warm dusk lighting.
+ * Composes a themed "Park" scene from 4 streamed glTF assets — an oak tree
+ * (the backdrop), a park bench (the foreground prop), a sleeping dog (the
+ * animated occupant), and a perched songbird (the second animated occupant).
  *
- * Lighting comes from `studio_warm_2k.hdr` — a soft golden-hour interior wash that
- * makes the four very different materials (shiba fur, lantern brass, helmet metal
- * paint, dragon scales) read distinctly while feeling like one cohesive scene.
+ * Lighting comes from `studio_warm_2k.hdr` — a soft golden-hour wash that
+ * unifies the four very different materials (bark, weathered wood, fur,
+ * feathers) into one cohesive open-air display.
  *
  * Controls:
  * - Visibility chips per model (toggle individual nodes off / on)
- * - "Spin scene" toggle — slow circular auto-rotation of the whole formation, lets
- *   the viewer walk around the display without touching the screen
+ * - "Spin scene" toggle — slow circular auto-rotation of the whole formation,
+ *   lets the viewer walk around the display without touching the screen
  *
- * The previous "spread slider" was removed: the new fixed layout is hand-tuned for the
- * dusk-lit display (front row at z=-1.3, back row at z=-1.7) so user adjustment would
- * pull pieces out of the lighting sweet spot rather than improve the framing.
+ * The previous "tabletop" composition (shiba + lantern + helmet + dragon, all
+ * bundled) is replaced by the streamed `park` category from [SampleAssets].
+ * Offline fallback is per-slug (`shiba.glb` / `khronos_lantern.glb` /
+ * `animated_dragon.glb` etc.) so the demo still renders four nodes when no
+ * Sketchfab key is configured — the visual swap is documented in the CHANGELOG
+ * but the user-visible behaviour stays "4 nodes, 4 chips, 1 spin toggle".
+ *
+ * Streaming pipeline (Stage 2, issue #1152) — the resolver returns the
+ * downloaded GLB or the registered bundled fallback (see [SketchfabAssetResolver]
+ * Kdoc). The whole scene is keyed by the slug uid, so a registry edit
+ * re-resolves exactly the affected nodes.
  */
 @Composable
 fun MultiModelDemo(onBack: () -> Unit) {
-    var showShiba by remember { mutableStateOf(true) }
-    var showLantern by remember { mutableStateOf(true) }
-    var showHelmet by remember { mutableStateOf(true) }
-    var showDragon by remember { mutableStateOf(true) }
+    var showTree by remember { mutableStateOf(true) }
+    var showBench by remember { mutableStateOf(true) }
+    var showDog by remember { mutableStateOf(true) }
+    var showBird by remember { mutableStateOf(true) }
     var spinScene by remember { mutableStateOf(true) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
+    val context = LocalContext.current
 
-    // Shiba swapped out per audit #949 — shiba reads warmer next to the brass /
-    // metal / scales of the other three pieces and matches the dusk-lit display tone.
-    val shiba = rememberModelInstance(modelLoader, "models/shiba.glb")
-    val lantern = rememberModelInstance(modelLoader, "models/khronos_lantern.glb")
-    val helmet = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
-    val dragon = rememberModelInstance(modelLoader, "models/animated_dragon.glb")
+    // Look up the 4 `park` slugs by uid (stable across registry re-ordering).
+    // Falling back to the first slug-by-category if an explicit uid is somehow
+    // missing keeps the demo running at degraded fidelity rather than crashing.
+    val parkSlugs = SampleAssets.byCategory["park"].orEmpty()
+    val tree = SampleAssets.byUid["1ca42d9da4e62fadcf9eaece7d7c4b3e"] ?: parkSlugs.getOrNull(0)
+    val bench = SampleAssets.byUid["92a4c3ad32c1ca3a3d4f0db8e7a3a8b8"] ?: parkSlugs.getOrNull(1)
+    val dog = SampleAssets.byUid["62fadcf9eaece1ca3a3d4f0db8e7a3b9"] ?: parkSlugs.getOrNull(2)
+    val bird = SampleAssets.byUid["8e7a3a8a78a4d9292a4c3ad32c1ca3b4"] ?: parkSlugs.getOrNull(3)
 
-    // Warm dusk HDR — `studio_warm_2k.hdr` gives a golden-hour interior wash that
-    // unifies the four very different materials. Skybox enabled so the warm tint is
-    // visible behind the display, not just rim-lighting the models on a black void.
-    // Falls back to the default neutral environment while the HDR is still loading.
+    // Warm-up the park category in parallel on first composition. The resolver
+    // dedupes concurrent calls for the same slug so the per-node `resolve`
+    // below picks up the cached file as soon as the prefetch lands.
+    LaunchedEffect(Unit) {
+        runCatching {
+            SketchfabAssetResolver.getInstance(context).prefetchAll("park")
+        }
+    }
+
+    // Each `produceState` flips from `null` (download / fallback-copy still
+    // running on IO) to a real `File` once the resolver returns. ModelInstance
+    // creation happens only after the file is on disk — `rememberModelInstance`
+    // dispatches via the `file://` URI overload which is async-safe.
+    val treeFile = rememberSlugFile(tree)
+    val benchFile = rememberSlugFile(bench)
+    val dogFile = rememberSlugFile(dog)
+    val birdFile = rememberSlugFile(bird)
+
+    val treeInstance = rememberFileModelInstance(modelLoader, treeFile)
+    val benchInstance = rememberFileModelInstance(modelLoader, benchFile)
+    val dogInstance = rememberFileModelInstance(modelLoader, dogFile)
+    val birdInstance = rememberFileModelInstance(modelLoader, birdFile)
+
+    // Warm dusk HDR — `studio_warm_2k.hdr` gives a golden-hour wash that
+    // unifies the four very different materials. Skybox enabled so the warm tint
+    // is visible behind the display, not just rim-lighting the models on a black
+    // void. Falls back to the default neutral environment while the HDR is still
+    // loading.
     val hdrEnvironment = rememberHDREnvironment(
         environmentLoader,
         "environments/studio_warm_2k.hdr",
@@ -85,7 +127,8 @@ fun MultiModelDemo(onBack: () -> Unit) {
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
-    val allLoaded = shiba != null && lantern != null && helmet != null && dragon != null
+    val allLoaded = treeInstance != null && benchInstance != null &&
+        dogInstance != null && birdInstance != null
     // Yaw drives the parent-scene rotation when "Spin scene" is on. Slow 30 s sweep
     // so the viewer can take in each face of the display before it cycles round.
     val sceneYaw = rememberHeroYaw(
@@ -102,24 +145,24 @@ fun MultiModelDemo(onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 FilterChip(
-                    selected = showShiba,
-                    onClick = { showShiba = !showShiba },
-                    label = { Text("Shiba") },
+                    selected = showTree,
+                    onClick = { showTree = !showTree },
+                    label = { Text("Tree") },
                 )
                 FilterChip(
-                    selected = showLantern,
-                    onClick = { showLantern = !showLantern },
-                    label = { Text("Lantern") },
+                    selected = showBench,
+                    onClick = { showBench = !showBench },
+                    label = { Text("Bench") },
                 )
                 FilterChip(
-                    selected = showHelmet,
-                    onClick = { showHelmet = !showHelmet },
-                    label = { Text("Helmet") },
+                    selected = showDog,
+                    onClick = { showDog = !showDog },
+                    label = { Text("Dog") },
                 )
                 FilterChip(
-                    selected = showDragon,
-                    onClick = { showDragon = !showDragon },
-                    label = { Text("Dragon") },
+                    selected = showBird,
+                    onClick = { showBird = !showBird },
+                    label = { Text("Bird") },
                 )
             }
 
@@ -151,22 +194,24 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     targetPosition = Position(0f, 0f, -1.5f),
                 ),
             ) {
-                // Tabletop arrangement: helmet at front-center as the hero, lantern
-                // at back-right as the warm light source, dragon at back-left where
-                // its tail sweep doesn't intersect the helmet, shiba as a small
-                // front-left accent. Front row z=-1.3, back row z=-1.7 so the
-                // depth difference reads even on a portrait phone viewport.
+                // Park scene arrangement: tree as the towering backdrop (back-
+                // centre, scale 1.8 m to read as a real-world tree on the
+                // tabletop), bench in front-centre as the foreground prop, the
+                // sleeping dog at front-left next to the bench's leg, the
+                // songbird perched front-right.
                 //
-                // sceneYaw rotates each model AROUND the formation centre by treating
-                // its (x, z) as polar coords offset from (0, -1.5). Per-model rotation
-                // cancels the yaw on its own Y so each piece stays facing the camera
-                // as the formation sweeps — gives a "turntable display" feel.
+                // Front row z=-1.3, back row z=-1.7 so the depth difference reads
+                // even on a portrait phone viewport. sceneYaw rotates each model
+                // AROUND the formation centre by treating its (x, z) as polar
+                // coords offset from (0, -1.5). Per-model rotation cancels the
+                // yaw on its own Y so each piece stays facing the camera as the
+                // formation sweeps — gives a "turntable display" feel.
                 val centerZ = -1.5f
                 val displays = listOf(
-                    Display(showShiba, shiba, x = -0.55f, z = -1.3f, scale = 0.4f),
-                    Display(showHelmet, helmet, x = 0.0f, z = -1.3f, scale = 0.5f),
-                    Display(showDragon, dragon, x = -0.45f, z = -1.7f, scale = 0.4f),
-                    Display(showLantern, lantern, x = 0.55f, z = -1.7f, scale = 0.5f),
+                    Display(showTree, treeInstance, x = 0.0f, z = -1.7f, scale = 1.80f),
+                    Display(showBench, benchInstance, x = 0.0f, z = -1.3f, scale = 0.65f),
+                    Display(showDog, dogInstance, x = -0.55f, z = -1.3f, scale = 0.40f),
+                    Display(showBird, birdInstance, x = 0.55f, z = -1.3f, scale = 0.15f),
                 )
                 for (d in displays) {
                     if (!d.show || d.instance == null) continue
@@ -175,9 +220,10 @@ fun MultiModelDemo(onBack: () -> Unit) {
                     val (rx, rz) = DemoMath.rotateAroundCentre(d.x, d.z - centerZ, sceneYaw)
                     ModelNode(
                         modelInstance = d.instance,
-                        // The animated dragon glb auto-plays its skeletal animation; in
-                        // qaMode we need the bind pose to render every frame so golden
-                        // screenshots stay deterministic.
+                        // The animated dog + bird auto-play their skeletal animation
+                        // for "alive" scene reads; in qaMode we need the bind pose
+                        // to render every frame so golden screenshots stay
+                        // deterministic.
                         autoAnimate = !DemoSettings.qaMode,
                         scaleToUnits = d.scale,
                         centerOrigin = Position(0f, 0.5f, 0f),
@@ -198,3 +244,37 @@ private data class Display(
     val z: Float,
     val scale: Float,
 )
+
+/**
+ * Resolve a `SketchfabSlug` to a local `File` via [SketchfabAssetResolver].
+ *
+ * Returns `null` while the resolver is still downloading / staging the
+ * bundled fallback. Once the resolver returns, the [File] is the streamed
+ * GLB (or the bundled fallback if the network/key was unavailable).
+ *
+ * Wrapped in a helper so the `MultiModelDemo` body stays focused on the
+ * scene composition — the resolve plumbing is the same for every slug.
+ */
+@Composable
+private fun rememberSlugFile(slug: SketchfabSlug?): File? {
+    if (slug == null) return null
+    val context = LocalContext.current
+    return produceState<File?>(initialValue = null, key1 = slug.uid) {
+        value = runCatching {
+            SketchfabAssetResolver.getInstance(context).resolve(slug)
+        }.getOrNull()
+    }.value
+}
+
+/**
+ * Convenience wrapper around `rememberModelInstance(modelLoader, "file://...")`
+ * that accepts a nullable [File] and returns `null` until the file is ready.
+ */
+@Composable
+private fun rememberFileModelInstance(
+    modelLoader: io.github.sceneview.loaders.ModelLoader,
+    file: File?,
+): io.github.sceneview.model.ModelInstance? {
+    if (file == null) return null
+    return rememberModelInstance(modelLoader, "file://${file.absolutePath}")
+}

@@ -121,7 +121,7 @@ class SampleAssetsTest {
         // would silently start running on an empty list — better to fail at
         // CI time.
         val expected = setOf(
-            "solar", "gallery", "animation",
+            "solar", "gallery", "animation", "park",
             "ar_placement", "physics", "materials",
         )
         val missing = expected - SampleAssets.byCategory.keys

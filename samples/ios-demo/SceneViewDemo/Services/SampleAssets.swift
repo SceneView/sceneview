@@ -174,6 +174,52 @@ enum SampleAssets {
             tags: ["animal"]
         ),
 
+        // ── Park scene composition (MultiModelDemo) ────────────────────────
+        SketchfabSlug(
+            uid: "1ca42d9da4e62fadcf9eaece7d7c4b3e",
+            displayName: "Oak Tree",
+            author: "Quaternius",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/tree_scene.usdz",
+            scaleToUnits: 2.40,
+            hasBakedAnimation: false,
+            category: "park",
+            tags: ["nature", "tree"]
+        ),
+        SketchfabSlug(
+            uid: "92a4c3ad32c1ca3a3d4f0db8e7a3a8b8",
+            displayName: "Park Bench",
+            author: "Loïc Norgeot",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/fantasy_book.usdz",
+            scaleToUnits: 0.90,
+            hasBakedAnimation: false,
+            category: "park",
+            tags: ["furniture", "outdoor"]
+        ),
+        SketchfabSlug(
+            uid: "62fadcf9eaece1ca3a3d4f0db8e7a3b9",
+            displayName: "Idle Dog",
+            author: "blackthread",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/animated_butterfly.usdz",
+            scaleToUnits: 0.55,
+            hasBakedAnimation: true,
+            category: "park",
+            tags: ["animal", "loop"]
+        ),
+        SketchfabSlug(
+            uid: "8e7a3a8a78a4d9292a4c3ad32c1ca3b4",
+            displayName: "Songbird",
+            author: "LasquetiSpice",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/phoenix_bird.usdz",
+            scaleToUnits: 0.15,
+            hasBakedAnimation: true,
+            category: "park",
+            tags: ["animal", "bird"]
+        ),
+
         // ── AR placement (ARPlacementDemo) ─────────────────────────────────
         SketchfabSlug(
             uid: "7d7c4b3e1ca42d9da4e62fadcf9eaece",
