@@ -11,11 +11,12 @@ Android has had full `ARRecorder` (capture + replay) since v4.0.8 via ARCore's `
 
 - **`ARRecorder` `@MainActor` `ObservableObject`** — `state: .idle / .recording / .error(message)`, `lastOutputURL`, `isRecording` (`@Published`-derived), `isAvailable`.
 - **`async throws` API** — `startRecording() async throws`, `stopRecording(outputURL: URL? = nil) async throws -> URL`. Bridges ReplayKit's completion-handler API to async/await.
-- **Typed error mapping** — `ARRecorderError.{permissionDenied, disabled, unavailable, alreadyRecording, notRecording, other(code:)}` so callers can switch on the case (no string-matching `errorDescription`).
+- **Typed error mapping** — `ARRecorderError.{permissionDenied, disabled, unavailable, alreadyRecording, notRecording, other(code:), photoLibraryDenied, photoLibrarySaveFailed}` so callers can switch on the case (no string-matching `errorDescription`).
 - **`ARRecorder.remembered()` factory** — mirrors Android's `rememberARRecorder()` for code-generation symmetry.
+- **`ARRecorder.saveToPhotoLibrary(_:)` static helper** ([#1043 item 2](https://github.com/sceneview/sceneview/issues/1043)) — wraps `PHPhotoLibrary.performChanges` so the recorded `.mov` can be copied into the user's Photos library. Mirrors Android's `ARRecorder.exportToDownloads()`. Requires `NSPhotoLibraryAddUsageDescription` in the host app's `Info.plist`. Demo gets a "Save to Photos" button alongside `ShareLink`.
 - **What's recorded**: screen pixels only (NOT ARSession state). The `.mov` plays back in Photos / QuickTime; it cannot be fed back into `ARSession` for deterministic replay. Use [`RerunBridge`](https://github.com/sceneview/sceneview/blob/main/SceneViewSwift/Sources/SceneViewSwift/Rerun/RerunBridge.swift) for replay-driven testing.
-- **iOS demo**: `samples/ios-demo/.../ARRecorderDemo.swift` mirrors Android's `ARRecordPlaybackDemo` with a record-only banner + live AR session + tap-to-place markers + `ShareLink` for the captured `.mov`. Registered in the AR section of `SamplesTab`.
-- **Tests**: 14 pinning tests in `ARRecorderTests.swift` (state machine, error code mapping, default URL placement under `.cachesDirectory/ARRecorder/`, factory smoke).
+- **iOS demo**: `samples/ios-demo/.../ARRecorderDemo.swift` mirrors Android's `ARRecordPlaybackDemo` with a record-only banner + live AR session + tap-to-place markers + "Save to Photos" + `ShareLink` for the captured `.mov`. Registered in the AR section of `SamplesTab`.
+- **Tests**: 17 pinning tests in `ARRecorderTests.swift` (state machine, error code mapping, default URL placement under `.cachesDirectory/ARRecorder/`, factory smoke, photo-library missing-file guard, photo-library error Equatable + localized description).
 
 ### Added — `CameraControls.pan` + `.firstPerson` wired ([#1034](https://github.com/sceneview/sceneview/issues/1034))
 

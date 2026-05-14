@@ -1,5 +1,6 @@
 #if os(iOS)
 import Foundation
+import Photos
 import ReplayKit
 import SwiftUI
 
@@ -206,6 +207,73 @@ public final class ARRecorder: ObservableObject {
         let folder = caches.appendingPathComponent("ARRecorder", isDirectory: true)
         return folder.appendingPathComponent("ARRecording-\(UUID().uuidString).mov")
     }
+
+    /// Saves a recorded `.mov` to the user's Photos library via
+    /// `PHPhotoLibrary.performChanges`. Mirrors Android's
+    /// `ARRecorder.exportToDownloads()` — the user-facing "make this
+    /// recording permanent" gesture. Closes #1043 (item 2).
+    ///
+    /// Requires the host app's `Info.plist` to declare
+    /// `NSPhotoLibraryAddUsageDescription`; the first call triggers the
+    /// system permission sheet. On denial throws
+    /// ``ARRecorderError/photoLibraryDenied(_:)``. On success the video
+    /// appears in the user's Photos app under "Recents" with the
+    /// "Recently Saved" smart-album link.
+    ///
+    /// - Parameter url: An existing `.mov` URL (typically from
+    ///   ``stopRecording(outputURL:)``). The file must exist on disk;
+    ///   `PHPhotoLibrary` copies it into the system-managed photo
+    ///   library and the original may be cleaned up afterwards.
+    /// - Throws: ``ARRecorderError/photoLibraryDenied(_:)`` if the user
+    ///   denied access, ``ARRecorderError/photoLibrarySaveFailed(_:)``
+    ///   if the underlying `performChanges` call returned an error.
+    @MainActor
+    public static func saveToPhotoLibrary(_ url: URL) async throws {
+        // Ensure the file is on disk before we even ask for permission —
+        // a missing-file error is more actionable than a generic
+        // "save failed" after the consent sheet.
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ARRecorderError.photoLibrarySaveFailed("file not found: \(url.lastPathComponent)")
+        }
+        // `PHAccessLevel.addOnly` is the minimum-privilege scope for
+        // writing — does not grant read/list access to existing photos.
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        let granted: PHAuthorizationStatus
+        switch status {
+        case .notDetermined:
+            granted = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        default:
+            granted = status
+        }
+        guard granted == .authorized || granted == .limited else {
+            throw ARRecorderError.photoLibraryDenied("Photos add-only permission denied (status=\(granted.rawValue))")
+        }
+        // Bridge PHPhotoLibrary's completion-handler API into async/await.
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                // `shouldMoveFile = true`: Photos moves the source out of our
+                // caches directory into the system-managed photo library
+                // (atomically — if the save fails, Photos preserves the
+                // original per Apple docs). Without this, the default
+                // behaviour COPIES the file and the caches copy keeps
+                // taking disk space until the OS reclaims it, which for
+                // AR session recordings of hundreds of MB is a real
+                // problem across multi-recording sessions.
+                let options = PHAssetResourceCreationOptions()
+                options.shouldMoveFile = true
+                request.addResource(with: .video, fileURL: url, options: options)
+            } completionHandler: { success, error in
+                if success {
+                    continuation.resume()
+                } else if let error {
+                    continuation.resume(throwing: ARRecorderError.photoLibrarySaveFailed(error.localizedDescription))
+                } else {
+                    continuation.resume(throwing: ARRecorderError.photoLibrarySaveFailed("PHPhotoLibrary.performChanges returned !success without an error"))
+                }
+            }
+        }
+    }
 }
 
 /// Errors surfaced by ``ARRecorder``.
@@ -223,6 +291,14 @@ public enum ARRecorderError: LocalizedError, Equatable {
     /// Any other `RPRecordingError` not matched above. The underlying
     /// `NSError.code` is preserved in the message for support reports.
     case other(String, code: Int)
+    /// The user dismissed the system "Allow access to Photos?" sheet,
+    /// or a parental control disabled write access. Thrown by
+    /// ``ARRecorder/saveToPhotoLibrary(_:)``. The host app must declare
+    /// `NSPhotoLibraryAddUsageDescription` in `Info.plist`.
+    case photoLibraryDenied(String)
+    /// `PHPhotoLibrary.performChanges` returned an error (or `success=false`
+    /// without an error). Thrown by ``ARRecorder/saveToPhotoLibrary(_:)``.
+    case photoLibrarySaveFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -231,7 +307,9 @@ public enum ARRecorderError: LocalizedError, Equatable {
              .notRecording(let msg),
              .permissionDenied(let msg),
              .disabled(let msg),
-             .other(let msg, _):
+             .other(let msg, _),
+             .photoLibraryDenied(let msg),
+             .photoLibrarySaveFailed(let msg):
             return msg
         }
     }

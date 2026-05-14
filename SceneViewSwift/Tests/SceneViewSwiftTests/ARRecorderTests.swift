@@ -158,6 +158,45 @@ final class ARRecorderTests: XCTestCase {
         }
     }
 
+    // MARK: - saveToPhotoLibrary
+
+    func testSaveToPhotoLibrary_missingFile_throwsSaveFailed() async {
+        // Exercises the early file-existence guard. We don't touch
+        // PHPhotoLibrary at all because the guard fires before the
+        // authorization check — so this test works without
+        // NSPhotoLibraryAddUsageDescription on the test bundle.
+        let nonExistent = URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).mov")
+        do {
+            try await ARRecorder.saveToPhotoLibrary(nonExistent)
+            XCTFail("expected saveToPhotoLibrary to throw for a missing file")
+        } catch let err as ARRecorderError {
+            if case .photoLibrarySaveFailed(let msg) = err {
+                XCTAssertTrue(msg.contains("file not found"),
+                              "expected file-not-found message, got '\(msg)'")
+            } else {
+                XCTFail("expected .photoLibrarySaveFailed, got \(err)")
+            }
+        } catch {
+            XCTFail("expected ARRecorderError, got \(type(of: error)): \(error)")
+        }
+    }
+
+    func testPhotoLibraryErrorsAreEquatable() {
+        XCTAssertEqual(
+            ARRecorderError.photoLibraryDenied("denied"),
+            ARRecorderError.photoLibraryDenied("denied")
+        )
+        XCTAssertNotEqual(
+            ARRecorderError.photoLibraryDenied("denied"),
+            ARRecorderError.photoLibrarySaveFailed("denied")
+        )
+    }
+
+    func testPhotoLibraryErrorsCarryLocalizedDescription() {
+        XCTAssertEqual(ARRecorderError.photoLibraryDenied("user said no").errorDescription, "user said no")
+        XCTAssertEqual(ARRecorderError.photoLibrarySaveFailed("disk full").errorDescription, "disk full")
+    }
+
     // MARK: - rememberARRecorder factory
 
     func testRememberedFactoryReturnsRecorder() {
