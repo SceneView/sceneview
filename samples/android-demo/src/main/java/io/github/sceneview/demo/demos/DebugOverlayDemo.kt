@@ -319,12 +319,23 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                 // per-node allocation, so the perf cost lives in the geometry buffers.
                 repeat(currentCount) { i ->
                     key(i) {
-                        val pos = remember(i) {
-                            Position(
-                                x = ((i % 10) - 5) * NODE_SPACING,
-                                y = (((i / 10) % 10) - 5) * NODE_SPACING,
-                                z = -((i / 100)) * NODE_SPACING,
-                            )
+                        // Count=1 special-case: place the single sphere at origin so the
+                        // demo opens with the sphere on screen (#1212). The 10×10×N grid
+                        // offsets (`-5 * NODE_SPACING`) assume the cluster averages back
+                        // to origin only when fully populated; for count=1 they place the
+                        // lone sphere at (-0.9, -0.9, 0), well outside the camera frustum.
+                        // The previous v2 fix raised the camera distance but didn't
+                        // address the position — re-applied here.
+                        val pos = remember(i, currentCount) {
+                            if (currentCount == 1) {
+                                Position(0f, 0f, 0f)
+                            } else {
+                                Position(
+                                    x = ((i % 10) - 5) * NODE_SPACING,
+                                    y = (((i / 10) % 10) - 5) * NODE_SPACING,
+                                    z = -((i / 100)) * NODE_SPACING,
+                                )
+                            }
                         }
                         SphereNode(
                             radius = NODE_RADIUS,
