@@ -97,7 +97,13 @@ jobs:
           max_attempts: 3
           timeout_minutes: 15
           retry_on: error
-          command: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml --no-configuration-cache
+          # Dokka 2.2.0 (bumped in gradle/libs.versions.toml#L59) removed V1
+          # mode. The V1 task `dokkaHtml` now errors with "Cannot run Dokka
+          # V1 tasks when V2 mode is enabled" — observed on v4.3.3, v4.3.4,
+          # v4.3.5 releases. V2 equivalent is `dokkaGenerateHtml`. Output
+          # path is unchanged (`build/dokka/html/`), so the
+          # upload-artifact step below still works as-is.
+          command: ./gradlew :sceneview:dokkaGenerateHtml :arsceneview:dokkaGenerateHtml --no-configuration-cache
 
       - name: Upload Dokka artifact
         uses: actions/upload-artifact@v7
