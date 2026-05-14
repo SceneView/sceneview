@@ -16,8 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -151,7 +154,19 @@ fun ExploreTabScreen(
 
         if (curatedSamples.isNotEmpty()) {
             CarouselSection(title = stringResource(R.string.explore_try_a_sample)) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val state = rememberLazyListState()
+                LazyRow(
+                    state = state,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    // Edge padding so the first/last card has breathing room
+                    // and never sits half-cropped at the viewport edge — the
+                    // Pixel 9 audit (#1182) caught a screenshot where a card
+                    // appeared truncated mid-name purely because of zero-pad.
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                    // Snap to card boundaries on fling so the user never
+                    // releases scroll on a half-card.
+                    flingBehavior = rememberSnapFlingBehavior(lazyListState = state),
+                ) {
                     items(curatedSamples) { sample ->
                         SampleCard(sample = sample, onClick = { onSampleClick(sample) })
                     }
@@ -321,7 +336,17 @@ private fun FeedSection(
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             }
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        val state = rememberLazyListState()
+        LazyRow(
+            state = state,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            // Edge padding so the first/last card has breathing room and never
+            // sits half-cropped at the viewport edge (#1182).
+            contentPadding = PaddingValues(horizontal = 4.dp),
+            // Snap to card boundaries on fling so the user never releases
+            // scroll on a half-card mid-name.
+            flingBehavior = rememberSnapFlingBehavior(lazyListState = state),
+        ) {
             items(models, key = { it.uid }) { m ->
                 FeaturedSketchfabCard(model = m, onClick = { onModelClick(m) })
             }
