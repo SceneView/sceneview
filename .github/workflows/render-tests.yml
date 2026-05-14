@@ -1,15 +1,14 @@
 name: Render Tests
 
 on:
+  # Render tests no longer run on PRs — they are non-blocking
+  # (`continue-on-error: true`), spin up 3 KVM-accelerated emulator shards
+  # + an iOS Simulator + Playwright web, and the screenshots they produce
+  # were rarely consulted by PR reviewers. The signal is still captured
+  # on every push to main, so post-merge regressions surface in the
+  # Actions tab without burning ~30 min × multiple PRs per day. Trigger
+  # manually via workflow_dispatch when you want to vet a feature branch.
   push:
-    branches: [main]
-    paths:
-      - 'sceneview/src/**'
-      - 'arsceneview/src/**'
-      - 'samples/**'
-      - 'SceneViewSwift/**'
-      - 'gradle/**'
-  pull_request:
     branches: [main]
     paths:
       - 'sceneview/src/**'

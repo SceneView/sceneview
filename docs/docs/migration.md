@@ -232,12 +232,12 @@ Update your Gradle / SPM / pubspec / package.json references:
 
 ```kotlin
 // Before
-implementation("io.github.sceneview:sceneview:4.3.4")
-implementation("io.github.sceneview:arsceneview:4.3.4")
+implementation("io.github.sceneview:sceneview:4.3.5")
+implementation("io.github.sceneview:arsceneview:4.3.5")
 
 // After (4.0.0)
-implementation("io.github.sceneview:sceneview:4.3.4")
-implementation("io.github.sceneview:arsceneview:4.3.4")
+implementation("io.github.sceneview:sceneview:4.3.5")
+implementation("io.github.sceneview:arsceneview:4.3.5")
 ```
 
 **Release candidate caveat:** Maven Central does **not** currently ship `4.0.0`. Either build from source (`./gradlew :sceneview:publishToMavenLocal`) or wait for `v4.0.0` stable.
@@ -435,8 +435,8 @@ implementation("io.github.sceneview:sceneview:2.3.0")
 implementation("io.github.sceneview:arsceneview:2.3.0")
 
 // After
-implementation("io.github.sceneview:sceneview:4.3.4")
-implementation("io.github.sceneview:arsceneview:4.3.4")
+implementation("io.github.sceneview:sceneview:4.3.5")
+implementation("io.github.sceneview:arsceneview:4.3.5")
 ```
 
 ---

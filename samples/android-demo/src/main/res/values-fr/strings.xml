@@ -366,4 +366,15 @@
     <string name="cd_back_button">Retour</string>
     <string name="cd_remove_model">Retirer le modèle placé</string>
     <string name="cd_scanning_surface">Recherche d\'une surface plane</string>
+
+    <!-- Streamed-model credits sheet (issue #1204 follow-up i18n sweep) -->
+    <string name="credits_sheet_title">Crédits des modèles diffusés</string>
+    <string name="credits_sheet_subtitle">Chaque modèle ci-dessous est diffusé depuis Sketchfab sous licence CC-BY 4.0. Appuyez sur une ligne pour ouvrir la page d\'origine.</string>
+    <string name="credits_sheet_footer">Les modèles intégrés (hors ligne) et les environnements HDR sont crédités dans assets/CREDITS.md à l\'intérieur de l\'APK.</string>
+    <string name="credits_row_open_cd">Ouvrir la page Sketchfab</string>
+
+    <!-- Asset-source chips shown on each demo (issue #1204 follow-up i18n sweep) -->
+    <string name="demo_chip_streamed">Diffusé (mis en cache)</string>
+    <string name="demo_chip_streaming">Diffusion en cours…</string>
+    <string name="demo_chip_bundled">Intégré (hors ligne)</string>
 </resources>

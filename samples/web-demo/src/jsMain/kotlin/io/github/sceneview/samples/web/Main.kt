@@ -23,12 +23,19 @@ import org.w3c.dom.HTMLInputElement
  * - WebXR AR/VR toggle buttons
  * - Tab-based navigation (Model Viewer / Geometry)
  * - Responsive dark theme
- * - SDK version 4.0.9 badge
+ * - SDK version 4.3.1 badge
  *
  * Uses Filament.js (WASM) — same rendering engine as SceneView Android.
+ *
+ * **Auto-update.** [SDK_VERSION] doubles as the build's locked version stamp;
+ * the inline-JS path in `index.html` compares it against
+ * `https://sceneview.github.io/version.json` on every `visibilitychange` to
+ * decide whether to surface a "Reload to update" snackbar. The version string
+ * is kept in sync with `gradle.properties` `VERSION_NAME` by
+ * `.claude/scripts/sync-versions.sh`.
  */
 
-private const val SDK_VERSION = "4.0.9"
+private const val SDK_VERSION = "4.3.5"
 
 /** Sketchfab public API endpoint for searching downloadable models. */
 private const val SKETCHFAB_API =

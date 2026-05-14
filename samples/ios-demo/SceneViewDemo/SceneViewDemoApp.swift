@@ -24,12 +24,29 @@ struct SceneViewDemoApp: App {
     /// Reset to `nil` after presentation so a config change doesn't replay it.
     @State private var pendingDeepLinkDemo: String?
 
+    /// App Store update checker — queried on every `.active` ScenePhase
+    /// transition. The published state drives `UpdateBanner` overlaid on
+    /// `ContentView`. See [AppStoreUpdater] for the throttle/snooze rules.
+    @StateObject private var updater = AppStoreUpdater()
+
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some SwiftUI.Scene {
         WindowGroup {
             ContentView(pendingDeepLinkDemo: $pendingDeepLinkDemo)
+                .environmentObject(updater)
+                .overlay(alignment: .top) {
+                    UpdateBanner()
+                        .environmentObject(updater)
+                }
                 .onOpenURL { url in
                     if let id = DeepLinkRouter.parse(url, allowedDemos: DemoDeepLinkRegistry.allowedIds) {
                         pendingDeepLinkDemo = id
+                    }
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active {
+                        Task { await updater.checkForUpdate() }
                     }
                 }
         }

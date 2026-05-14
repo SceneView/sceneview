@@ -1,8 +1,5 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+package io.github.sceneview.sample.common.update
 
-package io.github.sceneview.demo.update
-
-import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -21,137 +18,38 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.google.android.play.core.appupdate.AppUpdateInfo
-import com.google.android.play.core.appupdate.AppUpdateManagerFactory
-import com.google.android.play.core.appupdate.AppUpdateOptions
-import com.google.android.play.core.install.InstallStateUpdatedListener
-import com.google.android.play.core.install.model.AppUpdateType
-import com.google.android.play.core.install.model.InstallStatus
-import com.google.android.play.core.install.model.UpdateAvailability
 
-class InAppUpdateManager(private val activity: Activity) {
-
-    private val appUpdateManager = AppUpdateManagerFactory.create(activity)
-
-    var updateState by mutableStateOf(UpdateState.IDLE)
-        private set
-
-    var downloadProgress by mutableStateOf(0f)
-        private set
-
-    private var listenerRegistered = false
-
-    private val installStateListener: InstallStateUpdatedListener = InstallStateUpdatedListener { state ->
-        when (state.installStatus()) {
-            InstallStatus.DOWNLOADING -> {
-                updateState = UpdateState.DOWNLOADING
-                val totalBytes = state.totalBytesToDownload()
-                if (totalBytes > 0) {
-                    downloadProgress = state.bytesDownloaded().toFloat() / totalBytes.toFloat()
-                }
-            }
-            InstallStatus.DOWNLOADED -> {
-                updateState = UpdateState.READY_TO_INSTALL
-            }
-            InstallStatus.FAILED -> {
-                updateState = UpdateState.IDLE
-                unregisterListener()
-            }
-            InstallStatus.INSTALLED -> {
-                updateState = UpdateState.IDLE
-                unregisterListener()
-            }
-            InstallStatus.CANCELED -> {
-                updateState = UpdateState.IDLE
-                unregisterListener()
-            }
-            else -> {}
-        }
-    }
-
-    fun checkForUpdate() {
-        updateState = UpdateState.CHECKING
-        appUpdateManager.appUpdateInfo
-            .addOnSuccessListener { info ->
-                if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                    && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-                ) {
-                    updateState = UpdateState.AVAILABLE
-                    startFlexibleUpdate(info)
-                } else {
-                    updateState = UpdateState.UP_TO_DATE
-                }
-            }
-            .addOnFailureListener {
-                updateState = UpdateState.IDLE
-            }
-    }
-
-    private fun startFlexibleUpdate(info: AppUpdateInfo) {
-        if (!listenerRegistered) {
-            appUpdateManager.registerListener(installStateListener)
-            listenerRegistered = true
-        }
-        appUpdateManager.startUpdateFlow(
-            info,
-            activity,
-            AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build()
-        )
-    }
-
-    private fun unregisterListener() {
-        if (listenerRegistered) {
-            appUpdateManager.unregisterListener(installStateListener)
-            listenerRegistered = false
-        }
-    }
-
-    fun completeUpdate() {
-        appUpdateManager.completeUpdate()
-    }
-
-    fun checkForStalledUpdate() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.installStatus() == InstallStatus.DOWNLOADED) {
-                updateState = UpdateState.READY_TO_INSTALL
-            }
-        }
-    }
-
-    /** Must be called from Activity.onDestroy() to prevent listener leaks. */
-    fun destroy() {
-        unregisterListener()
-    }
-
-    enum class UpdateState {
-        IDLE, CHECKING, AVAILABLE, DOWNLOADING, READY_TO_INSTALL, UP_TO_DATE
-    }
-}
-
+/**
+ * Material 3 Expressive banner that surfaces a Play in-app update in progress.
+ *
+ * No-op while [InAppUpdateManager.updateState] is `IDLE` / `CHECKING` /
+ * `AVAILABLE` / `UP_TO_DATE`. Renders a progress card during `DOWNLOADING` and a
+ * primary "Restart" CTA once the install reaches `READY_TO_INSTALL`.
+ *
+ * The banner is intentionally rounded + edge-aligned (24 dp radius, 16 dp inset)
+ * so it overlays cleanly on top of any sample UI — including the full-bleed
+ * SceneView surface — without competing with primary CTAs.
+ */
 @Composable
-fun UpdateBanner(updateManager: InAppUpdateManager) {
+fun UpdateBanner(updateManager: InAppUpdateManager, modifier: Modifier = Modifier) {
     val showBanner = updateManager.updateState == InAppUpdateManager.UpdateState.DOWNLOADING
             || updateManager.updateState == InAppUpdateManager.UpdateState.READY_TO_INSTALL
 
     AnimatedVisibility(
         visible = showBanner,
         enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut()
+        exit = shrinkVertically() + fadeOut(),
+        modifier = modifier
     ) {
         Card(
             modifier = Modifier
@@ -176,7 +74,7 @@ fun UpdateBanner(updateManager: InAppUpdateManager) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = when (updateManager.updateState) {
-                                InAppUpdateManager.UpdateState.DOWNLOADING -> "Downloading update\u2026"
+                                InAppUpdateManager.UpdateState.DOWNLOADING -> "Downloading update…"
                                 InAppUpdateManager.UpdateState.READY_TO_INSTALL -> "Update ready!"
                                 else -> ""
                             },

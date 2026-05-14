@@ -1,6 +1,11 @@
 name: Build sample APKs
 
 on:
+  # PRs are NOT triggered here — ci.yml + pr-check.yml already build the
+  # same APKs via `:samples:android-demo:assembleDebug` (run twice on
+  # every PR before this slimming pass). This workflow now only produces
+  # the artifact-uploaded + release-attached APKs on main and tag pushes,
+  # which is the only unique value vs ci.yml's build.
   push:
     branches: [main]
     paths:
@@ -14,8 +19,6 @@ on:
       - 'gradle.properties'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 # Cancel in-progress runs for the same branch/PR

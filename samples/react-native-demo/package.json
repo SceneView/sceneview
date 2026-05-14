@@ -1,6 +1,6 @@
 {
   "name": "sceneview-react-native-demo",
-  "version": "3.6.2",
+  "version": "4.3.5",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -11,7 +11,9 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-native": "^0.73.0",
-    "@sceneview-sdk/react-native": "file:../../react-native/react-native-sceneview"
+    "@sceneview-sdk/react-native": "file:../../react-native/react-native-sceneview",
+    "react-native-device-info": "^14.0.0",
+    "sp-react-native-in-app-updates": "^1.4.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

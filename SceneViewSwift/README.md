@@ -21,7 +21,7 @@ Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview", from: "4.3.4")
+    .package(url: "https://github.com/sceneview/sceneview", from: "4.3.5")
 ]
 ```
 

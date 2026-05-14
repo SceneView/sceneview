@@ -340,6 +340,149 @@ jobs:
           r = requests.patch(f"{BASE}/appStoreVersions/{version_id}/relationships/build", headers=headers, json=payload)
           print(f"Build attached: {r.status_code}")
 
+          # 4b. Sync App Store localization metadata (en-US).
+          #
+          # Three buckets, ordered by per-release churn:
+          #
+          # - whatsNew (per-release) — extracted from CHANGELOG.md `## vX.Y.Z`
+          #   section. Apple does NOT auto-fill this when a new
+          #   appStoreVersion is created; without an explicit PATCH the App
+          #   Store keeps the previous version's notes verbatim, which ages
+          #   out fast (a v4.5.0 release shipping with v4.4.0's notes).
+          #
+          # - promotionalText (per-release, no review required) — short
+          #   tagline updateable at any time. Synced on every tag.
+          #
+          # - description / keywords / marketingUrl / supportUrl (per minor
+          #   bump only) — these fields TRIGGER an Apple review when
+          #   changed. Syncing on every patch would cost 4-5 review days
+          #   per patch for no user-visible improvement. Gated to
+          #   `vX.Y.0` tags so a metadata refresh lands once per minor
+          #   cycle, alongside the whatsNew that ships with every tag.
+          #
+          # Sourced from `samples/ios-demo/distribution/app-store/{locale}/`
+          # (fastlane-style layout, one file per field). Apple caps:
+          #   description     ≤4000   keywords         ≤100
+          #   promotionalText ≤170    marketingUrl/supportUrl ≤any
+          #
+          # Non-fatal on failure so the submission still proceeds with the
+          # previous metadata if a file is missing or the PATCH errors out.
+          try:
+              import re, subprocess, pathlib
+              attrs = {}
+
+              # ── whatsNew (every tag) ──────────────────────────────────
+              # `gsub(/\./, "\\.", ver)` escapes the dots in `4.3.1` so the
+              # regex doesn't also match `4-3-1` etc. Same hygiene as
+              # play-store.yml's awk extractor.
+              awk_out = subprocess.run(
+                  ["awk", "-v", f"ver=## v{version_string}",
+                   r'BEGIN { gsub(/\./, "\\.", ver) } '
+                   r'$0 ~ "^"ver"( |$)" { found=1; next } '
+                   r'found && /^## v[0-9]/ { exit } '
+                   r'found { print }',
+                   "../../CHANGELOG.md"],
+                  capture_output=True, text=True, check=False,
+              )
+              raw = awk_out.stdout
+              if raw.strip():
+                  text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", raw)
+                  text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+                  text = re.sub(r"`([^`]+)`", r"\1", text)
+                  text = re.sub(r"^#{1,6}\s*", "", text, flags=re.M)
+                  text = re.sub(r"\n{3,}", "\n\n", text).strip()
+                  if len(text) > 4000:
+                      text = text[:3997].rstrip() + "…"
+                  attrs["whatsNew"] = text
+              else:
+                  print(f"::warning::No '## v{version_string}' section in CHANGELOG.md — whatsNew left untouched")
+
+              # ── Read file-backed metadata ─────────────────────────────
+              meta_dir = pathlib.Path("distribution/app-store/en-US")
+
+              def _read(field, filename, cap):
+                  f = meta_dir / filename
+                  if not f.exists():
+                      return None
+                  v = f.read_text().strip()
+                  if len(v) > cap:
+                      print(f"::warning::{filename} exceeded {cap} chars — truncating")
+                      v = v[: cap - 1].rstrip() + "…"
+                  return v
+
+              # promotionalText syncs on every release (Apple allows
+              # updating without a new review).
+              v = _read("promotionalText", "promotional_text.txt", 170)
+              if v is not None:
+                  attrs["promotionalText"] = v
+
+              # Description / keywords / urls = per minor bump.
+              # `version_string` is already stripped of the leading `v`.
+              is_minor_bump = bool(re.fullmatch(r"\d+\.\d+\.0", version_string))
+              if is_minor_bump:
+                  print(f"Tag {version_string} is a minor/major bump — syncing description/keywords/urls")
+                  for field, fname, cap in [
+                      ("description", "description.txt", 4000),
+                      ("keywords", "keywords.txt", 100),
+                      ("marketingUrl", "marketing_url.txt", 2048),
+                      ("supportUrl", "support_url.txt", 2048),
+                  ]:
+                      v = _read(field, fname, cap)
+                      if v is not None:
+                          attrs[field] = v
+              else:
+                  print(f"Tag {version_string} is a patch — skipping description/keywords/urls (gated to vX.Y.0)")
+
+              # ── Find or create the en-US localization ─────────────────
+              if not attrs:
+                  print("No localization attributes to PATCH — skipping")
+              else:
+                  r = requests.get(
+                      f"{BASE}/appStoreVersions/{version_id}/appStoreVersionLocalizations",
+                      headers=headers,
+                  )
+                  r.raise_for_status()
+                  locs = r.json().get("data", [])
+                  en_us = next(
+                      (loc for loc in locs
+                       if loc.get("attributes", {}).get("locale") == "en-US"),
+                      None,
+                  )
+                  field_summary = ", ".join(f"{k}={len(v)}c" for k, v in attrs.items())
+                  if en_us:
+                      loc_id = en_us["id"]
+                      r = requests.patch(
+                          f"{BASE}/appStoreVersionLocalizations/{loc_id}",
+                          headers=headers,
+                          json={"data": {
+                              "type": "appStoreVersionLocalizations",
+                              "id": loc_id,
+                              "attributes": attrs,
+                          }},
+                      )
+                      r.raise_for_status()
+                      print(f"Localization PATCHed on en-US ({loc_id}): {field_summary}")
+                  else:
+                      # Build a separate dict for POST: `locale` is read-only on
+                      # PATCH so leaking it back into `attrs` would 409 on a
+                      # future refactor that PATCHes from the same dict.
+                      post_attrs = {**attrs, "locale": "en-US"}
+                      payload = {"data": {
+                          "type": "appStoreVersionLocalizations",
+                          "attributes": post_attrs,
+                          "relationships": {"appStoreVersion": {
+                              "data": {"type": "appStoreVersions", "id": version_id}
+                          }},
+                      }}
+                      r = requests.post(
+                          f"{BASE}/appStoreVersionLocalizations",
+                          headers=headers, json=payload,
+                      )
+                      r.raise_for_status()
+                      print(f"Localization CREATED on en-US: {field_summary}")
+          except Exception as e:
+              print(f"::warning::Failed to update App Store localization: {e}")
+
           # 5. Submit for review
           payload = {
               "data": {

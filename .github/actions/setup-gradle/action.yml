@@ -24,6 +24,15 @@ runs:
         java-version: ${{ inputs.java-version }}
         cache: gradle
 
+    # Verify the checked-in gradle-wrapper.jar matches the SHA of a known-good
+    # Gradle distribution. A malicious PR can otherwise sneak a tampered
+    # wrapper jar into the repo and have it executed by every downstream
+    # `./gradlew` call. Previously enforced by pr-check.yml's `compile-android`
+    # job; centralised here in 2026-05-15 so every workflow that calls
+    # `./gradlew` inherits the guard.
+    - name: Validate Gradle wrapper
+      uses: gradle/actions/wrapper-validation@v6
+
     - name: Make gradlew executable
       shell: bash
       run: chmod +x ./gradlew

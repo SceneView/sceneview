@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import io.github.sceneview.sample.common.update.InAppUpdateManager
+import io.github.sceneview.sample.common.update.UpdateBanner
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -80,19 +82,39 @@ internal val models = listOf(
  */
 class TvModelViewerActivity : ComponentActivity() {
 
+    // Exposed (internal) so [TvModelViewerScreen] can overlay the [UpdateBanner]
+    // on top of the SceneView surface. Same pattern as android-demo.
+    internal lateinit var updateManager: InAppUpdateManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        updateManager = InAppUpdateManager(this)
+
         setContent {
             SceneviewTheme {
-                TvModelViewerScreen()
+                TvModelViewerScreen(updateManager = updateManager)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-pick up a download already finished in a previous foreground
+        // before issuing a fresh check — handles the "user backgrounded the
+        // app mid-install" case without double-prompting.
+        updateManager.checkForStalledUpdate()
+        updateManager.checkForUpdate()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        updateManager.destroy()
     }
 }
 
 @Composable
-private fun TvModelViewerScreen() {
+private fun TvModelViewerScreen(updateManager: InAppUpdateManager? = null) {
     var selectedIndex by remember { mutableIntStateOf(0) }
     val selectedModel = models[selectedIndex]
 
@@ -199,6 +221,17 @@ private fun TvModelViewerScreen() {
             autoRotate = autoRotate,
             modifier = Modifier.align(Alignment.BottomStart)
         )
+
+        // Play in-app update banner — overlays the top of the screen during
+        // DOWNLOADING / READY_TO_INSTALL only (no-op otherwise). The Restart
+        // button is regular Material 3 — focusable via the D-pad without extra
+        // wiring. Tested by Google on Leanback; FLEXIBLE is the supported flow.
+        updateManager?.let { mgr ->
+            UpdateBanner(
+                updateManager = mgr,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
     }
 }
 

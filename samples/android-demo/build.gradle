@@ -17,7 +17,7 @@ android {
         minSdk 28
         targetSdk 36
         versionCode project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 350
-        versionName "4.3.4"
+        versionName "4.3.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -135,9 +135,9 @@ dependencies {
     implementation project(":sceneview")
     implementation project(":arsceneview")
 
-    // Google Play In-App Updates
-    implementation libs.play.app.update
-    implementation libs.play.app.update.ktx
+    // Google Play In-App Updates — Play Core deps come via :samples:common
+    // (`api libs.play.app.update*`). Manager + banner live in
+    // `io.github.sceneview.sample.common.update.*`.
 
     // Sketchfab API client — OkHttp for network, kotlinx-serialization for JSON.
     // Used by io.github.sceneview.demo.sketchfab.SketchfabService to stream

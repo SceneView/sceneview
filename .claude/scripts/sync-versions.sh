@@ -261,6 +261,58 @@ if [ -f "$WEBSITE_INDEX" ]; then
     add_check "website-static/index.html (softwareVersion)" "$V"
 fi
 
+# ─── 9b. Auto-update artefacts (per-sample version polled at runtime) ────
+# `website-static/version.json` is fetched by `samples/web-demo` on every
+# `visibilitychange` to decide whether to surface the "Reload to update"
+# snackbar — see plan `.claude/plans/bubbly-sauteeing-curry.md`. The
+# `.version` field MUST match VERSION_NAME, otherwise users get spurious
+# update prompts the moment the new build deploys but version.json hasn't
+# caught up (or vice versa — they never see the prompt because the file
+# claims they're already current).
+VERSION_JSON="$REPO_ROOT/website-static/version.json"
+if [ -f "$VERSION_JSON" ]; then
+    V=$(python3 -c "import json; print(json.load(open('$VERSION_JSON'))['version'])" 2>/dev/null || echo "MISSING")
+    add_check "website-static/version.json (.version)" "$V"
+fi
+
+# Web demo Kotlin/JS source — `const val SDK_VERSION = "X.Y.Z"` in Main.kt
+# stamps the running bundle. Compared against version.json at runtime so
+# both must point at the same version.
+WEB_DEMO_MAIN_KT="$REPO_ROOT/samples/web-demo/src/jsMain/kotlin/io/github/sceneview/samples/web/Main.kt"
+if [ -f "$WEB_DEMO_MAIN_KT" ]; then
+    V=$(grep -E 'const val SDK_VERSION' "$WEB_DEMO_MAIN_KT" | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | tr -d '"' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "samples/web-demo Main.kt SDK_VERSION" "$V"
+    fi
+fi
+
+# Web demo inline JS — `var BUILD_VERSION = 'X.Y.Z'` in index.html. The
+# inline-JS path is the one that actually drives the auto-update snackbar,
+# so it has to match. Kept literal-equal to Main.kt's SDK_VERSION.
+WEB_DEMO_INDEX="$REPO_ROOT/samples/web-demo/src/jsMain/resources/index.html"
+if [ -f "$WEB_DEMO_INDEX" ]; then
+    V=$(grep -E "var BUILD_VERSION = '" "$WEB_DEMO_INDEX" | grep -oE "'[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'" | tr -d "'" | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "samples/web-demo index.html BUILD_VERSION" "$V"
+    fi
+fi
+
+# React Native demo — both package.json and src/App.tsx's `VERSION` literal.
+RN_DEMO_PKG="$REPO_ROOT/samples/react-native-demo/package.json"
+if [ -f "$RN_DEMO_PKG" ]; then
+    V=$(python3 -c "import json; print(json.load(open('$RN_DEMO_PKG'))['version'])" 2>/dev/null || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "samples/react-native-demo/package.json" "$V"
+    fi
+fi
+RN_DEMO_APP="$REPO_ROOT/samples/react-native-demo/src/App.tsx"
+if [ -f "$RN_DEMO_APP" ]; then
+    V=$(grep -E "const VERSION = '" "$RN_DEMO_APP" | grep -oE "'[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'" | tr -d "'" | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "samples/react-native-demo App.tsx VERSION" "$V"
+    fi
+fi
+
 # ─── 10. Website (deployed — separate repo) ─────────────────────────────
 WEBSITE_DIR="$REPO_ROOT/../sceneview.github.io"
 if [ -d "$WEBSITE_DIR" ]; then
@@ -442,6 +494,73 @@ with open('$PKG_JSON', 'w') as f:
                 echo -e "  Fixed: website-static/index.html ($OLD_V -> $SOURCE_VERSION)"
             fi
         done
+    fi
+
+    # Fix website-static/version.json — the file served at
+    # sceneview.github.io/version.json that all auto-update clients poll.
+    # Re-write via python so the JSON stays valid; also stamp a fresh
+    # `build` timestamp so the deploy commit isn't a content no-op.
+    if [ -f "$VERSION_JSON" ]; then
+        CURRENT=$(python3 -c "import json; print(json.load(open('$VERSION_JSON'))['version'])" 2>/dev/null || echo "")
+        if [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            python3 -c "
+import json, datetime
+with open('$VERSION_JSON', 'r') as f:
+    data = json.load(f)
+data['version'] = '$SOURCE_VERSION'
+data['build'] = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+data['url'] = 'https://github.com/sceneview/sceneview/releases/tag/v$SOURCE_VERSION'
+data['notes'] = 'https://github.com/sceneview/sceneview/blob/main/CHANGELOG.md'
+with open('$VERSION_JSON', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+            echo -e "  Fixed: website-static/version.json ($CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+
+    # Fix samples/web-demo Main.kt SDK_VERSION constant
+    if [ -f "$WEB_DEMO_MAIN_KT" ]; then
+        CURRENT=$(grep -E 'const val SDK_VERSION' "$WEB_DEMO_MAIN_KT" | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | tr -d '"' | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            sed -i '' "s/const val SDK_VERSION = \"$CURRENT\"/const val SDK_VERSION = \"$SOURCE_VERSION\"/" "$WEB_DEMO_MAIN_KT"
+            echo -e "  Fixed: samples/web-demo Main.kt SDK_VERSION ($CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+
+    # Fix samples/web-demo index.html inline JS `var BUILD_VERSION = 'X.Y.Z'`
+    # AND the version pill (`v4.3.1`).
+    if [ -f "$WEB_DEMO_INDEX" ]; then
+        CURRENT=$(grep -E "var BUILD_VERSION = '" "$WEB_DEMO_INDEX" | grep -oE "'[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'" | tr -d "'" | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            sed -i '' "s/var BUILD_VERSION = '$CURRENT'/var BUILD_VERSION = '$SOURCE_VERSION'/" "$WEB_DEMO_INDEX"
+            sed -i '' "s/v$CURRENT/v$SOURCE_VERSION/g" "$WEB_DEMO_INDEX"
+            echo -e "  Fixed: samples/web-demo index.html ($CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+
+    # Fix samples/react-native-demo package.json + App.tsx VERSION literal.
+    if [ -f "$RN_DEMO_PKG" ]; then
+        CURRENT=$(python3 -c "import json; print(json.load(open('$RN_DEMO_PKG'))['version'])" 2>/dev/null || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            python3 -c "
+import json
+with open('$RN_DEMO_PKG', 'r') as f:
+    data = json.load(f)
+data['version'] = '$SOURCE_VERSION'
+with open('$RN_DEMO_PKG', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+            echo -e "  Fixed: samples/react-native-demo/package.json ($CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+    if [ -f "$RN_DEMO_APP" ]; then
+        CURRENT=$(grep -E "const VERSION = '" "$RN_DEMO_APP" | grep -oE "'[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'" | tr -d "'" | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            sed -i '' "s/const VERSION = '$CURRENT'/const VERSION = '$SOURCE_VERSION'/" "$RN_DEMO_APP"
+            echo -e "  Fixed: samples/react-native-demo App.tsx VERSION ($CURRENT -> $SOURCE_VERSION)"
+        fi
     fi
 
     # Fix SwiftPM `from:` clauses (#990) — rewrites every stale snippet to
