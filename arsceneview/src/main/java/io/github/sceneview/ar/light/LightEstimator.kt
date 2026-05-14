@@ -239,15 +239,21 @@ class LightEstimator(
                         cubeMapTexture.setImage(
                             engine,
                             0,
+                            // No-op callback — `arImages` were already closed synchronously
+                            // by `image.use {}` above (line 209), and the next reuse cycle
+                            // calls `cubeMapBuffer.clear()` at line ≈200. The previous
+                            // callback `{ arImages.forEach { it.close() }; buffer.clear() }`
+                            // was dead code that double-closed already-closed Images
+                            // (silently swallowed by Filament today, but a Filament SDK
+                            // upgrade that surfaces callback errors would explode), AND
+                            // raced with the next-frame buffer reuse path (#1090).
                             Texture.PixelBufferDescriptor(
                                 buffer,
                                 Texture.Format.RGB,
                                 Texture.Type.HALF,
-                                1, 0, 0, 0, null
-                            ) {
-                                arImages.forEach { it.close() }
-                                buffer.clear()
-                            },
+                                1, 0, 0, 0, null,
+                                Runnable { /* no-op — see comment above */ }
+                            ),
                             faceOffsets
                         )
                         reflections = if (environmentalHdrSpecularFilter) {
