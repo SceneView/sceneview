@@ -33,8 +33,8 @@ struct ModelItem: Identifiable, Hashable {
         ModelItem(id: "cyberpunk_car",        name: "Cyberpunk Car", icon: "bolt.car.fill",    asset: "cyberpunk_car",        scale: 0.8, category: .vehicles),
         ModelItem(id: "cyberpunk_hovercar",   name: "Hovercar",      icon: "airplane",         asset: "cyberpunk_hovercar",   scale: 0.6, category: .vehicles),
 
-        // Creatures
-        ModelItem(id: "animated_dragon",     name: "Dragon",            icon: "flame.fill",        asset: "animated_dragon",     scale: 0.6, category: .creatures),
+        // Creatures (`animated_dragon` removed in #1152 Stage 3 IPA slim-down
+        // — the dragon role is still represented by `black_dragon` below.)
         ModelItem(id: "black_dragon",        name: "Black Dragon",      icon: "lizard.fill",       asset: "black_dragon",        scale: 0.5, category: .creatures),
         ModelItem(id: "phoenix_bird",        name: "Phoenix",           icon: "bird.fill",         asset: "phoenix_bird",        scale: 0.8, category: .creatures),
         ModelItem(id: "animated_butterfly",  name: "Butterfly",         icon: "sparkles",          asset: "animated_butterfly",  scale: 0.8, category: .creatures),
@@ -225,8 +225,10 @@ struct ExploreTab: View {
 
     /// Curated featured set — first 6 bundled models, picked for visual variety.
     /// Used as fallback when no Sketchfab API key is configured.
+    /// `animated_dragon` replaced with `black_dragon` after #1152 Stage 3
+    /// dropped the 8.6 MB `animated_dragon.usdz` from the bundle.
     private var featuredModels: [ModelItem] {
-        let ids = ["ferrari_f40", "animated_dragon", "cyberpunk_character",
+        let ids = ["ferrari_f40", "black_dragon", "cyberpunk_character",
                    "game_boy_classic", "fantasy_book", "tree_scene"]
         return ids.compactMap { id in ModelItem.all.first { $0.id == id } }
     }

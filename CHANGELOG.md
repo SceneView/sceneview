@@ -1,6 +1,31 @@
 # Changelog
 
-## Unreleased
+## v4.3.2 — #1152 Sketchfab streaming complete + iOS key + DemoScaffold v2 + APK slim (2026-05-14)
+
+### Security — `fast-xml-parser` bumped to 5.7.0+ via npm overrides ([Dependabot alert #139](https://github.com/sceneview/sceneview/security/dependabot/139) — [PR #1162](https://github.com/sceneview/sceneview/pull/1162))
+
+Resolves [CVE-2026-41650 / GHSA-gh4j-gqv2-49f6](https://github.com/NaturalIntelligence/fast-xml-parser/security/advisories/GHSA-gh4j-gqv2-49f6) — `fast-xml-parser` XMLBuilder fails to escape `-->` (comment) and `]]>` (CDATA) delimiters, allowing XML injection / XSS / SOAP-injection when user-controlled data flows into those contexts.
+
+- **Package**: `fast-xml-parser` (npm, dev-only transitive in `react-native/react-native-sceneview`).
+- **Resolved version before fix**: `4.5.6` → **after fix**: `5.8.0`.
+- **Severity**: moderate (CVSS 6.1).
+- **Dependency chain**: `react-native` (devDep) → `@react-native-community/cli-platform-ios@11.4.1` → `fast-xml-parser@^4.0.12`.
+
+Fix shipped as an npm `overrides` block in `react-native/react-native-sceneview/package.json` — the standard npm 8+ way to force a safe transitive version without migrating `react-native` from 0.72 to a newer line. `npm install --package-lock-only` regenerated the lockfile cleanly; `npm audit` reports `found 0 vulnerabilities`. Dev-only chain (every entry in the affected closure is `"dev": true`); **no published runtime artefact from `@sceneview-sdk/react-native` ships `fast-xml-parser`**.
+
+### Changed — Stage 3 polish + APK slim-down + Credits sheet for streamed assets ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 3)
+
+Stage 3 closes the Sketchfab streaming umbrella (Stage 1 foundations, Stage 2 × 8 demo migrations, Stage 3 polish, Stage 4 docs). Four polish items shipped here:
+
+**APK / IPA slim-down.** `samples/android-demo/src/main/assets/models/animated_dragon.glb` (8.0 MB) and `samples/ios-demo/SceneViewDemo/Models/animated_dragon.usdz` (8.6 MB) are removed. Both files were used as canonical picks by `OrbitalARDemo` + `ArViewTab` (Android) and `OrbitalARDemo` + `ARTab` + `ExploreTab` (iOS). Canonical references migrate to `threejs_soldier.glb` (2.1 MB, animated peer) on Android and `phoenix_bird.usdz` (1.1 MB, animated peer) on iOS. Fallback paths in `SampleAssets.kt` for streamed slugs (butterfly / hummingbird / bee / koi / songbird) flip from `animated_dragon.glb` to `threejs_soldier.glb`. Net Android release-APK savings ~5 MB (88 MB → 88 MB after measurement, was 93 MB before); ~8 MB AAB on-disk. iOS IPA savings ~8.6 MB.
+
+**Credits sheet (CC-BY attribution).** New `samples/android-demo/.../ui/CreditsSheet.kt` + `samples/ios-demo/SceneViewDemo/Views/CreditsSheet.swift` ModalBottomSheet / SwiftUI sheet listing every streamed Sketchfab model the demo app may load, grouped by `SketchfabSlug.category`, with author + CC-BY 4.0 attribution + tap-to-open-Sketchfab-page rows. Anchored to the "Credits" card on the About tab. The sheet reads `SampleAssets.all` directly — adding a slug in the registry automatically credits it here. CC-BY 4.0 requires visible attribution; without this sheet, redistributing the streamed models violated the license.
+
+**Per-demo offline indicator chip.** New `AssetSourceState` enum (Streamed / Streaming / Bundled) + optional `assetSource:` parameter on `DemoScaffold`. The chip is pinned to the top-end of the scene area, advertises the streamed-or-fallback origin of the currently visible asset, and auto-hides when `null`. Wired into `OrbitalARDemo` / `SceneGalleryDemo` / `ModelViewerDemo` / `ARPlacementDemo` as exemplars; remaining Stage 2 demos can opt in incrementally. Helps users (and reviewers) understand at a glance whether they're seeing the streamed CC-BY model or the bundled offline fallback.
+
+**iOS parity audit.** `OrbitalARDemo` / `SceneGalleryDemo` / `MaterialsDemo` already stream via `SketchfabAssetResolver` (Stage 2 parity preserved). `ModelViewerDemo` / `AnimationDemo` / `MultiModelDemo` / `ARPlacementDemo` / `ARInstantPlacementDemo` / `PhysicsDemo` are Android-only in v4.3.x; per `feedback_ios_mirror_android.md` iOS V1 ships as a strict subset. Follow-up issue filed to track porting (see issue body — Stage 3 PR creation).
+
+**Cleanup.** `SketchfabSlug.sketchfabUrl` computed property added on both platforms (link target for the Credits sheet). `assets/CREDITS.md` keeps the dragon entry for posterity — the model is still on Sketchfab and the CDN-hosted GLB at `cdn.jsdelivr.net/.../assets/models/glb/animated_dragon.glb` did not exist anyway (web-demo dragon entry was a dead link before this PR; now removed).
 
 ### Added — Stage 4 docs + AI-first surfaces for Sketchfab streaming + `DemoScaffold` v2 ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 4)
 

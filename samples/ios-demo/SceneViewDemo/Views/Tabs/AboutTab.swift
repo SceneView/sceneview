@@ -10,6 +10,10 @@ struct AboutTab: View {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }()
 
+    // #1152 Stage 3 — Credits sheet (CC-BY attribution for every streamed
+    // Sketchfab model in `SampleAssets`).
+    @State private var showCreditsSheet = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -24,6 +28,9 @@ struct AboutTab: View {
                 .padding(.bottom, 24)
             }
             .navigationTitle("About")
+            .sheet(isPresented: $showCreditsSheet) {
+                CreditsSheet()
+            }
         }
     }
 
@@ -131,9 +138,9 @@ struct AboutTab: View {
                 icon: "person.2.fill",
                 iconColor: .teal,
                 title: "Credits",
-                subtitle: "Built with RealityKit, ARKit, SwiftUI",
-                trailing: nil,
-                action: nil
+                subtitle: "Authors & CC-BY attribution for every streamed Sketchfab model",
+                trailing: .chevron,
+                action: { showCreditsSheet = true }
             )
         }
     }

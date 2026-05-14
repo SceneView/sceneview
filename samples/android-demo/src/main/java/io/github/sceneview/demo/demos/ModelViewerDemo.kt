@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.R
@@ -106,7 +107,22 @@ fun ModelViewerDemo(onBack: () -> Unit) {
         durationMillis = 20_000,
     )
 
-    DemoScaffold(title = stringResource(R.string.demo_model_viewer), onBack = onBack) {
+    // Per-demo offline indicator chip (#1152 Stage 3): hide while we're on
+    // the bundled hero only (no Surprise tap yet). Once the user kicks a
+    // streamed roll the chip surfaces "Streaming…" → "Streamed (cached)".
+    // When no key is configured, "Surprise me" is disabled in the controls
+    // and we never enter the streaming branch — chip stays hidden.
+    val assetSource = when {
+        streamedFileUrl == null -> null
+        streamedModelInstance == null -> AssetSourceState.Streaming
+        else -> AssetSourceState.Streamed
+    }
+
+    DemoScaffold(
+        title = stringResource(R.string.demo_model_viewer),
+        onBack = onBack,
+        assetSource = assetSource,
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),

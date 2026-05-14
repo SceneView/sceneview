@@ -136,12 +136,18 @@ extract_refs() {
                 continue
                 ;;
         esac
+        # Skip Swift test files — they reference intentionally-missing assets
+        # ("Models/missing.usdz", "valid-\(UUID().uuidString).usdz") to exercise
+        # the not-found path of SketchfabAssetResolver.
+        case "$file" in
+            *Tests.swift|*+Tests.swift|*Test.swift) continue ;;
+        esac
         # 1. Quoted literals with a known extension ("models/foo.glb", "bar.hdr")
-        # Skip strings containing `$` — those are Kotlin/Swift string templates
-        # (e.g. `"$uid.glb"` in SketchfabService.kt is a runtime cache filename,
-        # not a static asset reference).
+        # Skip strings containing `$`, `\` (Swift `\(slug.uid).usdz`
+        # interpolation), or `<` (placeholder docs like `Models/<name>.usdz`) —
+        # those are runtime/template references, not static asset paths.
         # `|| true` so files with no match (grep exit 1) don't abort pipefail.
-        grep -oE "\"[^\"\$]*\.($ext_pattern)\"" "$file" 2>/dev/null |
+        grep -oE "\"[^\"\$\\\\<]*\.($ext_pattern)\"" "$file" 2>/dev/null |
             awk -v f="$file" '{ gsub(/"/, "", $0); printf "%s|%s\n", $0, f }' || true
 
         # 2. iOS Swift pattern — `asset: "name"` without extension. We emit the

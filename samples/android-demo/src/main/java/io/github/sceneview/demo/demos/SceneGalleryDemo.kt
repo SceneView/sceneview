@@ -21,7 +21,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
@@ -108,9 +110,21 @@ fun SceneGalleryDemo(onBack: () -> Unit) {
         rememberModelInstance(modelLoader, path)
     }
 
+    // Per-demo offline indicator chip (#1152 Stage 3). When no API key is
+    // configured we know up-front the resolver will fall back to bundled
+    // GLBs; while a slug is selected and `resolvedPath` is still null we
+    // surface a "Streaming…" pill; otherwise "Streamed (cached)".
+    val assetSource = when {
+        slugs.isEmpty() -> null
+        SketchfabConfig.apiKey == null -> AssetSourceState.Bundled
+        resolvedPath == null -> AssetSourceState.Streaming
+        else -> AssetSourceState.Streamed
+    }
+
     DemoScaffold(
         title = stringResource(R.string.demo_scene_gallery_title),
         onBack = onBack,
+        assetSource = assetSource,
         controls = {
             // Category chips along the top of the controls sheet. We expose
             // them as a horizontally scrolling row so the four labels never

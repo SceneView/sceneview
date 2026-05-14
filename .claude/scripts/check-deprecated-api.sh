@@ -53,6 +53,11 @@ is_whitelisted() {
     # we allow the whole file since the composable refs were already fixed
     docs/docs/nodes.md) return 0 ;;
 
+    # cheatsheet-ios.md is the Android-vs-iOS migration mapping table — by
+    # definition each row lists the deprecated Android API on the LHS so the
+    # iOS-curious reader can find the equivalent on the RHS (#1138, #1136).
+    docs/docs/cheatsheet-ios.md) return 0 ;;
+
     # The deprecated alias definitions themselves
     sceneview/src/main/java/io/github/sceneview/Scene.kt) return 0 ;;
     arsceneview/src/main/java/io/github/sceneview/ar/ARScene.kt) return 0 ;;

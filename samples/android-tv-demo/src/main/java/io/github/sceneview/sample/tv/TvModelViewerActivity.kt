@@ -59,11 +59,13 @@ internal val models = listOf(
     ModelEntry("Velvet Sofa", "models/khronos_glam_velvet_sofa.glb", 1.0f),
     ModelEntry("Lantern", "models/khronos_lantern.glb", 1.0f),
     ModelEntry("Iridescent Dish", "models/khronos_iridescent_dish.glb", 1.0f),
-    ModelEntry("Animated Dragon", "models/animated_dragon.glb", 1.0f),
+    // `animated_dragon.glb` dropped in #1152 Stage 3 — 8 MB GLB removed from
+    // the shared bundle. `Soldier` (below) covers the animated character role.
     ModelEntry("Duck", "models/khronos_duck.glb", 1.0f),
     ModelEntry("Fox", "models/khronos_fox.glb", 1.0f),
     ModelEntry("Toon Cat", "models/toon_cat.glb", 1.0f),
     ModelEntry("Shiba", "models/shiba.glb", 1.0f),
+    ModelEntry("Soldier", "models/threejs_soldier.glb", 1.0f),
     ModelEntry("Nike Air Jordan", "models/nike_air_jordan.glb", 1.0f),
 )
 
