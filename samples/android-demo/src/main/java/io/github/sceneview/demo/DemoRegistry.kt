@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudCircle
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FilterCenterFocus
@@ -134,6 +135,7 @@ val ALL_DEMOS = listOf(
     DemoEntry("geometry", R.string.demo_geometry_title, R.string.demo_geometry_subtitle, DemoCategory.BASICS_3D, Icons.Filled.Category),
     DemoEntry("animation", R.string.demo_animation_title, R.string.demo_animation_subtitle, DemoCategory.BASICS_3D, Icons.Filled.RotateRight),
     DemoEntry("multi-model", R.string.demo_multi_model_title, R.string.demo_multi_model_subtitle, DemoCategory.BASICS_3D, Icons.Filled.Layers),
+    DemoEntry("scene-gallery", R.string.demo_scene_gallery_title, R.string.demo_scene_gallery_subtitle, DemoCategory.BASICS_3D, Icons.Filled.Collections),
     // Lighting & Environment
     DemoEntry("lighting", R.string.demo_lighting_title, R.string.demo_lighting_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.Lightbulb),
     DemoEntry("movable-light", R.string.demo_movable_light_title, R.string.demo_movable_light_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.AutoFixHigh),

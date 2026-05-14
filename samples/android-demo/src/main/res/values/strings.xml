@@ -176,6 +176,10 @@
     <string name="demo_animation_subtitle">Play, pause, and control animations</string>
     <string name="demo_multi_model_title">Multi Model</string>
     <string name="demo_multi_model_subtitle">Multiple models in one scene</string>
+    <string name="demo_scene_gallery_title">Scene Gallery</string>
+    <string name="demo_scene_gallery_subtitle">Themed Sketchfab bundles streamed on demand</string>
+    <string name="demo_scene_gallery_loading">Streaming model…</string>
+    <string name="demo_scene_gallery_credit">by %1$s · CC-BY 4.0</string>
     <string name="demo_lighting_title">Light Types</string>
     <string name="demo_lighting_subtitle">Directional, point, and spot lights</string>
     <string name="demo_movable_light_title">Movable Light</string>

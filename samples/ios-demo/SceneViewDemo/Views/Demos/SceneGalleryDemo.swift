@@ -2,76 +2,141 @@ import SwiftUI
 import RealityKit
 import SceneViewSwift
 
-/// Scene gallery -- multiple shapes, text, lines, and lights in a composed scene.
+/// Streamed model gallery — themed bundles (Animals, Furniture, Retro, …)
+/// rotating Sketchfab CC-BY content. Each chip selects one `SketchfabSlug` in
+/// the curated `gallery` category of `SampleAssets`; the resolver hands back
+/// either the streamed asset or the bundled fallback when no API key is
+/// configured. `SceneView` then renders the model with an orbit camera.
+///
+/// Honours the umbrella's hard rules:
+///   - **No Sketchfab WebView / external link** — the demo only ever feeds the
+///     local `URL` returned by `SketchfabAssetResolver.resolve` to
+///     `ModelNode.load(contentsOf:)`.
+///   - **No network required to render something useful** — empty key (App Store
+///     cold-cache builds) → the resolver stages the bundled fallback under the
+///     same cache root and the demo renders it the same way as the streamed file.
+///   - **License attribution preserved** — the per-chip caption shows the
+///     author name. The Credits sheet (Stage 3) will surface the full
+///     per-model attribution.
 struct SceneGalleryDemo: View {
+    private let slugs: [SketchfabSlug] = SampleAssets.byCategory["gallery"] ?? []
+
+    @State private var selectedIndex: Int = 0
+    @State private var loadedNode: ModelNode?
+    @State private var loadError: String?
+
+    private var selectedSlug: SketchfabSlug? {
+        guard slugs.indices.contains(selectedIndex) else { return nil }
+        return slugs[selectedIndex]
+    }
+
     var body: some View {
         ZStack {
-            SceneView { root in
-                // Pedestals with shapes
-                let pedestals: [(String, Float, UIColor)] = [
-                    ("Cube", -0.8, .systemBlue),
-                    ("Sphere", -0.4, .systemRed),
-                    ("Cylinder", 0.0, .systemGreen),
-                    ("Cone", 0.4, .systemOrange),
-                    ("Plane", 0.8, .systemPurple),
-                ]
-
-                for (name, x, color) in pedestals {
-                    // Pedestal
-                    let pedestal = GeometryNode.cylinder(radius: 0.08, height: 0.02, color: .darkGray)
-                    pedestal.entity.position = .init(x: x, y: -0.25, z: -2)
-                    root.addChild(pedestal.entity)
-
-                    // Shape on pedestal
-                    let shape: GeometryNode
-                    switch name {
-                    case "Cube":
-                        shape = GeometryNode.cube(
-                            size: 0.12,
-                            material: .pbr(color: color, metallic: 0.6, roughness: 0.3),
-                            cornerRadius: 0.01
-                        )
-                    case "Sphere":
-                        shape = GeometryNode.sphere(
-                            radius: 0.07,
-                            material: .pbr(color: color, metallic: 0.8, roughness: 0.15)
-                        )
-                    case "Cylinder":
-                        shape = GeometryNode.cylinder(radius: 0.06, height: 0.12, color: color)
-                    case "Cone":
-                        shape = GeometryNode.cone(height: 0.14, radius: 0.06, color: color)
-                    default:
-                        shape = GeometryNode.plane(width: 0.12, depth: 0.12, color: color)
-                    }
-                    shape.entity.position = .init(x: x, y: -0.12, z: -2)
-                    root.addChild(shape.entity)
-
-                    // Billboard label
-                    let label = BillboardNode.text(name, fontSize: 0.025, color: color)
-                        .position(.init(x: x, y: 0.05, z: -2))
-                    root.addChild(label.entity)
-                }
-
-                // Decorative circle on floor
-                let circle = PathNode.circle(
-                    center: .init(x: 0, y: -0.25, z: -2),
-                    radius: 1.0,
-                    segments: 64,
-                    thickness: 0.003,
-                    color: .init(white: 0.25, alpha: 1)
-                )
-                root.addChild(circle.entity)
-
-                // Title at top
-                let title = TextNode(text: "SceneView Gallery", fontSize: 0.07, color: .white, depth: 0.01)
-                    .centered()
-                    .position(.init(x: 0, y: 0.4, z: -2.5))
-                root.addChild(title.entity)
+            sceneView
+            VStack {
+                Spacer()
+                controls
             }
-            .cameraControls(.orbit)
-            .autoRotate(speed: 0.2)
-            .ignoresSafeArea()
         }
         .background(Color.black)
+        .task(id: selectedSlug?.uid) {
+            await loadSelectedSlug()
+        }
+        .task {
+            // Warm the whole gallery on first appear so chip taps land on a
+            // hot cache. The resolver is idempotent — re-running it is cheap.
+            _ = await SketchfabAssetResolver.shared.prefetchAll(category: "gallery")
+        }
+    }
+
+    @ViewBuilder
+    private var sceneView: some View {
+        if let loadedNode {
+            SceneView { root in
+                loadedNode.entity.position = .init(x: 0, y: 0, z: -2)
+                root.addChild(loadedNode.entity)
+            }
+            .cameraControls(.orbit)
+            .autoRotate(speed: 0.25)
+            .ignoresSafeArea()
+            // Re-keys the SceneView when the selected slug changes so the
+            // previous entity is fully torn down rather than overlaid.
+            .id("gallery-\(selectedSlug?.uid ?? "none")")
+        } else {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .tint(.white)
+                if let loadError {
+                    Text(loadError)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                } else {
+                    Text("Streaming model…")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
+        }
+    }
+
+    private var controls: some View {
+        VStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(slugs.enumerated()), id: \.element.uid) { index, slug in
+                        Button {
+                            selectedIndex = index
+                            #if os(iOS)
+                            HapticManager.lightTap()
+                            #endif
+                        } label: {
+                            Text(slug.displayName)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(index == selectedIndex ? Color.black : Color.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(index == selectedIndex ? Color.white : Color.white.opacity(0.12))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+
+            if let slug = selectedSlug {
+                // CC-BY 4.0 attribution lives inline so it's always visible
+                // without a tap. The Credits sheet (Stage 3) carries the full
+                // attribution + Sketchfab page link.
+                Text("by \(slug.author) · CC-BY 4.0")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.75))
+            }
+        }
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 24)
+    }
+
+    @MainActor
+    private func loadSelectedSlug() async {
+        guard let slug = selectedSlug else { return }
+        loadedNode = nil
+        loadError = nil
+        do {
+            let url = try await SketchfabAssetResolver.shared.resolve(slug)
+            let node = try await ModelNode.load(contentsOf: url)
+            _ = node.scaleToUnits(slug.scaleToUnits)
+            _ = node.centerOrigin()
+            loadedNode = node
+        } catch {
+            loadError = error.localizedDescription
+        }
     }
 }
