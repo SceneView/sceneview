@@ -53,6 +53,12 @@ android {
         targetSdk 36
 
         consumerProguardFiles "consumer-rules.pro"
+
+        // Instrumented tests live in `src/androidTest/` and exercise real Filament JNI
+        // (see e.g. LightEstimatorConcurrentDestroyTest for the destroy()-race repro
+        // demanded by CORR-B reviewer R1 / umbrella #1094 acceptance #3). Required for
+        // `./gradlew :arsceneview:connectedDebugAndroidTest`.
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -116,6 +122,12 @@ dependencies {
     // Unit tests (JVM — no device required)
     testImplementation 'junit:junit:4.13.2'
     testImplementation libs.robolectric
+
+    // Instrumented tests (require a connected device or emulator with ARCore-compatible
+    // Filament. Filament Engine.create() runs JNI, so these can't be Robolectric.)
+    androidTestImplementation libs.androidx.test.junit
+    androidTestImplementation libs.androidx.test.runner
+    androidTestImplementation libs.androidx.test.rules
 }
 
 apply plugin: "com.vanniktech.maven.publish"
