@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
@@ -776,7 +777,15 @@ private fun RecordingRow(
                     onClick = onClick,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(if (isSelected) "Replaying" else "Replay")
+                    // "Replaying" (9 chars) overflows the 1/3-row button width on
+                    // Pixel 9 and wraps mid-word as "Replayin\ng" (#1205). "Stop"
+                    // is the action the tap will perform when playback is active,
+                    // and reads cleaner than a status word on an action button.
+                    Text(
+                        text = if (isSelected) "Stop" else "Replay",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
