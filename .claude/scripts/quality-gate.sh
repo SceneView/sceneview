@@ -142,6 +142,26 @@ fi
 
 echo ""
 
+# ─── 4a. SceneView Agent Skill Drift ───────────────────────────────────
+# Catches the kind of API hallucination that landed in the first cut of
+# `agents/sceneview/SKILL.md` (PR #1072) — fake APIs like
+# `rememberARSession` / `AnchorNode.image()` / `GeometryNode(geometry=...)`
+# that would compile into broken code in any project the skill helps
+# generate. The check runs in well under 1s.
+echo -e "${CYAN}--- SceneView Agent Skill ---${NC}"
+if [ -d "agents/sceneview" ] && [ -x ".claude/scripts/check-sceneview-skill.sh" ]; then
+    if bash .claude/scripts/check-sceneview-skill.sh --quiet > /tmp/check-sceneview-skill.log 2>&1; then
+        check "agents/sceneview/ in sync with source" "PASS" ""
+    else
+        DRIFT_COUNT=$(grep -cE '^    - ' /tmp/check-sceneview-skill.log 2>/dev/null || echo "?")
+        check "agents/sceneview/ in sync with source" "FAIL" "$DRIFT_COUNT drift item(s); see /tmp/check-sceneview-skill.log"
+    fi
+elif [ -d "agents/sceneview" ]; then
+    check "agents/sceneview/ drift check" "WARN" "check-sceneview-skill.sh missing"
+fi
+
+echo ""
+
 # ─── 4b. Demo App Asset Integrity ──────────────────────────────────────
 # Catches the class of bugs fixed in session 34 (TV demo bundled model
 # typos, web-demo dead 404 CDN URLs). Fast enough to run in every gate.

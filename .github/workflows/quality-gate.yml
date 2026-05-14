@@ -101,3 +101,12 @@ jobs:
           path: /tmp/check-deprecated-api.log
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload check-sceneview-skill log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: check-sceneview-skill-log
+          path: /tmp/check-sceneview-skill.log
+          if-no-files-found: ignore
+          retention-days: 7

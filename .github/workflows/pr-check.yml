@@ -30,6 +30,13 @@ jobs:
         shell: bash
         run: bash .claude/scripts/check-deprecated-api.sh --all
 
+      - name: Check SceneView agent skill is in sync with source
+        # Catches hallucinated APIs in agents/sceneview/ (e.g. `rememberARSession`
+        # or `AnchorNode.image()`) BEFORE merge — see PR #1072 for the kind of
+        # drift this guard prevents. Sub-second; no JDK or Gradle needed.
+        shell: bash
+        run: bash .claude/scripts/check-sceneview-skill.sh
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
