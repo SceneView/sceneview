@@ -226,19 +226,29 @@ internal fun closestPointOnSegment(
 /**
  * Closest points between two line segments AB and CD.
  * Returns (closest on AB, closest on CD).
+ *
+ * Implements Christer Ericson, *Real-Time Collision Detection* §5.1.9.
+ *
+ * Pre-#1126 this routine used `r = c - a` and inherited a consistent sign
+ * flip on `d4`/`d5` (Ericson's `c`/`f`). The bug was masked for collinear
+ * inputs (where `denom ≈ 0` and the degenerate branch dominates) but
+ * surfaced as wildly wrong closest pairs on perpendicular / skew segments —
+ * e.g. AB=(0,0,0)→(2,0,0), CD=(1,1,0)→(1,3,0) returned `(0,0,0)/(1,2,0)`
+ * (distance √5) instead of the correct `(1,0,0)/(1,1,0)` (distance 1).
+ * Fix: align with Ericson's convention `r = a - c`.
  */
 internal fun closestPointsBetweenSegments(
     a: Vector3, b: Vector3, c: Vector3, d: Vector3
 ): Pair<Vector3, Vector3> {
     val ab = Vector3.subtract(b, a)
     val cd = Vector3.subtract(d, c)
-    val ac = Vector3.subtract(c, a)
+    val r = Vector3.subtract(a, c)  // Ericson's `r = p1 - p2`
 
-    val d1 = Vector3.dot(ab, ab)
-    val d2 = Vector3.dot(ab, cd)
-    val d3 = Vector3.dot(cd, cd)
-    val d4 = Vector3.dot(ab, ac)
-    val d5 = Vector3.dot(cd, ac)
+    val d1 = Vector3.dot(ab, ab)         // a in Ericson
+    val d2 = Vector3.dot(ab, cd)         // b in Ericson
+    val d3 = Vector3.dot(cd, cd)         // e in Ericson
+    val d4 = Vector3.dot(ab, r)          // c in Ericson
+    val d5 = Vector3.dot(cd, r)          // f in Ericson
 
     val denom = d1 * d3 - d2 * d2
 
