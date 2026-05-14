@@ -38,12 +38,20 @@ open class GeometryNode(
     open val geometry: Geometry,
     materialInstances: List<MaterialInstance?>,
     primitivesOffsets: List<IntRange> = geometry.primitivesOffsets,
+    /**
+     * If `true`, [destroy] also destroys every non-null entry of [materialInstances].
+     *
+     * See [RenderableNode]'s `destroyMaterialsOnDispose` KDoc for usage guidance. Default
+     * `false` for backward compatibility (#1123).
+     */
+    destroyMaterialsOnDispose: Boolean = false,
     builderApply: RenderableManager.Builder.() -> Unit = {}
 ) : RenderableNode(
     engine = engine,
     primitiveCount = primitivesOffsets.size,
     boundingBox = geometry.boundingBox,
     materialInstances = materialInstances,
+    destroyMaterialsOnDispose = destroyMaterialsOnDispose,
     builder = {
         geometry(geometry, primitivesOffsets)
         materials(materialInstances)
@@ -54,12 +62,14 @@ open class GeometryNode(
         engine: Engine,
         geometry: Geometry,
         materialInstance: MaterialInstance? = null,
+        destroyMaterialsOnDispose: Boolean = false,
         builderApply: RenderableManager.Builder.() -> Unit = {}
     ) : this(
         engine = engine,
         geometry = geometry,
         materialInstances = listOf(materialInstance),
         primitivesOffsets = listOf(0..geometry.primitivesOffsets.last().last),
+        destroyMaterialsOnDispose = destroyMaterialsOnDispose,
         builderApply = builderApply
     )
 
