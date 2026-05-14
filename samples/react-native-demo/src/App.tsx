@@ -21,6 +21,7 @@ import {
   type GeometryNode,
   type LightNode,
 } from '@sceneview-sdk/react-native';
+import { UpdateChecker } from './UpdateChecker';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +48,7 @@ interface PlaygroundShape {
 // Constants
 // ---------------------------------------------------------------------------
 
-const VERSION = '3.6.2';
+const VERSION = '4.3.5';
 
 const ENVIRONMENT = 'environments/studio_small.hdr';
 
@@ -645,6 +646,11 @@ export default function App() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Auto-update banner — overlays the top of the screen when a newer
+          build is on the store. Hooks `AppState` internally so a resume
+          re-runs the check; no-op on dev / unsupported platforms. */}
+      <UpdateChecker />
     </SafeAreaView>
   );
 }

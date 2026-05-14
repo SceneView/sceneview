@@ -1646,6 +1646,31 @@ ARSceneView(
 
 ---
 
+## In-app auto-update across all samples
+
+Every published sample checks for a newer build on app resume and surfaces a banner that lets the user trigger the install in a single tap. The pattern is **sample-only** (not in the SceneView SDK itself — auto-update isn't a 3D/AR concern) and uses each platform's native store integration so there is no custom server, no manual version-string plumbing across releases.
+
+- **Android (`samples/android-demo`, `samples/android-tv-demo`)** — `io.github.sceneview.sample.common.update.InAppUpdateManager` (factored into `:samples:common`) wraps Play Core's `AppUpdateManager.startUpdateFlow(FLEXIBLE)`. The `UpdateBanner` composable renders during `DOWNLOADING` and `READY_TO_INSTALL` only. Plug it from your `Activity.onResume()`:
+  ```kotlin
+  class MainActivity : ComponentActivity() {
+      // `internal` (not `private`) so the Compose root below can read it via `activity.updateManager`.
+      internal lateinit var updateManager: InAppUpdateManager
+      override fun onCreate(b: Bundle?) { super.onCreate(b); updateManager = InAppUpdateManager(this) }
+      override fun onResume() { super.onResume(); updateManager.checkForStalledUpdate(); updateManager.checkForUpdate() }
+      override fun onDestroy() { super.onDestroy(); updateManager.destroy() }
+  }
+  // In your Compose root:
+  UpdateBanner(updateManager = activity.updateManager)
+  ```
+- **iOS (`samples/ios-demo`)** — `AppStoreUpdater` (an `ObservableObject`) hits `https://itunes.apple.com/lookup?id=<appStoreId>` on every `ScenePhase.active` transition, compares against `Bundle.main.infoDictionary["CFBundleShortVersionString"]`, and shows a `.regularMaterial` SwiftUI banner with `Update` (opens `itms-apps://`) + `Later` (7-day snooze) CTAs. Apple does not expose a programmatic install API on iOS, so the banner deep-links to the App Store.
+- **Web (`samples/web-demo`)** — `document.addEventListener('visibilitychange')` fires `fetch('/version.json')` (12 h `localStorage` throttle), compares with the build-time `BUILD_VERSION` constant, and slides a Liquid Glass snackbar from the bottom with a `Reload` CTA. `website-static/version.json` is committed at the source-of-truth version and automatically picked up by the existing GitHub Pages deploy workflow (`.github/workflows/deploy-website.yml`).
+- **Flutter (`samples/flutter-demo`)** — `UpdateChecker` (a `ChangeNotifier`) registers as a `WidgetsBindingObserver` and re-runs on `AppLifecycleState.resumed`. Android delegates to `in_app_update` (the community wrap of Play Core); iOS uses `http` + `package_info_plus` to read the iTunes lookup response and `url_launcher` to open the App Store.
+- **React Native (`samples/react-native-demo`)** — `<UpdateChecker />` component listens to `AppState` events; Android delegates to `sp-react-native-in-app-updates`, iOS hits the iTunes lookup via `fetch` and bounces to the App Store via `Linking.openURL`.
+
+The single source of truth is the root `gradle.properties`'s `VERSION_NAME` — every `BUILD_VERSION` / `VERSION` literal across the five sample apps is checked by `.claude/scripts/sync-versions.sh` and auto-fixed by `sync-versions.sh --fix`.
+
+---
+
 ## Recipes — "I want to..."
 
 ### Show a 3D model with orbit camera
