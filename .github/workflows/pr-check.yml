@@ -11,6 +11,19 @@ name: PR Check
 on:
   pull_request:
     branches: [main]
+    # Skip pure docs/marketing/branding PRs — none of the remaining jobs
+    # (deprecated-API guard, sceneview-skill drift, KMP all-targets compile,
+    # workflow shellcheck, demo-asset validator) exercise anything those
+    # paths touch. Mirrors the filter on ci.yml + quality-gate.yml so a
+    # README typo PR no longer spins up the ~5 min Gradle KMP compile.
+    paths-ignore:
+      - 'website-static/**'
+      - 'docs/**'
+      - 'marketing/**'
+      - 'branding/**'
+      - '*.md'
+      - 'llms*.txt'
+      - 'LICENSE'
   workflow_dispatch:
 
 # Cancel in-progress runs for the same PR to save resources
