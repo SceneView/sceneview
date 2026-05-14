@@ -60,7 +60,7 @@ import java.io.File
  * The previous "tabletop" composition (shiba + lantern + helmet + dragon, all
  * bundled) is replaced by the streamed `park` category from [SampleAssets].
  * Offline fallback is per-slug (`shiba.glb` / `khronos_lantern.glb` /
- * `animated_dragon.glb` etc.) so the demo still renders four nodes when no
+ * `threejs_soldier.glb` etc.) so the demo still renders four nodes when no
  * Sketchfab key is configured — the visual swap is documented in the CHANGELOG
  * but the user-visible behaviour stays "4 nodes, 4 chips, 1 spin toggle".
  *

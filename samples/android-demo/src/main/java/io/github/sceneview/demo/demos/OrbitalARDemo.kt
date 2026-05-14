@@ -28,10 +28,12 @@ import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
+import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.sketchfab.SketchfabSlug
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -56,7 +58,7 @@ import kotlin.math.sin
  *   "planets", fast at the inner ones, so the formation looks like a solar system
  *   rather than a rigid ring;
  * - either a **baked animation** (4 streamed animated creatures — butterfly,
- *   hummingbird, bee, koi — plus the bundled `animated_dragon`, oriented along the
+ *   hummingbird, bee, koi — plus the bundled `threejs_soldier`, oriented along the
  *   orbit tangent so they "fly the orbit") **or** a **local Y spin** (between 0.7
  *   and 2.0 rad/s) for static GLBs (helmet, lantern, toy car) so they feel alive
  *   without their own rig;
@@ -74,8 +76,8 @@ import kotlin.math.sin
  * curated `solar` category in [SampleAssets]. When [SketchfabConfig.apiKey] is
  * missing (App Store / first-launch / no-network) the resolver returns the bundled
  * fallback declared in the registry — so the demo always renders eight planets,
- * just sometimes with duplicate visuals. The four static GLBs (helmet, lantern,
- * toy car, dragon) are always read straight from `assets/models/` and have no
+ * just sometimes with duplicate visuals. The four bundled GLBs (helmet, lantern,
+ * toy car, soldier) are always read straight from `assets/models/` and have no
  * network dependency.
  *
  * This replaces the previous "2 duplicate dragons + 2 duplicate soldiers" workaround
@@ -191,9 +193,12 @@ private val ORBITAL_PLANETS: List<Planet> = run {
             height = -0.5f,
             hasBakedAnimation = true,
         ),
-        // Slot 6 — bundled animated dragon (baked walk cycle).
+        // Slot 6 — bundled animated soldier (baked walk cycle).
+        // Replaced animated_dragon.glb (8.0 MB) with threejs_soldier.glb
+        // (2.1 MB, same baked-animation property) as part of the Stage 3
+        // APK slim-down — see #1152 Stage 3 PR.
         Planet(
-            bundledAssetPath = "models/animated_dragon.glb",
+            bundledAssetPath = "models/threejs_soldier.glb",
             scaleToUnits = 0.30f,
             initialAngleRad = 2f * PI.toFloat() / 8f * 6,
             orbitSpeed = 0.05f,
@@ -269,9 +274,28 @@ fun OrbitalARDemo(onBack: () -> Unit) {
     }
     val orbitSeconds = orbitNanos / 1_000_000_000f
 
+    // Per-demo offline indicator (#1152 Stage 3): if every streamed slot has
+    // resolved to a real `File` (Sketchfab CDN), surface "Streamed". If some
+    // are still null, we're "Streaming…". If `SketchfabConfig.apiKey` is
+    // absent up-front, the resolver short-circuits to the bundled fallback
+    // and every slot resolves quickly to its fallback file — chip says
+    // "Bundled fallback" instead.
+    val streamedSlugs = ORBITAL_PLANETS.mapNotNull { it.streamedSlug }
+    val assetSource: AssetSourceState? = if (streamedSlugs.isEmpty()) {
+        null
+    } else if (SketchfabConfig.apiKey == null) {
+        AssetSourceState.Bundled
+    } else if (streamedFiles.filterIndexed { i, _ -> ORBITAL_PLANETS[i].streamedSlug != null }
+            .all { it != null }) {
+        AssetSourceState.Streamed
+    } else {
+        AssetSourceState.Streaming
+    }
+
     DemoScaffold(
         title = stringResource(R.string.demo_ar_orbital_title),
         onBack = onBack,
+        assetSource = assetSource,
         controls = {
             Text(
                 text = "8 models orbit around you in a personal solar system. " +

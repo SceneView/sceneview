@@ -154,6 +154,12 @@ private fun AboutTabContent() {
     val openLink: (String) -> Unit = { url ->
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
+    // #1152 Stage 3 — CC-BY attribution for every streamed Sketchfab model
+    // surfaces as a ModalBottomSheet anchored to the existing "Credits" card.
+    var showCreditsSheet by rememberSaveable { mutableStateOf(false) }
+    if (showCreditsSheet) {
+        CreditsSheet(onDismiss = { showCreditsSheet = false })
+    }
 
     Column(
         modifier = Modifier
@@ -206,6 +212,8 @@ private fun AboutTabContent() {
             iconColor = Color(0xFF26A69A),
             title = stringResource(R.string.about_card_credits_title),
             subtitle = stringResource(R.string.about_card_credits_subtitle),
+            trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+            onClick = { showCreditsSheet = true },
         )
 
         Button(

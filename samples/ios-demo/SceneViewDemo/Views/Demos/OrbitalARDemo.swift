@@ -14,7 +14,7 @@ import SceneViewSwift
 ///
 /// Models with a baked animation (4 streamed creatures from the `solar`
 /// `SampleAssets` category — butterfly, hummingbird, bee, fish — plus the bundled
-/// `animated_dragon`) face the orbit tangent so they "fly the orbit" naturally —
+/// `phoenix_bird`) face the orbit tangent so they "fly the orbit" naturally —
 /// their own animation does the wing flap / locomotion. Static models (red_car,
 /// nintendo_switch, retro_piano) keep a local Y spin (between 0.5 and 2.0 rad/s)
 /// so they don't look frozen.
@@ -100,8 +100,11 @@ struct OrbitalARDemo: View {
             Planet(bundledAsset: "game_boy_classic", scale: 0.12, initialAngle: .pi * 2 / 8 * 2, orbitSpeed: 0.20, spinSpeed: 1.6, height:  0.4, hasBakedAnimation: false),
             // Slot 3 — streamed hummingbird, baked anim.
             Planet(streamedSlug: hummingbird,       scale: 0.15, initialAngle: .pi * 2 / 8 * 3, orbitSpeed: 0.15, spinSpeed: 0,   height: -0.4, hasBakedAnimation: true),
-            // Slot 4 — bundled animated dragon (baked walk cycle).
-            Planet(bundledAsset: "animated_dragon", scale: 0.15, initialAngle: .pi * 2 / 8 * 4, orbitSpeed: 0.05, spinSpeed: 0,   height:  0.2, hasBakedAnimation: true),
+            // Slot 4 — bundled phoenix bird (baked flight cycle).
+            // Replaced `animated_dragon.usdz` (8.6 MB) with `phoenix_bird.usdz`
+            // (1.1 MB, baked-animation peer) as part of the Stage 3 IPA slim-down
+            // — see #1152 Stage 3 PR.
+            Planet(bundledAsset: "phoenix_bird",    scale: 0.15, initialAngle: .pi * 2 / 8 * 4, orbitSpeed: 0.05, spinSpeed: 0,   height:  0.2, hasBakedAnimation: true),
             // Slot 5 — streamed bee, baked anim.
             Planet(streamedSlug: bee,               scale: 0.10, initialAngle: .pi * 2 / 8 * 5, orbitSpeed: 0.25, spinSpeed: 0,   height: -0.5, hasBakedAnimation: true),
             // Slot 6 — bundled nintendo switch, static spinning.

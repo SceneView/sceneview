@@ -329,7 +329,19 @@
     <string name="about_card_sponsor_title">Sponsor</string>
     <string name="about_card_sponsor_subtitle">Help keep the project free &amp; active</string>
     <string name="about_card_credits_title">Credits</string>
-    <string name="about_card_credits_subtitle">Built with Filament, ARCore, Jetpack Compose</string>
+    <string name="about_card_credits_subtitle">Authors &amp; CC-BY attribution for every streamed Sketchfab model</string>
+
+    <!-- Credits bottom sheet (#1152 Stage 3 — CC-BY attribution surface) -->
+    <string name="credits_sheet_title">Streamed model credits</string>
+    <string name="credits_sheet_subtitle">Every model below is streamed from Sketchfab under CC-BY 4.0. Tap a row to open the original page.</string>
+    <string name="credits_sheet_footer">Bundled (offline) models and HDR environments are credited in assets/CREDITS.md inside the APK.</string>
+    <string name="credits_row_subtitle">by %1$s — CC-BY 4.0</string>
+    <string name="credits_row_open_cd">Open Sketchfab page</string>
+
+    <!-- Stage 3 per-demo offline indicator chip (DemoScaffold v2) -->
+    <string name="demo_chip_streamed">Streamed (cached)</string>
+    <string name="demo_chip_streaming">Streaming…</string>
+    <string name="demo_chip_bundled">Bundled fallback</string>
     <string name="about_star_on_github">Star on GitHub</string>
     <string name="about_made_with">Made with</string>
     <string name="about_made_by"> by Thomas Gorisse</string>

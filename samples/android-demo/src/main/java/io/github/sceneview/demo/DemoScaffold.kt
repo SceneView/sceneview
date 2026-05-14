@@ -61,6 +61,26 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
+ * Asset source state surfaced in the per-demo indicator chip (#1152 Stage 3).
+ *
+ * Demos that load models via `SketchfabAssetResolver` expose this state to
+ * advertise the offline / streaming / cached origin of the currently visible
+ * asset. The chip floats top-end of the scene area and is intentionally
+ * compact + low-contrast so it doesn't compete with the 3D content.
+ *
+ * - [Streamed] — model came from the Sketchfab CDN and is now cached on disk
+ *   (LRU). Subsequent launches are instant.
+ * - [Streaming] — fetch in progress; the visual is the bundled fallback for
+ *   the moment, swapping to the streamed model when [Streamed] is reached.
+ * - [Bundled] — no API key or network → showing the offline fallback declared
+ *   in the slug registry. Demos still render fully.
+ *
+ * Demos that never touch the resolver should pass `null` for the chip param so
+ * the chip is hidden entirely.
+ */
+enum class AssetSourceState { Streamed, Streaming, Bundled }
+
+/**
  * Shared scaffold for all demo screens — version 2 (modal bottom sheet).
  *
  * Renders the 3D scene **full-screen** under the top bar, with the user controls
@@ -71,6 +91,10 @@ import kotlinx.coroutines.launch
  * - `controls != null` → a `Tune` FAB pinned to the bottom-end opens the controls
  *   sheet. While the sheet is closed, a small peek chip ("Settings") sits above
  *   the FAB to advertise the gesture (see [#951] discoverability lesson).
+ * - `assetSource != null` → an "Streamed / Streaming / Bundled fallback" chip
+ *   pinned to the top-end of the scene area, advertising the offline origin
+ *   of the currently visible asset (#1152 Stage 3). The chip auto-hides when
+ *   `null` so legacy demos stay untouched.
  *
  * Gestures:
  * - **Tap FAB / tap peek chip** → opens the sheet at its partial detent.
@@ -92,6 +116,7 @@ fun DemoScaffold(
     title: String,
     onBack: () -> Unit,
     controls: (@Composable ColumnScope.() -> Unit)? = null,
+    assetSource: AssetSourceState? = null,
     scene: @Composable BoxScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -153,6 +178,10 @@ fun DemoScaffold(
         ) {
             Box(modifier = Modifier.fillMaxSize(), content = scene)
 
+            if (assetSource != null) {
+                AssetSourceChip(state = assetSource)
+            }
+
             if (controls != null) {
                 DemoSettingsLayer(
                     controlsContent = controls,
@@ -160,6 +189,47 @@ fun DemoScaffold(
                 )
             }
         }
+    }
+}
+
+/**
+ * Compact chip surfacing the [AssetSourceState] of the demo's currently
+ * visible asset. Pinned to the top-end of the scene area below the system
+ * bars so it doesn't crash into the controls FAB at the bottom-end.
+ */
+@Composable
+private fun BoxScope.AssetSourceChip(state: AssetSourceState) {
+    val (label, tint) = when (state) {
+        AssetSourceState.Streamed -> stringResource(R.string.demo_chip_streamed) to
+            MaterialTheme.colorScheme.tertiary
+        AssetSourceState.Streaming -> stringResource(R.string.demo_chip_streaming) to
+            MaterialTheme.colorScheme.primary
+        AssetSourceState.Bundled -> stringResource(R.string.demo_chip_bundled) to
+            MaterialTheme.colorScheme.outline
+    }
+    Row(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .testTag(DemoScaffoldTestTags.ASSET_SOURCE_CHIP)
+            .semantics { contentDescription = "Asset source: $label" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(tint),
+        )
+        Text(
+            text = " $label",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -174,6 +244,7 @@ object DemoScaffoldTestTags {
     const val SETTINGS_PEEK = "demo-settings-peek"
     const val SETTINGS_SHEET = "demo-settings-sheet"
     const val QA_PILL = "demo-qa-pill"
+    const val ASSET_SOURCE_CHIP = "demo-asset-source-chip"
 }
 
 /**

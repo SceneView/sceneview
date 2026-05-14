@@ -42,7 +42,9 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -156,9 +158,20 @@ fun ARPlacementDemo(onBack: () -> Unit) {
     // right now". Drag → "Moving", twist → "Rotating", pinch → "Scaling".
     var gestureMode by remember { mutableStateOf<String?>(null) }
 
+    // Per-demo offline indicator chip (#1152 Stage 3). The chip reflects the
+    // selected slug's resolve state — `null` means no slug picked yet (cycle
+    // mode), so we surface "Bundled fallback" (the cycle is 100% bundled).
+    val assetSource = when {
+        selectedSlug == null -> AssetSourceState.Bundled
+        SketchfabConfig.apiKey == null -> AssetSourceState.Bundled
+        selectedFile == null -> AssetSourceState.Streaming
+        else -> AssetSourceState.Streamed
+    }
+
     DemoScaffold(
         title = stringResource(R.string.demo_ar_placement_title),
         onBack = onBack,
+        assetSource = assetSource,
         controls = {
             Text(
                 text = "Tap a detected plane to drop a model. Each model is editable: drag to " +
