@@ -188,7 +188,12 @@ data class AABB(
             val bMin = when (axis) { 0 -> min.x; 1 -> min.y; else -> min.z }
             val bMax = when (axis) { 0 -> max.x; 1 -> max.y; else -> max.z }
 
-            if (abs(d) < 1e-10f) {
+            // 1e-6f matches the parallel-ray epsilon used in `Box.rayIntersection`
+            // after #1096. Pre-existing `1e-10f` was below FLT_EPSILON for typical
+            // normalised ray directions in [-1,1] → "parallel" branch effectively
+            // never fired, near-parallel rays divided by ~0 producing ±Inf t-values
+            // that false-passed through the slab math.
+            if (abs(d) < 1.0E-6f) {
                 if (o < bMin || o > bMax) return false
             } else {
                 var t1 = (bMin - o) / d

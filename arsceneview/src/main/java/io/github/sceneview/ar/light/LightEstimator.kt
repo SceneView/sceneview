@@ -294,34 +294,43 @@ class LightEstimator(
     companion object {
 
         /**
-         * Convert Environmental HDR's spherical harmonics to Filament spherical harmonics.
+         * Filament SH normalization factors for the 9 first-order spherical harmonic
+         * bands, in the order Filament's `IndirectLight.Builder.irradiance(3, factors)`
+         * expects (matches `filament/libs/ibl/src/CubemapSH.cpp` band layout):
          *
-         * This conversion is calculated to include the following:
-         *     - pre-scaling by SH basis normalization factor [shader optimization]
-         *     - sqrt(2) factor coming from keeping only the real part of the basis
-         *     [shader optimization]
-         *     - 1/pi factor for the diffuse lambert BRDF [shader optimization]
-         *     - |dot(n,l)| spherical harmonics [irradiance]
-         *     - scaling for convolution of SH function by radially symmetrical SH function
-         *     [irradiance]
+         *     index | band | symbol | K
+         *     ------|------|--------|----
+         *     0     | 0    | y00    |  0.282095   = sqrt(1/(4π))
+         *     1     | 1    | y1m1   | -0.325735   = sqrt(3/(4π)) signed
+         *     2     | 1    | y10    |  0.325735
+         *     3     | 1    | y11    | -0.325735
+         *     4     | 2    | y2m2   |  0.273137
+         *     5     | 2    | y2m1   | -0.273137
+         *     6     | 2    | y20    |  0.078848
+         *     7     | 2    | y21    | -0.273137
+         *     8     | 2    | y22    |  0.136569
+         *
+         * Per the ARCore docs the 27 floats from
+         * `getEnvironmentalHdrAmbientSphericalHarmonics()` are returned in the SAME
+         * order: 9 coefficients × 3 RGB channels in y00, y1m1, y10, y11, y2m2,
+         * y2m1, y20, y21, y22 sequence. The factor[i] slot at index `i/3` therefore
+         * scales the matching ARCore band directly.
+         *
+         * The pre-#1093 code applied a `mapIndexed { 6 -> [7]; 7 -> [6] }` swap
+         * after constructing this array. That swap was based on a v1.x assumption
+         * (Sceneform-era ThomasGorisse/SceneformMaintained PR #156) that the two
+         * APIs used different basis orderings. After cross-checking Filament's
+         * CubemapSH.cpp + ARCore's SH ordering docs, both use the SAME band layout.
+         * The swap inverted y20 (`0.078848`) and y21 (`-0.273137`) factors → matte
+         * surfaces in AR were lit with wrong direction-dependent shifts (y20 is
+         * the up-down axis, y21 the up-front cross term). Removed in #1093.
+         *
+         * Pinning regression test: `LightEstimatorSphericalHarmonicsTest`.
          */
-        internal val SPHERICAL_HARMONICS_IRRADIANCE_FACTORS =
-            //  SH coefficients at indices 6 and 7 are swapped between the two implementations.
-            floatArrayOf(
-                0.282095f, -0.325735f, 0.325735f,
-                -0.325735f, 0.273137f, -0.273137f,
-                0.078848f, -0.273137f, 0.136569f
-            ).let {
-                it.mapIndexed { index, value ->
-                    // SH coefficients are not in the same order in Filament and Environmental HDR.
-                    // SH coefficients at indices 6 and 7 are swapped between the two
-                    // implementations.
-                    when (index) {
-                        6 -> it[7]
-                        7 -> it[6]
-                        else -> value
-                    }
-                }
-            }
+        internal val SPHERICAL_HARMONICS_IRRADIANCE_FACTORS = floatArrayOf(
+            0.282095f, -0.325735f, 0.325735f,
+            -0.325735f, 0.273137f, -0.273137f,
+            0.078848f, -0.273137f, 0.136569f
+        )
     }
 }

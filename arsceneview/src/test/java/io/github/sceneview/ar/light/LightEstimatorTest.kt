@@ -93,22 +93,44 @@ class LightEstimatorTest {
     }
 
     /**
-     * The source array has indices 6 and 7 SWAPPED before being stored.
-     * This is required because ARCore and Filament use different SH coefficient
-     * ordering. Verify the swap happened correctly.
+     * Pinning #1093: the SH factors match Filament's `CubemapSH.cpp` band layout
+     * directly — NO swap is needed. The pre-#1093 code applied a `mapIndexed { 6 ->
+     * [7]; 7 -> [6] }` swap based on a v1.x assumption that ARCore and Filament
+     * used different orderings; cross-checking both APIs showed they use the SAME
+     * order (y00, y1m1, y10, y11, y2m2, y2m1, y20, y21, y22). The swap inverted
+     * y20 (0.078848) and y21 (-0.273137) → matte AR surfaces were lit with wrong
+     * up-axis direction-dependent shifts.
      *
-     * Source before swap:  [..., 0.078848, -0.273137, 0.136569]  (indices 6,7,8)
-     * After swap at 6↔7:   [..., -0.273137, 0.078848, 0.136569]
+     * If a future SDK upgrade actually changes ARCore's ordering, this test will
+     * fail and force a re-evaluation rather than silently producing wrong output.
      */
     @Test
-    fun `SPHERICAL_HARMONICS_IRRADIANCE_FACTORS has swapped indices 6 and 7`() {
+    fun `SPHERICAL_HARMONICS_IRRADIANCE_FACTORS matches Filament band layout (no swap, #1093)`() {
         val f = LightEstimator.SPHERICAL_HARMONICS_IRRADIANCE_FACTORS
-        // After the swap: index 6 should be the original index-7 value (-0.273137)
-        assertEquals(-0.273137f, f[6], 0.000001f)
-        // After the swap: index 7 should be the original index-6 value (0.078848)
-        assertEquals(0.078848f, f[7], 0.000001f)
-        // Index 8 is unchanged
+        // y20 = sqrt(5/(16π)) ≈ 0.078848 — Filament's CubemapSH.cpp ki[6]
+        assertEquals(0.078848f, f[6], 0.000001f)
+        // y21 = -sqrt(15/(4π))/2 ≈ -0.273137 — Filament's ki[7]
+        assertEquals(-0.273137f, f[7], 0.000001f)
+        // y22 = sqrt(15/(16π)) ≈ 0.136569 — Filament's ki[8]
         assertEquals(0.136569f, f[8], 0.000001f)
+    }
+
+    /**
+     * Full pin of all 9 SH factors against Filament's K constants. Catches any
+     * accidental reordering / sign flip / value drift in a single shot.
+     */
+    @Test
+    fun `SPHERICAL_HARMONICS_IRRADIANCE_FACTORS full Filament K layout`() {
+        val f = LightEstimator.SPHERICAL_HARMONICS_IRRADIANCE_FACTORS
+        val expected = floatArrayOf(
+            0.282095f,                              // y00
+            -0.325735f, 0.325735f, -0.325735f,      // y1m1, y10, y11
+            0.273137f, -0.273137f,                  // y2m2, y2m1
+            0.078848f, -0.273137f, 0.136569f,       // y20, y21, y22
+        )
+        for (i in expected.indices) {
+            assertEquals("factor[$i] mismatch", expected[i], f[i], 0.000001f)
+        }
     }
 
     /**
