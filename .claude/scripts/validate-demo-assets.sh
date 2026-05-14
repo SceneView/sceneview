@@ -136,20 +136,16 @@ extract_refs() {
                 continue
                 ;;
         esac
-        # Skip Swift `+Tests.swift` and Kotlin `*Test*.kt` files — they
-        # intentionally reference NOT-bundled paths (e.g. `Models/missing.usdz`)
-        # to assert fallback-failure mode. These are test fixtures, not
-        # static asset references.
+        # Skip Swift test files — they reference intentionally-missing assets
+        # ("Models/missing.usdz", "valid-\(UUID().uuidString).usdz") to exercise
+        # the not-found path of SketchfabAssetResolver.
         case "$file" in
-            *+Tests.swift|*Tests.swift|*Test.kt|*Tests.kt|*/test/*|*/androidTest/*)
-                continue
-                ;;
+            *Tests.swift|*+Tests.swift|*Test.swift) continue ;;
         esac
         # 1. Quoted literals with a known extension ("models/foo.glb", "bar.hdr")
-        # Skip strings containing `$` (Kotlin/Swift string templates), `\` (Swift
-        # `\(...)` interpolation prefix), or `<` (placeholder syntax in KDoc /
-        # Swift doc / inline comment examples). All three are runtime / docs
-        # patterns, not static asset references.
+        # Skip strings containing `$`, `\` (Swift `\(slug.uid).usdz`
+        # interpolation), or `<` (placeholder docs like `Models/<name>.usdz`) —
+        # those are runtime/template references, not static asset paths.
         # `|| true` so files with no match (grep exit 1) don't abort pipefail.
         grep -oE "\"[^\"\$\\\\<]*\.($ext_pattern)\"" "$file" 2>/dev/null |
             awk -v f="$file" '{ gsub(/"/, "", $0); printf "%s|%s\n", $0, f }' || true
