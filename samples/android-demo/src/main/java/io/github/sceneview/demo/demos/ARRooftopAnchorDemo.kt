@@ -315,7 +315,6 @@ fun ARRooftopAnchorDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = false,
-                cameraExposure = -1.0f,
                 sessionConfiguration = { session: Session, config: Config ->
                     val geospatialOk = runCatching {
                         session.isGeospatialModeSupported(Config.GeospatialMode.ENABLED)

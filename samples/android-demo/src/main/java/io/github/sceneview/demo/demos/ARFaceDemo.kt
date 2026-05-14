@@ -79,10 +79,12 @@ fun ARFaceDemo(onBack: () -> Unit) {
                 materialLoader = materialLoader,
                 planeRenderer = false,
                 sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
-                // Counter the washed-out / over-exposed selfie-camera output reported on
-                // Pixel 9 — the front camera's auto-exposure runs hotter than Camera2's
-                // baseline, producing a pale image when ARCore's defaults are kept.
-                // Negative EV darkens the preview to match natural skin tones again.
+                // Front-camera-only workaround. After #1088 realigned `ARDefaultCameraNode`
+                // to f/12 1/200 ISO 200 and #1101 removed `cameraExposure = -1.0f` from the
+                // 11 back-camera demos, the selfie camera's auto-exposure still runs hotter
+                // than Camera2's baseline on Pixel 9 (light estimation is forced DISABLED
+                // for the front camera, so the AR baseline can't compensate). Keep the
+                // negative bias here until a per-facing AE strategy lands.
                 cameraExposure = -1.5f,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D

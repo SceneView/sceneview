@@ -433,8 +433,6 @@ private fun ModeContent(
         modelLoader = modelLoader,
         materialLoader = materialLoader,
         planeRenderer = true,
-        // Same exposure tweak as ARPlacementDemo — Pixel 9 review feedback.
-        cameraExposure = -1.0f,
         playbackDataset = playbackDataset,
         sessionConfiguration = { _: Session, config: Config ->
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL

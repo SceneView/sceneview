@@ -191,7 +191,6 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
                     modelLoader = modelLoader,
                     materialLoader = materialLoader,
                     planeRenderer = true,
-                    cameraExposure = -1.0f,
                     sessionConfiguration = { session: Session, config: Config ->
                         config.planeFindingMode =
                             Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL

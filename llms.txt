@@ -122,6 +122,7 @@ fun ARSceneView(
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberAREnvironment(engine),
     mainLightNode: LightNode? = rememberMainLightNode(engine),
+    fillLightNode: LightNode? = rememberFillLightNode(engine),  // v4.3.0+ — dual-light AR baseline; pass null for single-light
     cameraNode: ARCameraNode = rememberARCameraNode(engine),
     collisionSystem: CollisionSystem = rememberCollisionSystem(view),
     viewNodeWindowManager: ViewNode.WindowManager? = null,
@@ -155,7 +156,10 @@ fun MyARScreen() {
         sessionConfiguration = { session, config ->
             config.depthMode = Config.DepthMode.AUTOMATIC
             config.instantPlacementMode = Config.InstantPlacementMode.LOCAL_Y_UP
-            config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+            // ENVIRONMENTAL_HDR is the v4.3.0+ default — set BEFORE this callback runs. Front
+            // camera sessions are clamped to DISABLED inside ARSession.configure regardless.
+            // Uncomment to opt back into AMBIENT_INTENSITY:
+            // config.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
         },
         onSessionCreated = { session -> /* ARCore session ready */ },
         onSessionResumed = { session -> /* session resumed */ },

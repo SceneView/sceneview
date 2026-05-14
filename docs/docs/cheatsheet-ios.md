@@ -70,6 +70,10 @@ ARSceneView(
 .onSessionStarted { arView in }       // called when AR session begins
 ```
 
+Environment texturing defaults to `.automatic` — RealityKit's equivalent of ARCore's
+`ENVIRONMENTAL_HDR` (which became the Android default in v4.3.0, `#1063`). PBR reflections
+are driven by runtime-built environment probes; no configuration knob is exposed.
+
 ## ARRecorder (v4.3.0+, record-only)
 
 Inside a SwiftUI `View` body:

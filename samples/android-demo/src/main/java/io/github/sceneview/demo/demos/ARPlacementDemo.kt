@@ -142,11 +142,6 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = true,
-                // Pixel 9 review feedback: the rear-camera preview was washed out on
-                // this device — ARCore's auto-exposure under ENVIRONMENTAL_HDR
-                // overshoots Camera2's baseline. Apply a -1 EV bias for realistic
-                // tones, matching ar-pose / ar-streetscape.
-                cameraExposure = -1.0f,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
