@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Added — Stage 2 demo migrations: `ModelViewerDemo` gains a "Surprise me" Sketchfab pick ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+Second Stage 2 migration. `ModelViewerDemo` keeps the bundled `khronos_damaged_helmet.glb` as its hero default (so screenshots / Play Store store assets stay byte-identical) and adds an `ExtendedFloatingActionButton` that streams a fresh downloadable Sketchfab model on demand:
+
+- **Default state.** Bundled helmet, same as before. The hero shot the store-page renders promise.
+- **Tap "Surprise me".** Calls `SketchfabService.search(query, downloadable = true, limit = 24)` with a small rotating PBR-friendly query list (`pbr` / `modern` / `scan`), filters to `downloadable && faceCount in 1..200_000` (so a 5 M-poly scan doesn't stall the demo), picks a random hit, and downloads it through the shared `SketchfabService` cache. The streamed pick replaces the helmet for the rest of the session until the next tap.
+- **No-key build.** The FAB is hidden when `SketchfabConfig.apiKey == null` (App Store / no-secret CI builds) — silently falling back to the same helmet would mislead users about the demo's capability.
+- **Failure modes are silent.** A 4xx / 5xx / empty-results path keeps the helmet on screen rather than going black. The `surpriseInFlight` flag flips back to `false` so the user can retry.
+
+**Files touched:**
+
+- `samples/android-demo/.../demos/ModelViewerDemo.kt` — full rewrite of the composable. Adds the FAB, the surprise coroutine, the failure-keeps-helmet contract. Streamed instance scaled to 0.4 m (vs the helmet's historical 0.3 m) so a 5 cm bee and a 5 m crate both read in the orbit sweet spot.
+- `samples/android-demo/src/main/res/values/strings.xml` + `values-fr/strings.xml` — 3 new keys: `demo_model_viewer_loading`, `demo_model_viewer_surprise`, `demo_model_viewer_surprise_loading`.
+
+**iOS counterpart.** No iOS file change — there is no dedicated `ModelViewerDemo.swift`. The iOS deep-link router already maps `"model-viewer"` to `SceneGalleryDemo` (`DemoDeepLinkRegistry.swift:77`), which already streams Sketchfab content (now with the Stage 2 gallery migration). The iOS Explore tab is the canonical "browse + surprise" experience on iOS.
+
+**`SampleAssets` slugs added:** 0. The Surprise path doesn't go through the curated registry — it's a free-form Sketchfab search restricted to `downloadable && PBR-friendly`. The license filter on the search side is not yet a 100% guarantee of CC-BY (Sketchfab returns mixed CC variants); Stage 3 will add a license-filter pass before the model lands on screen + a Credits sheet exposing the per-pick attribution.
+
+**i18n hygiene.** All three new FAB strings ship in EN + FR. No raw English leaks on the FR locale.
+
+**Screen recording.** Deferred to the combined Stage 2 visual-smoke pass.
+
+**Acceptance:** Android `./gradlew :samples:android-demo:compileDebugKotlin` GREEN. `:samples:android-demo:testDebugUnitTest --tests "io.github.sceneview.demo.sketchfab.*"` GREEN (27/27 unchanged).
+
 ### Added — Stage 2 demo migrations: `SceneGalleryDemo` streams the curated `gallery` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 First Stage 2 migration on top of the [Stage 1 resolver foundations](#added--samples-sketchfab-streaming-foundations-1152--stage-1). `SceneGalleryDemo` is now a category-chip-driven streamed gallery on both Android and iOS — chips map 1:1 to the four `gallery` slugs in [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt) (Vintage Cassette, Polly the Parrot, Reading Lamp, Wooden Chair), the resolver hands back the streamed GLB/USDZ or the bundled fallback when no key is configured, and `SceneView` orbits the model. No external Sketchfab WebView — the demo only ever feeds the local file URL to `rememberModelInstance` (Android) / `ModelNode.load(contentsOf:)` (iOS).
