@@ -5,12 +5,22 @@
 # Prerequisites:
 #   - Android emulator running (adb devices shows a device)
 #   - APK built: ./gradlew :samples:android-demo:assembleDebug
+#   - Google's `android` CLI on PATH (auto-installed from ~/.local/bin if missing).
+#     See https://developer.android.com/tools/agents/android-cli — it replaces
+#     `adb shell uiautomator dump` (XML) with JSON layouts and `adb exec-out screencap`
+#     with a corruption-free `screen capture`.
 #
 # Options:
 #   --install   Install APK before testing
 #   --report    Generate HTML report after testing
 
 set -euo pipefail
+
+# Pull in helpers for Google's Android CLI (with adb fallback).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/android-cli.sh
+source "$SCRIPT_DIR/lib/android-cli.sh"
+android_cli_ensure || true  # fallback to adb if install fails — script still works
 
 PACKAGE="io.github.sceneview.demo"
 ACTIVITY=".MainActivity"
@@ -107,11 +117,16 @@ for i in "${!DEMOS[@]}"; do
     # Clear logcat
     adb logcat -c 2>/dev/null
 
-    # Helper: dump UI and find demo coordinates
+    # Helper: dump UI as JSON via `android layout` (centers precomputed) and
+    # find the demo's tap coordinates. Falls back to uiautomator XML if the
+    # android CLI is unavailable.
     find_demo() {
-        adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-        adb pull /sdcard/ui.xml /tmp/qa_ui.xml >/dev/null 2>&1
-        python3 -c "
+        if android_cli_layout /tmp/qa_ui.json >/dev/null 2>&1; then
+            android_cli_resolve_tap /tmp/qa_ui.json "$demo" 2>/dev/null
+        else
+            adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+            adb pull /sdcard/ui.xml /tmp/qa_ui.xml >/dev/null 2>&1
+            python3 -c "
 import xml.etree.ElementTree as ET, re
 tree = ET.parse('/tmp/qa_ui.xml')
 target = '$demo'
@@ -126,6 +141,7 @@ for node in tree.iter('node'):
             print(f'{cx},{cy}')
             break
 " 2>/dev/null
+        fi
     }
 
     COORDS=$(find_demo)
@@ -173,8 +189,15 @@ for node in tree.iter('node'):
         continue
     fi
 
-    # Take screenshot
-    adb exec-out screencap -p > "$SCREENSHOT_DIR/${filename}.png" 2>/dev/null
+    # Take screenshot via `android screen capture` (LF/CRLF-safe), adb fallback.
+    if ! android_cli_screenshot "$SCREENSHOT_DIR/${filename}.png" 2>/dev/null; then
+        echo -e "${RED}SCREENSHOT FAILED${NC}"
+        RESULTS+=("FAIL|$demo|screenshot capture failed")
+        FAILED=$((FAILED + 1))
+        adb shell "input keyevent KEYCODE_BACK" 2>/dev/null
+        sleep "$WAIT_TRANSITION"
+        continue
+    fi
 
     # Check for errors in logcat
     ERRORS=$(adb logcat -d '*:E' 2>/dev/null | grep -c "FATAL\|IllegalState\|NullPointer\|ClassNotFound" || echo 0)

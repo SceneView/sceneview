@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 # AR emulator screenshot capture — uses unified android-demo app.
 # Tests AR features integrated in the demo app's AR tab.
+#
+# Uses Google's `android` CLI for install+launch and screenshots
+# (developer.android.com/tools/agents/android-cli) via the shared helper.
+# Keeps `adb` for input/sensor injection/logcat where the `android` CLI has
+# no equivalent.
 set -euo pipefail
+
+# Source the shared helper. Repo-root resolution works regardless of CWD: this
+# script lives at .github/scripts/ — go up two levels to reach the worktree root.
+THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$THIS_DIR/../.." && pwd)"
+# shellcheck source=../../.claude/scripts/lib/android-cli.sh
+source "$REPO_ROOT/.claude/scripts/lib/android-cli.sh"
+android_cli_ensure || echo "WARN: android CLI unavailable — adb fallback active." >&2
 
 # ---------------------------------------------------------------------------
 # Boot / unlock
@@ -20,7 +33,9 @@ adb shell getprop ro.build.version.release
 adb emu avd name || true
 
 # ---------------------------------------------------------------------------
-# Install ARCore and demo APK
+# Install ARCore (always via adb — ARCore APK has no launchable activity to use
+# with `android run`). The demo APK is installed-and-launched in one shot below
+# via the helper, so no separate `adb install` for it.
 # ---------------------------------------------------------------------------
 adb install -r arcore-emulator.apk
 
@@ -30,9 +45,8 @@ if [ -z "$DEMO_APK" ]; then
   echo "ERROR: android-demo APK not found"
   exit 1
 fi
-adb install -r "$DEMO_APK"
 
-# Grant camera permission
+# Grant camera permission early — must come before launch.
 adb shell pm grant io.github.sceneview.demo android.permission.CAMERA || true
 
 # ---------------------------------------------------------------------------
@@ -54,7 +68,7 @@ inject_motion() {
 # Launch demo app and capture AR tab
 # ---------------------------------------------------------------------------
 echo "=== ANDROID DEMO — AR TAB ==="
-adb shell am start -S --activity-clear-task -n "io.github.sceneview.demo/.MainActivity"
+android_cli_install_and_launch "$DEMO_APK" "io.github.sceneview.demo/.MainActivity"
 sleep 10
 inject_motion
 sleep 20
@@ -62,7 +76,10 @@ sleep 20
 adb logcat -d -s "ArCamera:*" "ArSession:*" "ARCore:*" "sceneview:*" \
   | tail -30 > ar-demo-logcat.txt || true
 
-adb exec-out screencap -p > ar-demo-screenshot.png
+if ! android_cli_screenshot ar-demo-screenshot.png; then
+  echo "ERROR: ar-demo-screenshot.png capture failed" >&2
+  exit 1
+fi
 echo "  ar-demo-screenshot.png: $(wc -c < ar-demo-screenshot.png) bytes"
 
 echo "AR screenshot captured."

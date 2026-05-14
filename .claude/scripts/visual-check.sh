@@ -1,12 +1,20 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Visual QA — capture screenshots Android + iOS et les affiche
 # Usage:
 #   bash .claude/scripts/visual-check.sh              → screenshot maintenant
 #   bash .claude/scripts/visual-check.sh before       → sauvegarde baseline
 #   bash .claude/scripts/visual-check.sh after        → sauvegarde après modif
 #   bash .claude/scripts/visual-check.sh tab 3D|AR|Samples|About  → navigue vers un onglet Android
+#
+# Côté Android: utilise Google's `android` CLI (developer.android.com/tools/agents/android-cli)
+# pour les captures — adb fallback automatique si pas installé ou multi-device.
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/android-cli.sh
+source "$SCRIPT_DIR/lib/android-cli.sh"
+android_cli_ensure || true
 
 DIR="/tmp/sceneview-visual"
 mkdir -p "$DIR"
@@ -46,7 +54,14 @@ capture_android() {
     return 1
   fi
 
-  adb exec-out screencap -p > "$filename" 2>/dev/null
+  # `android screen capture` when single-device; adb fallback for multi-device.
+  # Diagnostics from the helper go to stderr — let them through so failures are
+  # visible (the previous adb-only version had nothing to say, but the helper
+  # surfaces multi-device / ToS issues here).
+  if ! android_cli_screenshot "$filename"; then
+    echo -e "${RED}[Android] Screenshot échoué → $filename${NC}"
+    return 1
+  fi
   echo -e "${GREEN}[Android] Screenshot → $filename${NC}"
   echo "$filename"
 }

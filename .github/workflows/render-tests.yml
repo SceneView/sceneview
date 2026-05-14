@@ -123,6 +123,21 @@ jobs:
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: ./gradlew :samples:android-demo:assembleDebug --stacktrace
 
+      # Google's Android CLI — UI-tree JSON, LF/CRLF-safe screenshots, single
+      # entrypoint for install+launch. https://developer.android.com/tools/agents/android-cli
+      # Source: https://dl.google.com/android/cli (Google's official SDK CDN —
+      # same trust root as the SDK Manager, so a plain HTTPS fetch is sufficient).
+      - name: Install Android CLI
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL https://dl.google.com/android/cli/latest/linux_x86_64/android \
+            -o "$HOME/.local/bin/android"
+          chmod +x "$HOME/.local/bin/android"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # `--version` accepts the first-run ToS prompt non-interactively.
+          # `--no-metrics` disables telemetry for every subsequent call.
+          "$HOME/.local/bin/android" --no-metrics --version
+
       - name: Capture demo screenshots
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
@@ -132,30 +147,40 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            # Install the demo app
-            adb install samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk || true
+            # The ReactiveCircus action runs this `script:` in its own subshell;
+            # GitHub's $GITHUB_PATH augmentation does NOT propagate here, so we
+            # re-add ~/.local/bin explicitly.
+            export PATH="$HOME/.local/bin:$PATH"
 
-            # Launch the app and wait for it to load
-            adb shell am start -n io.github.sceneview.demo/.MainActivity
+            # Block until the emulator finishes booting. The action waits for
+            # device-online but not for package-manager readiness — `android run`
+            # would otherwise race the PM during cold boot.
+            adb wait-for-device
+            until [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]]; do
+              sleep 2
+            done
+
+            # Install + launch atomically via the Android CLI.
+            android --no-metrics run \
+              --apks=samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk \
+              --activity=io.github.sceneview.demo/.MainActivity || true
             sleep 10
 
-            # Capture screenshots of the main screen
             mkdir -p demo-screenshots
-            adb exec-out screencap -p > demo-screenshots/01_demo_main.png
+            android --no-metrics screen capture --output demo-screenshots/01_demo_main.png
 
-            # Try navigating tabs via UI automation (best-effort)
-            # Swipe to next tab
+            # Tab swipes still go through adb — `android` CLI has no input-event API.
             adb shell input swipe 800 1500 200 1500 300
             sleep 5
-            adb exec-out screencap -p > demo-screenshots/02_demo_tab2.png
-
-            adb shell input swipe 800 1500 200 1500 300
-            sleep 5
-            adb exec-out screencap -p > demo-screenshots/03_demo_tab3.png
+            android --no-metrics screen capture --output demo-screenshots/02_demo_tab2.png
 
             adb shell input swipe 800 1500 200 1500 300
             sleep 5
-            adb exec-out screencap -p > demo-screenshots/04_demo_tab4.png
+            android --no-metrics screen capture --output demo-screenshots/03_demo_tab3.png
+
+            adb shell input swipe 800 1500 200 1500 300
+            sleep 5
+            android --no-metrics screen capture --output demo-screenshots/04_demo_tab4.png
 
       - name: Upload demo screenshots
         if: always()

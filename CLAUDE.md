@@ -77,6 +77,34 @@ or `materialLoader.*` from a background coroutine directly.
 `rememberModelInstance` handles this correctly — use it in composables.
 For imperative code, use `modelLoader.loadModelInstanceAsync`.
 
+## Android CLI (preferred for agent-driven QA)
+
+Google's [`android` CLI](https://developer.android.com/tools/agents/android-cli)
+(tested against **v0.7.15411012**, first release April 2026) is the agent-focused
+front-end for `adb` / `uiautomator` / `emulator` / `sdkmanager`. SceneView's QA scripts
+and CI install it on the fly and use it for:
+
+- `android layout --device=<serial> -o ui.json --pretty` — JSON UI tree with
+  **precomputed `center` coords** per node (no `uiautomator dump` XML parsing, no
+  `bounds` regex). `--diff` returns only nodes changed since the last invocation.
+- `android screen capture --output ui.png` — PNG screenshot that bypasses the adb
+  shell PTY, so it doesn't suffer the **LF/CRLF translation that the legacy
+  `adb shell screencap -p > file` form does** (modern `adb exec-out screencap` also
+  bypasses the PTY and is fine).
+- `android screen capture --annotate` + `android screen resolve --screenshot=ui.png
+  --string="tap #5"` — visual-label tapping (the AI-first workflow this CLI exists for).
+- `android run --apks=app.apk --activity=pkg/.Main` — install + launch in one call.
+
+**When to use what:**
+- Screenshots, UI dumps, install+launch → `android` CLI (via `.claude/scripts/lib/android-cli.sh`)
+- `input tap/swipe/keyevent`, `am force-stop`, `pm grant`, `emu sensor set`, `logcat`,
+  `adb pull` → still `adb` — the CLI has no equivalent in v0.7
+
+The helper auto-installs the CLI to `~/.local/bin/android` on first use and falls back to
+`adb` if the install fails or on multi-device hosts (the `screen capture` subcommand
+has no `--device` flag in v0.7 — but `android layout --device=<serial>` does work).
+Telemetry is disabled via `--no-metrics` on every invocation.
+
 ## Samples
 
 One unified showcase app per platform — all features integrated into tabs.
@@ -467,6 +495,10 @@ Hooks trigger automatically on specific Claude Code actions:
 | `sync-versions.sh` | Scan ALL version declarations, report/fix mismatches |
 | `cross-platform-check.sh` | Compare Android vs iOS vs Web API surface, report gaps |
 | `release-checklist.sh` | Pre-release validation (versions, changelog, tests, etc.) |
+| `lib/android-cli.sh` | Shared helpers for Google's `android` CLI (screenshot, layout, install+launch) with `adb` fallback |
+| `qa-android-demos.sh` | QA loop over every demo — uses `android layout`/`screen capture` for the UI dump and screenshots |
+| `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
+| `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |
 
 ### Version location map
 
