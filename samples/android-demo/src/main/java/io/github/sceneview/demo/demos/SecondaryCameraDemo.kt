@@ -40,16 +40,24 @@ import io.github.sceneview.rememberModelLoader
 /**
  * Secondary camera (picture-in-picture) demo.
  *
- * Two [SceneView]s share the same engine/loaders/model and render the helmet
+ * Two [SceneView]s share the same engine/loaders and render the helmet
  * simultaneously:
  *  - the main view uses the default orbital camera (user-interactive),
  *  - the small PiP overlay binds a dedicated [rememberCameraNode] driven by the
  *    selected preset chip (Top / Side / Front / Corner), so switching chips
  *    actually changes what the PiP shows (top-down, side profile, front-on, 3/4).
  *
+ * Each view loads its own [ModelInstance] — two SceneViews cannot share one
+ * instance because [ModelNode]'s wrapper entity is `modelInstance.root`, so a
+ * single instance attached to two scenes would be destroyed twice on dispose
+ * (SIGABRT) and its child light/camera nodes reparented to whichever ModelNode
+ * was built last. `rememberModelInstance` calls are cheap — the GLB bytes are
+ * parsed once into the shared [io.github.sceneview.loaders.ModelLoader] cache.
+ *
  * The PiP SceneView uses [SurfaceType.TextureSurface] so it composites
  * correctly over the main [SurfaceType.Surface] view with rounded corners and
- * a translucent background.
+ * a translucent background. Placed top-start so it never collides with the
+ * top-end `AssetSourceChip` or bottom-end settings FAB used by [DemoScaffold].
  */
 @Composable
 fun SecondaryCameraDemo(onBack: () -> Unit) {
@@ -58,15 +66,13 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
 
-    val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+    val mainInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+    val pipInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
     var cameraPreset by remember { mutableStateOf(CameraPreset.TOP) }
     val target = remember { Position(0f, 0f, 0f) }
 
-    val pipCameraNode = rememberCameraNode(engine) {
-        position = CameraPreset.TOP.eye
-        lookAt(target)
-    }
+    val pipCameraNode = rememberCameraNode(engine)
     LaunchedEffect(cameraPreset) {
         pipCameraNode.position = cameraPreset.eye
         pipCameraNode.lookAt(target)
@@ -98,7 +104,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,
         ) {
-            modelInstance?.let { instance ->
+            mainInstance?.let { instance ->
                 ModelNode(
                     modelInstance = instance,
                     scaleToUnits = 0.5f,
@@ -109,7 +115,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
 
         Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopStart)
                 .padding(16.dp)
                 .size(160.dp, 120.dp)
                 .clip(RoundedCornerShape(12.dp))
@@ -125,7 +131,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
                 environmentLoader = environmentLoader,
                 cameraNode = pipCameraNode,
             ) {
-                modelInstance?.let { instance ->
+                pipInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
                         scaleToUnits = 0.5f,
