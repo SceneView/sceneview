@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased — v4.3.5 hotfix (in progress)
+## v4.3.5 — Pixel 9 production polish: AR demo UX fixes + FR i18n + CI dedup + iOS pull-to-refresh (2026-05-15)
+
+### Added — iOS pull-to-refresh on Explore feeds ([#1211](https://github.com/sceneview/sceneview/issues/1211) item 1 — [PR #1225](https://github.com/sceneview/sceneview/pull/1225))
+
+- **iOS pull-to-refresh on Sketchfab Explore feeds** — `samples/ios-demo/SceneViewDemo/Views/ExploreTab.swift` now wires `.refreshable { await loadSketchfabFeeds(force: true) }` on the ExploreTab `ScrollView`, mirroring the Android `PullToRefreshBox` shipped in v4.3.4 ([PR #1203](https://github.com/sceneview/sceneview/pull/1203)). New `loadSketchfabFeeds(force: Bool = false)` overload bypasses the "already loaded" guard when invoked from the swipe-down gesture, and conditionally gates the loader on `SketchfabConfig.apiKey` so builds without the key don't spinner-flash on every refresh. Items 2 (`matchedGeometryEffect` hero zoom) and 3 (ARTab close affordance) from [#1211](https://github.com/sceneview/sceneview/issues/1211) remain open as follow-ups.
+
+### Fixed — SPM version drift caught post-v4.3.4 ([PR #1217](https://github.com/sceneview/sceneview/pull/1217))
+
+- **2 stale SPM `from: "4.3.3"` references bumped to 4.3.4** — `pro/gpt-store/gpt-instructions.md:77` and `marketing/stackoverflow/qa-drafts.md:215`. Both files live in non-canonical directories that `sync-versions.sh` doesn't sweep, so the drift slipped past the v4.3.4 release cut ([#1153](https://github.com/sceneview/sceneview/issues/1153)). Surfaced by `.claude/scripts/impact-check.sh` after [PR #1203](https://github.com/sceneview/sceneview/pull/1203) landed.
 
 ### Changed — CI workflow deduplication (~20 min saved per PR)
 
