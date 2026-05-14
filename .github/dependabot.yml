@@ -25,6 +25,18 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # Filament runtime ↔ .filamat ABI invariant: a runtime bump WITHOUT
+      # recompiling every `.filamat` blob in the same PR ships a crash (cf.
+      # CLAUDE.md "Filament runtime ↔ .filamat ABI invariant"). Dependabot
+      # can't recompile blobs, so its filament bumps always fail quality-gate
+      # for the wrong reason — block them and let a contributor cut the bump
+      # plus the matc recompile in a single manual PR.
+      - dependency-name: "com.google.android.filament:*"
+      # Compose Material3 alphas now require AGP 9.1+ / compileSdk 37+ ahead
+      # of the rest of the toolchain. Re-enable when the project upgrades
+      # AGP (tracked separately in the maintenance dep-version-check report).
+      - dependency-name: "androidx.compose.material3:material3"
+        versions: [">=1.5.0-alpha19"]
 
   # npm — MCP server
   - package-ecosystem: "npm"
