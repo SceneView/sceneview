@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## v4.3.2 — #1152 Sketchfab streaming complete + iOS key + DemoScaffold v2 + APK slim (2026-05-14)
+
+### Security — `fast-xml-parser` bumped to 5.7.0+ via npm overrides ([Dependabot alert #139](https://github.com/sceneview/sceneview/security/dependabot/139) — [PR #1162](https://github.com/sceneview/sceneview/pull/1162))
+
+Resolves [CVE-2026-41650 / GHSA-gh4j-gqv2-49f6](https://github.com/NaturalIntelligence/fast-xml-parser/security/advisories/GHSA-gh4j-gqv2-49f6) — `fast-xml-parser` XMLBuilder fails to escape `-->` (comment) and `]]>` (CDATA) delimiters, allowing XML injection / XSS / SOAP-injection when user-controlled data flows into those contexts.
+
+- **Package**: `fast-xml-parser` (npm, dev-only transitive in `react-native/react-native-sceneview`).
+- **Resolved version before fix**: `4.5.6` → **after fix**: `5.8.0`.
+- **Severity**: moderate (CVSS 6.1).
+- **Dependency chain**: `react-native` (devDep) → `@react-native-community/cli-platform-ios@11.4.1` → `fast-xml-parser@^4.0.12`.
+
+Fix shipped as an npm `overrides` block in `react-native/react-native-sceneview/package.json` — the standard npm 8+ way to force a safe transitive version without migrating `react-native` from 0.72 to a newer line. `npm install --package-lock-only` regenerated the lockfile cleanly; `npm audit` reports `found 0 vulnerabilities`. Dev-only chain (every entry in the affected closure is `"dev": true`); **no published runtime artefact from `@sceneview-sdk/react-native` ships `fast-xml-parser`**.
 
 ### Changed — Stage 3 polish + APK slim-down + Credits sheet for streamed assets ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 3)
 
