@@ -127,20 +127,33 @@ struct ARRecorderDemo: View {
             }
 
             if let url = recorder.lastOutputURL {
-                HStack(spacing: 10) {
+                VStack(spacing: 6) {
                     Text(url.lastPathComponent)
                         .font(.caption2.monospaced())
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    ShareLink(item: url) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.caption)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.white.opacity(0.15))
-                            .clipShape(Capsule())
+                    HStack(spacing: 10) {
+                        Button(action: { saveToPhotos(url) }) {
+                            Label("Save to Photos", systemImage: "photo.on.rectangle.angled")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.accentColor)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+
+                        ShareLink(item: url) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(.white.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
                     }
                 }
             }
@@ -188,6 +201,24 @@ struct ARRecorderDemo: View {
 
     private func humanFileSize(_ bytes: Int) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+
+    /// Wraps `ARRecorder.saveToPhotoLibrary` with a status-banner update
+    /// so the user knows whether the save succeeded, was denied, or
+    /// failed. Tied to the view's `activeTask` so disappear cancels it.
+    private func saveToPhotos(_ url: URL) {
+        activeTask?.cancel()
+        activeTask = Task {
+            statusMessage = "Saving to Photos…"
+            do {
+                try await ARRecorder.saveToPhotoLibrary(url)
+                if Task.isCancelled { return }
+                statusMessage = "Saved to Photos"
+            } catch {
+                if Task.isCancelled { return }
+                statusMessage = "Save failed: \(error.localizedDescription)"
+            }
+        }
     }
 }
 #endif

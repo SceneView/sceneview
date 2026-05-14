@@ -97,8 +97,25 @@ capture screen pixels (NOT an ARKit session dataset). The `.mov` plays
 back in Photos / QuickTime; it **cannot** be replayed into `ARSession`
 (ARKit has no deterministic playback API — replay stays Android-only).
 Typed errors via `ARRecorderError.{permissionDenied, disabled,
-unavailable, alreadyRecording, notRecording, other(code:)}`. See the
-parity table below.
+unavailable, alreadyRecording, notRecording, other(code:),
+photoLibraryDenied, photoLibrarySaveFailed}`. See the parity table below.
+
+### Save to Photos (v4.3.1+)
+
+```swift
+// after stopRecording() returns the URL:
+try await ARRecorder.saveToPhotoLibrary(url)
+```
+
+Wraps `PHPhotoLibrary.shared().performChanges` to copy the `.mov` into
+the system Photos library — mirrors Android's `ARRecorder.exportToDownloads()`.
+First call surfaces the system permission sheet; subsequent calls go
+straight through. **Requires** the host app's `Info.plist` to declare
+`NSPhotoLibraryAddUsageDescription` — without it, iOS crashes the app
+on first invocation per Apple's privacy policy.
+
+On user denial throws `ARRecorderError.photoLibraryDenied`; on
+`performChanges` failure throws `.photoLibrarySaveFailed`.
 
 ---
 
