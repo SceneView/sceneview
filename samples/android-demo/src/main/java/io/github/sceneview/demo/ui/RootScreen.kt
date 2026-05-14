@@ -56,14 +56,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
 import io.github.sceneview.demo.ALL_DEMOS
 import io.github.sceneview.demo.BuildConfig
 import io.github.sceneview.demo.DemoEntry
 import io.github.sceneview.demo.DemoListScreen
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.ui.explore.ExploreTabScreen
 
 /**
@@ -88,7 +91,7 @@ fun RootScreen(onDemoClick: (String) -> Unit) {
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
                         icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) },
+                        label = { Text(stringResource(tab.labelRes)) },
                     )
                 }
             }
@@ -112,11 +115,11 @@ fun RootScreen(onDemoClick: (String) -> Unit) {
     }
 }
 
-enum class RootTab(val label: String, val icon: ImageVector) {
-    Explore("Explore", Icons.Filled.Search),
-    ArView("AR View", Icons.Filled.ViewInAr),
-    Samples("Samples", Icons.Filled.PlayArrow),
-    About("About", Icons.Filled.Info),
+enum class RootTab(@StringRes val labelRes: Int, val icon: ImageVector) {
+    Explore(R.string.tab_explore, Icons.Filled.Search),
+    ArView(R.string.tab_ar_view, Icons.Filled.ViewInAr),
+    Samples(R.string.tab_samples, Icons.Filled.PlayArrow),
+    About(R.string.tab_about, Icons.Filled.Info),
 }
 
 /**
@@ -163,46 +166,46 @@ private fun AboutTabContent() {
         AboutInfoCard(
             icon = Icons.Filled.Favorite,
             iconColor = Color(0xFFE91E63),
-            title = "Open Source",
-            subtitle = "Apache 2.0 — free for any project, forever",
+            title = stringResource(R.string.about_card_open_source_title),
+            subtitle = stringResource(R.string.about_card_open_source_subtitle),
         )
         AboutInfoCard(
             icon = Icons.Filled.Book,
             iconColor = Color(0xFF2196F3),
-            title = "Documentation",
-            subtitle = "Guides, API reference, recipes",
+            title = stringResource(R.string.about_card_docs_title),
+            subtitle = stringResource(R.string.about_card_docs_subtitle),
             trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
             onClick = { openLink("https://sceneview.github.io") },
         )
         AboutInfoCard(
             icon = Icons.Filled.Code,
             iconColor = Color(0xFF5C6BC0),
-            title = "GitHub",
-            subtitle = "Source, issues, releases",
+            title = stringResource(R.string.about_card_github_title),
+            subtitle = stringResource(R.string.about_card_github_subtitle),
             trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
             onClick = { openLink("https://github.com/sceneview/sceneview") },
         )
         AboutInfoCard(
             icon = Icons.Filled.PlayArrow,
             iconColor = Color(0xFFFF9800),
-            title = "3D Playground",
-            subtitle = "Try every feature in the browser",
+            title = stringResource(R.string.about_card_playground_title),
+            subtitle = stringResource(R.string.about_card_playground_subtitle),
             trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
             onClick = { openLink("https://sceneview.github.io/playground.html") },
         )
         AboutInfoCard(
             icon = Icons.Filled.Favorite,
             iconColor = Color(0xFFF44336),
-            title = "Sponsor",
-            subtitle = "Help keep the project free & active",
+            title = stringResource(R.string.about_card_sponsor_title),
+            subtitle = stringResource(R.string.about_card_sponsor_subtitle),
             trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
             onClick = { openLink("https://github.com/sponsors/sceneview") },
         )
         AboutInfoCard(
             icon = Icons.Filled.Group,
             iconColor = Color(0xFF26A69A),
-            title = "Credits",
-            subtitle = "Built with Filament, ARCore, Jetpack Compose",
+            title = stringResource(R.string.about_card_credits_title),
+            subtitle = stringResource(R.string.about_card_credits_subtitle),
         )
 
         Button(
@@ -218,7 +221,7 @@ private fun AboutTabContent() {
         ) {
             Icon(Icons.Filled.Star, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text("Star on GitHub", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.about_star_on_github), style = MaterialTheme.typography.titleMedium)
         }
 
         Column(
@@ -227,7 +230,7 @@ private fun AboutTabContent() {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Made with ",
+                    stringResource(R.string.about_made_with) + " ",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -238,13 +241,13 @@ private fun AboutTabContent() {
                     modifier = Modifier.size(14.dp),
                 )
                 Text(
-                    " by Thomas Gorisse",
+                    stringResource(R.string.about_made_by),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
-                "and the SceneView contributors",
+                stringResource(R.string.about_made_by_team),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -287,7 +290,7 @@ private fun AboutHeroCard() {
                 )
             }
             Text(
-                "SceneView",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -319,7 +322,7 @@ private fun AboutHeroCard() {
                 }
             }
             Text(
-                "3D & AR for Jetpack Compose, SwiftUI, and the Web.\nDeclarative, AI-friendly, open source.",
+                stringResource(R.string.about_tagline_hero),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

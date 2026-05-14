@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.AugmentedFace
 import com.google.ar.core.Config
@@ -25,6 +26,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -68,7 +70,7 @@ fun ARFaceDemo(onBack: () -> Unit) {
     val faceMaterial = rememberUnlitMaterialInstance(materialLoader, SceneViewColors.PrimaryOverlay)
 
     DemoScaffold(
-        title = "Face Mesh",
+        title = stringResource(R.string.demo_ar_face_title),
         onBack = onBack
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

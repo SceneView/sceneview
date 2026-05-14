@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -40,6 +41,7 @@ import dev.romainguy.kotlin.math.Quaternion
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.RooftopAnchorNode
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -114,7 +116,7 @@ fun ARRooftopAnchorDemo(onBack: () -> Unit) {
     }
 
     if (!permissionsResolved || !cameraGranted || !fineLocationGranted) {
-        DemoScaffold(title = "Rooftop Anchors", onBack = onBack) {
+        DemoScaffold(title = stringResource(R.string.demo_ar_rooftop_title), onBack = onBack) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = permissionDeniedReason ?: "Requesting permissions…",
@@ -167,7 +169,7 @@ fun ARRooftopAnchorDemo(onBack: () -> Unit) {
     val labelInstance = rememberModelInstance(modelLoader, "models/khronos_lantern.glb")
 
     DemoScaffold(
-        title = "Rooftop Anchors",
+        title = stringResource(R.string.demo_ar_rooftop_title),
         onBack = onBack,
         controls = {
             Text(

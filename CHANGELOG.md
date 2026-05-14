@@ -47,6 +47,23 @@ The v4.3.0 cut commit `efc168bc` introduced a multi-line backslash continuation 
 
 ## Unreleased
 
+### Fixed — i18n: migrate `android-demo` UI to `stringResource(R.string.…)` ([#1099](https://github.com/sceneview/sceneview/issues/1099))
+
+PR [#1073](https://github.com/sceneview/sceneview/pull/1073) added `samples/android-demo/src/main/res/values-fr/strings.xml` (164 keys) but the Compose UI never read them — every `Text("…")` was a hardcoded English literal, so switching the device locale to French at runtime had zero visible effect.
+
+This PR fully closes [#955](https://github.com/sceneview/sceneview/issues/955) by migrating every public-facing UI surface to `stringResource(R.string.…)`:
+
+- **`DemoEntry` data class refactor** — `title: String, subtitle: String` → `@StringRes titleRes: Int, @StringRes subtitleRes: Int`. The `category` field stays a stable non-translated key (used as map key + accent-colour lookup) with a parallel `categoryDisplayNameRes(category)` helper that returns the localized header.
+- **37-demo registry rewritten** to thread `R.string.demo_*_title` / `R.string.demo_*_subtitle` IDs through to the Samples grid and the Explore "Try a sample" carousel.
+- **39 per-demo `DemoScaffold(title = "…")` callsites** migrated to `stringResource(R.string.demo_*_title)` — every demo's `TopAppBar` title now follows the active locale.
+- **Top-level UI surfaces migrated**: `RootScreen.kt` (4 tab labels, About-tab 6 cards + hero tagline + footer + Star CTA), `ArViewTab.kt` (full launcher screen — status messages, CTA labels, featured-demo card titles, status pill, model picker, share toast, tracking-failure friendly names), `DemoListScreen.kt` (Samples title, "About" action, status chips, footer), `DemoScaffold.kt` (back-button content description), `MainActivity.kt` (`PlaceholderDemo` "Coming soon" + entry title fallback), `ExploreTabScreen.kt` (Explore heading, search placeholder, Animated filter chip, all carousel section titles, Categories, Recent searches, Clear, Remove $query), `SketchfabModelViewerScreen.kt` (Animated pill, Open-in-SceneView CTA, loading / streaming / rendered-by labels, error screen + Try again, download-failed fallback).
+- **`strings.xml` expanded** from 164 → 270+ keys, covering every public-facing UI string in the priority surfaces. FR `values-fr/strings.xml` mirrors 1-to-1.
+- **Locale-flip verified end-to-end** on Pixel_7a emulator using Android 13+ per-app locale (`adb shell cmd locale set-app-locales io.github.sceneview.demo --locales fr-FR`). 4 tabs + AR launcher + Samples list + a demo AppBar all flip between EN ⇄ FR, with no regressions. Sketchfab category chips still come from `SketchfabCategories.kt` and stay English — out of scope for #1099, separate larger refactor.
+- **Existing legacy keys preserved** (e.g. `demo_lighting`, `demo_geometry`, etc.) for backwards compatibility with any external consumer holding refs to them.
+- **`DeepLinkRouterTest.kt`** updated to pass `R.string.*` IDs instead of literal `"Title", "Subtitle"` strings — title / subtitle are not part of the route, so any pair satisfies the type.
+
+Build green: `:samples:android-demo:compileDebugKotlin` + `:assembleDebug` + `:testDebugUnitTest` + `:sceneview:compileReleaseKotlin` + `:arsceneview:compileReleaseKotlin` all succeed locally.
+
 ### Added — iOS parity: `LightSlot` + `.fillLight(_:)` on `ARSceneView` ([#1138](https://github.com/sceneview/sceneview/issues/1138))
 
 Port the second half of Android v4.3.0's `#1063` (dual-light AR baseline + `ENVIRONMENTAL_HDR` default) to `SceneViewSwift.ARSceneView`. The 3D `SceneView` already shipped these in v4.2.0 (`#1016`); AR was the missing surface.

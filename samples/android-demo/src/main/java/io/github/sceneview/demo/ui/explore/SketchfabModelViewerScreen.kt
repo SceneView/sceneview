@@ -45,6 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import io.github.sceneview.demo.R
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -196,7 +198,7 @@ private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit)
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Animated",
+                        text = stringResource(R.string.sketchfab_animated),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onTertiary,
                         fontWeight = FontWeight.SemiBold,
@@ -234,13 +236,13 @@ private fun PreviewContent(model: SketchfabModel, onOpenInSceneView: () -> Unit)
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Open in SceneView",
+                text = stringResource(R.string.sketchfab_open_in_sceneview),
                 fontWeight = FontWeight.SemiBold,
             )
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Rendered locally by Filament — no external viewer.",
+            text = stringResource(R.string.sketchfab_rendered_locally),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
@@ -306,7 +308,7 @@ private fun DownloadingContent(
         }
         result.fold(
             onSuccess = onReady,
-            onFailure = { onError(it.message ?: "Download failed") },
+            onFailure = { onError(it.message ?: context.getString(R.string.sketchfab_download_failed)) },
         )
     }
 
@@ -355,13 +357,13 @@ private fun DownloadingContent(
                     CircularProgressIndicator()
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "Loading ${model.name}…",
+                        text = stringResource(R.string.sketchfab_loading_model, model.name),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Streaming from Sketchfab · rendering in SceneView",
+                        text = stringResource(R.string.sketchfab_streaming_from),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -479,7 +481,7 @@ private fun RenderContent(
             modifier = Modifier.padding(horizontal = 20.dp),
         )
         Text(
-            text = "Rendered by SceneView · ${model.formattedFaceCount()} polys",
+            text = stringResource(R.string.sketchfab_rendered_by, model.formattedFaceCount()),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 20.dp),
@@ -500,7 +502,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Couldn't open this model",
+            text = stringResource(R.string.sketchfab_could_not_open),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.error,
         )
@@ -511,6 +513,6 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onRetry) { Text("Try again") }
+        Button(onClick = onRetry) { Text(stringResource(R.string.sketchfab_try_again)) }
     }
 }

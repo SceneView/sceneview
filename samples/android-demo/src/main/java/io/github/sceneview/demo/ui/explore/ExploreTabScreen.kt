@@ -48,10 +48,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.demo.DemoEntry
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.sketchfab.SketchfabModel
 import io.github.sceneview.demo.sketchfab.SketchfabService
@@ -129,7 +131,7 @@ fun ExploreTabScreen(
     ) {
         Spacer(Modifier.height(0.dp))
         Text(
-            text = "Explore",
+            text = stringResource(R.string.explore_heading),
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -148,7 +150,7 @@ fun ExploreTabScreen(
         }
 
         if (curatedSamples.isNotEmpty()) {
-            CarouselSection(title = "Try a sample") {
+            CarouselSection(title = stringResource(R.string.explore_try_a_sample)) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(curatedSamples) { sample ->
                         SampleCard(sample = sample, onClick = { onSampleClick(sample) })
@@ -169,19 +171,19 @@ fun ExploreTabScreen(
             // sample" carousel + Categories grid silently. A red dev-style
             // error banner here was the v4.1.0 "horrible UI" complaint.
             FeedSection(
-                title = "Trending models",
+                title = stringResource(R.string.explore_trending_models),
                 models = mostLiked,
                 loading = loadingFeeds && mostLiked.isEmpty(),
                 onModelClick = { selectedModel = it },
             )
             FeedSection(
-                title = "Staff picks",
+                title = stringResource(R.string.explore_staff_picks),
                 models = staffPicks,
                 loading = loadingFeeds && staffPicks.isEmpty(),
                 onModelClick = { selectedModel = it },
             )
             FeedSection(
-                title = "Recently added",
+                title = stringResource(R.string.explore_recently_added),
                 models = recent,
                 loading = loadingFeeds && recent.isEmpty(),
                 onModelClick = { selectedModel = it },
@@ -219,7 +221,7 @@ private fun SearchField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text("Search 3D models on Sketchfab") },
+        placeholder = { Text(stringResource(R.string.explore_search_placeholder)) },
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         singleLine = true,
         shape = RoundedCornerShape(28.dp),
@@ -228,7 +230,7 @@ private fun SearchField(
         trailingIcon = if (value.isNotEmpty()) {
             {
                 IconButton(onClick = { onValueChange("") }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.explore_clear_search))
                 }
             }
         } else null,
@@ -241,7 +243,7 @@ private fun FiltersBar(animatedOnly: Boolean, onToggle: () -> Unit) {
         FilterChip(
             selected = animatedOnly,
             onClick = onToggle,
-            label = { Text("Animated") },
+            label = { Text(stringResource(R.string.explore_filter_animated)) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Filled.AutoAwesome,
@@ -368,14 +370,14 @@ private fun SampleCard(sample: DemoEntry, onClick: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = sample.title,
+                    text = stringResource(sample.titleRes),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                 )
                 Text(
-                    text = sample.subtitle,
+                    text = stringResource(sample.subtitleRes),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -401,7 +403,7 @@ private fun CategoriesSection(onCategoryClick: (SketchfabCategory) -> Unit) {
     val scrollState = rememberScrollState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "Categories",
+            text = stringResource(R.string.explore_categories),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -460,13 +462,13 @@ private fun RecentSearchesSection(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = "Recent searches",
+                text = stringResource(R.string.explore_recent_searches),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onClear) { Text("Clear") }
+            TextButton(onClick = onClear) { Text(stringResource(R.string.explore_clear)) }
         }
         items.forEach { query ->
             Row(
@@ -491,7 +493,7 @@ private fun RecentSearchesSection(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = { onRemove(query) }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove $query")
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.explore_remove_query, query))
                 }
             }
         }

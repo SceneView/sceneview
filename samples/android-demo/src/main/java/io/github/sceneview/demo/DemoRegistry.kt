@@ -1,5 +1,6 @@
 package io.github.sceneview.demo
 
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.BlurOn
@@ -61,78 +62,116 @@ enum class DemoStatus {
 /**
  * One entry in the curated demo list shown on the Samples tab.
  *
- * @param id        Stable identifier used by the deep-link router
- *                  (`sceneview://demo/<id>`) and as a Compose key.
- * @param title     Short headline shown on the card.
- * @param subtitle  One-line description rendered under [title].
- * @param category  Section header on the Samples tab; ordered by [DEMO_CATEGORIES].
- * @param icon      Material icon used to give the card visual identity
- *                  in the absence of a captured 3D thumbnail.
- * @param status    See [DemoStatus]. Defaults to [DemoStatus.Working].
+ * String content is referenced through Android resources so locale flips
+ * (English / French today, more locales tomorrow) take effect at runtime
+ * without re-shipping. Closes #1099 / #955.
+ *
+ * @param id          Stable identifier used by the deep-link router
+ *                    (`sceneview://demo/<id>`) and as a Compose key.
+ * @param titleRes    Short headline shown on the card — resolved with
+ *                    [androidx.compose.ui.res.stringResource] at the call site.
+ * @param subtitleRes One-line description rendered under [titleRes].
+ * @param category    Stable, non-translated category key. Used as a map key
+ *                    when grouping demos and to look up the per-category
+ *                    accent colour — see [categoryDisplayNameRes] for the
+ *                    localized header label.
+ * @param icon        Material icon used to give the card visual identity
+ *                    in the absence of a captured 3D thumbnail.
+ * @param status      See [DemoStatus]. Defaults to [DemoStatus.Working].
  */
 data class DemoEntry(
     val id: String,
-    val title: String,
-    val subtitle: String,
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int,
     val category: String,
     val icon: ImageVector,
     val status: DemoStatus = DemoStatus.Working,
 )
 
-/** Ordered list of category names — controls display order in the list. */
+/**
+ * Stable category keys. NEVER translate these strings — they are map keys
+ * and registry filters. Use [categoryDisplayNameRes] to obtain the locale-
+ * specific header label.
+ */
+object DemoCategory {
+    const val BASICS_3D = "3D Basics"
+    const val LIGHTING_ENVIRONMENT = "Lighting & Environment"
+    const val CONTENT = "Content"
+    const val INTERACTION = "Interaction"
+    const val ADVANCED = "Advanced"
+    const val AUGMENTED_REALITY = "Augmented Reality"
+}
+
+/** Ordered list of category keys — controls display order in the list. */
 val DEMO_CATEGORIES = listOf(
-    "3D Basics",
-    "Lighting & Environment",
-    "Content",
-    "Interaction",
-    "Advanced",
-    "Augmented Reality",
+    DemoCategory.BASICS_3D,
+    DemoCategory.LIGHTING_ENVIRONMENT,
+    DemoCategory.CONTENT,
+    DemoCategory.INTERACTION,
+    DemoCategory.ADVANCED,
+    DemoCategory.AUGMENTED_REALITY,
 )
+
+/**
+ * Maps a stable category key to its localized display-name resource ID.
+ * Unknown keys fall back to [R.string.category_3d] (safe default — never
+ * surfaces a raw key like "3D Basics" on the FR locale).
+ */
+@StringRes
+fun categoryDisplayNameRes(category: String): Int = when (category) {
+    DemoCategory.BASICS_3D -> R.string.category_3d_basics
+    DemoCategory.LIGHTING_ENVIRONMENT -> R.string.category_lighting_environment
+    DemoCategory.CONTENT -> R.string.category_content
+    DemoCategory.INTERACTION -> R.string.category_interaction
+    DemoCategory.ADVANCED -> R.string.category_advanced
+    DemoCategory.AUGMENTED_REALITY -> R.string.category_augmented_reality
+    else -> R.string.category_3d_basics
+}
 
 val ALL_DEMOS = listOf(
     // 3D Basics
-    DemoEntry("model-viewer", "Model Viewer", "Load and display 3D models", "3D Basics", Icons.Filled.ViewInAr),
-    DemoEntry("geometry", "Geometry Primitives", "Cube, Sphere, Cylinder, Plane", "3D Basics", Icons.Filled.Category),
-    DemoEntry("animation", "Auto Rotate", "Play, pause, and control animations", "3D Basics", Icons.Filled.RotateRight),
-    DemoEntry("multi-model", "Multi Model", "Multiple models in one scene", "3D Basics", Icons.Filled.Layers),
+    DemoEntry("model-viewer", R.string.demo_model_viewer, R.string.demo_model_viewer_subtitle, DemoCategory.BASICS_3D, Icons.Filled.ViewInAr),
+    DemoEntry("geometry", R.string.demo_geometry_title, R.string.demo_geometry_subtitle, DemoCategory.BASICS_3D, Icons.Filled.Category),
+    DemoEntry("animation", R.string.demo_animation_title, R.string.demo_animation_subtitle, DemoCategory.BASICS_3D, Icons.Filled.RotateRight),
+    DemoEntry("multi-model", R.string.demo_multi_model_title, R.string.demo_multi_model_subtitle, DemoCategory.BASICS_3D, Icons.Filled.Layers),
     // Lighting & Environment
-    DemoEntry("lighting", "Light Types", "Directional, point, and spot lights", "Lighting & Environment", Icons.Filled.Lightbulb),
-    DemoEntry("movable-light", "Movable Light", "Drag to orbit the light around the model", "Lighting & Environment", Icons.Filled.AutoFixHigh),
-    DemoEntry("dynamic-sky", "Dynamic Sky", "Time-of-day sun simulation", "Lighting & Environment", Icons.Filled.WbSunny),
-    DemoEntry("fog", "Fog", "Atmospheric fog effects", "Lighting & Environment", Icons.Filled.Cloud),
-    DemoEntry("environment", "Environment Gallery", "HDR environment switching", "Lighting & Environment", Icons.Filled.PanoramaPhotosphere),
+    DemoEntry("lighting", R.string.demo_lighting_title, R.string.demo_lighting_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.Lightbulb),
+    DemoEntry("movable-light", R.string.demo_movable_light_title, R.string.demo_movable_light_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.AutoFixHigh),
+    DemoEntry("dynamic-sky", R.string.demo_dynamic_sky, R.string.demo_dynamic_sky_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.WbSunny),
+    DemoEntry("fog", R.string.demo_fog, R.string.demo_fog_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.Cloud),
+    DemoEntry("environment", R.string.demo_environment_title, R.string.demo_environment_subtitle, DemoCategory.LIGHTING_ENVIRONMENT, Icons.Filled.PanoramaPhotosphere),
     // Content
-    DemoEntry("text", "Text Nodes", "3D text in the scene", "Content", Icons.Filled.FormatShapes),
-    DemoEntry("lines-paths", "Lines & Paths", "Line segments and polylines", "Content", Icons.Filled.Timeline),
-    DemoEntry("image", "Image Planes", "Image planes in 3D space", "Content", Icons.Filled.Image),
-    DemoEntry("billboard", "Billboard", "Camera-facing quads", "Content", Icons.Filled.Visibility),
-    DemoEntry("video", "Video", "Video playback on 3D surface", "Content", Icons.Filled.VideoLibrary),
+    DemoEntry("text", R.string.demo_text_title, R.string.demo_text_subtitle, DemoCategory.CONTENT, Icons.Filled.FormatShapes),
+    DemoEntry("lines-paths", R.string.demo_lines_paths_title, R.string.demo_lines_paths_subtitle, DemoCategory.CONTENT, Icons.Filled.Timeline),
+    DemoEntry("image", R.string.demo_image_title, R.string.demo_image_subtitle, DemoCategory.CONTENT, Icons.Filled.Image),
+    DemoEntry("billboard", R.string.demo_billboard_title, R.string.demo_billboard_subtitle, DemoCategory.CONTENT, Icons.Filled.Visibility),
+    DemoEntry("video", R.string.demo_video_title, R.string.demo_video_subtitle, DemoCategory.CONTENT, Icons.Filled.VideoLibrary),
     // Interaction
-    DemoEntry("camera-controls", "Camera Controls", "Orbit, fly, and free camera modes", "Interaction", Icons.Filled.PhotoCamera),
-    DemoEntry("gesture-editing", "Gesture Editing", "Move, scale, rotate with gestures", "Interaction", Icons.Filled.OpenWith),
-    DemoEntry("collision", "Collision & Hit Test", "Hit testing and collision detection", "Interaction", Icons.Filled.CenterFocusStrong),
-    DemoEntry("view-node", "ViewNode", "Compose UI embedded in 3D space", "Interaction", Icons.Filled.Dashboard),
+    DemoEntry("camera-controls", R.string.demo_camera_controls_title, R.string.demo_camera_controls_subtitle, DemoCategory.INTERACTION, Icons.Filled.PhotoCamera),
+    DemoEntry("gesture-editing", R.string.demo_gesture_editing_title, R.string.demo_gesture_editing_subtitle, DemoCategory.INTERACTION, Icons.Filled.OpenWith),
+    DemoEntry("collision", R.string.demo_collision_title, R.string.demo_collision_subtitle, DemoCategory.INTERACTION, Icons.Filled.CenterFocusStrong),
+    DemoEntry("view-node", R.string.demo_view_node_title, R.string.demo_view_node_subtitle, DemoCategory.INTERACTION, Icons.Filled.Dashboard),
     // Advanced
-    DemoEntry("physics", "Physics", "Gravity, collisions, rigid bodies", "Advanced", Icons.Filled.ScatterPlot),
-    DemoEntry("post-processing", "Post Processing", "SSAO, anti-aliasing, tone mapping", "Advanced", Icons.Filled.Tune),
-    DemoEntry("custom-mesh", "Custom Mesh", "Custom vertex and index buffers", "Advanced", Icons.Filled.Hexagon),
-    DemoEntry("shape", "All Shapes", "Extruded 2D polygons", "Advanced", Icons.Filled.Pentagon),
-    DemoEntry("reflection-probes", "Reflection Probes", "Local cubemap reflections", "Advanced", Icons.Filled.BlurOn),
-    DemoEntry("secondary-camera", "Camera Presets", "Picture-in-picture camera view", "Advanced", Icons.Filled.PictureInPicture),
-    DemoEntry("debug-overlay", "Debug Overlay", "Performance stats overlay", "Advanced", Icons.Filled.Speed),
+    DemoEntry("physics", R.string.demo_physics_title, R.string.demo_physics_subtitle, DemoCategory.ADVANCED, Icons.Filled.ScatterPlot),
+    DemoEntry("post-processing", R.string.demo_post_processing_title, R.string.demo_post_processing_subtitle, DemoCategory.ADVANCED, Icons.Filled.Tune),
+    DemoEntry("custom-mesh", R.string.demo_custom_mesh_title, R.string.demo_custom_mesh_subtitle, DemoCategory.ADVANCED, Icons.Filled.Hexagon),
+    DemoEntry("shape", R.string.demo_shape_title, R.string.demo_shape_subtitle, DemoCategory.ADVANCED, Icons.Filled.Pentagon),
+    DemoEntry("reflection-probes", R.string.demo_reflection_probes_title, R.string.demo_reflection_probes_subtitle, DemoCategory.ADVANCED, Icons.Filled.BlurOn),
+    DemoEntry("secondary-camera", R.string.demo_secondary_camera_title, R.string.demo_secondary_camera_subtitle, DemoCategory.ADVANCED, Icons.Filled.PictureInPicture),
+    DemoEntry("debug-overlay", R.string.demo_debug_overlay_title, R.string.demo_debug_overlay_subtitle, DemoCategory.ADVANCED, Icons.Filled.Speed),
     // Augmented Reality
-    DemoEntry("ar-placement", "Tap to Place", "Place 3D models in AR", "Augmented Reality", Icons.Filled.TouchApp),
-    DemoEntry("ar-image", "Augmented Image", "Detect and track images", "Augmented Reality", Icons.Filled.Image),
-    DemoEntry("ar-face", "Face Mesh", "Facial mesh tracking", "Augmented Reality", Icons.Filled.Face),
-    DemoEntry("ar-cloud-anchor", "Cloud Anchor", "Persistent cloud anchors", "Augmented Reality", Icons.Filled.CloudCircle),
-    DemoEntry("ar-streetscape", "Streetscape Geometry", "Urban geometry overlay", "Augmented Reality", Icons.Filled.LocationCity),
-    DemoEntry("ar-pose", "Pose Placement", "Free pose positioning", "Augmented Reality", Icons.Filled.MyLocation),
-    DemoEntry("ar-rerun", "Rerun Debug", "AR debug streaming to Rerun.io", "Augmented Reality", Icons.Filled.BugReport),
-    DemoEntry("ar-record-playback", "Record & Playback", "Record an AR session and replay it without a phone", "Augmented Reality", Icons.Filled.Replay),
-    DemoEntry("ar-depth-occlusion", "Depth Occlusion", "Real objects hide virtual ones — Depth API", "Augmented Reality", Icons.Filled.FilterCenterFocus),
-    DemoEntry("ar-instant-placement", "Instant Placement", "Place models before plane detection converges", "Augmented Reality", Icons.Filled.HourglassEmpty),
-    DemoEntry("ar-terrain", "Terrain Anchors", "Geospatial anchor that snaps to outdoor terrain", "Augmented Reality", Icons.Filled.Landscape),
-    DemoEntry("ar-rooftop", "Rooftop Anchors", "Geospatial anchor that snaps to building rooftops", "Augmented Reality", Icons.Filled.Roofing),
-    DemoEntry("ar-image-stabilization", "Image Stabilization (EIS)", "Smooth shaky camera with one config flag", "Augmented Reality", Icons.Filled.Texture),
-    DemoEntry("ar-orbital", "Orbital AR", "Models orbit around you in a personal solar system", "Augmented Reality", Icons.Filled.Public),
+    DemoEntry("ar-placement", R.string.demo_ar_placement_title, R.string.demo_ar_placement_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.TouchApp),
+    DemoEntry("ar-image", R.string.demo_ar_image_title, R.string.demo_ar_image_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Image),
+    DemoEntry("ar-face", R.string.demo_ar_face_title, R.string.demo_ar_face_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Face),
+    DemoEntry("ar-cloud-anchor", R.string.demo_ar_cloud_anchor_title, R.string.demo_ar_cloud_anchor_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.CloudCircle),
+    DemoEntry("ar-streetscape", R.string.demo_ar_streetscape_title, R.string.demo_ar_streetscape_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.LocationCity),
+    DemoEntry("ar-pose", R.string.demo_ar_pose_title, R.string.demo_ar_pose_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.MyLocation),
+    DemoEntry("ar-rerun", R.string.demo_ar_rerun_title, R.string.demo_ar_rerun_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.BugReport),
+    DemoEntry("ar-record-playback", R.string.demo_ar_record_playback_title, R.string.demo_ar_record_playback_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Replay),
+    DemoEntry("ar-depth-occlusion", R.string.demo_ar_depth_occlusion_title, R.string.demo_ar_depth_occlusion_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.FilterCenterFocus),
+    DemoEntry("ar-instant-placement", R.string.demo_ar_instant_placement_title, R.string.demo_ar_instant_placement_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.HourglassEmpty),
+    DemoEntry("ar-terrain", R.string.demo_ar_terrain_title, R.string.demo_ar_terrain_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Landscape),
+    DemoEntry("ar-rooftop", R.string.demo_ar_rooftop_title, R.string.demo_ar_rooftop_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Roofing),
+    DemoEntry("ar-image-stabilization", R.string.demo_ar_image_stabilization_title, R.string.demo_ar_image_stabilization_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Texture),
+    DemoEntry("ar-orbital", R.string.demo_ar_orbital_title, R.string.demo_ar_orbital_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Public),
 )

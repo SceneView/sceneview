@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -33,6 +34,7 @@ import com.google.android.filament.LightManager
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.math.Direction
@@ -122,7 +124,7 @@ fun LightingDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Lighting",
+        title = stringResource(R.string.demo_lighting_title),
         onBack = onBack,
         controls = {
             // Light type selector
