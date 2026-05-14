@@ -297,26 +297,25 @@ fun SceneView(
     }
 
     // ── Main light node ───────────────────────────────────────────────────────────────────────────
+    //
+    // DisposableEffect (NOT SideEffect) so the light is removed from the Filament Scene
+    // both on (a) key change and (b) composition disposal. Pre-#1122 used SideEffect which
+    // only swapped on key change — a SceneView leaving composition cleanly would leak the
+    // 2 lights into a shared `rememberScene(engine)`. See #1122.
 
-    val prevMainLightRef = remember { AtomicReference<LightNode?>(null) }
-    SideEffect {
-        val prev = prevMainLightRef.get()
-        if (prev != mainLightNode) {
-            prev?.let { nodeManager.removeNode(it) }
-            mainLightNode?.let { nodeManager.addNode(it) }
-            prevMainLightRef.set(mainLightNode)
+    DisposableEffect(mainLightNode) {
+        mainLightNode?.let { nodeManager.addNode(it) }
+        onDispose {
+            mainLightNode?.let { nodeManager.removeNode(it) }
         }
     }
 
     // ── Fill light node ───────────────────────────────────────────────────────────────────────────
 
-    val prevFillLightRef = remember { AtomicReference<LightNode?>(null) }
-    SideEffect {
-        val prev = prevFillLightRef.get()
-        if (prev != fillLightNode) {
-            prev?.let { nodeManager.removeNode(it) }
-            fillLightNode?.let { nodeManager.addNode(it) }
-            prevFillLightRef.set(fillLightNode)
+    DisposableEffect(fillLightNode) {
+        fillLightNode?.let { nodeManager.addNode(it) }
+        onDispose {
+            fillLightNode?.let { nodeManager.removeNode(it) }
         }
     }
 
