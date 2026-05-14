@@ -210,7 +210,6 @@ final class RecentSearches {
 struct ExploreTab: View {
     @State private var searchText = ""
     @State private var selectedModel: ModelItem?
-    @State private var selectedSketchfabModel: SketchfabModel?
     @State private var viewingSketchfabModel: SketchfabModel?
     @State private var selectedCategory: SketchfabCategory?
     @State private var recentSearches = RecentSearches()
@@ -221,6 +220,11 @@ struct ExploreTab: View {
     @State private var feedsError: String?
     /// When `true`, all three carousels filter to `animated=true` (skeletal rigs).
     @State private var animatedOnly = false
+    /// Shared namespace for the iOS 18 zoom transition: the carousel card's
+    /// thumbnail morphs into the SketchfabModelViewerScreen hero when the
+    /// navigation pushes the viewer. Matches the Android SharedTransitionLayout
+    /// hero morph in #1203.
+    @Namespace private var heroNamespace
     private let favoritesManager = FavoritesManager.shared
 
     /// Curated featured set — first 6 bundled models, picked for visual variety.
@@ -282,23 +286,13 @@ struct ExploreTab: View {
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
             }
-            .sheet(item: $selectedSketchfabModel) { model in
-                SketchfabModelSheet(model: model) { picked in
-                    viewingSketchfabModel = picked
-                }
-                .presentationDetents([.medium, .large])
-                #if os(iOS)
-                .presentationBackground(.regularMaterial)
-                .presentationCornerRadius(28)
-                #endif
+            .navigationDestination(item: $viewingSketchfabModel) { model in
+                SketchfabModelViewerScreen(model: model)
+                    // iOS 18 zoom navigation transition — the source thumbnail
+                    // matchedTransitionSource lives on the FeaturedSketchfabCard,
+                    // sharing the heroNamespace declared on this view.
+                    .navigationTransition(.zoom(sourceID: "sketchfab-hero-\(model.uid)", in: heroNamespace))
             }
-            #if os(iOS)
-            .fullScreenCover(item: $viewingSketchfabModel) { model in
-                NavigationStack {
-                    SketchfabModelViewerScreen(model: model)
-                }
-            }
-            #endif
             .sheet(item: $selectedCategory) { category in
                 CategorySheet(category: category) { query in
                     searchText = query
@@ -432,8 +426,13 @@ struct ExploreTab: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(models) { model in
-                        FeaturedSketchfabCard(model: model) {
-                            selectedSketchfabModel = model
+                        FeaturedSketchfabCard(model: model, transitionNamespace: heroNamespace) {
+                            // Push directly to the viewer — drops the previous
+                            // "preview sheet" intermediate step so the iOS 18
+                            // zoom transition can fire card → viewer hero, and
+                            // matches the Android UX (tap → modal viewer that
+                            // starts loading immediately) added in #1203.
+                            viewingSketchfabModel = model
                             #if os(iOS)
                             HapticManager.lightTap()
                             #endif
@@ -576,6 +575,12 @@ private struct FeaturedCard: View {
 
 private struct FeaturedSketchfabCard: View {
     let model: SketchfabModel
+    /// Namespace used by iOS 18's `.navigationTransition(.zoom(sourceID:in:))`
+    /// to animate the card thumbnail into the SketchfabModelViewerScreen's hero
+    /// when the parent NavigationStack pushes it. Optional so the card stays
+    /// usable in contexts that don't wire up the zoom transition (e.g. future
+    /// list views that present via .sheet).
+    var transitionNamespace: Namespace.ID? = nil
     let onTap: () -> Void
 
     /// Pick a thumbnail close to the card's render size (≥320 wide, ≤640) to avoid
@@ -618,6 +623,7 @@ private struct FeaturedSketchfabCard: View {
                     .frame(width: 200, height: 160)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .modifier(MatchedSourceModifier(id: "sketchfab-hero-\(model.uid)", namespace: transitionNamespace))
 
                     // Top-left "Animated" pill (when applicable)
                     if model.isAnimated {
@@ -657,6 +663,23 @@ private struct FeaturedSketchfabCard: View {
     }
 }
 
+/// Conditionally applies `.matchedTransitionSource(id:in:)` when a namespace is
+/// provided. iOS 18+ wires this into `.navigationTransition(.zoom(...))` so
+/// the card thumbnail morphs into the SketchfabModelViewerScreen's hero on push.
+/// Returns the unmodified view when no namespace is passed.
+private struct MatchedSourceModifier: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            content
+        }
+    }
+}
+
 // MARK: - Helpers on SketchfabModel for card / sheet display
 
 private extension SketchfabModel {
@@ -682,118 +705,11 @@ private extension SketchfabModel {
 
 // Sketchfab models render through `SketchfabModelViewerScreen` (SceneView SDK),
 // not via Sketchfab's web iframe viewer. The whole point of this demo app is to
-// showcase SceneView's renderer.
-
-// MARK: - Sketchfab model detail sheet
-
-private struct SketchfabModelSheet: View {
-    let model: SketchfabModel
-    let onOpenInSceneView: (SketchfabModel) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    private var largeThumbnailURL: URL? {
-        let images = model.thumbnails.images
-        let preferred = images.max(by: { $0.width < $1.width }) ?? images.first
-        return preferred.flatMap { URL(string: $0.url) }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    thumbnailHero
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(model.name)
-                            .font(.title2.weight(.bold))
-                        if let desc = model.description, !desc.isEmpty {
-                            Text(desc.trimmingCharacters(in: .whitespacesAndNewlines))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(8)
-                        }
-                    }
-
-                    if let tags = model.tags, !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(tags.prefix(10), id: \.name) { tag in
-                                    Text(tag.name)
-                                        .font(.caption)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 4)
-                                        .background(.tint.opacity(0.12), in: Capsule())
-                                        .foregroundStyle(.tint)
-                                }
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    // Primary CTA — open the model in SceneView. This downloads the GLB
-                    // via SketchfabService and renders it through SceneViewSwift's native
-                    // renderer (RealityKit). The Sketchfab web viewer is intentionally
-                    // NOT used — this demo app exists to showcase SceneView.
-                    Button {
-                        let captured = model
-                        dismiss()
-                        // Small delay so the sheet finishes dismissing before the
-                        // fullScreenCover presents — avoids "trying to present X on Y
-                        // while another presentation is in progress" warnings.
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(250))
-                            onOpenInSceneView(captured)
-                        }
-                    } label: {
-                        Label(model.downloadable ? "Open in SceneView" : "Preview in SceneView",
-                              systemImage: "cube.transparent.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(.tint, in: Capsule())
-                            .foregroundStyle(.white)
-                    }
-                    .disabled(!model.downloadable)
-                    .opacity(model.downloadable ? 1.0 : 0.5)
-
-                    if !model.downloadable {
-                        Text("This model is not downloadable on the Sketchfab free tier and can't be rendered in SceneView yet.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                }
-                .padding(20)
-            }
-            .navigationTitle(model.name)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var thumbnailHero: some View {
-        AsyncImage(url: largeThumbnailURL) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fit)
-            default:
-                Rectangle().fill(.tint.opacity(0.08))
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .overlay { ProgressView() }
-            }
-        }
-        .frame(maxHeight: 280)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
+// showcase SceneView's renderer. The previous intermediate `SketchfabModelSheet`
+// (preview state with description + "Open in SceneView" CTA) was removed in
+// favour of a direct card → viewer push so iOS 18's
+// `.navigationTransition(.zoom)` can fire — matches the Android UX added in
+// #1203 (single tap → modal viewer that starts loading immediately).
 
 // MARK: - Sample promo card (compact entry-point to a Scenes tab demo)
 
