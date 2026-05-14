@@ -158,8 +158,8 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                                 statusMessage = when (state) {
                                     Anchor.CloudAnchorState.ERROR_NOT_AUTHORIZED ->
                                         "Resolve failed: ERROR_NOT_AUTHORIZED. The ARCore Cloud " +
-                                            "API key is rejecting this APK's SHA-1. See " +
-                                            "STREETSCAPE_SETUP.md → \"Play App Signing key\"."
+                                            "API key is rejecting this APK. Check SHA-1 + billing " +
+                                            "+ ARCore API restrictions in STREETSCAPE_SETUP.md."
                                     else -> "Resolve failed: $state"
                                 }
                             }
@@ -251,8 +251,8 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                                 statusMessage = when (state) {
                                     Anchor.CloudAnchorState.ERROR_NOT_AUTHORIZED ->
                                         "Hosting failed: ERROR_NOT_AUTHORIZED. The ARCore Cloud " +
-                                            "API key is rejecting this APK's SHA-1. See " +
-                                            "STREETSCAPE_SETUP.md → \"Play App Signing key\"."
+                                            "API key is rejecting this APK. Check SHA-1 + billing " +
+                                            "+ ARCore API restrictions in STREETSCAPE_SETUP.md."
                                     else -> "Hosting failed: $state"
                                 }
                             }

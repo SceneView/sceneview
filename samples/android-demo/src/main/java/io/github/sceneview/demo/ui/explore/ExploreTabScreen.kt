@@ -97,6 +97,17 @@ fun ExploreTabScreen(
     var animatedOnly by remember { mutableStateOf(false) }
     var selectedModel by remember { mutableStateOf<SketchfabModel?>(null) }
 
+    // Search execution state (#1239). Until v4.3.5 the SearchField persisted
+    // queries to recent searches but never executed them — `searchQuery` was
+    // a UI-only dead-end. `activeSearchQuery` (set on submit) drives the
+    // search LaunchedEffect below.
+    //   - activeSearchQuery == ""  → no search yet, default carousels show
+    //   - searchResults == null    → query is loading
+    //   - searchResults.isEmpty()  → query ran and returned 0 hits
+    //   - searchResults non-empty  → render results section, hide trending/staff/recent
+    var activeSearchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SketchfabModel>?>(null) }
+
     var staffPicks by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var mostLiked by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var recent by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
@@ -141,12 +152,53 @@ fun ExploreTabScreen(
         }
     }
 
+    // Execute search when activeSearchQuery changes (#1239). `null` results
+    // means "in flight"; an empty list means "0 hits"; non-empty means we
+    // have results to render. CancellationException is re-thrown so the
+    // structured concurrency teardown still applies on navigation away.
+    //
+    // Note: `SketchfabService.search` does NOT accept an `animated` filter
+    // (that's only on the staffPicks/featured/recentlyAdded endpoints). The
+    // animated chip therefore has no effect on the search results — that's a
+    // Sketchfab API limitation, not a wiring gap.
+    LaunchedEffect(activeSearchQuery) {
+        if (activeSearchQuery.isBlank() || SketchfabConfig.apiKey == null) return@LaunchedEffect
+        searchResults = null  // signal loading
+        searchResults = try {
+            sketchfabService.search(
+                query = activeSearchQuery,
+                limit = 24,
+            )
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            // 429 / network blip / transient API error — surface an empty
+            // result set rather than a crash. The empty-state UI explains.
+            emptyList()
+        }
+    }
+
     val body = @Composable {
         ExploreBody(
             scroll = scroll,
             searchQuery = searchQuery,
-            onSearchQueryChange = { searchQuery = it },
-            onSearchSubmit = { q -> if (q.isNotBlank()) recentSearches.push(q) },
+            onSearchQueryChange = { newValue ->
+                searchQuery = newValue
+                // Clearing the field cancels the active search and restores
+                // the default carousels (#1239).
+                if (newValue.isBlank()) {
+                    activeSearchQuery = ""
+                    searchResults = null
+                }
+            },
+            onSearchSubmit = { q ->
+                if (q.isNotBlank()) {
+                    recentSearches.push(q)
+                    activeSearchQuery = q  // triggers the search LaunchedEffect (#1239)
+                }
+            },
+            activeSearchQuery = activeSearchQuery,
+            searchResults = searchResults,
             animatedOnly = animatedOnly,
             onToggleAnimated = { animatedOnly = !animatedOnly },
             curatedSamples = curatedSamples,
@@ -193,6 +245,8 @@ private fun ExploreBody(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSearchSubmit: (String) -> Unit,
+    activeSearchQuery: String,
+    searchResults: List<SketchfabModel>?,
     animatedOnly: Boolean,
     onToggleAnimated: () -> Unit,
     curatedSamples: List<DemoEntry>,
@@ -205,6 +259,7 @@ private fun ExploreBody(
     onCategoryClick: (SketchfabCategory) -> Unit,
     recentSearches: RecentSearchesState,
 ) {
+    val isSearching = activeSearchQuery.isNotBlank()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -259,28 +314,53 @@ private fun ExploreBody(
         // grid below — no dev-flavored "set SKETCHFAB_API_KEY" placeholder
         // ever reaches a real user.
         if (SketchfabConfig.apiKey != null) {
-            // No `feedsError` Text — when the API is unreachable each empty
-            // FeedSection self-hides and the page falls back to the "Try a
-            // sample" carousel + Categories grid silently. A red dev-style
-            // error banner here was the v4.1.0 "horrible UI" complaint.
-            FeedSection(
-                title = stringResource(R.string.explore_trending_models),
-                models = mostLiked,
-                loading = loadingFeeds && mostLiked.isEmpty(),
-                onModelClick = onModelClick,
-            )
-            FeedSection(
-                title = stringResource(R.string.explore_staff_picks),
-                models = staffPicks,
-                loading = loadingFeeds && staffPicks.isEmpty(),
-                onModelClick = onModelClick,
-            )
-            FeedSection(
-                title = stringResource(R.string.explore_recently_added),
-                models = recent,
-                loading = loadingFeeds && recent.isEmpty(),
-                onModelClick = onModelClick,
-            )
+            if (isSearching) {
+                // Active search (#1239): render results section, hide the three
+                // default feeds. searchResults == null ⇒ still loading;
+                // empty ⇒ ran but 0 hits; non-empty ⇒ render carousel.
+                when {
+                    searchResults == null -> FeedSection(
+                        title = stringResource(R.string.explore_search_results),
+                        models = emptyList(),
+                        loading = true,
+                        onModelClick = onModelClick,
+                    )
+                    searchResults.isEmpty() -> Text(
+                        text = stringResource(R.string.explore_search_no_results, activeSearchQuery),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    else -> FeedSection(
+                        title = stringResource(R.string.explore_search_results),
+                        models = searchResults,
+                        loading = false,
+                        onModelClick = onModelClick,
+                    )
+                }
+            } else {
+                // No `feedsError` Text — when the API is unreachable each empty
+                // FeedSection self-hides and the page falls back to the "Try a
+                // sample" carousel + Categories grid silently. A red dev-style
+                // error banner here was the v4.1.0 "horrible UI" complaint.
+                FeedSection(
+                    title = stringResource(R.string.explore_trending_models),
+                    models = mostLiked,
+                    loading = loadingFeeds && mostLiked.isEmpty(),
+                    onModelClick = onModelClick,
+                )
+                FeedSection(
+                    title = stringResource(R.string.explore_staff_picks),
+                    models = staffPicks,
+                    loading = loadingFeeds && staffPicks.isEmpty(),
+                    onModelClick = onModelClick,
+                )
+                FeedSection(
+                    title = stringResource(R.string.explore_recently_added),
+                    models = recent,
+                    loading = loadingFeeds && recent.isEmpty(),
+                    onModelClick = onModelClick,
+                )
+            }
         }
 
         CategoriesSection(onCategoryClick = onCategoryClick)

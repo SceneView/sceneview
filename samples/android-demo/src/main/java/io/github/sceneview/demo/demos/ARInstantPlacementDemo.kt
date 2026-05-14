@@ -520,7 +520,7 @@ private fun InstantPlacementScene(
                     } ?: if (instantEnabled) {
                         "Initializing camera — you can already tap to place"
                     } else {
-                        "Scanning for surfaces…"
+                        stringResource(R.string.ar_status_scanning)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
