@@ -21,9 +21,10 @@ import java.nio.Buffer
 /**
  * Creates an [ARCameraNode] with default AR-appropriate exposure settings.
  *
- * The default exposure (aperture 16, shutter speed 1/125s, ISO 100) is tuned to match
- * ARCore's light estimation output so that virtual objects blend naturally with the
- * real-world camera feed.
+ * The default exposure (`f/12, 1/200 s, ISO 200` ≈ EV 11.6) matches the 3D
+ * `DefaultCameraNode` and the v4.1.0 main+fill light setup (10k + 3k lux). See
+ * [ARDefaultCameraNode] for why the previous "sunny-16" exposure broke after
+ * the v4.1.0 light rebalance (#1067).
  */
 fun createARCameraNode(engine: Engine): ARCameraNode = ARDefaultCameraNode(engine)
 
@@ -54,15 +55,28 @@ fun createAREnvironment(
 ) = createEnvironment(
     engine = engine,
     isOpaque = true,
-    indirectLight = iblBuffer?.let { KTX1Loader.createIndirectLight(engine, it).indirectLight },
+    // Apply DEFAULT_IBL_INTENSITY (10k lux) so the AR baseline IBL doesn't blow out
+    // direct lighting once ARCore ENVIRONMENTAL_HDR replaces it (#1075). Same pattern
+    // as the 3D `createEnvironment` path.
+    indirectLight = iblBuffer?.let {
+        KTX1Loader.createIndirectLight(engine, it).indirectLight
+            ?.also { ibl -> ibl.intensity = io.github.sceneview.DEFAULT_IBL_INTENSITY }
+    },
     skybox = null,
 )
 
 /**
- * Default AR camera node with exposure tuned for ARCore light estimation.
+ * Default AR camera node, exposure realigned with the v4.1.0 main+fill light setup
+ * (10k + 3k lux + 10k IBL after #1075).
+ *
+ * Mirrors the 3D `DefaultCameraNode` exposure at `f/12, 1/200 s, ISO 200` (≈ EV 11.6).
+ * The previous `f/16, 1/125 s, ISO 100` ("sunny-16", ≈ EV 15) assumed the pre-v4.1.0
+ * 100k lux main light. After the v4.1.0 rebalance the AR camera was 10× too dim,
+ * which is why every AR demo had to override `cameraExposure = -1.0f` as a workaround.
+ * With #1067 those workarounds become removable (track via the AR demo audit).
  */
 class ARDefaultCameraNode(engine: Engine) : ARCameraNode(engine) {
     init {
-        setExposure(16.0f, 1.0f / 125.0f, 100.0f)
+        setExposure(12.0f, 1.0f / 200.0f, 200.0f)
     }
 }
