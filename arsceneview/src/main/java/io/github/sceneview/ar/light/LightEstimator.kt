@@ -30,6 +30,17 @@ import java.nio.ByteOrder
  * information about the lighting in a scene. You can then use this information when rendering
  * virtual objects to light them under the same conditions as the scene they're placed in,
  * keeping users grounded and engaged.
+ *
+ * ## Thread safety
+ *
+ * [update] is invoked from the AR render path each frame; [destroy] from the Compose
+ * main thread via [androidx.compose.runtime.DisposableEffect]'s `onDispose`. The
+ * Filament `PixelBufferDescriptor` upload callback fires on Filament's render
+ * thread. Cross-thread state transitions are gated by two `@Volatile` flags
+ * ([isDestroyed], [uploadInFlight]) — see the field docs. The public
+ * `environmentalHdr*` toggles are also `@Volatile` and safe to flip from any
+ * thread. See CORR-B audit (acceptance #2 of umbrella #1094) for the
+ * destroy-race / texture-leak / buffer-race specifics.
  */
 class LightEstimator(
     val engine: Engine,
