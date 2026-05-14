@@ -1,3 +1,7 @@
+## 4.3.1
+
+- Version alignment with SceneView v4.3.1. Patch release: CI hardening (Dokka config-cache + GitHub Release decoupled from Dokka, render-tests `android-demo-screenshots` job unblocked), Android CLI migration sweep across install/launch QA scripts, GeometryDemo lux retune (80k → 5k for v4.1.0 light defaults), i18n `stringResource(R.string.…)` migration for the Android demo, IBLPrefilter KDoc cost matrix, and iOS parity for `LightSlot` + `.fillLight(_:)` on `ARSceneView`. No public Android API change.
+
 ## 4.3.0
 
 - Version alignment with SceneView v4.3.0. Android rendering pipeline hardened: AR main light additive vs ARCore estimate (no more pitch-black scenes when ARCore dims), new AR fill light baseline + IBL, fixed Spring underdamped + Matrix.decomposeRotation thread-safety + slerp frame-rate independence + segment closest-points sign, LightEstimator robustness (destroy gate, toggle leak, buffer race), AR cubemap `GEN_MIPMAPPABLE` fix. iOS unchanged. See root `CHANGELOG.md` for full breakdown.

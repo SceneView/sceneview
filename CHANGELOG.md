@@ -1,8 +1,11 @@
 # Changelog
 
-## v4.3.1 — CI + docs + GeometryDemo light fixups (UNRELEASED)
+## v4.3.1 — CI hardening + iOS AR LightSlot parity + i18n migration (2026-05-14)
 
-CI hardening + docs accuracy + one v4.1.0-stale demo light tune. No public API change.
+CI hardening + docs accuracy + Android CLI migration + one v4.1.0-stale demo light tune,
+plus the second half of #1063 ported to iOS (`LightSlot` + `.fillLight(_:)` on `ARSceneView`)
+and a full `android-demo` UI migration to `stringResource(R.string.…)` so French locale
+actually flips at runtime. No new Android public API; one new iOS surface.
 
 ### Fixed — release.yml: Dokka config-cache crash + GitHub Release decoupled from Dokka ([#1150](https://github.com/sceneview/sceneview/issues/1150))
 
@@ -45,9 +48,7 @@ The v4.3.0 cut commit `efc168bc` introduced a multi-line backslash continuation 
 - **Validator extension**: `.claude/scripts/check-workflow-scripts.sh` (shipped by [#1145](https://github.com/sceneview/sceneview/pull/1145)) now runs a per-line slicing simulation on every `with.script:` block — `dash -n` passes a `\<EOL>` because the whole-file parser splices continuations together first, but the runtime action does not. The new pass flags any trailing-backslash continuation and fails the PR check, so this class of bug can no longer ship to `main` undetected. Sanity-tested by reintroducing the original break locally — validator exits `1` with a pointed error message.
 - **Backwards compatibility**: `run:` blocks (which GitHub Actions defaults to `bash -e {0}`, executed as one script) are untouched; backslash continuations remain valid there. Only `with.script:` blocks (per-line `sh -c` semantics) are checked.
 
-## Unreleased
-
-### Fixed — i18n: migrate `android-demo` UI to `stringResource(R.string.…)` ([#1099](https://github.com/sceneview/sceneview/issues/1099))
+### Fixed — i18n: migrate `android-demo` UI to `stringResource(R.string.…)` ([#1099](https://github.com/sceneview/sceneview/issues/1099), closes [#955](https://github.com/sceneview/sceneview/issues/955))
 
 PR [#1073](https://github.com/sceneview/sceneview/pull/1073) added `samples/android-demo/src/main/res/values-fr/strings.xml` (164 keys) but the Compose UI never read them — every `Text("…")` was a hardcoded English literal, so switching the device locale to French at runtime had zero visible effect.
 
