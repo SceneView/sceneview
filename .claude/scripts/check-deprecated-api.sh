@@ -57,6 +57,11 @@ is_whitelisted() {
     sceneview/src/main/java/io/github/sceneview/Scene.kt) return 0 ;;
     arsceneview/src/main/java/io/github/sceneview/ar/ARScene.kt) return 0 ;;
 
+    # Regression test that intentionally references the deprecated alias
+    # signature by name (regex assertion on the ARScene.kt body that the
+    # `fun ARScene(...)` forwarder still includes `fillLightNode`, per #1136).
+    arsceneview/src/test/java/io/github/sceneview/ar/ARCompletenessDefaultsTest.kt) return 0 ;;
+
     # Filament framework class bindings
     sceneview-web/src/jsMain/kotlin/io/github/sceneview/web/bindings/Filament.kt) return 0 ;;
 

@@ -1,9 +1,13 @@
 # Changelog
 
-## v4.3.0 — iOS CameraControls.pan/.firstPerson + auto-center + ARRecorder + parity table (UNRELEASED)
+## v4.3.0 — Android rendering pipeline overhaul + iOS CameraControls.pan/.firstPerson + ARRecorder + parity table (2026-05-14)
 
-**Status**: in-progress. Closes the last #928 silent-stub item and the biggest
-v4.2.0 UX gap on iOS demos. PRs [#1038](https://github.com/sceneview/sceneview/pull/1038), [#1042](https://github.com/sceneview/sceneview/pull/1042).
+**Status**: shipped. 14-PR Android rendering audit (#1062 → #1142) hardens AR + 3D
+defaults, fixes 6 pre-v3 BLOCKERs (multiplicative light drift, AR IBL missing,
+SH coefficient swap, Box ray-parallel, spherePlaneResponse contact wrong-side,
+AR cubemap GEN_MIPMAPPABLE). Also closes the last #928 silent-stub item and the
+biggest v4.2.0 UX gap on iOS demos. PRs [#1038](https://github.com/sceneview/sceneview/pull/1038), [#1042](https://github.com/sceneview/sceneview/pull/1042), and the
+[#1131](https://github.com/sceneview/sceneview/pull/1131)–[#1142](https://github.com/sceneview/sceneview/pull/1142) rendering + math audit batch.
 
 ### Added — iOS `ARRecorder` record-only via ReplayKit ([#1032](https://github.com/sceneview/sceneview/issues/1032))
 
@@ -71,6 +75,11 @@ Apps with intentionally off-centre content will see the centroid re-centred at t
   1. **`destroy()` race vs. late render frame** — added `@Volatile private var isDestroyed` gate at the top of `update()` so a frame arriving after `DisposableEffect.onDispose` short-circuits instead of touching freed `engine.destroyTexture` natives. `destroy()` is now idempotent and latches the flag *before* freeing textures.
   2. **Cubemap-texture leak on `environmentalHdrReflections` toggle** — toggling `true → false` previously skipped the `if (reflectionsOn) { ... }` branch entirely, leaving `cubeMapTexture` + `cubeMapTextureSpecular` + the direct staging `ByteBuffer` alive in native heap forever. New nullify-on-disable path at the top of `update()` routes through the existing destroy-on-reassign setters; symmetric handling of `environmentalHdrSpecularFilter` toggling off (frees only the specular texture, preserves the base).
   3. **Staging-buffer race vs. async Filament upload** — restored the `PixelBufferDescriptor` callback as a `@Volatile uploadInFlight` flag flip (set true before `setImage`, reset by the Filament render thread). AR thread now skips the cubemap update while in flight, preventing a `cubeMapBuffer.clear() + put(rgbBytes)` overwrite from corrupting an in-flight GPU upload (smeared cubemap / 1-frame HDR garbage flash). Long-form comment on the callback site guards against a future refactor re-no-op'ing it. Regression suite: 14 pinning tests in `LightEstimatorRobustnessTest`.
+- **AR cleanup batch — 4 follow-ups to CORR-B and post-merge audit of [#1069](https://github.com/sceneview/sceneview/pull/1069) / [#1091](https://github.com/sceneview/sceneview/pull/1091)**:
+  1. **`createAREnvironment` no longer advertises an inert `isOpaque`** ([#1121](https://github.com/sceneview/sceneview/issues/1121)). The hard-coded `isOpaque = true` was bypassed by `skybox = null`, so the parameter was effectively ignored. Dropped from the call; KDoc updated to call out that AR environments are inherently non-opaque (camera feed shows through). No behaviour change for end users.
+  2. **`uploadInFlight` callback hoisted from per-frame allocation** ([#1102](https://github.com/sceneview/sceneview/issues/1102)). `Texture.PixelBufferDescriptor` previously received a fresh `Runnable { uploadInFlight = false }` per cubemap upload; with the new CORR-B gate firing the callback ~1 Hz, that's still one short-lived lambda per upload. Now hoisted as a `private val uploadCompletedCallback` so a single allocation per `LightEstimator` instance covers its full lifetime. Can't move to the companion object because the callback mutates per-instance state.
+  3. **`LightEstimator` lifecycle ownership documented** (CORR-B FU-3). Class KDoc gets a new "Lifecycle ownership" section spelling out that `engine` and `iblPrefilter` are borrowed (caller-owned, typically `ARSceneView`-scoped) and the correct LIFO teardown order (estimator first, then engine).
+  4. **Instrumented stress test for concurrent `update()` ↔ `destroy()`** ([#1094 acceptance #3](https://github.com/sceneview/sceneview/issues/1094)). `LightEstimatorConcurrentDestroyTest.kt` lands in both `src/test/` (algorithmic mirror, fast CI tier — 4 tests) and `src/androidTest/` (real Filament Engine smoke — 3 tests, JNI-grounded). `arsceneview` gains a `testInstrumentationRunner` config so `./gradlew :arsceneview:connectedDebugAndroidTest` works. Asserts: no exceptions, monotonic `isDestroyed` transition, post-destroy textures freed, engine survives ≥10 allocate→destroy cycles.
 
 ### Fixed — 3D rendering pipeline
 
@@ -84,6 +93,24 @@ Apps with intentionally off-centre content will see the centroid re-centred at t
 
 - **🚨 Box ray-OBB intersection broken for parallel rays** ([#1096](https://github.com/sceneview/sceneview/issues/1096) via [PR #1098](https://github.com/sceneview/sceneview/pull/1098)). `MathHelper.MAX_DELTA = 1e-10f` was below FLT_EPSILON (~1.19e-7) for normalised ray directions, so the parallel branch never triggered — `Inf / Inf` slab comparisons produced lottery hits on flat OBBs. New explicit `abs(d) < 1e-6f` parallel detection at the 3 Box slab call sites + matching twin fix in `MeshCollider.AABB.rayIntersection` ([PR #1100](https://github.com/sceneview/sceneview/pull/1100)). **Note** : `MathHelper.MAX_DELTA` stays at `1e-10f` because bumping it would silently break `Vector3.normalized()` for short vectors (documented in KDoc).
 - **🚨 `spherePlaneResponse` returned wrong contact point on negative side** ([#1097](https://github.com/sceneview/sceneview/issues/1097) via [PR #1098](https://github.com/sceneview/sceneview/pull/1098)). Used the flipped (collision) `normal` for the contact-point projection — bounce side was double-shifted off the plane. Now uses `planeNormal` directly for the projection identity `contact = center - planeNormal * signedDist`, regardless of side. Ball-on-floor no longer clips through.
+
+### Fixed — Math + collision regressions ([#1126](https://github.com/sceneview/sceneview/issues/1126) audit batch)
+
+Four sub-items audited from the `sceneview-core` math/animation/collision packages. Each lands as its own PR with a regression pin.
+
+- **`SpringAnimator` underdamped uses analytical velocity** ([#1126](https://github.com/sceneview/sceneview/issues/1126) item 1, [PR #1135](https://github.com/sceneview/sceneview/pull/1135)). Velocity was numerically differentiated from position — produced wrong magnitude under heavy damping and integration drift at low frame rates. Now uses the closed-form analytical derivative for the underdamped case, so spring physics is frame-rate independent and correct from the first step.
+- **`Quaternion.slerp` transform uses exponential decay** ([#1126](https://github.com/sceneview/sceneview/issues/1126) item 2, [PR #1141](https://github.com/sceneview/sceneview/pull/1141)). `Transform.slerp` previously called raw `Quaternion.slerp(a, b, t)` with `t = deltaTime * speed`, which is NOT frame-rate independent (smaller `t` at higher fps → slower convergence). Replaced by exponential-decay formulation `t = 1 - exp(-speed * deltaTime)` so convergence rate is identical at 30 / 60 / 120 fps.
+- **`Matrix.decomposeRotation` no longer uses `this` as scratch** ([#1126](https://github.com/sceneview/sceneview/issues/1126) item 3, [PR #1140](https://github.com/sceneview/sceneview/pull/1140)). The method mutated `this` as a scratch buffer during decomposition, corrupting the source matrix when callers held a reference. Two concurrent decompositions on the same matrix raced. Now allocates a local scratch — `decomposeRotation` is pure + thread-safe.
+- **`closestPointsBetweenSegments` — Ericson §5.1.9 sign** ([#1126](https://github.com/sceneview/sceneview/issues/1126) item 4, [PR #1139](https://github.com/sceneview/sceneview/pull/1139)). A sign error in the parallel-segment branch (transcribed from Christer Ericson's "Real-Time Collision Detection" §5.1.9) returned the wrong end-point pair when one segment fully shadowed the other. Now matches the reference text + 6 pinning tests for the 4 parallel-overlap topologies.
+
+### Fixed — Engine resource leaks
+
+- **Main + fill light add wrapped in `DisposableEffect`** ([#1122](https://github.com/sceneview/sceneview/issues/1122) via [PR #1131](https://github.com/sceneview/sceneview/pull/1131)). `engine.scene.addEntity(light)` was called from a bare `SideEffect` so a removed `LightNode` recomposition left the light entity attached to the Filament scene forever. Now uses `DisposableEffect(mainLightNode, fillLightNode)` with explicit `removeEntity` on dispose — symmetric add/remove, no Filament-side leak across `LightSlot` swaps. Pinned by the existing `Scene` lifecycle tests + a new add/remove-balance assertion.
+- **`destroyMaterialsOnDispose` flag on `RenderableNode` + `GeometryNode`** ([#1123](https://github.com/sceneview/sceneview/issues/1123) via [PR #1132](https://github.com/sceneview/sceneview/pull/1132)). `MaterialInstance` allocated inside a node's `apply` block was leaked because the node assumed the material was owned by the caller. New `destroyMaterialsOnDispose: Boolean = false` parameter (default preserves caller-owned semantics); set `true` when the node creates its own `MaterialInstance`. `rememberMaterialInstance` helpers default to `true`, so callers using the v4.0.x recommended pattern see no leak.
+
+### Fixed — AR cubemap upload ([#1142](https://github.com/sceneview/sceneview/pull/1142))
+
+- **🚨 `Texture.Builder` now sets `Usage.GEN_MIPMAPPABLE` for the ARCore HDR cubemap** ([PR #1142](https://github.com/sceneview/sceneview/pull/1142)). v4.3.0 RC blocker. Filament 1.71 hardened the texture-usage check and `engine.createTexture` now throws when a cubemap is built without `GEN_MIPMAPPABLE` and later submitted to mipmap generation. `LightEstimator` called `texture.generateMipmaps()` immediately after `setImage`, so AR sessions with `environmentalHdrReflections = true` crashed on the first cubemap upload (~1 second after `START_TRACKING`). Fix adds the flag at the two `Texture.Builder` call sites + a regression pin in `LightEstimatorCubemapBuilderTest`.
 
 ### Tooling — Bundled ARCore session recording for demos
 

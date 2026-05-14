@@ -41,6 +41,28 @@ import java.nio.ByteOrder
  * `environmentalHdr*` toggles are also `@Volatile` and safe to flip from any
  * thread. See CORR-B audit (acceptance #2 of umbrella #1094) for the
  * destroy-race / texture-leak / buffer-race specifics.
+ *
+ * ## Lifecycle ownership
+ *
+ * [engine] and [iblPrefilter] are **borrowed**, not owned. The caller (typically the
+ * enclosing [io.github.sceneview.ar.ARSceneView] / `ARScene`, which scopes the Filament
+ * `Engine` to its own lifecycle) is responsible for keeping both alive at least until
+ * after [destroy] returns.
+ *
+ * Concretely:
+ *  - [destroy] frees the `Texture` resources this class allocated via [engine] —
+ *    `engine.destroyTexture(…)` requires a live engine, otherwise it dispatches a
+ *    JNI call into a freed native context. The setter for each `Texture` field wraps
+ *    the call in `runCatching` as belt-and-suspenders, but a deterministically dead
+ *    engine on entry to [destroy] is still a contract violation.
+ *  - [destroy] does **not** destroy [engine] or [iblPrefilter]. Calling
+ *    `lightEstimator.destroy()` then `engine.destroy()` is the correct LIFO teardown
+ *    order; the inverse (destroy engine first, then estimator) is undefined.
+ *
+ * In Compose, this contract is satisfied automatically: the ARScene composable creates
+ * the `Engine` (via `rememberEngine()`), creates the `LightEstimator` later in the same
+ * composition, and `DisposableEffect`'s LIFO teardown destroys the estimator before the
+ * engine. Direct (non-Compose) callers must replicate that ordering.
  */
 class LightEstimator(
     val engine: Engine,
@@ -149,9 +171,15 @@ class LightEstimator(
      * Also gated: the public toggles (`environmentalHdrXxx`) are already
      * `@Volatile`, so toggling after `destroy()` is a no-op via the same
      * early-return.
+     *
+     * Visibility: `internal` (with `private set`) so the
+     * `LightEstimatorConcurrentDestroyTest` androidTest can pin the gate
+     * transition contract on a real Filament Engine. Does not leak into the
+     * consumer-facing public API (Kotlin `internal` is module-private).
      */
     @Volatile
-    private var isDestroyed = false
+    internal var isDestroyed = false
+        private set
 
     /**
      * Acts as a 1-bit semaphore between the AR thread (which fills
@@ -171,6 +199,25 @@ class LightEstimator(
      */
     @Volatile
     private var uploadInFlight = false
+
+    /**
+     * Hoisted instance-scoped callback handed to [Texture.PixelBufferDescriptor] on every
+     * cubemap upload (#1102). ARCore drives `ENVIRONMENTAL_HDR` cubemap updates at roughly
+     * 1 Hz, but the AR render loop ran the call site at ~30–60 Hz before the
+     * [uploadInFlight] gate landed (CORR-B #1134); together that historically allocated up
+     * to several hundred `Runnable` lambdas per second on the AR frame thread, all
+     * destined for short-lived GC.
+     *
+     * Hoisting it as a `private val` means one allocation per [LightEstimator] instance
+     * for its entire lifetime (typically one per ARScene) — same closure semantics
+     * (captures `this.uploadInFlight` via the implicit receiver), zero per-frame cost.
+     *
+     * Cannot be hoisted to the companion object: the callback mutates the per-instance
+     * [uploadInFlight] field, and a single shared `Runnable` would have no way to know
+     * which estimator's flag to reset. See PR #1134's long-form comment at the call site
+     * for the synchronisation contract this Runnable implements.
+     */
+    private val uploadCompletedCallback = Runnable { uploadInFlight = false }
 
     fun update(session: Session, frame: Frame, camera: Camera): Estimation? {
         // Fix 1 (CORR-B, #1094 acceptance #2): a late render frame raced with `destroy()` from
@@ -418,7 +465,10 @@ class LightEstimator(
                                     Texture.Format.RGB,
                                     Texture.Type.HALF,
                                     1, 0, 0, 0, null,
-                                    Runnable { uploadInFlight = false }
+                                    // Hoisted to instance-scoped `uploadCompletedCallback`
+                                    // (#1102) — same closure semantics, one allocation per
+                                    // LightEstimator instead of one per cubemap upload.
+                                    uploadCompletedCallback
                                 ),
                                 faceOffsets
                             )
