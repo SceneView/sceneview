@@ -38,6 +38,7 @@ import io.github.sceneview.demo.demos.ViewNodeDemo
 import io.github.sceneview.demo.demos.GestureEditingDemo
 import io.github.sceneview.demo.demos.CollisionDemo
 import io.github.sceneview.demo.demos.DynamicSkyDemo
+import io.github.sceneview.demo.demos.MaterialsDemo
 import io.github.sceneview.demo.demos.MultiModelDemo
 import io.github.sceneview.demo.demos.SceneGalleryDemo
 import io.github.sceneview.demo.demos.PhysicsDemo
@@ -269,6 +270,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         // Advanced
         "dynamic-sky" -> DynamicSkyDemo(onBack)
         "multi-model" -> MultiModelDemo(onBack)
+        "materials" -> MaterialsDemo(onBack)
         "physics" -> PhysicsDemo(onBack)
         "post-processing" -> PostProcessingDemo(onBack)
         "custom-mesh" -> CustomMeshDemo(onBack)

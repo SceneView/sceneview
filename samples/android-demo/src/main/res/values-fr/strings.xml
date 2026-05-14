@@ -217,6 +217,10 @@
     <string name="demo_view_node_subtitle">UI Compose intégrée dans l\'espace 3D</string>
     <string name="demo_physics_title">Physique</string>
     <string name="demo_physics_subtitle">Gravité, collisions, corps rigides</string>
+    <string name="demo_materials_title">Matériaux PBR</string>
+    <string name="demo_materials_subtitle">Extensions KHR_materials_* streamées depuis Sketchfab</string>
+    <string name="demo_materials_loading">Streaming du matériau…</string>
+    <string name="demo_materials_credit">par %1$s · CC-BY 4.0</string>
     <string name="demo_post_processing_title">Post-traitement</string>
     <string name="demo_post_processing_subtitle">SSAO, anti-aliasing, mappage tonal</string>
     <string name="demo_custom_mesh_title">Maillage personnalisé</string>

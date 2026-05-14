@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added — Stage 2 demo migrations: `MaterialsDemo` streams the curated `materials` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+Third Stage 2 migration. The previous `MaterialsDemo` (5-sphere metallic/roughness spectrum) didn't actually exercise any of the modern glTF material extensions — it was a hand-built PBR sweep useful for diagnosing the renderer, not for answering "what does `KHR_materials_sheen` look like in SceneView?". Stage 2 replaces it on both platforms with the curated extension-bearing models from `SampleAssets`'s `materials` category (Iridescent Beetle / Glass Decanter / Velvet Cushion — sheen, transmission, iridescence).
+
+**Why streamed.** Each model carries a glTF extension that depends on the author's source PBR tooling — bundling a hand-authored stand-in would either ship a giant binary (transmission demands a full IBL backdrop) or fake the look (and mislead the AI-first contract). Streaming the real Khronos / community assets keeps the demo honest.
+
+**Files touched:**
+
+- `samples/android-demo/.../demos/MaterialsDemo.kt` (new) — chip row + studio HDR + auto-orbit + per-chip extension tag (the registry's `tags[0]` is the `KHR_materials_*` extension name).
+- `samples/android-demo/.../DemoRegistry.kt` — new `materials` entry in the `Advanced` category with the `Icons.Filled.Palette` icon.
+- `samples/android-demo/.../MainActivity.kt` — routes `materials` to `MaterialsDemo`.
+- `samples/android-demo/src/main/res/values/strings.xml` + `values-fr/strings.xml` — 4 new keys: `demo_materials_title`, `demo_materials_subtitle`, `demo_materials_loading`, `demo_materials_credit`.
+- `samples/ios-demo/SceneViewDemo/Views/Demos/MaterialsDemo.swift` — rewrote the 5-sphere PBR sweep as the streamed mirror. Same `materials` category, same chip row + extension tag + author byline, `SketchfabAssetResolver.shared.resolve(slug)` + `ModelNode.load(contentsOf:)`. The existing `SamplesTab` entry already wires up `MaterialsDemo()` — no dispatch change needed.
+
+**`SampleAssets` slugs added:** 0. The three `materials` slugs (Iridescent Beetle, Glass Decanter, Velvet Cushion) shipped in Stage 1 and are now consumed by this PR for the first time.
+
+**i18n hygiene.** All 4 new keys ship in EN + FR. The chip labels are catalogue-authored ids (English-only, per `OrbitalARDemo` convention). The extension tag (`KHR_materials_iridescence` etc.) is a glTF extension name and intentionally not localised — it's a spec identifier developers will Google.
+
+**Screen recording.** Deferred to the combined Stage 2 visual-smoke pass.
+
+**Acceptance:** Android `./gradlew :samples:android-demo:compileDebugKotlin` GREEN. `:samples:android-demo:testDebugUnitTest --tests "io.github.sceneview.demo.sketchfab.*"` GREEN (27/27 unchanged).
+
 ### Added — Stage 2 demo migrations: `ModelViewerDemo` gains a "Surprise me" Sketchfab pick ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 Second Stage 2 migration. `ModelViewerDemo` keeps the bundled `khronos_damaged_helmet.glb` as its hero default (so screenshots / Play Store store assets stay byte-identical) and adds an `ExtendedFloatingActionButton` that streams a fresh downloadable Sketchfab model on demand:
