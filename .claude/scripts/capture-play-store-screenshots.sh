@@ -17,6 +17,9 @@
 # Requirements:
 #   - A booted Pixel-class AVD (or physical phone) with ARCore-ish capabilities.
 #   - `adb` on $PATH (Android SDK platform-tools).
+#   - Google's `android` CLI from developer.android.com/tools/agents/android-cli
+#     (auto-installed by the helper). It avoids `adb shell screencap`'s LF/CRLF
+#     corruption that the previous version had to patch in Python.
 #   - Python 3 with Pillow installed (`pip3 install pillow`).
 #
 # Output:
@@ -31,6 +34,12 @@
 # wifi / clock — those change every screenshot session and inflate the diff.
 
 set -euo pipefail
+
+# Pull in helpers for Google's Android CLI (with adb fallback for older hosts).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/android-cli.sh
+source "$SCRIPT_DIR/lib/android-cli.sh"
+android_cli_ensure || true
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 DEMOS_DEFAULT="model-viewer,ar-pose,reflection-probes,environment"
@@ -164,16 +173,11 @@ for DEMO in "${DEMO_ARR[@]}"; do
   sleep "$SETTLE_SECONDS"
 
   RAW="$TMP_DIR/raw-$INDEX.png"
-  adb shell screencap -p > "$RAW" 2>/dev/null
-  # adb shell may corrupt LF/CRLF on some shells — strip the spurious 0x0d.
-  python3 - "$RAW" <<'PY'
-import sys, re
-p = sys.argv[1]
-data = open(p, "rb").read()
-# Older adb shells convert LF→CRLF on stdout; reverse it for PNG.
-fixed = re.sub(rb"\r\n", b"\n", data)
-open(p, "wb").write(fixed)
-PY
+  # `android screen capture` writes the PNG directly without going through an
+  # adb shell pipe, so no LF/CRLF correction is needed. The helper falls back to
+  # `adb -s $serial exec-out screencap -p` if the android CLI is unavailable —
+  # both paths produce clean PNG bytes.
+  android_cli_screenshot "$RAW"
 
   OUT="$OUT_DIR/phone-screenshot-$INDEX.png"
   python3 - "$RAW" "$OUT" "$STATUS_BAR_PX" "$TARGET_HEIGHT" "$VARIANCE_THRESHOLD" <<'PY'
