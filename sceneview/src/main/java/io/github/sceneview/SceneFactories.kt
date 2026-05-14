@@ -66,6 +66,22 @@ val DEFAULT_FILL_LIGHT_INTENSITY = DEFAULT_FILL_LIGHT_COLOR_INTENSITY
 
 val DEFAULT_OBJECT_POSITION = Position(0.0f, 0.0f, -4.0f)
 
+/**
+ * Default `IndirectLight` intensity (lux).
+ *
+ * Lowered from Filament's hard-coded `30_000` default — too bright after the v4.1.0
+ * main+fill rebalancing (10k+3k direct + 30k IBL = ambient dominated everything,
+ * shadows looked weak, key-vs-fill ratio invisible). 10k matches the main light so
+ * direct + indirect are roughly balanced (≈ 60/40), giving the carefully-tuned 3-point
+ * setup actual visible contrast. See [#1075](https://github.com/sceneview/sceneview/issues/1075).
+ *
+ * Cross-platform parity note: iOS RealityKit uses `IBLComponent.intensityExponent = 0`
+ * which exposes-out at ≈1000 lux equivalent. Android stays at 10× that for now (Filament
+ * doesn't have an exposure-relative IBL knob); the absolute values diverge but the
+ * key:IBL ratio matches.
+ */
+const val DEFAULT_IBL_INTENSITY = 10_000.0f
+
 fun createEglContext(): EGLContext {
     filamentInit  // ensure init
     return OpenGL.createEglContext()
@@ -195,7 +211,7 @@ fun createEnvironment(
     indirectLight = KTX1Loader.createIndirectLight(
         environmentLoader.engine,
         environmentLoader.context.assets.readBuffer("environments/neutral/neutral_ibl.ktx"),
-    ).indirectLight
+    ).indirectLight?.also { it.intensity = DEFAULT_IBL_INTENSITY },
 )
 
 fun createEnvironment(

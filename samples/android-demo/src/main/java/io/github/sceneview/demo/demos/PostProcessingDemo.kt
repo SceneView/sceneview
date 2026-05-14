@@ -44,7 +44,13 @@ import io.github.sceneview.rememberView
  */
 @Composable
 fun PostProcessingDemo(onBack: () -> Unit) {
-    var ssaoEnabled by remember { mutableStateOf(false) }
+    // Initial state mirrors the SDK's library defaults from `SceneFactories.kt:93-112`
+    // (`createView`): SSAO on, MSAA off, FXAA on, dithering on. Pre-#1076 this demo
+    // shipped `ssaoEnabled = false` which silently disabled SSAO on first paint,
+    // teaching users the wrong default. Now the toggles reflect what the library
+    // actually does out of the box; flipping them shows the user the contrast
+    // vs. the default.
+    var ssaoEnabled by remember { mutableStateOf(true) }
     var msaaEnabled by remember { mutableStateOf(false) }
     var fxaaEnabled by remember { mutableStateOf(true) }
     var ditheringEnabled by remember { mutableStateOf(true) }
