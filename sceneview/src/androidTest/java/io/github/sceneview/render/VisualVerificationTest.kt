@@ -45,6 +45,11 @@ import java.io.FileWriter
  * adb pull /sdcard/Android/data/io.github.sceneview.test/files/render-test-output/
  * ```
  *
+ * Note: `adb pull` is the only operation here without a Google `android` CLI
+ * equivalent as of v0.7 — the CLI ships `screen capture` / `layout` / `run`
+ * but no file-transfer subcommand. For everything else (install, launch,
+ * screenshots, UI dumps) prefer the `android` CLI via `.claude/scripts/lib/android-cli.sh`.
+ *
  * The HTML report (`visual-report.html`) shows all rendered images side-by-side
  * with expected descriptions, enabling quick visual regression detection.
  *

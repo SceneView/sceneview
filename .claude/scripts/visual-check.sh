@@ -31,6 +31,10 @@ MODE="${1:-now}"
 TAB="${2:-}"
 
 # ── Navigation Android (onglets) ──────────────────────────────────────────────
+# NOTE: `adb shell input tap` is a legit holdout — the `android` CLI v0.7 has
+# no input-event API (no `tap`, `swipe`, `keyevent`). Re-evaluate when v0.8+
+# adds one. For text-based tapping prefer `android_cli_resolve_tap`, but
+# bottom-nav coordinates are static so a fixed-coord adb tap is faster here.
 android_tap_tab() {
   local tab="$1"
   # Coordonnées onglets bottom nav sur Pixel 7a (1080×2400)

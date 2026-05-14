@@ -61,7 +61,18 @@ Browse all APKs
 ### Install from terminal
 
 ```bash
-# Download and install in one line
+# Download and install + launch in one line, using Google's android CLI
+# (https://developer.android.com/tools/agents/android-cli)
+curl -fSL -o /tmp/sceneview-android-demo.apk \
+  https://github.com/sceneview/sceneview/releases/latest/download/sceneview-android-demo.apk \
+  && android run \
+    --apks=/tmp/sceneview-android-demo.apk \
+    --activity=io.github.sceneview.demo/.MainActivity
+```
+
+…or, with the legacy `adb` toolchain:
+
+```bash
 curl -fSL -o /tmp/sceneview-android-demo.apk \
   https://github.com/sceneview/sceneview/releases/latest/download/sceneview-android-demo.apk \
   && adb install -r /tmp/sceneview-android-demo.apk
