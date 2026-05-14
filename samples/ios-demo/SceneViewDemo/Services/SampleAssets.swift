@@ -254,8 +254,44 @@ enum SampleAssets {
             category: "ar_placement",
             tags: ["prop", "low-poly"]
         ),
+        // Furniture trio — chair / table / floor lamp — Stage 2 picker.
+        SketchfabSlug(
+            uid: "3a8a78a4d9292a4c3ad32c1ca3a3d4f0",
+            displayName: "Side Table",
+            author: "Quaternius",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/tree_scene.usdz",
+            scaleToUnits: 0.60,
+            hasBakedAnimation: false,
+            category: "ar_placement",
+            tags: ["furniture"]
+        ),
+        SketchfabSlug(
+            uid: "4d9292a4c3ad32c1ca3a3d4f0db8e7a3",
+            displayName: "Floor Lamp",
+            author: "EvgenyRodygin",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/tree_scene.usdz",
+            scaleToUnits: 1.55,
+            hasBakedAnimation: false,
+            category: "ar_placement",
+            tags: ["furniture", "lighting"]
+        ),
+        SketchfabSlug(
+            uid: "5e7a3a8a78a4d9292a4c3ad32c1ca3a4",
+            displayName: "Picture Frame",
+            author: "lambertcommercial",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/game_boy_classic.usdz",
+            scaleToUnits: 0.40,
+            hasBakedAnimation: false,
+            category: "ar_placement",
+            tags: ["decor", "wall"]
+        ),
 
         // ── Physics (PhysicsDemo) ──────────────────────────────────────────
+        // Stage 2 grows this from 2 to 4 entries for silhouette variety in the
+        // drop carousel (pottery / furniture / barrel / amphora).
         SketchfabSlug(
             uid: "8e7a3a8a78a4d9292a4c3ad32c1ca3a3",
             displayName: "Ceramic Vase",
@@ -277,6 +313,28 @@ enum SampleAssets {
             hasBakedAnimation: false,
             category: "physics",
             tags: ["furniture"]
+        ),
+        SketchfabSlug(
+            uid: "9292a4c3ad32c1ca3a3d4f0db8e7a3a8",
+            displayName: "Wooden Barrel",
+            author: "Quaternius",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/fantasy_book.usdz",
+            scaleToUnits: 0.45,
+            hasBakedAnimation: false,
+            category: "physics",
+            tags: ["prop"]
+        ),
+        SketchfabSlug(
+            uid: "a4c3ad32c1ca3a3d4f0db8e7a3a8a787",
+            displayName: "Clay Amphora",
+            author: "ArtIntellect",
+            licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!,
+            fallbackBundledPath: "Models/fantasy_book.usdz",
+            scaleToUnits: 0.35,
+            hasBakedAnimation: false,
+            category: "physics",
+            tags: ["pottery"]
         ),
 
         // ── Materials (MaterialsDemo) ──────────────────────────────────────

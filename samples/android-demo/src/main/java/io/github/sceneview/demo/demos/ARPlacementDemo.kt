@@ -4,23 +4,33 @@ import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -34,21 +44,36 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.sketchfab.SampleAssets
+import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
+import io.github.sceneview.demo.sketchfab.SketchfabSlug
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberOnGestureListener
+import java.io.File
 
 /**
- * Interactive AR tap-to-place demo.
+ * Interactive AR tap-to-place demo with a "Pick what to place" picker.
  *
  * Plane detection is rendered as a translucent overlay. Each tap on a detected horizontal or
  * vertical plane spawns a NEW [ModelNode] instance attached to its own
- * [AnchorNode][io.github.sceneview.ar.node.AnchorNode]. The model cycles through a small curated
- * list of bundled GLBs so the user can sample the SDK's variety: helmet, fox, lantern,
- * boom-box-style toy car, and shiba.
+ * [AnchorNode][io.github.sceneview.ar.node.AnchorNode].
+ *
+ * **Picker — Stage 2 ([#1152](https://github.com/sceneview/sceneview/issues/1152)).** The
+ * controls sheet exposes a chip row sourced from [SampleAssets.byCategory]`["ar_placement"]`
+ * — coffee mug / houseplant / wooden crate / side table / floor lamp / picture frame, all
+ * streamed CC-BY models from Sketchfab via [SketchfabAssetResolver]. Tapping a chip arms
+ * that slug as the next placed model; subsequent taps on a plane place a fresh instance.
+ *
+ * **Bundled fallback.** The default chip "Bundled cycle" preserves the v4.3.1 behaviour —
+ * each tap places the next entry of the 5-model bundled GLB cycle (helmet → fox → lantern
+ * → toy car → shiba). This keeps the demo useful even when the app launched with no
+ * Sketchfab API key or with the network down — the resolver's per-slug fallback path will
+ * also serve a bundled GLB, but the explicit cycle gives a deterministic "no surprises"
+ * mode for QA / offline / store-listing screenshots.
  *
  * Each placed model is **editable** — `isEditable = true` on the [ModelNode] enables
  * pinch-to-scale, two-finger rotate, and one-finger drag. Because the parent [AnchorNode] is
@@ -62,8 +87,10 @@ import io.github.sceneview.rememberOnGestureListener
 private data class PlacedModel(
     val id: Int,
     val anchor: Anchor,
-    val assetPath: String,
-    val displayName: String
+    /** Local file URI (`file://...`) for a streamed slug, OR `assets/`-relative path for a
+     *  bundled GLB. `rememberModelInstance` accepts both via its single-string overload. */
+    val assetLocation: String,
+    val displayName: String,
 )
 
 private data class CycleEntry(val assetPath: String, val displayName: String)
@@ -85,10 +112,37 @@ fun ARPlacementDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    val context = LocalContext.current
 
     val placedModels = remember { mutableStateListOf<PlacedModel>() }
     var nextId by remember { mutableStateOf(0) }
     var cycleIndex by remember { mutableStateOf(0) }
+
+    // Streamed `ar_placement` slugs from SampleAssets. selectedSlug == null
+    // means "Bundled cycle" (the v4.3.1 default behaviour). Selecting a slug
+    // arms it as the next tap's payload, replacing the cycle for that tap.
+    val placementSlugs = remember { SampleAssets.byCategory["ar_placement"].orEmpty() }
+    var selectedSlug by remember { mutableStateOf<SketchfabSlug?>(null) }
+
+    // Warm the `ar_placement` cache so taps land instantly once the user picks
+    // a chip. The resolver dedupes concurrent calls, so when the per-tap
+    // resolve fires below it picks up the already-staged file.
+    LaunchedEffect(Unit) {
+        runCatching {
+            SketchfabAssetResolver.getInstance(context).prefetchAll("ar_placement")
+        }
+    }
+
+    // Resolve the currently-selected slug to a local file (null while
+    // downloading / staging the bundled fallback). When null, the next tap
+    // falls back to the bundled MODEL_CYCLE.
+    val selectedFile: File? = selectedSlug?.let { slug ->
+        produceState<File?>(initialValue = null, key1 = slug.uid) {
+            value = runCatching {
+                SketchfabAssetResolver.getInstance(context).resolve(slug)
+            }.getOrNull()
+        }.value
+    }
 
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var isTracking by remember { mutableStateOf(false) }
@@ -109,8 +163,53 @@ fun ARPlacementDemo(onBack: () -> Unit) {
             Text(
                 text = "Tap a detected plane to drop a model. Each model is editable: drag to " +
                     "translate, pinch to scale, twist to rotate — the active gesture is shown " +
-                    "in the top-center pill. Models cycle on each tap.",
+                    "in the top-center pill.",
                 style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.demo_ar_placement_picker_label),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // "Bundled cycle" chip preserves the v4.3.1 behaviour — each
+                // tap rotates through MODEL_CYCLE so QA / offline screenshots
+                // stay deterministic.
+                FilterChip(
+                    selected = selectedSlug == null,
+                    onClick = { selectedSlug = null },
+                    label = {
+                        Text(stringResource(R.string.demo_ar_placement_picker_bundled))
+                    },
+                )
+                placementSlugs.forEach { slug ->
+                    FilterChip(
+                        selected = selectedSlug?.uid == slug.uid,
+                        onClick = { selectedSlug = slug },
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.demo_ar_placement_picker_streamed,
+                                    slug.displayName,
+                                )
+                            )
+                        },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.demo_ar_placement_picker_subtitle),
+                style = MaterialTheme.typography.labelSmall,
             )
 
             OutlinedButton(
@@ -129,9 +228,12 @@ fun ARPlacementDemo(onBack: () -> Unit) {
             }
 
             // Up-next preview so the user knows what the next tap will spawn.
-            val nextEntry = MODEL_CYCLE[cycleIndex % MODEL_CYCLE.size]
+            val nextLabel = selectedSlug?.let { slug ->
+                if (selectedFile != null) slug.displayName
+                else stringResource(R.string.demo_ar_placement_picker_streaming, slug.displayName)
+            } ?: MODEL_CYCLE[cycleIndex % MODEL_CYCLE.size].displayName
             Text(
-                text = "Next tap places: ${nextEntry.displayName}",
+                text = "Next tap places: $nextLabel",
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -175,16 +277,28 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                                 result.distance <= 5.0f // limit placement distance
                         }
                         if (hit != null) {
-                            val entry = MODEL_CYCLE[cycleIndex % MODEL_CYCLE.size]
+                            // Resolve the asset location based on the picker. A selected slug
+                            // whose download has landed → its file URI. A selected slug whose
+                            // download is still in flight → silently fall back to the bundled
+                            // cycle so the tap isn't lost. No selection → cycle through
+                            // MODEL_CYCLE as before.
+                            val slug = selectedSlug
+                            val pendingFile = selectedFile
+                            val (location, name) = if (slug != null && pendingFile != null) {
+                                "file://${pendingFile.absolutePath}" to slug.displayName
+                            } else {
+                                val entry = MODEL_CYCLE[cycleIndex % MODEL_CYCLE.size]
+                                cycleIndex = (cycleIndex + 1) % MODEL_CYCLE.size
+                                entry.assetPath to entry.displayName
+                            }
                             placedModels.add(
                                 PlacedModel(
                                     id = nextId++,
                                     anchor = hit.createAnchor(),
-                                    assetPath = entry.assetPath,
-                                    displayName = entry.displayName
+                                    assetLocation = location,
+                                    displayName = name,
                                 )
                             )
-                            cycleIndex = (cycleIndex + 1) % MODEL_CYCLE.size
                         }
                     },
                     // Pixel 9 review v2: surface which gesture is active so the user
@@ -213,7 +327,7 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                 placedModels.forEach { placed ->
                     key(placed.id) {
                         AnchorNode(anchor = placed.anchor) {
-                            val instance = rememberModelInstance(modelLoader, placed.assetPath)
+                            val instance = rememberModelInstance(modelLoader, placed.assetLocation)
                             instance?.let {
                                 ModelNode(
                                     modelInstance = it,
