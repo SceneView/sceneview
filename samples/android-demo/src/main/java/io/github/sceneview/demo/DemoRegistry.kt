@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanoramaPhotosphere
 import androidx.compose.material.icons.filled.Pentagon
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -154,6 +155,7 @@ val ALL_DEMOS = listOf(
     DemoEntry("collision", R.string.demo_collision_title, R.string.demo_collision_subtitle, DemoCategory.INTERACTION, Icons.Filled.CenterFocusStrong),
     DemoEntry("view-node", R.string.demo_view_node_title, R.string.demo_view_node_subtitle, DemoCategory.INTERACTION, Icons.Filled.Dashboard),
     // Advanced
+    DemoEntry("materials", R.string.demo_materials_title, R.string.demo_materials_subtitle, DemoCategory.ADVANCED, Icons.Filled.Palette),
     DemoEntry("physics", R.string.demo_physics_title, R.string.demo_physics_subtitle, DemoCategory.ADVANCED, Icons.Filled.ScatterPlot),
     DemoEntry("post-processing", R.string.demo_post_processing_title, R.string.demo_post_processing_subtitle, DemoCategory.ADVANCED, Icons.Filled.Tune),
     DemoEntry("custom-mesh", R.string.demo_custom_mesh_title, R.string.demo_custom_mesh_subtitle, DemoCategory.ADVANCED, Icons.Filled.Hexagon),
