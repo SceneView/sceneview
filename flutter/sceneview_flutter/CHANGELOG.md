@@ -1,3 +1,7 @@
+## 4.3.4
+
+- Version alignment with SceneView v4.3.4. Pixel 9 production hotfix: AR Face Mesh full-black fix ([#1179](https://github.com/sceneview/sceneview/issues/1179)) — dropped negative `cameraExposure` on `ARFaceDemo`; AR Instant Placement Lost-anchor UX ([#1184](https://github.com/sceneview/sceneview/issues/1184)); AR Image Stabilization auto-place ([#1183](https://github.com/sceneview/sceneview/issues/1183)); Sketchfab carousel snap-fling polish ([#1182](https://github.com/sceneview/sceneview/issues/1182)); Sketchfab UTF-8 decoding ([#1181](https://github.com/sceneview/sceneview/issues/1181)); AR launcher M3 grid parity ([#1185](https://github.com/sceneview/sceneview/issues/1185)); iOS `ARLightingDemo.swift` ([#1155](https://github.com/sceneview/sceneview/issues/1155)). No public Flutter API change.
+
 ## 4.3.3
 
 - Version alignment with SceneView v4.3.3. Hotfix: AR production blockers from Pixel 9 v4.3.0 audit — actionable Cloud Anchor `ERROR_NOT_AUTHORIZED` toast pointing at the Play App Signing key runbook ([#1177](https://github.com/sceneview/sceneview/issues/1177)), CI guard `verify-arcore-key.sh` for missing/dropped `ARCORE_API_KEY` wiring, plus verified-fixed closures for `spherePlaneResponse` ([#1097](https://github.com/sceneview/sceneview/issues/1097)), R8 strip of Fused Location Provider ([#1178](https://github.com/sceneview/sceneview/issues/1178)), and the AR rendering umbrella P0s/P1s ([#1061](https://github.com/sceneview/sceneview/issues/1061)). No public Flutter API change.
