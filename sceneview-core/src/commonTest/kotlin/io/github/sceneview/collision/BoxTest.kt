@@ -203,4 +203,60 @@ class BoxTest {
         val hit = RayHit()
         assertFalse(box.rayIntersection(ray, hit))
     }
+
+    // ── Parallel-ray epsilon regression pins (#1096) ────────────────────────
+    //
+    // Before the fix, the parallel-ray branch tested `abs(f) >= 1e-10f`, which
+    // is below FLT_EPSILON for typical normalised ray directions. That meant
+    // the "parallel" branch effectively never fired, and rays nearly aligned
+    // with a box axis fell through to the `(e + min)/f` slab math with
+    // `f` ≈ 0 — producing ±Inf t-values that false-passed or false-failed
+    // depending on rounding. Fixed by lifting the epsilon to `1e-6f` so the
+    // parallel branch correctly catches the degenerate case for flat (thin-slab)
+    // boxes commonly used as collision proxies for plane-like geometry.
+
+    @Test
+    fun rayParallelToFaceOnFlatBoxHits() {
+        // 0.001 m flat box (thin slab in y axis) at the origin.
+        val box = Box(Vector3(2f, 0.001f, 2f), Vector3(0f, 0f, 0f))
+        val ray = Ray(Vector3(0f, 5f, 0f), Vector3(0f, -1f, 0f))
+        val hit = RayHit()
+        assertTrue(
+            box.rayIntersection(ray, hit),
+            "Ray pointing down into a thin slab box should hit (pre-#1096 produced Inf/Inf and false-failed)"
+        )
+        // Box top face is at y = 0 + 0.001/2 = 0.0005, so distance from y=5 is ~4.9995.
+        assertClose(4.9995f, hit.getDistance(), 0.01f)
+    }
+
+    @Test
+    fun rayParallelButOutsideMisses() {
+        // Same flat slab, but ray travels along +x (parallel to top/bottom face)
+        // and is outside the y-slab. Pre-#1096 the "parallel" branch never
+        // fired so the slab math accepted any ray whose y was outside the box
+        // through divide-by-near-zero.
+        val box = Box(Vector3(2f, 0.001f, 2f), Vector3(0f, 0f, 0f))
+        val ray = Ray(Vector3(0f, 5f, 0f), Vector3(1f, 0f, 0f))
+        val hit = RayHit()
+        assertFalse(
+            box.rayIntersection(ray, hit),
+            "Ray parallel to slab faces and clearly outside the y-extent should miss"
+        )
+    }
+
+    @Test
+    fun rayParallelToXAxisInsideSlabHits() {
+        // Same flat slab, ray parallel to +x and inside the y-slab (y = 0).
+        // The new epsilon correctly takes the `else if (-e + min.y > 0 ...)`
+        // branch and stays inside the box. Slab is x∈[-1, 1], so origin (-3, 0, 0)
+        // hits at distance 2.
+        val box = Box(Vector3(2f, 0.001f, 2f), Vector3(0f, 0f, 0f))
+        val ray = Ray(Vector3(-3f, 0f, 0f), Vector3(1f, 0f, 0f))
+        val hit = RayHit()
+        assertTrue(
+            box.rayIntersection(ray, hit),
+            "Ray parallel to x but starting inside the thin y-slab should hit"
+        )
+        assertClose(2f, hit.getDistance(), 0.01f)
+    }
 }

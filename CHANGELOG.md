@@ -98,6 +98,16 @@ Apps with intentionally off-centre content will see the centroid re-centred at t
 - [#884](https://github.com/sceneview/sceneview/issues/884) RN+Flutter version drift — `@sceneview-sdk/react-native@4.2.0` and `sceneview_flutter@4.2.0` aligned with the monorepo on npm/pub.
 - [#1004](https://github.com/sceneview/sceneview/issues/1004) iOS parity v4.2.0 umbrella — SHIPPED end-to-end; deferred items split into focused #1032 / #1033 / #1034 / #1035 / #1036.
 
+### Tests — Regression pins for the 14-PR rendering burst (CORR-C batch)
+
+Five missing regression pins added for fixes shipped without coverage in the 2026-05-14 rendering wave. Each pin lives next to the fix it protects:
+
+- **`BoxTest.kt`** — 3 new tests pin `Box.rayIntersection` correct behaviour for rays parallel to a thin-slab box face (`rayParallelToFaceOnFlatBoxHits`, `rayParallelButOutsideMisses`, `rayParallelToXAxisInsideSlabHits`). Acceptance criterion oublié de [#1096](https://github.com/sceneview/sceneview/issues/1096).
+- **`MeshColliderTest.kt`** — 3 new tests pin the twin parallel-ray epsilon fix in `MeshCollider.AABB.rayIntersection` (`aabbRayParallelToFaceOnFlatSlabHits`, `aabbRayParallelButOutsideMisses`, `aabbRayParallelInsideSlabHits`). Acceptance criterion oublié de [#1100](https://github.com/sceneview/sceneview/issues/1100).
+- **`SceneFactoriesTest.kt`** (new file) — pins `DEFAULT_IBL_INTENSITY = 10_000f` as a deterministic value. Changing it is a BREAKING visual change ([#1075](https://github.com/sceneview/sceneview/issues/1075)).
+- **`ARDefaultCameraNodeTest.kt`** (new file) — pins `ARDefaultCameraNode` exposure (f/12, 1/200 s, ISO 200) via three companion constants (`DEFAULT_APERTURE`, `DEFAULT_SHUTTER_SPEED`, `DEFAULT_ISO`) extracted in the same PR, plus a fourth test cross-checks the combined EV is ≥ 1 stop brighter than sunny-16 ([#1067](https://github.com/sceneview/sceneview/issues/1067)).
+- **`RenderQualityLaunchedEffectTest.kt`** (new file) — pins the `LaunchedEffect(view, renderQuality)` re-keying contract via a 25-line JVM simulator. Verifies `applyRenderQuality` fires exactly once when the key tuple stays constant, re-runs only on actual key change, and reapplies when the View identity changes. Catches regression to the pre-#1078 unkeyed `SideEffect` pattern ([#1078](https://github.com/sceneview/sceneview/issues/1078)).
+
 ### CI — Batch B0 ([#1116](https://github.com/sceneview/sceneview/issues/1116), [#1117](https://github.com/sceneview/sceneview/issues/1117), [#1118](https://github.com/sceneview/sceneview/issues/1118))
 
 - **`publish-api-docs` now gates `create-release`** (#1116) — a Dokka build failure on a tag push now produces a workflow red X instead of a silent "Other Changes" GitHub Release with no API documentation. `continue-on-error: true` and `|| echo` swallow removed.

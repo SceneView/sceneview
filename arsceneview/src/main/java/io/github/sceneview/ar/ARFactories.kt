@@ -77,6 +77,17 @@ fun createAREnvironment(
  */
 class ARDefaultCameraNode(engine: Engine) : ARCameraNode(engine) {
     init {
-        setExposure(12.0f, 1.0f / 200.0f, 200.0f)
+        setExposure(DEFAULT_APERTURE, DEFAULT_SHUTTER_SPEED, DEFAULT_ISO)
+    }
+
+    companion object {
+        /** Aperture (f-stop) — must match the 3D `DefaultCameraNode` for parity. */
+        const val DEFAULT_APERTURE = 12.0f
+
+        /** Shutter speed in seconds — must match the 3D `DefaultCameraNode`. */
+        const val DEFAULT_SHUTTER_SPEED = 1.0f / 200.0f
+
+        /** ISO sensitivity — must match the 3D `DefaultCameraNode`. */
+        const val DEFAULT_ISO = 200.0f
     }
 }
