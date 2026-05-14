@@ -221,13 +221,21 @@ class SketchfabService private constructor(
             .url(url)
             .header("Authorization", "Token $apiKey")
             .header("Accept", "application/json")
+            .header("Accept-Charset", "utf-8")
             .get()
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw SketchfabError.RequestFailed(response.code)
             }
-            return response.body.string()
+            // Force UTF-8 decoding regardless of the Content-Type charset.
+            // `body.string()` honours the response charset and falls back to
+            // ISO-8859-1 when the header lacks a `charset=` parameter — which
+            // can happen with edge-cache rewrites — corrupting any non-ASCII
+            // character in model names like `Myślinice` (Polish ś → U+FFFD).
+            // The Sketchfab API always returns UTF-8 bytes, so decoding them
+            // as UTF-8 explicitly is both correct and defensive (#1181).
+            return response.body.source().readString(Charsets.UTF_8)
         }
     }
 

@@ -42,6 +42,7 @@
 		C10000000000000000000024 /* DemoDeepLinkRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000024 /* DemoDeepLinkRegistry.swift */; };
 		C10000000000000000000025 /* OrbitalARDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000025 /* OrbitalARDemo.swift */; };
 		C10000000000000000000031 /* ARRecorderDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000031 /* ARRecorderDemo.swift */; };
+		C10000000000000000000032 /* ARLightingDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000032 /* ARLightingDemo.swift */; };
 		C10000000000000000000030 /* FavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000030 /* FavoritesManager.swift */; };
 		C10000000000000000000050 /* DemoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000050 /* DemoSheet.swift */; };
 		C10000000000000000000051 /* CreditsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000051 /* CreditsSheet.swift */; };
@@ -118,6 +119,7 @@
 		C20000000000000000000024 /* DemoDeepLinkRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDeepLinkRegistry.swift; sourceTree = "<group>"; };
 		C20000000000000000000025 /* OrbitalARDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalARDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000031 /* ARRecorderDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARRecorderDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000032 /* ARLightingDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARLightingDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000030 /* FavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManager.swift; sourceTree = "<group>"; };
 		C20000000000000000000050 /* DemoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DemoSheet.swift; path = SceneViewDemo/Views/Components/DemoSheet.swift; sourceTree = SOURCE_ROOT; };
 		C20000000000000000000051 /* CreditsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CreditsSheet.swift; path = SceneViewDemo/Views/CreditsSheet.swift; sourceTree = SOURCE_ROOT; };
@@ -260,6 +262,7 @@
 				C20000000000000000000022 /* RerunDebugDemo.swift */,
 				C20000000000000000000025 /* OrbitalARDemo.swift */,
 				C20000000000000000000031 /* ARRecorderDemo.swift */,
+				C20000000000000000000032 /* ARLightingDemo.swift */,
 			);
 			path = Demos;
 			sourceTree = "<group>";
@@ -464,6 +467,7 @@
 				E11525021A2B40A19EAECE6700000003 /* SketchfabAssetResolver.swift in Sources */,
 				C10000000000000000000025 /* OrbitalARDemo.swift in Sources */,
 				C10000000000000000000031 /* ARRecorderDemo.swift in Sources */,
+				C10000000000000000000032 /* ARLightingDemo.swift in Sources */,
 				ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */,
 				C10000000000000000000050 /* DemoSheet.swift in Sources */,
 				C10000000000000000000051 /* CreditsSheet.swift in Sources */,

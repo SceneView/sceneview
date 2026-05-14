@@ -2,6 +2,14 @@
 
 ## Unreleased — v4.3.4 hotfix (in progress)
 
+### Fixed — Sketchfab Explore cosmetic & iOS demo gaps
+
+- **Sketchfab Explore — Polish name `My�linice` shows U+FFFD ([#1181](https://github.com/sceneview/sceneview/issues/1181))** — `SketchfabService.authenticatedGet` now decodes the response body as UTF-8 explicitly via `response.body.source().readString(Charsets.UTF_8)` instead of `body.string()`. OkHttp's `string()` honours the `Content-Type` charset and falls back to ISO-8859-1 when the header lacks a `charset=` parameter (which can happen at edge-cache rewrites), corrupting any non-ASCII byte. Sketchfab's API always returns UTF-8, so forcing the decode is both correct and defensive. New unit test `decodes non-ascii model names without substitution` exercises Polish / Czech / Greek / CJK fixtures.
+
+- **AR Examples menu — green pills replaced with M3 Expressive grid ([#1185](https://github.com/sceneview/sceneview/issues/1185))** — `ArViewTab.kt`'s `ArDemoCard` now mirrors the `DemoCard` pattern from `DemoListScreen.kt`: gradient-tinted icon header on top + title + subtitle below, using the "Augmented Reality" category green accent (light `#66BB6A` / dark `#A5D6A7`) so the AR View launcher feels like the same app as the Samples tab. Pre-refactor the cards used floating tertiary-tinted pills that read as a "different app" against the Samples-tab grid.
+
+- **iOS sample — `ARLightingDemo.swift` companion to #1151 fillLightNode port ([#1155](https://github.com/sceneview/sceneview/issues/1155))** — New AR demo at `samples/ios-demo/SceneViewDemo/Views/Demos/ARLightingDemo.swift` showcases the `.mainLight(_:)` + `.fillLight(_:)` modifiers shipped in v4.2.0 (PR #1151). Three filter chips toggle between `.systemDefault` on both slots, dim-key `.custom(LightNode.directional(intensity: 5_000))`, and key-only (`.fillLight(.disabled)`) — registered under the AR section in `SamplesTab.swift`.
+
 ### Fixed — Pixel 9 v4.3.0 production audit follow-ups ([umbrella #1176](https://github.com/sceneview/sceneview/issues/1176))
 
 These two findings carried over from the v4.3.0 production audit and were not blocking enough to require a v4.3.3 cut, but accumulate for the next hotfix.

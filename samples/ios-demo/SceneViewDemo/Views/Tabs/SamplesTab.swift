@@ -320,6 +320,9 @@ struct SamplesTab: View {
             DemoItem(title: "AR Recording", icon: "record.circle", subtitle: "Capture the AR session as a screen video (record-only on iOS)", category: .ar) {
                 ARRecorderDemo()
             },
+            DemoItem(title: "AR Lighting", icon: "lightbulb.max.fill", subtitle: "Compare .mainLight / .fillLight modifier presets", category: .ar) {
+                ARLightingDemo()
+            },
             DemoItem(
                 comingSoonTitle: "AR Plane Placement",
                 icon: "arkit",

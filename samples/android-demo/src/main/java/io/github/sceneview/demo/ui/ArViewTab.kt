@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -809,8 +810,14 @@ private fun ArLauncherScreen(
             modifier = Modifier.padding(start = 4.dp, top = 4.dp),
         )
 
-        // Grid of 6 AR demo cards
+        // Grid of 6 AR demo cards — mirror the Samples-tab `DemoCard` pattern
+        // (gradient icon header on top + title + subtitle below) so the AR
+        // View tab feels like the same app when the user switches tabs.
+        // Pre-refactor (#1185) the cards used floating tertiary-tinted pills
+        // which read as a "different app" against the M3 Expressive grid in
+        // Samples.
         val featured = remember { FEATURED_AR_DEMOS }
+        val dark = isSystemInDarkTheme()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             featured.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -818,6 +825,7 @@ private fun ArLauncherScreen(
                         ArDemoCard(
                             title = stringResource(demo.titleRes),
                             subtitle = stringResource(demo.subtitleRes),
+                            dark = dark,
                             onClick = { onArDemoClick(demo.id) },
                             modifier = Modifier.weight(1f),
                         )
@@ -831,55 +839,76 @@ private fun ArLauncherScreen(
     }
 }
 
+/**
+ * Mirrors `DemoListScreen.kt`'s `DemoCard` — gradient-tinted icon header
+ * on top + title + subtitle below — using the "Augmented Reality" category
+ * green accent so the launcher's demo cards feel like the same component
+ * as the Samples-tab grid (#1185).
+ */
 @Composable
 private fun ArDemoCard(
     title: String,
     subtitle: String,
+    dark: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Match the Samples-tab "Augmented Reality" accent verbatim so the two
+    // grids look like a single app surface. Keep these in sync with
+    // `DemoListScreen.categoryAccent*` if either palette ever changes.
+    val accent = if (dark) Color(0xFFA5D6A7) else Color(0xFF66BB6A)
+
     Surface(
         modifier = modifier
-            .heightIn(min = 124.dp)
+            .heightIn(min = 168.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 1.dp,
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .fillMaxWidth()
+                    .height(60.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f),
-                        shape = RoundedCornerShape(10.dp),
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.32f),
+                                accent.copy(alpha = 0.14f),
+                            ),
+                        ),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Filled.ViewInAr,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(20.dp),
+                    tint = accent,
+                    modifier = Modifier.size(28.dp),
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                lineHeight = 16.sp,
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    lineHeight = 16.sp,
+                )
+            }
         }
     }
 }
