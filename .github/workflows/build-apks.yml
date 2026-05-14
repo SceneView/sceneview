@@ -34,13 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: Build all sample APKs
         env:

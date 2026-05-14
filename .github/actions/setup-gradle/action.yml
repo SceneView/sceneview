@@ -1,0 +1,29 @@
+name: Set up Gradle
+description: |
+  Installs the JDK, configures Gradle caching, and makes ./gradlew executable.
+  Used by every workflow that invokes ./gradlew so the JDK/cache snippet
+  lives in exactly one place.
+
+inputs:
+  java-version:
+    description: JDK major version (e.g. 17 for Flutter jobs, 21 for everything else)
+    required: false
+    default: "21"
+  java-distribution:
+    description: JDK distribution (temurin, zulu, etc.)
+    required: false
+    default: temurin
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK ${{ inputs.java-version }}
+      uses: actions/setup-java@v5
+      with:
+        distribution: ${{ inputs.java-distribution }}
+        java-version: ${{ inputs.java-version }}
+        cache: gradle
+
+    - name: Make gradlew executable
+      shell: bash
+      run: chmod +x ./gradlew

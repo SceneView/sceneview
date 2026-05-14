@@ -17,8 +17,28 @@ name: quality-gate
 on:
   pull_request:
     branches: [main]
+    # Skip docs-only PRs — quality-gate.sh builds Android + runs unit + MCP
+    # tests, none of which are affected by README/CHANGELOG/website edits.
+    # Mirrors the filter on ci.yml. NOTE: do NOT add `mcp*/**` here — the
+    # gate explicitly runs MCP unit tests. Closes #1117.
+    paths-ignore:
+      - 'website-static/**'
+      - 'docs/**'
+      - 'marketing/**'
+      - 'branding/**'
+      - '*.md'
+      - 'llms*.txt'
+      - 'LICENSE'
   push:
     branches: [main]
+    paths-ignore:
+      - 'website-static/**'
+      - 'docs/**'
+      - 'marketing/**'
+      - 'branding/**'
+      - '*.md'
+      - 'llms*.txt'
+      - 'LICENSE'
   workflow_dispatch:
 
 # One run per ref; cancel older in-progress runs to save resources.
@@ -54,18 +74,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           # PRs read the cache (no writes from forks). Pushes to main repopulate it.
+          # Uses gradle/actions/setup-gradle@v6 (not the `cache: gradle` shortcut
+          # on setup-java) because this workflow runs the full quality gate
+          # — a build-scan-aware Gradle setup gives us richer cache hits than
+          # the lightweight wrapper-only cache.
           cache-read-only: ${{ github.event_name != 'push' }}
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: mcp/package-lock.json
-
-      - name: Install MCP dependencies
-        # `npm ci` runs the prepare script which builds dist/, so MCP tests can run.
-        run: cd mcp && npm ci
+      - uses: ./.github/actions/setup-mcp
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4

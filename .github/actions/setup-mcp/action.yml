@@ -1,0 +1,32 @@
+name: Set up MCP toolchain
+description: |
+  Installs Node + caches npm + runs `npm ci` in mcp/. Used by every
+  workflow that needs the MCP build artefacts (publish-mcp, quality-gate,
+  telemetry-ci). Centralises the Node version and the cache-dependency-path
+  so a bump in mcp/package-lock.json stays consistent across workflows.
+
+inputs:
+  node-version:
+    description: Node major version
+    required: false
+    default: "20"
+  registry-url:
+    description: Optional npm registry URL (set when this is the publish step)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js ${{ inputs.node-version }}
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: ${{ inputs.registry-url }}
+        cache: npm
+        cache-dependency-path: mcp/package-lock.json
+
+    - name: Install MCP dependencies
+      shell: bash
+      working-directory: mcp
+      run: npm ci

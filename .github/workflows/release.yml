@@ -25,13 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: Check if version already published
         id: check-maven
@@ -79,17 +73,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: Generate Dokka docs
-        run: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml || echo "::warning::Dokka generation failed — skipping"
-        continue-on-error: true
+        # No `continue-on-error`/`|| echo` swallow — `create-release` now
+        # gates on this job's outcome (#1116), so a Dokka failure on a
+        # release tag must surface as a workflow red X, not a silent
+        # "Other Changes" GitHub Release with no API documentation.
+        run: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml
 
       - name: Upload Dokka artifact
         uses: actions/upload-artifact@v7
@@ -111,14 +102,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-mcp
         with:
-          node-version: 20
           registry-url: https://registry.npmjs.org
-
-      - name: Install dependencies
-        working-directory: mcp
-        run: npm ci
 
       - name: Check if version already published
         id: check-mcp
@@ -166,18 +152,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
+      - uses: ./.github/actions/setup-gradle
 
       - uses: actions/setup-node@v6
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-
-      - run: chmod +x ./gradlew
 
       - name: Check if version already published
         id: check-web
@@ -364,7 +344,7 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [publish-library, publish-mcp, publish-web, publish-rn, validate-spm]
+    needs: [publish-library, publish-api-docs, publish-mcp, publish-web, publish-rn, validate-spm]
     # All three publishers must NOT have failed before the GitHub Release is
     # cut. Previously the gate only checked `publish-library == 'success'`,
     # so a Maven Central success with an npm publish failure still
@@ -383,6 +363,8 @@ jobs:
       always()
       && needs.publish-library.result != 'failure'
       && needs.publish-library.result != 'cancelled'
+      && needs.publish-api-docs.result != 'failure'
+      && needs.publish-api-docs.result != 'cancelled'
       && needs.publish-mcp.result != 'failure'
       && needs.publish-mcp.result != 'cancelled'
       && needs.publish-web.result != 'failure'

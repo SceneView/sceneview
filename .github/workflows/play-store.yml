@@ -70,13 +70,7 @@ jobs:
         with:
           fetch-depth: 0  # Full history for version calculation
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       # Auto-versioning:
       #   versionCode = run_number (always increasing)

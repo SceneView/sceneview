@@ -84,11 +84,7 @@ jobs:
           [ ! -f "site/llms.txt" ] && [ -f "llms.txt" ] && cp llms.txt site/ || true
 
       # ── 3b. Build and publish samples/web-demo to /web-demo/ ────────────
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
+      - uses: ./.github/actions/setup-gradle
 
       - name: Build samples/web-demo (Kotlin/JS distribution)
         run: |
@@ -104,7 +100,6 @@ jobs:
           # Distribution task is the correct one for "deploy a static
           # site" because it bundles the HTML next to the JS bundle.
           # See #926.
-          chmod +x ./gradlew
           ./gradlew :samples:web-demo:jsBrowserDistribution --stacktrace
           mkdir -p site/web-demo
           # Defensive: support both AGP/Gradle output layouts.

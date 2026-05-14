@@ -37,13 +37,7 @@ jobs:
         shell: bash
         run: bash .claude/scripts/check-sceneview-skill.sh
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
       - uses: gradle/actions/wrapper-validation@v6
 
       - name: Assemble all
@@ -69,13 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: Run lint
         run: |
@@ -104,13 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: Compile KMP core (all targets)
         run: ./gradlew :sceneview-core:assemble --stacktrace
@@ -155,13 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: jsBrowserProductionWebpack
         run: ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
@@ -189,11 +165,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
+      - uses: ./.github/actions/setup-gradle
         with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
+          # Flutter's Android build still uses AGP 7.x-era toolchain
+          # constraints — needs JDK 17 not 21.
+          java-version: "17"
 
       - uses: subosito/flutter-action@v2
         with:

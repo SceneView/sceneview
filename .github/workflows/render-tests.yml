@@ -45,13 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       # Enable KVM for hardware acceleration (required for emulator performance)
       - name: Enable KVM
@@ -104,13 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - run: chmod +x ./gradlew
+      - uses: ./.github/actions/setup-gradle
 
       - name: Enable KVM
         run: |

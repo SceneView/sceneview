@@ -68,6 +68,13 @@ Apps with intentionally off-centre content will see the centroid re-centred at t
 - [#884](https://github.com/sceneview/sceneview/issues/884) RN+Flutter version drift — `@sceneview-sdk/react-native@4.2.0` and `sceneview_flutter@4.2.0` aligned with the monorepo on npm/pub.
 - [#1004](https://github.com/sceneview/sceneview/issues/1004) iOS parity v4.2.0 umbrella — SHIPPED end-to-end; deferred items split into focused #1032 / #1033 / #1034 / #1035 / #1036.
 
+### CI — Batch B0 ([#1116](https://github.com/sceneview/sceneview/issues/1116), [#1117](https://github.com/sceneview/sceneview/issues/1117), [#1118](https://github.com/sceneview/sceneview/issues/1118))
+
+- **`publish-api-docs` now gates `create-release`** (#1116) — a Dokka build failure on a tag push now produces a workflow red X instead of a silent "Other Changes" GitHub Release with no API documentation. `continue-on-error: true` and `|| echo` swallow removed.
+- **`quality-gate.yml` skips docs-only PRs** (#1117) — `paths-ignore` mirrors the filter already in place on `ci.yml`. Docs PRs (typo fixes in `*.md`, `docs/**`, `website-static/**`, `marketing/**`, `branding/**`) no longer burn ~12 min of Android + MCP gate time. `mcp*/**` intentionally NOT excluded so MCP tests still run on MCP-only PRs.
+- **Composite actions for JDK + MCP setup** (#1118) — new `.github/actions/setup-gradle` (JDK + Gradle cache + `chmod +x ./gradlew`, defaults to JDK 21, accepts `java-version: "17"` for Flutter jobs) and `.github/actions/setup-mcp` (Node + npm-lockfile cache + `npm ci` in `mcp/`). Adopted across 7 workflows (release, ci, pr-check, render-tests, docs, build-apks, play-store, quality-gate). Net –68 LOC, eliminates JDK-version drift, single bump point for Node/Java versions.
+- **Render-tests sharding** ([#1119](https://github.com/sceneview/sceneview/issues/1119)) filed as a follow-up — `android-library-render` is `continue-on-error: true` and not a merge gate, so a 4× emulator boot cost vs current 20 min wall-clock needs validation before committing.
+
 ---
 
 ## v4.2.0 — iOS parity sprint: LightSlot, RenderQuality, NodeGesture, AR anchors (2026-05-13)
