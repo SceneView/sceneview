@@ -34,6 +34,7 @@ import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
@@ -102,6 +103,16 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var isTracking by remember { mutableStateOf(false) }
 
+    // Auto-placement guard. The demo's whole point — "model stays anchored while
+    // the camera bg stabilizes" — only lands if the user *sees* a model on screen
+    // the moment they open the demo. Without auto-place, a fresh-open shows the
+    // raw camera feed with no virtual content; the user has no point of reference
+    // to feel the EIS toggle and walks away unimpressed (see #1183).
+    //
+    // Once true, we never re-auto-place — Clear + manual re-tap stays in the
+    // user's hands. Re-entering the demo resets the flag (remembered per scope).
+    var autoPlaced by remember { mutableStateOf(false) }
+
     // Latest Frame for hit testing in the gesture callback.
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
 
@@ -126,7 +137,10 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
                     modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp)
                 )
                 Text(
-                    text = "1. Toggle EIS on.\n" +
+                    text = "A helmet auto-places ~1 m in front of you the moment " +
+                        "tracking stabilizes. Tap anywhere on a plane to relocate, " +
+                        "or use Clear to remove.\n\n" +
+                        "1. Toggle EIS on.\n" +
                         "2. Move the phone around — notice the camera feed is much smoother.\n" +
                         "3. Toggle off — judder returns.\n" +
                         "4. The virtual model stays anchored either way; only the camera " +
@@ -218,9 +232,34 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
                             Config.ImageStabilizationMode.OFF
                         }
                     },
-                    onSessionUpdated = { _, frame: Frame ->
+                    onSessionUpdated = { session: Session, frame: Frame ->
                         latestFrame = frame
                         isTracking = frame.camera.trackingState == TrackingState.TRACKING
+
+                        // Auto-place the helmet ~1 m in front of the camera on the
+                        // first stable TRACKING frame. We don't wait for plane
+                        // detection — the EIS demo doesn't need a plane-anchored
+                        // pose to demonstrate "model stays glued while bg
+                        // stabilizes", and waiting for ARCore's plane finder
+                        // (5–10 s indoors) eats the first impression.
+                        //
+                        // The pose is built from the camera's world pose
+                        // composed with a -1 m Z translation in the camera's
+                        // local frame, so the helmet appears straight ahead at
+                        // eye-level regardless of camera tilt.
+                        if (!autoPlaced &&
+                            placedAnchor == null &&
+                            frame.camera.trackingState == TrackingState.TRACKING
+                        ) {
+                            val anchorPose = frame.camera.pose.compose(
+                                Pose.makeTranslation(0f, 0f, -1.0f)
+                            )
+                            runCatching { session.createAnchor(anchorPose) }
+                                .onSuccess { anchor ->
+                                    placedAnchor = anchor
+                                    autoPlaced = true
+                                }
+                        }
                     },
                     onTrackingFailureChanged = { reason ->
                         trackingFailureReason = reason
