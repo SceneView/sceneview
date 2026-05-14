@@ -241,6 +241,19 @@ private fun InstantPlacementScene(
         mutableStateMapOf<Int, InstantPlacementPoint.TrackingMethod>()
     }
 
+    // Per-anchor lost flag (#1184). When ARCore can no longer refine an Instant
+    // Placement point — typically because the user panned away from the screen
+    // region where the point was approximated — the underlying `Anchor` flips its
+    // `trackingState` from `TRACKING` to `STOPPED`. Continuing to render a
+    // ModelNode under a STOPPED AnchorNode pins it at the last frozen world pose
+    // and produces the "anchor floats off into space" effect that hurts the demo
+    // (#1184: 2/4 anchors went `Lost` in the production Pixel 9 audit). We hide
+    // the ModelNode the moment the anchor stops tracking and surface "Lost" on
+    // the badge so the user knows they can drop a fresh tap to retry. Detach the
+    // dead anchor too — ARCore won't revive a STOPPED point even on re-entering
+    // its screen region.
+    val lostAnchors = remember { mutableStateMapOf<Int, Boolean>() }
+
     Box(modifier = Modifier.fillMaxSize()) {
         ARSceneView(
             modifier = Modifier.fillMaxSize(),
@@ -265,7 +278,27 @@ private fun InstantPlacementScene(
                 // when the value actually changes so we don't churn Compose state at
                 // 60 Hz (each unchanged write would still flag the snapshot dirty and
                 // recompose the badge column).
+                //
+                // Also reconcile `lostAnchors` for #1184. ARCore can drop a placed
+                // Instant Placement point's `trackingState` to STOPPED a few seconds
+                // after the camera pans away (e.g. Fox + Toy Car in the Pixel 9 audit).
+                // Hiding those models + surfacing "Lost" on the badge is cheaper than
+                // a re-hit-test recovery and keeps the demo deterministic.
                 placedModels.forEach { placed ->
+                    val anchorStopped = placed.anchor.trackingState == TrackingState.STOPPED
+                    if (lostAnchors[placed.id] != anchorStopped) {
+                        lostAnchors[placed.id] = anchorStopped
+                    }
+                    if (anchorStopped) {
+                        // Free ARCore's anchor slot — there are only a few dozen per
+                        // session and dead Instant Placement points never recover.
+                        runCatching { placed.anchor.detach() }
+                        // Don't refresh the trackingMethod snapshot once the anchor's
+                        // gone — the underlying InstantPlacementPoint may still report
+                        // its last method, which would mask the "Lost" state behind a
+                        // stale "Tracked" badge.
+                        return@forEach
+                    }
                     val current = (placed.trackable as? InstantPlacementPoint)
                         ?.trackingMethod
                         ?: return@forEach
@@ -322,15 +355,20 @@ private fun InstantPlacementScene(
         ) {
             placedModels.forEach { placed ->
                 key(placed.id) {
-                    AnchorNode(anchor = placed.anchor) {
-                        val instance = rememberModelInstance(modelLoader, placed.assetLocation)
-                        instance?.let {
-                            ModelNode(
-                                modelInstance = it,
-                                scaleToUnits = 0.3f,
-                                centerOrigin = Position(0.0f, 0.0f, 0.0f),
-                                isEditable = true
-                            )
+                    // Skip rendering once the anchor has gone STOPPED — see lostAnchors
+                    // doc (#1184). AnchorNode under a STOPPED anchor freezes the model
+                    // at the last good pose, which looks broken to the user.
+                    if (lostAnchors[placed.id] != true) {
+                        AnchorNode(anchor = placed.anchor) {
+                            val instance = rememberModelInstance(modelLoader, placed.assetLocation)
+                            instance?.let {
+                                ModelNode(
+                                    modelInstance = it,
+                                    scaleToUnits = 0.3f,
+                                    centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    isEditable = true
+                                )
+                            }
                         }
                     }
                 }
@@ -348,14 +386,22 @@ private fun InstantPlacementScene(
             shape = MaterialTheme.shapes.small
         ) {
             val count = placedModels.size
-            val approximating = trackingMethods.values.count {
-                it == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE
+            val lost = lostAnchors.values.count { it }
+            val approximating = placedModels.count { placed ->
+                lostAnchors[placed.id] != true &&
+                    trackingMethods[placed.id] ==
+                    InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE
             }
-            val tracked = trackingMethods.values.count {
-                it == InstantPlacementPoint.TrackingMethod.FULL_TRACKING
+            val tracked = placedModels.count { placed ->
+                lostAnchors[placed.id] != true &&
+                    trackingMethods[placed.id] ==
+                    InstantPlacementPoint.TrackingMethod.FULL_TRACKING
             }
             val label = if (instantEnabled) {
-                "$count placed • $approximating approximating • $tracked tracked"
+                // Lost segment only surfaces when there's something to report — keeps
+                // the pill compact when everything is tracking cleanly (#1184).
+                val lostSegment = if (lost > 0) " • $lost lost" else ""
+                "$count placed • $approximating approximating • $tracked tracked$lostSegment"
             } else if (count == 1) {
                 "1 model placed"
             } else {
@@ -370,21 +416,28 @@ private fun InstantPlacementScene(
 
         // Per-model tracking badges, listed below the count pill. Hidden when instant placement
         // is off — plane hits don't carry an InstantPlacementPoint trackable.
-        if (instantEnabled && trackingMethods.isNotEmpty()) {
+        //
+        // #1184: iterate over `placedModels` (the source of truth) rather than `trackingMethods`
+        // so anchors that went `STOPPED` before their first `InstantPlacementPoint.trackingMethod`
+        // ever fired still surface as `Lost` (previously they had no entry in `trackingMethods`
+        // and silently disappeared from the badge list).
+        if (instantEnabled && placedModels.isNotEmpty()) {
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                trackingMethods.entries.take(4).forEach { (id, method) ->
-                    val placed = placedModels.firstOrNull { it.id == id } ?: return@forEach
-                    val (label, color) = when (method) {
-                        InstantPlacementPoint.TrackingMethod.FULL_TRACKING ->
+                placedModels.take(4).forEach { placed ->
+                    val isLost = lostAnchors[placed.id] == true
+                    val method = trackingMethods[placed.id]
+                    val (label, color) = when {
+                        isLost -> "Lost — tap to re-place" to Color(0xFF8A0000)
+                        method == InstantPlacementPoint.TrackingMethod.FULL_TRACKING ->
                             "Tracked" to Color(0xFF1B873B)
-                        InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE ->
+                        method == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE ->
                             "Approximating" to Color(0xFFE07B00)
-                        else -> "Lost" to Color(0xFF8A0000)
+                        else -> "Initializing" to Color(0xFF555555)
                     }
                     Surface(
                         color = color.copy(alpha = 0.85f),
@@ -409,6 +462,7 @@ private fun InstantPlacementScene(
                 placedModels.forEach { runCatching { it.anchor.detach() } }
                 placedModels.clear()
                 trackingMethods.clear()
+                lostAnchors.clear()
                 cycleIndex = 0
             },
             modifier = Modifier
