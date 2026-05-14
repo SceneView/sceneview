@@ -76,6 +76,7 @@ import io.github.sceneview.node.ViewNode.WindowManager
 import io.github.sceneview.rememberCollisionSystem
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberFillLightNode
 import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
@@ -147,6 +148,12 @@ import java.util.concurrent.atomic.AtomicReference
  *                                 original device or location.
  * @param sessionCameraConfig      Override for the ARCore camera configuration.
  * @param sessionConfiguration     Callback to configure the ARCore [Session] and [Config].
+ *                                 SceneView pre-sets `config.lightEstimationMode = ENVIRONMENTAL_HDR`
+ *                                 (replacing ARCore's `AMBIENT_INTENSITY` default) BEFORE invoking
+ *                                 this callback, so the IBL baseline shipped by [rememberAREnvironment]
+ *                                 is replaced by ARCore's real-environment estimate once stable.
+ *                                 Front-camera sessions still force `DISABLED` regardless. Override
+ *                                 inside this callback to choose a different mode if needed (#1063).
  * @param planeRenderer            Whether to render the AR plane grid overlay.
  * @param cameraStream             [ARCameraStream] for camera texture rendering and occlusion.
  * @param view                     Filament [View] for this scene. Use [rememberARView] (default)
@@ -157,6 +164,12 @@ import java.util.concurrent.atomic.AtomicReference
  * @param scene                    Filament [SceneView] graph. Use [rememberScene].
  * @param environment              IBL + skybox environment. Use [rememberAREnvironment].
  * @param mainLightNode            Primary directional light. Use [rememberMainLightNode].
+ * @param fillLightNode            Secondary fill light (softer ambient — opposite-side directional
+ *                                 at ~30% main intensity). Mirrors the 3D [SceneView] v4.1.0 two-light
+ *                                 setup so the AR scene baseline matches the 3D demos. Use
+ *                                 [rememberFillLightNode] or pass `null` for a single-light setup.
+ *                                 ARCore light estimation still drives `mainLightNode`; `fillLightNode`
+ *                                 keeps its baseline color/intensity untouched (#1063).
  * @param cameraNode               AR camera node. Use [rememberARCameraNode].
  * @param cameraExposure           Optional exposure override for the AR camera, in EV (exposure
  *                                 value). When non-null, overrides the default ARCore-tuned exposure
@@ -279,6 +292,14 @@ fun ARSceneView(
      * Always add a direct light source since it is required for shadowing.
      */
     mainLightNode: LightNode? = rememberMainLightNode(engine),
+    /**
+     * Optional secondary "fill" directional light that softens the shadows produced by
+     * [mainLightNode]. Default mirrors the 3D `Scene` two-light setup (main + fill at 30%)
+     * shipped in v4.1.0 — AR scenes now match the 3D demo baseline (#1063). Pass `null` for
+     * a single-light AR scene. ARCore's `ENVIRONMENTAL_HDR` estimate only drives
+     * [mainLightNode]; [fillLightNode] keeps its baseline color/intensity each frame.
+     */
+    fillLightNode: LightNode? = rememberFillLightNode(engine),
     cameraNode: ARCameraNode = rememberARCameraNode(engine),
     /**
      * Optional exposure override applied to the AR camera, in EV (exposure value).
@@ -449,6 +470,16 @@ fun ARSceneView(
                 sessionCameraConfigRef.get()?.let { session.cameraConfig = it(session) }
                 session.configure { config ->
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                    // Default to ENVIRONMENTAL_HDR (#1063 acceptance). ARCore's stock default is
+                    // AMBIENT_INTENSITY which only returns a pixel-intensity scalar, so the IBL
+                    // baseline shipped by `rememberAREnvironment` would never be replaced by the
+                    // real environment estimate — PBR metals stay locked on the neutral baseline
+                    // even after the user pans across a real scene. ENVIRONMENTAL_HDR returns
+                    // mainLightDirection + spherical-harmonics irradiance + the HDR cubemap so
+                    // `onARFrame` can swap in the real-environment IBL. Front-camera sessions
+                    // still force DISABLED inside `ARSession.configure()` regardless. Set BEFORE
+                    // invoking the user callback so callers can opt back into another mode.
+                    config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
                     sessionConfigurationRef.get()?.invoke(session, config)
                 }
                 cameraStream?.let { scene.addEntity(it.entity) }
@@ -510,6 +541,28 @@ fun ARSceneView(
             prev?.let { nodeManager.removeNode(it) }
             mainLightNode?.let { nodeManager.addNode(it) }
             prevMainLightRef.set(mainLightNode)
+        }
+    }
+
+    // ── Fill light node ───────────────────────────────────────────────────────────────────────────
+    //
+    // Mirrors the 3D `Scene` v4.1.0 two-light setup (main + fill at 30%) so the AR scene
+    // baseline matches the 3D demos. The light estimator only mutates `mainLightNode`
+    // (`onARFrame` reads back its color/intensity from `baselineMainLightColorRef`); the fill
+    // light keeps its `createFillLightNode` defaults each frame regardless of ARCore (#1063).
+    //
+    // `DisposableEffect` (not `SideEffect`) — same pattern as the 3D `Scene.kt` `mainLight` /
+    // `fillLight` wiring landed in #1131. Removes the light from the Filament scene both on
+    // (a) key change AND (b) composable disposal so a shared `rememberScene(engine)` doesn't
+    // leak duplicates when the AR view leaves composition.
+    //
+    // If a caller passes the SAME `LightNode` instance for `mainLightNode` and `fillLightNode`,
+    // the duplicate `addNode` is a no-op (`SceneNodeManager.managedNodes` is a `Set`), and the
+    // shared instance is removed cleanly when whichever of the two effects disposes last.
+    DisposableEffect(fillLightNode) {
+        fillLightNode?.let { nodeManager.addNode(it) }
+        onDispose {
+            fillLightNode?.let { nodeManager.removeNode(it) }
         }
     }
 
@@ -944,7 +997,7 @@ private fun ARScenePreview(modifier: Modifier) {
  * @deprecated Use [ARSceneView] instead. This function is a direct alias provided for backward
  * compatibility with code written against earlier SceneView versions.
  */
-@Deprecated("Use ARSceneView instead", ReplaceWith("ARSceneView(modifier, surfaceType, engine, modelLoader, materialLoader, environmentLoader, sessionFeatures, playbackDataset, sessionCameraConfig, sessionConfiguration, planeRenderer, cameraStream, view, isOpaque, renderer, scene, environment, mainLightNode, cameraNode, cameraExposure, collisionSystem, viewNodeWindowManager, onSessionCreated, onSessionResumed, onSessionPaused, onSessionFailed, onSessionUpdated, onTrackingFailureChanged, onGestureListener, onTouchEvent, permissionHandler, lifecycle, content)"))
+@Deprecated("Use ARSceneView instead", ReplaceWith("ARSceneView(modifier, surfaceType, engine, modelLoader, materialLoader, environmentLoader, sessionFeatures, playbackDataset, sessionCameraConfig, sessionConfiguration, planeRenderer, cameraStream, view, isOpaque, renderer, scene, environment, mainLightNode, fillLightNode, cameraNode, cameraExposure, collisionSystem, viewNodeWindowManager, onSessionCreated, onSessionResumed, onSessionPaused, onSessionFailed, onPlaybackFailed, onSessionUpdated, onTrackingFailureChanged, onGestureListener, onTouchEvent, permissionHandler, lifecycle, content)"))
 @Composable
 fun ARScene(
     modifier: Modifier = Modifier,
@@ -965,6 +1018,7 @@ fun ARScene(
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberAREnvironment(engine),
     mainLightNode: LightNode? = rememberMainLightNode(engine),
+    fillLightNode: LightNode? = rememberFillLightNode(engine),
     cameraNode: ARCameraNode = rememberARCameraNode(engine),
     cameraExposure: Float? = null,
     collisionSystem: CollisionSystem = rememberCollisionSystem(view),
@@ -973,6 +1027,7 @@ fun ARScene(
     onSessionResumed: ((session: Session) -> Unit)? = null,
     onSessionPaused: ((session: Session) -> Unit)? = null,
     onSessionFailed: ((exception: Exception) -> Unit)? = null,
+    onPlaybackFailed: ((exception: Exception) -> Unit)? = null,
     onSessionUpdated: ((session: Session, frame: Frame) -> Unit)? = null,
     onTrackingFailureChanged: ((trackingFailureReason: TrackingFailureReason?) -> Unit)? = null,
     onGestureListener: GestureDetector.OnGestureListener? = rememberOnGestureListener(),
@@ -1001,6 +1056,7 @@ fun ARScene(
     scene = scene,
     environment = environment,
     mainLightNode = mainLightNode,
+    fillLightNode = fillLightNode,
     cameraNode = cameraNode,
     cameraExposure = cameraExposure,
     collisionSystem = collisionSystem,
@@ -1009,6 +1065,7 @@ fun ARScene(
     onSessionResumed = onSessionResumed,
     onSessionPaused = onSessionPaused,
     onSessionFailed = onSessionFailed,
+    onPlaybackFailed = onPlaybackFailed,
     onSessionUpdated = onSessionUpdated,
     onTrackingFailureChanged = onTrackingFailureChanged,
     onGestureListener = onGestureListener,

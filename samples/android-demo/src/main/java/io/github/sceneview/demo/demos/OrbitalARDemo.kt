@@ -128,9 +128,6 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = false,
-                // Same -1 EV bias as the other AR demos — ARCore's auto-exposure
-                // tends to overshoot indoors on Pixel 9 devices.
-                cameraExposure = -1.0f,
                 sessionConfiguration = { _: Session, config: Config ->
                     // Plane detection off — the formation lives in world space around the
                     // user, not on a plane. Disabling planes is cheaper and gives a cleaner

@@ -82,9 +82,11 @@ ARSceneView(
     planeRenderer = true,
     sessionConfiguration = { session, config ->
         config.depthMode = Config.DepthMode.AUTOMATIC
-        config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+        // ENVIRONMENTAL_HDR is the v4.3.0+ library default — pre-set BEFORE this callback.
+        // Override only to opt back into AMBIENT_INTENSITY for the cost profile.
     },
     sessionFeatures = setOf(),  // e.g., Session.Feature.FRONT_CAMERA
+    // fillLightNode = null,     // v4.3.0+: pass null to disable the dual-light AR baseline
     cameraExposure = null,      // null = ARCore default; Float (EV) to override
     onSessionUpdated = { session, frame -> },
     onTouchEvent = { event, hitResult -> true }

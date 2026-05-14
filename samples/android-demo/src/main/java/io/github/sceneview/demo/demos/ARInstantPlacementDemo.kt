@@ -162,7 +162,6 @@ private fun InstantPlacementScene(instantEnabled: Boolean) {
             modelLoader = modelLoader,
             materialLoader = materialLoader,
             planeRenderer = !instantEnabled,
-            cameraExposure = -1.0f,
             sessionConfiguration = { _: Session, config: Config ->
                 config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                 config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR

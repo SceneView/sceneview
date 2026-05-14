@@ -248,9 +248,6 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = false,
-                // Slight negative bias to counter the washed-out / over-exposed rear-camera
-                // preview that the Pixel 9 review flagged across the AR demos.
-                cameraExposure = -1.0f,
                 sessionConfiguration = { session: Session, config: Config ->
                     // ACCESS_FINE_LOCATION + CAMERA are guaranteed granted at this
                     // point — the permission gate above held the composition until

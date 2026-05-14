@@ -278,7 +278,6 @@ fun ArViewTabContent(
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 planeRenderer = true,
-                cameraExposure = -1.0f,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
