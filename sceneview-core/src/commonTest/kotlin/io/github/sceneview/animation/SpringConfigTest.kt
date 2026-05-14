@@ -126,4 +126,31 @@ class SpringConfigTest {
         assertTrue(animator.isSettled)
         assertClose(1f, animator.value)
     }
+
+    // ── Regression: frame-rate independence (#1126) ──────────────────────────────
+
+    @Test
+    fun springAnimatorUnderdampedConvergesAcrossFrameRates() {
+        // Pre-#1126: the underdamped branch overwrote the analytical velocity with a
+        // finite-difference `(newDisplacement - displacement) / deltaSeconds`. The
+        // displacement formula then read this lagged velocity on the next tick, so
+        // the trajectory drifted as a function of frame rate. At 30 fps the spring
+        // settled to a visibly different value than at 120 fps over the same total
+        // time — exactly the "underdamped lags at 30 fps" symptom #1126 reported.
+        //
+        // Post-fix: both branches use the analytical velocity → frame-rate independent.
+        val config = SpringConfig.BOUNCY  // underdamped (dampingRatio = 0.4)
+
+        val at30Hz = SpringAnimator(config)
+        val at120Hz = SpringAnimator(config)
+
+        // 1 second of simulation at each rate
+        repeat(30) { at30Hz.update(1f / 30f) }
+        repeat(120) { at120Hz.update(1f / 120f) }
+
+        // Values should agree to within 5% after 1 s — the analytical solver is
+        // approximation-free for the underdamped DHO closed-form. Pre-fix this
+        // tolerance was exceeded.
+        assertClose(at120Hz.value, at30Hz.value, epsilon = 0.05f)
+    }
 }
