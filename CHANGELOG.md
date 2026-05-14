@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Added — Stage 4 docs + AI-first surfaces for Sketchfab streaming + `DemoScaffold` v2 ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 4)
+
+Stage 4 of the [#1152](https://github.com/sceneview/sceneview/issues/1152) umbrella. The Stage 2 patterns shipped over the last 7 PRs (Sketchfab streaming + DemoScaffold v2 modal sheet + chip picker) now have first-class documentation on every AI-first surface SceneView exposes.
+
+**New recipe pages (mkdocs).**
+
+- `docs/docs/recipes/sketchfab-streaming.md` — full how-to + license guidance + add-a-slug checklist + API-key wiring story.
+- `docs/docs/recipes/demo-settings-sheet.md` — `DemoScaffold` v2 API + picker pattern + gesture map + discoverability lesson from issue [#951](https://github.com/sceneview/sceneview/issues/951).
+- `docs/mkdocs.yml` — nav restructured. "Recipes" was a single leaf; now it's a section with Overview + the two new recipe pages.
+
+**llms.txt updates (root + `docs/docs/llms.txt` mirror).**
+
+Two new sections inserted before "Android Advanced APIs":
+
+- `## Sketchfab streaming for samples (#1152)` — copy-paste resolver pattern (8 lines of Kotlin) + hard rules (CC-BY-only, no WebView, never network-required, attribute the author) + LRU cache contract + bounds sanity check.
+- `## DemoScaffold v2 — full-screen scene + ModalBottomSheet controls (#1154)` — DemoScaffold API signature + picker pattern + gesture map.
+
+`docs/docs/llms.txt` synced byte-for-byte to root via `cp`.
+
+**New MCP resources (`sceneview-mcp` npm package).**
+
+Two new `examples://` URIs surface compact (< 4 KB each) inline examples that an AI agent can fetch in one round-trip when it needs to scaffold a demo:
+
+- `examples://demo-with-settings` — DemoScaffold v2 pattern.
+- `examples://sketchfab-streaming` — SketchfabAssetResolver pattern.
+
+Both are registered in `mcp/src/index.ts`'s `ListResourcesRequestSchema` + `ReadResourceRequestSchema` handlers. Body strings live in a new `mcp/src/examples.ts` module so the build pipeline can pin their byte budget via `mcp/src/examples.test.ts` (16 new vitest cases — start with H1, mention key APIs, < 4 KB, point at full recipe).
+
+**Files touched:**
+
+- `docs/docs/recipes/sketchfab-streaming.md` (new) — full how-to.
+- `docs/docs/recipes/demo-settings-sheet.md` (new) — full how-to.
+- `docs/mkdocs.yml` — Recipes section restructured.
+- `llms.txt` + `docs/docs/llms.txt` — 2 new sections + version-resync to 4.3.1.
+- `mcp/src/examples.ts` (new) — inline resource bodies.
+- `mcp/src/examples.test.ts` (new) — 16 vitest cases pin the resource shape.
+- `mcp/src/index.ts` — wires the 2 new resources into the `ListResourcesRequestSchema` + `ReadResourceRequestSchema` handlers.
+- `mcp/src/generated/llms-txt.ts` — regenerated from root `llms.txt` (the build pipeline embeds it via `mcp/scripts/generate-llms-txt.js`).
+- `mcp/src/__fixtures__/analyze-project/android-ok/build.gradle.kts` — fixture bumped from 4.1.2 to 4.3.1 by `mcp/scripts/generate-version.js` running during `npm run prepare`.
+
+**Acceptance:**
+
+- `cd mcp && npm test` GREEN (2562 tests, 102 files — 16 new from `examples.test.ts`).
+- `bash .claude/scripts/sync-versions.sh` GREEN (0 errors, 1 pre-existing warning).
+- `cp llms.txt docs/docs/llms.txt` — diff is now empty.
+
 ### Changed — Stage 2 demo migrations: `PhysicsDemo` drops streamed crash-test bodies ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 `samples/android-demo/.../demos/PhysicsDemo.kt` keeps the existing `PhysicsNode`-driven simulation but replaces the coloured spheres carousel with the four streamed entries from [`SampleAssets.byCategory`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt)`["physics"]` — Ceramic Vase, Wooden Stool, Wooden Barrel, Clay Amphora (all CC-BY from Sketchfab). A first "Bundled spheres" chip preserves the v4.3.1 visual default for QA / offline / store-listing screenshot determinism.
