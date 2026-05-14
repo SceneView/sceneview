@@ -199,8 +199,9 @@ for node in tree.iter('node'):
         continue
     fi
 
-    # Check for errors in logcat
-    ERRORS=$(adb logcat -d '*:E' 2>/dev/null | grep -c "FATAL\|IllegalState\|NullPointer\|ClassNotFound" || echo 0)
+    # Check for errors in logcat (use || true so grep no-match doesn't kill set -e/pipefail)
+    ERRORS=$( { adb logcat -d '*:E' 2>/dev/null | grep -E "FATAL|IllegalState|NullPointer|ClassNotFound" || true; } | wc -l | tr -d ' \n')
+    ERRORS=${ERRORS:-0}
 
     if [[ "$ERRORS" -gt 0 ]]; then
         echo -e "${YELLOW}WARNING ($ERRORS errors in logcat)${NC}"
