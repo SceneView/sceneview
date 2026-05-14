@@ -456,31 +456,50 @@ private fun InstantPlacementScene(
             }
         }
 
-        // Clear-all control at the bottom-left.
-        OutlinedButton(
-            onClick = {
-                placedModels.forEach { runCatching { it.anchor.detach() } }
-                placedModels.clear()
-                trackingMethods.clear()
-                lostAnchors.clear()
-                cycleIndex = 0
-            },
+        // Clear-all control at the bottom-left. Only surface it once something
+        // has actually been placed — issue #1199. Before any tap, the button is
+        // a dead affordance that shares vertical space with the "Initializing
+        // camera" pill and creates the impression of two stacked buttons.
+        AnimatedVisibility(
+            visible = placedModels.isNotEmpty(),
+            enter = fadeIn(),
+            exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
         ) {
-            Text("Clear All")
+            OutlinedButton(
+                onClick = {
+                    placedModels.forEach { runCatching { it.anchor.detach() } }
+                    placedModels.clear()
+                    trackingMethods.clear()
+                    lostAnchors.clear()
+                    cycleIndex = 0
+                },
+            ) {
+                Text("Clear All")
+            }
         }
 
-        // Scanning indicator overlay
+        // Scanning indicator overlay. Anchored top-center just below the stats
+        // pill (issue #1199) so it never competes with the bottom-anchored Clear
+        // All button. The top-center placement also matches Material's standard
+        // "transient status" snackbar pattern and is the first thing the user
+        // sees while ARCore is still initialising.
         AnimatedVisibility(
             visible = !isTracking,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.TopCenter)
         ) {
             Surface(
-                modifier = Modifier.padding(bottom = 32.dp),
+                // Top padding accounts for: the stats pill (8 dp + ~28 dp text
+                // height) + the per-model badge column when present
+                // (placedModels.take(4) * ~26 dp). 56 dp keeps the pill visible
+                // even with up to one badge below the stats; with the v4.3.5
+                // hide-when-empty rule the Clear All button is also gone at
+                // session start so there's no longer any visual collision.
+                modifier = Modifier.padding(top = 56.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = MaterialTheme.shapes.large

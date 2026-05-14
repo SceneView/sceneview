@@ -489,40 +489,56 @@ private fun RenderContent(
                 .height(440.dp)
                 .then(heroModifier),
         ) {
-            SceneView(
-                modifier = Modifier.fillMaxSize(),
-                // TextureSurface so the live render respects the Compose layer
-                // alpha during the SharedTransitionLayout morph and the
-                // surrounding cinematic-vignette overlay. The default SurfaceView
-                // is a hardware overlay punched through the window and ignores
-                // Compose's fadeOut/fadeIn during the stage transition — the
-                // viewport would pop in opaque instead of morphing in.
-                surfaceType = SurfaceType.TextureSurface,
-                engine = engine,
-                modelLoader = modelLoader,
-                environmentLoader = environmentLoader,
-                environment = environment,
-                cameraManipulator = cameraManipulator,
-            ) {
-                instance?.let { ModelNode(modelInstance = it, scaleToUnits = 1f) }
-            }
-            // Cinematic vignette — costs ~0 GPU and lifts the model in the
-            // centre without obscuring it. Matches the SwiftUI viewer's look.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.0f),
-                                Color.Black.copy(alpha = 0.35f),
+            // Defer SceneView mount until the GLB has finished loading
+            // (issue #1201). Previously the SceneView was always composed and
+            // a CircularProgressIndicator-over-opaque-surface placeholder was
+            // layered ON TOP — but during the bottom-sheet expand transition
+            // the opaque surface faded relative to the still-rendering
+            // SceneView surface underneath, producing a brief "model inside a
+            // circular crop / porthole" frame (the user could see the model
+            // through the fading surface overlay, with the centered spinner
+            // ring framing the visible area). Mounting the SceneView only
+            // when `instance != null` means the underlying Surface never
+            // exists during the transition and the placeholder owns the full
+            // 440 dp box cleanly.
+            if (instance != null) {
+                SceneView(
+                    modifier = Modifier.fillMaxSize(),
+                    // TextureSurface so the live render respects the Compose
+                    // layer alpha during the SharedTransitionLayout morph and
+                    // the surrounding cinematic-vignette overlay. The default
+                    // SurfaceView is a hardware overlay punched through the
+                    // window and ignores Compose's fadeOut/fadeIn during the
+                    // stage transition — the viewport would pop in opaque
+                    // instead of morphing in. (Carried over from #1203.)
+                    surfaceType = SurfaceType.TextureSurface,
+                    engine = engine,
+                    modelLoader = modelLoader,
+                    environmentLoader = environmentLoader,
+                    environment = environment,
+                    cameraManipulator = cameraManipulator,
+                ) {
+                    ModelNode(modelInstance = instance, scaleToUnits = 1f)
+                }
+                // Cinematic vignette — costs ~0 GPU and lifts the model in
+                // the centre without obscuring it. Only drawn once the
+                // SceneView is mounted so it doesn't tint the loading
+                // placeholder.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.0f),
+                                    Color.Black.copy(alpha = 0.35f),
+                                ),
+                                radius = 800f,
+                                center = Offset.Unspecified,
                             ),
-                            radius = 800f,
-                            center = Offset.Unspecified,
                         ),
-                    ),
-            )
-            if (instance == null) {
+                )
+            } else {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

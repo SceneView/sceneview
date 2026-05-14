@@ -61,14 +61,18 @@ fun ARPoseDemo(onBack: () -> Unit) {
     // nudge them relative to that anchor, not to the moving camera).
     var basePose by remember { mutableStateOf<Pose?>(null) }
 
-    // Cube and sphere materials — distinct on-brand colours plus matte PBR settings.
+    // Cube and sphere materials — distinct on-brand colours plus PBR settings tuned
+    // to read clearly under ARCore's `ENVIRONMENTAL_HDR` light estimation.
     //
-    // The previous version used metallic=0.5, roughness=0.3, reflectance=0.5 on the
-    // single cubeMaterial. Under ARCore's `ENVIRONMENTAL_HDR` light estimation the IBL
-    // brightness on a Pixel 9 indoors blew out the specular pass, so the cube + sphere
-    // both came out near-white / unlit-looking despite being purple. Switching to a
-    // matte response (roughness 0.85, low metallic, low reflectance) keeps the base
-    // colour readable in any lighting and makes the AR placement obvious.
+    // The previous version went all the way to roughness=0.85 to avoid a Pixel 9 IBL
+    // blowout on the original metallic=0.5/roughness=0.3 setup, but that swung the
+    // dial too far the other way — the sphere lost all visible diffuse falloff and
+    // specular highlight on Pixel 9 (issue #1200) and read as a flat 2D disc next to
+    // a barely-shaded cube. Re-tuned to roughness=0.55 / reflectance=0.2: matte
+    // enough that the IBL can't blow out the highlight, but glossy enough that the
+    // sphere gradient (lit cap → shadowed underside) is unmistakable. Also adds an
+    // explicit dim DirectionalLight in the scene below so even ARCore's most
+    // featureless estimations (uniform low-light interior) still produce shading.
     //
     // Two materials so cube and sphere read as distinct objects, not a single white
     // blob — matches the same brand-ramp split used elsewhere in the demos.
@@ -76,15 +80,15 @@ fun ARPoseDemo(onBack: () -> Unit) {
         materialLoader = materialLoader,
         color = SceneViewColors.Accent,
         metallic = 0.0f,
-        roughness = 0.85f,
-        reflectance = 0.1f,
+        roughness = 0.55f,
+        reflectance = 0.2f,
     )
     val sphereMaterial = rememberMaterialInstance(
         materialLoader = materialLoader,
         color = SceneViewColors.Primary,
         metallic = 0.0f,
-        roughness = 0.85f,
-        reflectance = 0.1f,
+        roughness = 0.55f,
+        reflectance = 0.2f,
     )
 
     DemoScaffold(

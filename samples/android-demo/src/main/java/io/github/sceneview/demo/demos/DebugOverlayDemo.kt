@@ -305,10 +305,30 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                     if (historySize < fpsHistory.size) historySize++
                 }
             ) {
-                // Spawn `currentCount` procedural spheres in a 10×10×N grid centered on
-                // origin. SphereNode is a built-in SDK primitive (24×24 tessellation =
-                // ~1152 tris each), so the perf cost comes purely from draw calls +
-                // transforms + frustum culling — exactly what the stress test exercises.
+                // Spawn `currentCount` procedural spheres in a centered 3-axis grid.
+                // SphereNode is a built-in SDK primitive (24×24 tessellation ≈ 1152
+                // tris each), so the perf cost comes purely from draw calls +
+                // transforms + frustum culling — exactly what the stress test
+                // exercises.
+                //
+                // v3 — fix issue #1212: the previous formula `(i % 10) - 5` centered
+                // the grid on the *full* 10×10 footprint, so at count=1 the sole
+                // sphere landed at (-0.9, -0.9, 0) — outside the camera frustum at
+                // the SINGLE_SPHERE_DISTANCE = 0.8 m camera. We now compute the
+                // actual occupied half-extents per axis and offset the grid by that
+                // amount so the *cluster mean* is always at origin, regardless of
+                // count. At count=100..1000 this is a no-op (the grid was already
+                // visually centered); at count=1 the sphere sits cleanly at origin.
+                val cols = minOf(10, currentCount).coerceAtLeast(1)
+                val rows = if (currentCount > 0) {
+                    minOf(10, ((currentCount + cols - 1) / cols)).coerceAtLeast(1)
+                } else 1
+                val layers = if (currentCount > 0) {
+                    ((currentCount + cols * rows - 1) / (cols * rows)).coerceAtLeast(1)
+                } else 1
+                val xOffset = -(cols - 1) / 2f * NODE_SPACING
+                val yOffset = -(rows - 1) / 2f * NODE_SPACING
+                val zOffset = (layers - 1) / 2f * NODE_SPACING
                 //
                 // PERF NOTE: each SphereNode here allocates its own VertexBuffer +
                 // IndexBuffer because the SDK's SphereNode constructor builds a fresh
@@ -319,11 +339,18 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                 // per-node allocation, so the perf cost lives in the geometry buffers.
                 repeat(currentCount) { i ->
                     key(i) {
-                        val pos = remember(i) {
+                        // currentCount is a key here so re-spawning at a different
+                        // count rebuilds the position with the correct centering —
+                        // otherwise the `remember(i)` from v2 would freeze each
+                        // sphere's position at its first-render count.
+                        val pos = remember(i, cols, rows, layers) {
+                            val col = i % cols
+                            val row = (i / cols) % rows
+                            val layer = i / (cols * rows)
                             Position(
-                                x = ((i % 10) - 5) * NODE_SPACING,
-                                y = (((i / 10) % 10) - 5) * NODE_SPACING,
-                                z = -((i / 100)) * NODE_SPACING,
+                                x = col * NODE_SPACING + xOffset,
+                                y = row * NODE_SPACING + yOffset,
+                                z = -(layer * NODE_SPACING) + zOffset,
                             )
                         }
                         SphereNode(
@@ -518,14 +545,19 @@ private const val CAMERA_REKEY_SNAP_M = 0.05f
  */
 internal fun autoFitDistance(nodeCount: Int): Float {
     if (nodeCount <= 1) return SINGLE_SPHERE_DISTANCE
-    // Grid layout: x in [0..9] (mod 10), y in [0..9] (i/10 mod 10), z layer = i/100.
-    // For nodeCount n: zLayers = ceil(n / 100).
-    val xExtent = if (nodeCount >= 10) 9 else (nodeCount - 1)
-    val yExtent = if (nodeCount >= 100) 9 else (((nodeCount - 1) / 10).coerceAtLeast(0))
-    val zLayers = ((nodeCount - 1) / 100).coerceAtLeast(0)
-    val halfX = (xExtent * NODE_SPACING) / 2f + NODE_RADIUS
-    val halfY = (yExtent * NODE_SPACING) / 2f + NODE_RADIUS
-    val halfZ = (zLayers * NODE_SPACING) / 2f + NODE_RADIUS
+    // Grid layout — must match the centering math in the SceneView spawn block
+    // above. `cols`, `rows`, `layers` describe the actual occupied footprint:
+    //   cols   = min(10, nodeCount)
+    //   rows   = min(10, ceil(nodeCount / cols))
+    //   layers = ceil(nodeCount / (cols * rows))
+    // The grid is *centered on origin* (post-#1212 fix), so the half-extent on
+    // each axis is (axisLen - 1) / 2 × NODE_SPACING.
+    val cols = minOf(10, nodeCount)
+    val rows = minOf(10, ((nodeCount + cols - 1) / cols)).coerceAtLeast(1)
+    val layers = ((nodeCount + cols * rows - 1) / (cols * rows)).coerceAtLeast(1)
+    val halfX = (cols - 1) / 2f * NODE_SPACING + NODE_RADIUS
+    val halfY = (rows - 1) / 2f * NODE_SPACING + NODE_RADIUS
+    val halfZ = (layers - 1) / 2f * NODE_SPACING + NODE_RADIUS
     val radius = sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ)
         .coerceAtLeast(NODE_RADIUS * 4f)
     // 35° vertical FOV (radians) → tan(17.5°) ≈ 0.3153.

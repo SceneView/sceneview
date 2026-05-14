@@ -185,40 +185,56 @@ fi
 echo ""
 
 # ─── 5. Build & Test (skip in quick mode) ────────────────────────────
+#
+# Two skip flags:
+#   --quick                          skips Android build, Android tests, MCP tests
+#                                    (local fast path)
+#   QUALITY_GATE_SKIP_ANDROID=1      skips Android build + tests but KEEPS MCP
+#                                    tests + asset CDN checks. Used by the CI
+#                                    workflow because ci.yml's `build` job
+#                                    already runs assembleDebug + the same unit
+#                                    test set + JaCoCo coverage. Running them
+#                                    a second time here was pure duplication
+#                                    (~5 min × every PR + push).
 if [ "$QUICK_MODE" != "--quick" ]; then
-    echo -e "${CYAN}--- Build ---${NC}"
+    if [ "${QUALITY_GATE_SKIP_ANDROID:-0}" != "1" ]; then
+        echo -e "${CYAN}--- Build ---${NC}"
 
-    if [ -f "gradlew" ]; then
-        echo -e "  Building Android debug..."
-        ASSEMBLE_LOG=/tmp/qg-assemble-debug.log
-        if ./gradlew assembleDebug --console=plain > "$ASSEMBLE_LOG" 2>&1; then
-            check "Android assembleDebug" "PASS" ""
-        else
-            check "Android assembleDebug" "FAIL" "Build failed — see $ASSEMBLE_LOG"
-            echo -e "${RED}--- assembleDebug tail ---${NC}"
-            tail -60 "$ASSEMBLE_LOG"
-            echo -e "${RED}--- end ---${NC}"
+        if [ -f "gradlew" ]; then
+            echo -e "  Building Android debug..."
+            ASSEMBLE_LOG=/tmp/qg-assemble-debug.log
+            if ./gradlew assembleDebug --console=plain > "$ASSEMBLE_LOG" 2>&1; then
+                check "Android assembleDebug" "PASS" ""
+            else
+                check "Android assembleDebug" "FAIL" "Build failed — see $ASSEMBLE_LOG"
+                echo -e "${RED}--- assembleDebug tail ---${NC}"
+                tail -60 "$ASSEMBLE_LOG"
+                echo -e "${RED}--- end ---${NC}"
+            fi
         fi
-    fi
 
-    echo ""
-    echo -e "${CYAN}--- Tests ---${NC}"
+        echo ""
+        echo -e "${CYAN}--- Tests ---${NC}"
 
-    if [ -f "gradlew" ]; then
-        echo -e "  Running unit tests..."
-        UT_LOG=/tmp/qg-unit-tests.log
-        # `:samples:android-demo:testDebugUnitTest` runs ARBundledRecordingsTest
-        # (the ftyp + avc1 + mett contract suite added by #1060, moved to
-        # `testDebug/` sourceSet by #1100). Without it the gate silently drops
-        # the bundled-recording regression suite. See #1130.
-        if ./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest :samples:android-demo:testDebugUnitTest --console=plain > "$UT_LOG" 2>&1; then
-            check "Android unit tests" "PASS" ""
-        else
-            check "Android unit tests" "FAIL" "Tests failed — see $UT_LOG"
-            echo -e "${RED}--- unit tests tail ---${NC}"
-            tail -60 "$UT_LOG"
-            echo -e "${RED}--- end ---${NC}"
+        if [ -f "gradlew" ]; then
+            echo -e "  Running unit tests..."
+            UT_LOG=/tmp/qg-unit-tests.log
+            # `:samples:android-demo:testDebugUnitTest` runs ARBundledRecordingsTest
+            # (the ftyp + avc1 + mett contract suite added by #1060, moved to
+            # `testDebug/` sourceSet by #1100). Without it the gate silently drops
+            # the bundled-recording regression suite. See #1130.
+            if ./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest :samples:android-demo:testDebugUnitTest --console=plain > "$UT_LOG" 2>&1; then
+                check "Android unit tests" "PASS" ""
+            else
+                check "Android unit tests" "FAIL" "Tests failed — see $UT_LOG"
+                echo -e "${RED}--- unit tests tail ---${NC}"
+                tail -60 "$UT_LOG"
+                echo -e "${RED}--- end ---${NC}"
+            fi
         fi
+    else
+        echo -e "${YELLOW}Skipping Android build + tests (QUALITY_GATE_SKIP_ANDROID=1 — covered by ci.yml)${NC}"
+        echo ""
     fi
 
     if [ -d "mcp" ] && [ -f "mcp/package.json" ] && [ -d "mcp/node_modules" ]; then
