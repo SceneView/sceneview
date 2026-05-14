@@ -36,12 +36,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
 import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.sketchfab.SampleAssets
+import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
+import io.github.sceneview.demo.sketchfab.SketchfabSlug
 import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
@@ -53,6 +58,7 @@ import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import java.io.File
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.launch
@@ -89,28 +95,150 @@ import kotlinx.coroutines.launch
  */
 private enum class CameraMode { HERO, REVEAL, VERTIGO, TRACKING, FREE }
 
+/**
+ * One slot in the carousel of animated models.
+ *
+ * Exactly one of [bundledAssetPath] / [streamedSlug] is non-null. Bundled
+ * entries are read straight from `assets/`; streamed entries resolve through
+ * [SketchfabAssetResolver] and fall back to the registry's bundled asset when
+ * the API key is missing (App Store builds, cold cache, network down).
+ *
+ * `scaleToUnits` is the ground-up height of the model in metres — picked so all
+ * five carousel models read at roughly the same screen size in the existing
+ * cinematic framing (camera at y=0.5, radius 3.5 m). The cinematic shots and
+ * IBL slider stay model-agnostic so swapping models doesn't break the framing.
+ */
+private data class AnimationModel(
+    val displayName: String,
+    val bundledAssetPath: String? = null,
+    val streamedSlug: SketchfabSlug? = null,
+    val scaleToUnits: Float,
+    /**
+     * Default animation index to play when the carousel lands on this model.
+     * Negative means "auto-play index 0 if any animation exists" — used for
+     * streamed models we can't introspect statically (their animation count
+     * is only known after the GLB loads).
+     */
+    val defaultAnimationIndex: Int = -1,
+) {
+    init {
+        require((bundledAssetPath == null) != (streamedSlug == null)) {
+            "AnimationModel must define exactly one of bundledAssetPath or streamedSlug."
+        }
+    }
+}
+
+/**
+ * Carousel of 5 animated models for [AnimationDemo].
+ *
+ * Slot 0 is the historical `threejs_soldier.glb` (bundled, 4 animations:
+ * 0=Idle, 1=Run, 2=TPose, 3=Walk). The next 4 slots stream the 4 entries from
+ * the `animation` category of [SampleAssets] — each carries at least one
+ * baked animation so the play/pause/speed/loop controls have something to
+ * drive.
+ *
+ * Streamed slots fall back to their registered bundled GLB when offline so
+ * the demo always renders five carousel options (the bundled fallback for
+ * three of the four streamed slugs is `threejs_soldier.glb` / `shiba.glb` /
+ * `khronos_fox.glb` — those still ship in the APK).
+ */
+private val ANIMATION_MODELS: List<AnimationModel> = run {
+    val walkingRobot = SampleAssets.byUid["1eaa978c12d147d9a4e62fadcf9eaece"]
+    val dancingKnight = SampleAssets.byUid["f1d75e7a4f9d4f0db8e7a3a8a78a4d92"]
+    val idleCat = SampleAssets.byUid["ad32c1ca3a3d4f0db8e7a3a8a78a4d92"]
+    val sleepingFox = SampleAssets.byUid["f0e7a4f9d4f0db8e7a3a8a78a4d92ad3"]
+    listOf(
+        AnimationModel(
+            displayName = "Soldier",
+            bundledAssetPath = "models/threejs_soldier.glb",
+            scaleToUnits = 1.0f,
+            // 3 = "Walk" — the strongest first-impression animation on the
+            // soldier rig (the cinematic REVEAL pull-back pairs with a walking
+            // subject). Kept as the historical default for visual stability.
+            defaultAnimationIndex = 3,
+        ),
+        AnimationModel(
+            displayName = walkingRobot?.displayName ?: "Walking Robot",
+            streamedSlug = walkingRobot,
+            scaleToUnits = 1.30f,
+        ),
+        AnimationModel(
+            displayName = dancingKnight?.displayName ?: "Dancing Knight",
+            streamedSlug = dancingKnight,
+            scaleToUnits = 1.45f,
+        ),
+        AnimationModel(
+            displayName = idleCat?.displayName ?: "Idle Cat",
+            streamedSlug = idleCat,
+            scaleToUnits = 0.40f,
+        ),
+        AnimationModel(
+            displayName = sleepingFox?.displayName ?: "Sleeping Fox",
+            streamedSlug = sleepingFox,
+            scaleToUnits = 0.55f,
+        ),
+    )
+}
+
 @OptIn(ExperimentalSceneViewApi::class)
 @Composable
 fun AnimationDemo(onBack: () -> Unit) {
+    // Index into [ANIMATION_MODELS] — defaults to the historical soldier so the
+    // first frame looks identical to v4.3.1 when the carousel is unused.
+    var selectedModelIndex by remember { mutableIntStateOf(0) }
     var isPlaying by remember { mutableStateOf(true) }
     var speed by remember { mutableFloatStateOf(1f) }
     var loop by remember { mutableStateOf(true) }
-    // Default to "Walk" — animation index 3 is the walk cycle on the threejs Soldier
-    // (0=Idle, 1=Run, 2=TPose, 3=Walk). REVEAL + Walk together is the strongest first
-    // impression (camera pulls back to reveal a walking subject).
-    var selectedAnim by remember { mutableIntStateOf(3) }
+    // Animation index inside the *current* model. Reset to the per-model default
+    // when the carousel switches.
+    var selectedAnim by remember { mutableIntStateOf(ANIMATION_MODELS[0].defaultAnimationIndex.coerceAtLeast(0)) }
     // Default cinematic shot is REVEAL — close-up to wide pull-back is the most
-    // dramatic intro and pairs naturally with the Walk animation.
+    // dramatic intro and pairs naturally with a walking subject.
     var cameraMode by remember { mutableStateOf(CameraMode.REVEAL) }
     // IBL intensity — exposed as a slider so users can dial atmospheric vs neutral.
     // Default 5_000 lux balances the rooftop_night HDR's warm tint without bleeding
-    // into the soldier's albedo. Range 0–10_000 covers pitch-black to over-exposed.
+    // into the model's albedo. Range 0–10_000 covers pitch-black to over-exposed.
     var iblIntensity by remember { mutableFloatStateOf(5_000f) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
-    val modelInstance = rememberModelInstance(modelLoader, "models/threejs_soldier.glb")
+    val context = LocalContext.current
+
+    // Resolve every streamed slug exactly once per composition. Bundled-only
+    // models pass through (`null`) and are loaded via the asset-path overload
+    // of `rememberModelInstance`. The streamed slot flips from `null` (download
+    // / fallback-copy still running on IO) to a real [File] once the resolver
+    // returns. ANIMATION_MODELS is a `val` constant so the call order is stable.
+    val streamedFiles: List<File?> = ANIMATION_MODELS.mapIndexed { index, model ->
+        val slug = model.streamedSlug
+        if (slug == null) {
+            null
+        } else {
+            produceState<File?>(initialValue = null, key1 = slug.uid, key2 = index) {
+                value = runCatching {
+                    SketchfabAssetResolver.getInstance(context).resolve(slug)
+                }.getOrNull()
+            }.value
+        }
+    }
+
+    val activeModel = ANIMATION_MODELS[selectedModelIndex]
+    val activeFileLocation: String? = when {
+        activeModel.bundledAssetPath != null -> activeModel.bundledAssetPath
+        else -> streamedFiles.getOrNull(selectedModelIndex)?.let { "file://${it.absolutePath}" }
+    }
+    val modelInstance = if (activeFileLocation != null) {
+        rememberModelInstance(modelLoader, activeFileLocation)
+    } else null
+
+    // Re-pin the animation track to the new model's default whenever the
+    // carousel switches. We can't always know the streamed model's animation
+    // count up-front, so we fall back to 0 and let the play/pause LaunchedEffect
+    // below clamp out-of-range indices.
+    LaunchedEffect(selectedModelIndex) {
+        selectedAnim = activeModel.defaultAnimationIndex.coerceAtLeast(0)
+    }
 
     // HDR environment matching the sci-fi tactical Vanguard soldier — urban rooftop at
     // dusk gives a dramatic atmospheric backdrop. Skybox enabled so the sky and city
@@ -456,6 +584,29 @@ fun AnimationDemo(onBack: () -> Unit) {
         title = stringResource(R.string.demo_animation_title),
         onBack = onBack,
         controls = {
+            // Model carousel — switches the active animated subject. Slot 0 is
+            // the bundled threejs soldier; slots 1–4 stream from the `animation`
+            // category of SampleAssets. Streamed slots fall back to the bundled
+            // soldier / shiba / fox GLBs when no Sketchfab key is configured.
+            Text("Subject", style = MaterialTheme.typography.labelLarge)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ANIMATION_MODELS.forEachIndexed { index, model ->
+                    FilterChip(
+                        selected = selectedModelIndex == index,
+                        onClick = { selectedModelIndex = index },
+                        label = { Text(model.displayName) },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Cinematic camera picker. Hero (heroic low-angle orbit), Reveal
             // (close-up to wide pullback), Vertigo (Hitchcock dolly-zoom), Tracking
             // (lateral pass), Free (user gesture only).
@@ -593,14 +744,15 @@ fun AnimationDemo(onBack: () -> Unit) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 1.0f,
+                        scaleToUnits = activeModel.scaleToUnits,
                         // Center the model on its bounding-box origin so it stays inside the
                         // viewport on small screens (Pixel_7a was cropping the previous model).
                         centerOrigin = Position(0f, 0f, 0f),
                         // Lift the model so its feet rest on y=0 (ground plane) instead of
-                        // floating with bbox-center at origin. With scaleToUnits=1 the bbox
-                        // half-height is 0.5 m → translate up by +0.5 m to put feet at y=0.
-                        position = Position(0f, 0.5f, 0f),
+                        // floating with bbox-center at origin. After centering on the bbox
+                        // origin the half-height equals scaleToUnits / 2, so translating up
+                        // by that much puts the feet at y=0 regardless of the active model.
+                        position = Position(0f, activeModel.scaleToUnits * 0.5f, 0f),
                         // autoAnimate = false so the ModelNode init doesn't fire-and-forget
                         // all animations — we drive them from the LaunchedEffect above so
                         // the speed / loop / play-pause controls have real effect.
@@ -613,7 +765,10 @@ fun AnimationDemo(onBack: () -> Unit) {
                     }
                 }
             }
-            LoadingScrim(loading = modelInstance == null, label = "Loading soldier…")
+            LoadingScrim(
+                loading = modelInstance == null,
+                label = "Loading ${activeModel.displayName}…",
+            )
         }
     }
 }

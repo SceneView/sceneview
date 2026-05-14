@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Changed — Stage 2 demo migrations: `AnimationDemo` carousel of 5 animated models from the `animation` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+`samples/android-demo/.../demos/AnimationDemo.kt` is no longer locked to a single hard-coded `threejs_soldier.glb`. A new "Subject" chip row above the existing Camera row lets the user cycle through 5 animated models — the bundled soldier (slot 0, preserves the v4.3.1 default for visual stability) plus the four streamed entries of the `animation` category in [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt): Walking Robot, Dancing Knight, Idle Cat, Sleeping Fox.
+
+Switching subjects rebinds the play/pause/speed/loop controls + the animation-name chip row to the new model — `playAnimation`/`stopAnimation` use the active model's animation count, so out-of-range indices are clamped automatically when going from a 4-animation soldier to a 1-animation streamed creature. The model lift is now derived from `scaleToUnits` (was hard-coded `position.y = 0.5`), so the feet stay grounded at `y=0` for every model regardless of scale.
+
+Offline behaviour preserved — when `SketchfabConfig.apiKey == null`, each streamed slot falls back to the registered bundled GLB (`threejs_soldier.glb` / `shiba.glb` / `khronos_fox.glb`), so the carousel always has 5 working entries (some may look like duplicates in offline mode, which is the same trade-off Stage 1 documented).
+
+**iOS counterpart skipped this PR.** iOS `AutoRotateDemo.swift` is the iOS V1 stand-in for the Android `AnimationDemo` and renders a non-animated metallic torus — there's no skeletal-rig playback on iOS yet (tracked in the v4.3.0 parity backlog, see [#1004](https://github.com/sceneview/sceneview/issues/1004) iOS parity umbrella). Migrating it requires the iOS skinning port first.
+
+**`SampleAssets` slugs added:** 0. The four `animation` slugs shipped in Stage 1 already.
+
+**30 s screen recording deferred** — agent worktree has no Pixel device access; tracked in the [#1152](https://github.com/sceneview/sceneview/issues/1152) acceptance checklist.
+
 ### Added — Stage 2 demo migrations: `MaterialsDemo` streams the curated `materials` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 Third Stage 2 migration. The previous `MaterialsDemo` (5-sphere metallic/roughness spectrum) didn't actually exercise any of the modern glTF material extensions — it was a hand-built PBR sweep useful for diagnosing the renderer, not for answering "what does `KHR_materials_sheen` look like in SceneView?". Stage 2 replaces it on both platforms with the curated extension-bearing models from `SampleAssets`'s `materials` category (Iridescent Beetle / Glass Decanter / Velvet Cushion — sheen, transmission, iridescence).
