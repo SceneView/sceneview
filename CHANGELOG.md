@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added — Stage 2 demo migrations: `SceneGalleryDemo` streams the curated `gallery` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+First Stage 2 migration on top of the [Stage 1 resolver foundations](#added--samples-sketchfab-streaming-foundations-1152--stage-1). `SceneGalleryDemo` is now a category-chip-driven streamed gallery on both Android and iOS — chips map 1:1 to the four `gallery` slugs in [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt) (Vintage Cassette, Polly the Parrot, Reading Lamp, Wooden Chair), the resolver hands back the streamed GLB/USDZ or the bundled fallback when no key is configured, and `SceneView` orbits the model. No external Sketchfab WebView — the demo only ever feeds the local file URL to `rememberModelInstance` (Android) / `ModelNode.load(contentsOf:)` (iOS).
+
+**Files touched:**
+
+- `samples/android-demo/.../demos/SceneGalleryDemo.kt` (new) — streams the four `gallery` slugs via `SketchfabAssetResolver`, warms the category on first frame with `prefetchAll("gallery")`, orbit camera, inline CC-BY author byline.
+- `samples/android-demo/.../DemoRegistry.kt` — new `scene-gallery` entry in the `3D Basics` category with the `Icons.Filled.Collections` icon.
+- `samples/android-demo/.../MainActivity.kt` — routes `scene-gallery` to `SceneGalleryDemo`.
+- `samples/android-demo/src/main/res/values/strings.xml` + `values-fr/strings.xml` — 4 new keys: `demo_scene_gallery_title`, `demo_scene_gallery_subtitle`, `demo_scene_gallery_loading`, `demo_scene_gallery_credit` (used for `"by %s · CC-BY 4.0"`). The chip labels themselves come from the catalogue's `SketchfabSlug.displayName` (curator-authored English ids, not localizable copy).
+- `samples/ios-demo/SceneViewDemo/Views/Demos/SceneGalleryDemo.swift` — rewrote the placeholder shape-pedestal scene as the cross-platform mirror: same `gallery` category, same chip row + author byline, `SketchfabAssetResolver.shared.resolve(slug)` + `ModelNode.load(contentsOf:)`, `prefetchAll(category:)` warm, error path surfaces the resolver's `localizedDescription` rather than failing silently.
+
+**`SampleAssets` slugs added:** 0. The four `gallery` slugs (Vintage Cassette, Polly the Parrot, Reading Lamp, Wooden Chair) shipped in Stage 1 already and are now consumed by this PR for the first time.
+
+**i18n hygiene.** The chip labels render `SketchfabSlug.displayName` directly — those strings are curator-authored Sketchfab catalogue ids (English-only, like the `OrbitalARDemo` planet labels) and don't go through `stringResource()`. All demo scaffolding (title, subtitle, loading copy, attribution caption) goes through the new `demo_scene_gallery_*` keys in both `values/` and `values-fr/`. No raw English string leaks into a non-English locale.
+
+**Screen recording.** Deferred to the visual-smoke pass at the end of Stage 2 (one combined recording covering all three Stage 2 demos in this batch). Compile + unit tests gated this PR.
+
+**Acceptance:** Android `./gradlew :samples:android-demo:compileDebugKotlin` GREEN. `:samples:android-demo:testDebugUnitTest --tests "io.github.sceneview.demo.sketchfab.*"` GREEN (27 sketchfab tests passing unchanged from Stage 1). iOS `xcodebuild` skipped in this batch (CHANGELOG entry kept honest — Stage 1 ran the Xcode build; the SceneGalleryDemo iOS rewrite is a small file replacement with no new Swift symbols).
+
 ### Added — Samples Sketchfab streaming foundations ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 1)
 
 Stage 1 of the [`#1152`](https://github.com/sceneview/sceneview/issues/1152) umbrella — `SketchfabAssetResolver` foundations that the Stage 2 demo migrations (`OrbitalARDemo`, `SceneGalleryDemo`, `AnimationDemo`, `MultiModelDemo`, `ARPlacementDemo`, `PhysicsDemo`, `MaterialsDemo`) will build on. **No demo is migrated in this PR** — the bundled GLBs/USDZs stay as they are. The resolver, registry, and tests are the foundation; demo migrations land 1 PR per demo.

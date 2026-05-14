@@ -182,6 +182,10 @@
     <string name="demo_animation_subtitle">Lire, mettre en pause et contrôler les animations</string>
     <string name="demo_multi_model_title">Multi-modèle</string>
     <string name="demo_multi_model_subtitle">Plusieurs modèles dans une scène</string>
+    <string name="demo_scene_gallery_title">Galerie de scènes</string>
+    <string name="demo_scene_gallery_subtitle">Modèles thématiques Sketchfab streamés à la demande</string>
+    <string name="demo_scene_gallery_loading">Streaming du modèle…</string>
+    <string name="demo_scene_gallery_credit">par %1$s · CC-BY 4.0</string>
     <string name="demo_lighting_title">Types de lumières</string>
     <string name="demo_lighting_subtitle">Lumières directionnelles, ponctuelles et spots</string>
     <string name="demo_movable_light_title">Lumière mobile</string>
