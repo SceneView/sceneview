@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        French translation for SceneView demo.
+        Closes #955. Source-of-truth: values/strings.xml.
+        When adding a key in the source, mirror it here (or fall back to the
+        English string by leaving it out of this file).
+    -->
+    <string name="app_name">SceneView</string>
+
+    <!-- Navigation -->
+    <string name="tab_3d">3D</string>
+    <string name="tab_ar">RA</string>
+    <string name="tab_samples">Démos</string>
+    <string name="tab_about">À propos</string>
+
+    <!-- Explore screen -->
+    <string name="explore_title">SceneView</string>
+    <string name="explore_subtitle">3D et RA pour Jetpack Compose</string>
+    <string name="explore_gesture_hint">Pincer pour zoomer · Glisser pour orbiter · Double-tap pour agrandir</string>
+    <string name="explore_pause">Mettre l\'animation en pause</string>
+    <string name="explore_play">Lancer l\'animation</string>
+    <string name="explore_animation_count">%d animations</string>
+    <string name="explore_loading">Chargement du modèle 3D</string>
+
+    <!-- AR screen -->
+    <string name="ar_scan_surface">Pointez votre caméra vers une surface plane</string>
+    <string name="ar_model_placed">Modèle placé — tapez pour repositionner</string>
+    <string name="ar_not_available_title">RA indisponible</string>
+    <string name="ar_not_available_description">Cet appareil ne prend pas en charge ARCore.\nLes fonctionnalités RA nécessitent un appareil Android compatible avec Google Play Services pour la RA.</string>
+    <string name="ar_drag_to_move">Glisser pour déplacer</string>
+    <string name="ar_pinch_to_scale">Pincer pour redimensionner</string>
+    <string name="ar_twist_to_rotate">Tourner avec deux doigts pour pivoter</string>
+    <string name="ar_remove">Retirer</string>
+    <string name="ar_model_load_failed">Le modèle n\'a pas pu se charger — vérifiez votre connexion</string>
+
+    <!-- Samples screen -->
+    <string name="samples_title">Démos</string>
+    <string name="samples_feature_count">%d démos de fonctionnalités</string>
+    <string name="samples_badge_live">EN DIRECT</string>
+    <string name="samples_badge_soon">BIENTÔT</string>
+    <string name="samples_back">Retour</string>
+
+    <!-- Sample categories -->
+    <string name="category_3d">3D</string>
+    <string name="category_effects">Effets</string>
+    <string name="category_content">Contenu</string>
+    <string name="category_advanced">Avancé</string>
+    <string name="category_ar">RA</string>
+    <string name="category_interactive">Interactif</string>
+
+    <!-- Sample demo titles -->
+    <string name="demo_model_viewer">Visualiseur de modèle</string>
+    <string name="demo_model_viewer_desc">Charger et afficher des modèles 3D glTF/GLB avec caméra orbitale</string>
+    <string name="demo_geometry">Nœuds de géométrie</string>
+    <string name="demo_geometry_desc">Géométrie procédurale : cube, sphère, cylindre et plan</string>
+    <string name="demo_animations">Animations</string>
+    <string name="demo_animations_desc">Lire, mettre en pause et parcourir les animations du modèle</string>
+    <string name="demo_dynamic_sky">Ciel dynamique</string>
+    <string name="demo_dynamic_sky_desc">Position solaire selon l\'heure de la journée avec diffusion atmosphérique</string>
+    <string name="demo_lighting">Éclairage</string>
+    <string name="demo_lighting_desc">Lumières ponctuelles, directionnelles et spots avec ombres</string>
+    <string name="demo_camera_controls">Contrôles de la caméra</string>
+    <string name="demo_camera_controls_desc">Manipulateur d\'orbite, panoramique et zoom</string>
+    <string name="demo_post_processing">Post-traitement</string>
+    <string name="demo_post_processing_desc">Bloom, SSAO, FXAA, mappage tonal, vignettage</string>
+    <string name="demo_fog">Brouillard</string>
+    <string name="demo_fog_desc">Brouillard volumétrique atmosphérique basé sur la hauteur</string>
+    <string name="demo_text_labels">Étiquettes textuelles</string>
+    <string name="demo_text_labels_desc">Rendu de texte 3D avec orientation billboard</string>
+    <string name="demo_line_paths">Tracés en ligne</string>
+    <string name="demo_line_paths_desc">Polylignes 3D et courbes de Lissajous</string>
+    <string name="demo_physics">Physique</string>
+    <string name="demo_physics_desc">Simulation de corps rigides avec balles rebondissantes</string>
+    <string name="demo_image_detection">Détection d\'image</string>
+    <string name="demo_image_detection_desc">Reconnaissance d\'images réelles avec superposition RA</string>
+    <string name="demo_reflection_probes">Sondes de réflexion</string>
+    <string name="demo_reflection_probes_desc">Réflexions cubemap locales pour des matériaux réalistes</string>
+    <string name="demo_gltf_cameras">Caméras glTF</string>
+    <string name="demo_gltf_cameras_desc">Importer et basculer entre les caméras des fichiers glTF</string>
+    <string name="demo_multi_model">Scène multi-modèles</string>
+    <string name="demo_multi_model_desc">Composer plusieurs modèles dans une scène stylisée</string>
+    <string name="demo_dynamic_lighting">Éclairage dynamique</string>
+    <string name="demo_dynamic_lighting_desc">Ajuster couleur, intensité et type de lumière en temps réel</string>
+    <string name="demo_animation_control">Contrôle d\'animation</string>
+    <string name="demo_animation_control_desc">Changer d\'animation par nom, contrôler vitesse et boucle</string>
+    <string name="demo_environment_gallery">Galerie d\'environnements</string>
+    <string name="demo_environment_gallery_desc">Comparer des environnements HDR sur le même modèle côte à côte</string>
+    <string name="demo_gesture_editing">Édition par gestes</string>
+    <string name="demo_gesture_editing_desc">Glisser, pivoter et redimensionner les modèles avec des gestes tactiles</string>
+
+    <!-- Demo UI controls -->
+    <string name="control_sun_intensity">Intensité du soleil : %d lux</string>
+    <string name="control_fog_density">Densité du brouillard : %s</string>
+    <string name="control_drop_again">Lâcher à nouveau</string>
+    <string name="control_camera_label">Caméra : %s</string>
+    <string name="control_orbit_instruction">1 doigt — Orbiter</string>
+    <string name="control_pan_instruction">2 doigts — Panoramique</string>
+    <string name="control_zoom_instruction">Pincer — Zoom</string>
+    <string name="control_double_tap_reset">Double tap — Réinitialiser</string>
+    <string name="control_environment_reflections">Réflexions de l\'environnement</string>
+    <string name="control_environment_reflections_desc">Changez d\'environnement pour voir comment les réflexions varient à la surface du modèle.</string>
+    <string name="control_light_color">Couleur de la lumière</string>
+    <string name="control_light_intensity">Intensité : %d</string>
+    <string name="control_light_type">Type de lumière</string>
+    <string name="control_animation_speed">Vitesse : %.1fx</string>
+    <string name="control_animation_loop">Boucle</string>
+    <string name="control_gesture_drag_hint">Glisser pour déplacer · Pincer pour redimensionner · Tourner pour pivoter</string>
+    <string name="control_reset_position">Réinitialiser</string>
+
+    <!-- Image Detection demo -->
+    <string name="image_detection_title">Démo de détection d\'image</string>
+    <string name="image_detection_desc">Utilise AugmentedImageDatabase pour détecter\ndes images imprimées et superposer du contenu 3D.</string>
+    <string name="image_detection_point_camera">Pointez la caméra vers le logo SceneView</string>
+    <string name="image_detection_count">%d image(s) détectée(s)</string>
+    <string name="image_detection_ar_unavailable">RA indisponible sur cet appareil.\nLa détection d\'image nécessite ARCore.</string>
+
+    <!-- About screen -->
+    <string name="about_title">À propos</string>
+    <string name="about_sceneview">SceneView</string>
+    <string name="about_version">v%s</string>
+    <string name="about_tagline">3D et RA en interface déclarative\npour Android, iOS, Web et plus</string>
+    <string name="about_feature_3d_title">Scènes 3D</string>
+    <string name="about_feature_3d_desc">Intégration complète à Jetpack Compose avec le moteur de rendu Filament. Chargez des modèles glTF/GLB, de la géométrie procédurale, des ciels dynamiques et plus.</string>
+    <string name="about_feature_ar_title">Réalité augmentée</string>
+    <string name="about_feature_ar_desc">Tap-pour-placer, détection de plans, suivi d\'images, occlusion par profondeur et estimation de la lumière, propulsés par ARCore.</string>
+    <string name="about_feature_ai_title">SDK pensé IA</string>
+    <string name="about_feature_ai_desc">Conçu pour que les assistants IA génèrent du code 3D/RA correct du premier coup. API déclarative, documentation exhaustive, références lisibles par machine.</string>
+    <string name="about_platforms_title">9 plateformes</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_docs">Docs</string>
+    <string name="about_credits_title">Crédits</string>
+    <string name="about_credits_filament">Construit avec Google Filament, ARCore, Jetpack Compose et Material 3 Expressive.</string>
+    <string name="about_credits_models">Les modèles 3D proviennent de Sketchfab, des Khronos glTF Sample Assets et de Poly Haven. Chaque modèle est distribué sous sa licence d\'origine CC-BY 4.0 ou CC0 1.0 ; les crédits sont donnés à chaque créateur dans la liste complète ci-dessous.</string>
+    <string name="about_credits_models_link">Voir les crédits des assets 3D</string>
+    <string name="about_credits_models_url">https://github.com/sceneview/sceneview/blob/main/assets/CREDITS.md</string>
+    <string name="about_credits_license">SceneView est open source sous licence Apache 2.0. Les licences des modèles sont distinctes et attachées à chaque asset.</string>
+
+    <!-- Update banner -->
+    <string name="update_available">Mise à jour disponible</string>
+    <string name="update_downloading">Téléchargement de la mise à jour…</string>
+    <string name="update_ready">Mise à jour prête !</string>
+    <string name="update_restart">Redémarrer</string>
+    <string name="update_check">Rechercher les mises à jour</string>
+
+    <!-- Error states -->
+    <string name="ar_not_available">La RA n\'est pas disponible sur cet appareil</string>
+    <string name="ar_not_installed">Google Play Services pour la RA n\'est pas installé</string>
+    <string name="ar_camera_permission">L\'autorisation caméra est requise pour la RA</string>
+    <string name="ar_grant_permission">Autoriser la caméra</string>
+    <string name="model_loading">Chargement du modèle 3D…</string>
+    <string name="model_loading_error">Échec du chargement du modèle</string>
+    <string name="scene_error">Erreur lors du rendu de la scène</string>
+
+    <!-- Accessibility -->
+    <string name="cd_3d_scene">Visualiseur de scène 3D</string>
+    <string name="cd_ar_scene">Visualiseur de réalité augmentée</string>
+    <string name="cd_loading_model">Chargement du modèle 3D, veuillez patienter</string>
+    <string name="cd_model_selector">Sélectionner un modèle 3D</string>
+    <string name="cd_environment_selector">Sélectionner l\'environnement d\'éclairage</string>
+    <string name="cd_back_button">Retour</string>
+    <string name="cd_remove_model">Retirer le modèle placé</string>
+    <string name="cd_scanning_surface">Recherche d\'une surface plane</string>
+</resources>
