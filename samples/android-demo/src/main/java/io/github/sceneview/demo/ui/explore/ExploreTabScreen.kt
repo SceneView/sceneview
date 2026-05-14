@@ -47,9 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,34 +102,43 @@ fun ExploreTabScreen(
     var recent by remember { mutableStateOf<List<SketchfabModel>>(emptyList()) }
     var loadingFeeds by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+    // Bumped on each pull-to-refresh so the LaunchedEffect below re-keys and
+    // cancels its previous run. This avoids the race where (a) the user pulls
+    // to refresh, then (b) toggles the "Animated" filter chip before the
+    // request returns: both would otherwise race writes into the same three
+    // feed lists. Keying the LaunchedEffect on both `animatedOnly` and
+    // `refreshTick` gives us a single cancel-then-restart pipeline.
+    var refreshTick by remember { mutableStateOf(0) }
 
     val sketchfabService = SketchfabService.getInstance(LocalContext.current)
-    val scope = rememberCoroutineScope()
 
-    suspend fun loadSketchfabFeeds() {
-        if (SketchfabConfig.apiKey == null) return
+    /** (re)load the three feeds when the animated toggle flips, on first composition, or on pull-to-refresh. */
+    LaunchedEffect(animatedOnly, refreshTick) {
+        if (SketchfabConfig.apiKey == null) return@LaunchedEffect
         loadingFeeds = true
         val animatedParam: Boolean? = if (animatedOnly) true else null
-        // supervisorScope so a single feed failure (transient 429, network blip)
-        // doesn't cancel the other two — surviving feeds still render (#980).
-        // Each catch re-throws CancellationException so the parent scope
-        // cancellation (toggle re-keys, navigation away) still tears down
-        // the in-flight requests cleanly. `runCatching` swallows
-        // CancellationException, which would break structured concurrency.
-        supervisorScope {
-            val a = async { catchingFeed { sketchfabService.staffPicks(animated = animatedParam, limit = 10) } }
-            val b = async { catchingFeed { sketchfabService.featured(animated = animatedParam, limit = 10) } }
-            val c = async { catchingFeed { sketchfabService.recentlyAdded(animated = animatedParam, limit = 10) } }
-            staffPicks = a.await()
-            mostLiked = b.await()
-            recent = c.await()
+        // supervisorScope so a single feed failure (transient 429, network
+        // blip) doesn't cancel the other two — surviving feeds still render
+        // (#980). Each `catchingFeed` re-throws CancellationException so the
+        // parent LaunchedEffect cancellation (toggle re-keys, pull-to-refresh
+        // re-keys, navigation away) still tears down the in-flight requests
+        // cleanly.
+        try {
+            supervisorScope {
+                val a = async { catchingFeed { sketchfabService.staffPicks(animated = animatedParam, limit = 10) } }
+                val b = async { catchingFeed { sketchfabService.featured(animated = animatedParam, limit = 10) } }
+                val c = async { catchingFeed { sketchfabService.recentlyAdded(animated = animatedParam, limit = 10) } }
+                staffPicks = a.await()
+                mostLiked = b.await()
+                recent = c.await()
+            }
+        } finally {
+            // try/finally so loadingFeeds + isRefreshing always reset even if
+            // the coroutine was cancelled mid-flight (otherwise the skeleton
+            // spinners would stay forever after navigating away mid-refresh).
+            loadingFeeds = false
+            isRefreshing = false
         }
-        loadingFeeds = false
-    }
-
-    /** (re)load the three feeds when the animated toggle flips or on first composition. */
-    LaunchedEffect(animatedOnly) {
-        loadSketchfabFeeds()
     }
 
     val body = @Composable {
@@ -157,18 +164,15 @@ fun ExploreTabScreen(
     // Pull-to-refresh is only wired when the Sketchfab carousels are visible —
     // without an API key there's nothing dynamic to refresh and pulling would
     // spin a spinner that immediately settles, which is worse than no affordance
-    // at all.
+    // at all. onRefresh just bumps `refreshTick`; the LaunchedEffect above
+    // owns the single cancel-then-restart pipeline.
     if (SketchfabConfig.apiKey != null) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
-                isRefreshing = true
-                scope.launch {
-                    try {
-                        loadSketchfabFeeds()
-                    } finally {
-                        isRefreshing = false
-                    }
+                if (!isRefreshing) {
+                    isRefreshing = true
+                    refreshTick++
                 }
             },
         ) {

@@ -284,10 +284,13 @@ fun ArViewTabContent(
     }
 
     // System back gesture exits the live AR session instead of dropping the
-    // user out of the tab. Predictive back is opted in via
-    // `android:enableOnBackInvokedCallback="true"` in AndroidManifest.xml, so
-    // Android 14+ users see the standard preview animation as they swipe.
-    BackHandler(enabled = true) {
+    // user out of the tab. Combined with `android:enableOnBackInvokedCallback="true"`
+    // in AndroidManifest.xml, Android 13+ routes back via the new
+    // OnBackInvokedDispatcher (a prerequisite for any future
+    // PredictiveBackHandler upgrade); today the user still sees the system's
+    // default home-peek animation during the swipe rather than an in-app
+    // preview of the launcher screen — see #1206 follow-up.
+    BackHandler {
         exitArSession()
     }
 

@@ -2,6 +2,12 @@
 
 ## Unreleased — v4.3.4 hotfix (in progress)
 
+### Added — Compose UX patterns in `samples/android-demo`
+
+- **Pull-to-refresh on Explore Sketchfab feeds** ([`ExploreTabScreen.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/ui/explore/ExploreTabScreen.kt)) — `PullToRefreshBox` reloads the Trending / Staff Picks / Recently Added carousels on swipe-down. The pull-down affordance is conditionally wired so it only shows when the Sketchfab API key is present (no spinner-flash on builds without the key). The refresh path goes through a single cancel-then-restart pipeline (`refreshTick` LaunchedEffect key) so toggling the "Animated" filter mid-refresh can't race two concurrent loads writing to the same lists.
+- **System back exits live AR session** ([`ArViewTab.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/ui/ArViewTab.kt)) — `BackHandler` routes the system gesture to the same exit path as the top-end Close button (detach anchors, return to the AR launcher screen). Manifest opts into `android:enableOnBackInvokedCallback="true"` so Android 13+ routes back via the new `OnBackInvokedDispatcher` (prerequisite for any future `PredictiveBackHandler` upgrade).
+- **Shared-element hero morph between viewer stages** ([`SketchfabModelViewerScreen.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/ui/explore/SketchfabModelViewerScreen.kt)) — `Crossfade` replaced with `SharedTransitionLayout` + `AnimatedContent`. The 220 dp Preview thumbnail morphs in place into the 440 dp Ken-Burns Downloading hero, then into the live SceneView surface, sharing bounds across the three stages with a consistent rounded-corner clip. The live render uses `SurfaceType.TextureSurface` so the layer alpha is honoured during the morph (the default `SurfaceView` is a hardware overlay and would pop in opaque). Stage.Error is excluded from the shared bounds (no hero) and uses a clean 300 ms fade.
+
 ### Fixed — Pixel 9 v4.3.0 production audit follow-ups ([umbrella #1176](https://github.com/sceneview/sceneview/issues/1176))
 
 These two findings carried over from the v4.3.0 production audit and were not blocking enough to require a v4.3.3 cut, but accumulate for the next hotfix.

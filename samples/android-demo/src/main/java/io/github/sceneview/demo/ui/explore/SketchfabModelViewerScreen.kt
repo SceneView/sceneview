@@ -3,6 +3,8 @@
 package io.github.sceneview.demo.ui.explore
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -65,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.SurfaceType
 import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.demo.sketchfab.SketchfabModel
@@ -109,11 +112,12 @@ fun SketchfabModelViewerScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var stage by remember(model.uid) { mutableStateOf<Stage>(Stage.Preview) }
 
-    // Hoist Engine + loaders ABOVE the Crossfade so the Filament engine survives
-    // stage transitions. Previously every Crossfade swap (Preview → Downloading
-    // → Rendering) tore down and recreated the Engine inside RenderContent
-    // (200-400 ms freeze + black flash). With the engine remembered here it
-    // outlives the crossfade tween and only releases when the sheet closes.
+    // Hoist Engine + loaders ABOVE the SharedTransitionLayout so the Filament
+    // engine survives stage transitions. Previously every Crossfade swap
+    // (Preview → Downloading → Rendering) tore down and recreated the Engine
+    // inside RenderContent (200-400 ms freeze + black flash). With the engine
+    // remembered here it outlives the transition tween and only releases when
+    // the sheet closes.
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
@@ -126,25 +130,42 @@ fun SketchfabModelViewerScreen(
         // SharedTransitionLayout + AnimatedContent so the hero thumbnail
         // morphs smoothly between Preview (220 dp card) → Downloading
         // (440 dp Ken-Burns) → Rendering (live SceneView surface). Each
-        // stage opts in via the `heroModifier` slot. Stage.Error stays
-        // a hard fade because it has no hero — re-using the bounds would
-        // animate the error card sliding out of the now-empty hero.
+        // stage receives a `heroModifier` slot carrying `sharedBounds` +
+        // a matching `clip(RoundedCornerShape(24.dp))` so the corner
+        // radius stays consistent through the morph (without the clip
+        // baked into the shared modifier, Preview's rounded corners
+        // would snap to square corners at frame 1 of the animation).
+        // Stage.Error opts out — there is no hero so reusing the bounds
+        // would animate the error card sliding out of empty space.
+        val heroShape = RoundedCornerShape(24.dp)
+        val heroKey = "sketchfab-hero-${model.uid}"
         SharedTransitionLayout {
             AnimatedContent(
                 targetState = stage,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(500)) togetherWith
-                        fadeOut(animationSpec = tween(500))
+                    // Stages that share the hero (Preview / Downloading /
+                    // Rendering) opt out of fade so only `sharedBounds`
+                    // drives the morph — a parallel fadeIn/fadeOut would
+                    // wash the hero semi-transparent halfway through. Only
+                    // Stage.Error (no shared element) uses a real fade.
+                    val errorInvolved = initialState is Stage.Error || targetState is Stage.Error
+                    if (errorInvolved) {
+                        fadeIn(animationSpec = tween(300)) togetherWith
+                            fadeOut(animationSpec = tween(300))
+                    } else {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    }
                 },
                 label = "sketchfab-stage",
             ) { s ->
-                val heroKey = "sketchfab-hero-${model.uid}"
                 val heroModifier: Modifier = when (s) {
                     Stage.Preview, Stage.Downloading, is Stage.Rendering ->
-                        Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = heroKey),
-                            animatedVisibilityScope = this@AnimatedContent,
-                        )
+                        Modifier
+                            .sharedBounds(
+                                sharedContentState = rememberSharedContentState(key = heroKey),
+                                animatedVisibilityScope = this@AnimatedContent,
+                            )
+                            .clip(heroShape)
                     is Stage.Error -> Modifier
                 }
                 when (s) {
@@ -318,8 +339,9 @@ private fun StatChip(label: String) {
 /**
  * Hero state while the GLB is downloading. Shows the Sketchfab thumbnail with a
  * slow Ken-Burns zoom (1.0 → 1.18) and a soft blur, so the screen feels like a
- * premium preview instead of a spinner. Cross-fades into the live SceneView via
- * the parent [Crossfade] when [RenderContent] takes over.
+ * premium preview instead of a spinner. Morphs into the live SceneView via
+ * the parent [SharedTransitionLayout] + [AnimatedContent] when [RenderContent]
+ * takes over — the 440 dp hero Box keeps its shared bounds across the swap.
  */
 @Composable
 private fun DownloadingContent(
@@ -469,6 +491,13 @@ private fun RenderContent(
         ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                // TextureSurface so the live render respects the Compose layer
+                // alpha during the SharedTransitionLayout morph and the
+                // surrounding cinematic-vignette overlay. The default SurfaceView
+                // is a hardware overlay punched through the window and ignores
+                // Compose's fadeOut/fadeIn during the stage transition — the
+                // viewport would pop in opaque instead of morphing in.
+                surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
