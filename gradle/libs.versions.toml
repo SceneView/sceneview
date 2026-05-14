@@ -13,7 +13,7 @@ fragmentKtx = "1.8.9"
 composeBom = "2026.03.00"
 composeMaterial3Expressive = "1.5.0-alpha17"
 activityCompose = "1.13.0"
-navigationCompose = "2.9.7"
+navigationCompose = "2.9.8"
 lifecycleRuntimeCompose = "2.10.0"
 
 # Kotlin Libraries
