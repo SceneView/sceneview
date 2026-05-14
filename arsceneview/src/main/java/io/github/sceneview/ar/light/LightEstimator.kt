@@ -70,16 +70,22 @@ class LightEstimator(
     var environmentalHdrSphericalHarmonics = true
 
     /**
-     * SpecularFilter applies a filter based on the BRDF used for lighting
+     * Build a roughness-prefiltered cubemap before handing it to Filament's
+     * `IndirectLight.reflections()`.
      *
-     * Specular highlights are the shiny bits of surfaces that reflect a light source directly.
-     * Highlights on an object change relative to the position of a viewer in a scene.
+     * **Default `true`** (#1064). Filament's `IndirectLight.reflections()` expects a
+     * prefiltered roughness mip chain — feeding a raw cubemap means every roughness
+     * lookup samples mip 0, so reflections are mirror-like at any roughness slider
+     * value, highlights oversaturate, and metallic/glossy materials look wrong.
      *
-     * `true` = Reduce the amount of reflectivity a surface has. It is a key component in determining
-     * the brightness of specular highlights, along with shininess to determine the size of the
-     * highlights.
+     * Cost: a one-time prefilter pass per cubemap update (~5–15 ms on a Pixel 9).
+     * ARCore updates the HDR cubemap roughly once per second, so the cost is
+     * amortised.
+     *
+     * Set `false` only on perf-budget-constrained devices where the materials are
+     * known not to use roughness > 0 (e.g. unlit-only scenes).
      */
-    var environmentalHdrSpecularFilter = false
+    var environmentalHdrSpecularFilter = true
 
     /**
      * Move the directional light
