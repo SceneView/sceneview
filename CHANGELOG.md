@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Added — Samples Sketchfab streaming foundations ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 1)
+
+Stage 1 of the [`#1152`](https://github.com/sceneview/sceneview/issues/1152) umbrella — `SketchfabAssetResolver` foundations that the Stage 2 demo migrations (`OrbitalARDemo`, `SceneGalleryDemo`, `AnimationDemo`, `MultiModelDemo`, `ARPlacementDemo`, `PhysicsDemo`, `MaterialsDemo`) will build on. **No demo is migrated in this PR** — the bundled GLBs/USDZs stay as they are. The resolver, registry, and tests are the foundation; demo migrations land 1 PR per demo.
+
+**New files (Android — `samples/android-demo/.../sketchfab/`):**
+
+- [`SketchfabSlug.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SketchfabSlug.kt) — typed slug + license + scale + animation + category + author + tags. Constructor rejects any non-CC-BY 4.0 license URL, a blank author, an empty fallback path, or a non-positive scale.
+- [`SampleAssets.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt) — 20-entry curated CC-BY-only registry grouped into 6 Stage 2 categories: `solar` (4), `gallery` (4), `animation` (4), `ar_placement` (3), `physics` (2), `materials` (3). `byUid` / `byCategory` lookups + `requireValid()` for CI invariants (no duplicate uids, every uid is 32-char lowercase hex).
+- [`SketchfabAssetResolver.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SketchfabAssetResolver.kt) — `resolve(slug)` / `prefetchAll(category)` / LRU eviction (250 MB cap, tighter than the Explore-tab 500 MB cap) / bounds sanity check (magic-byte + size floor) / fallback-to-bundle when no key OR network fails. Wraps `SketchfabService` with exponential backoff (429/5xx only, max 3 retries) and falls back immediately on policy-decision 4xx.
+
+**New files (iOS — `samples/ios-demo/SceneViewDemo/Services/`):**
+
+- [`SketchfabSlug.swift`](samples/ios-demo/SceneViewDemo/Services/SketchfabSlug.swift), [`SampleAssets.swift`](samples/ios-demo/SceneViewDemo/Services/SampleAssets.swift), [`SketchfabAssetResolver.swift`](samples/ios-demo/SceneViewDemo/Services/SketchfabAssetResolver.swift) — same 20-uid registry, same resolver semantics, RealityKit-compatible (accepts both GLB `glTF` magic and USDZ ZIP `PK\x03\x04` magic in the bounds check). `actor` for the `URLSession` serialisation invariant that matches `SketchfabService`.
+- [`SketchfabAssetResolver+Tests.swift`](samples/ios-demo/SceneViewDemo/Services/SketchfabAssetResolver+Tests.swift) — XCTest mirror of the Android suite (no live `xcodebuild test` target wires it up yet; the file lives next to the existing `SketchfabService+Tests.swift` scaffold for documentation parity).
+
+**Tests (Android — 24 new unit tests, all passing):**
+
+- [`SampleAssetsTest.kt`](samples/android-demo/src/test/java/io/github/sceneview/demo/sketchfab/SampleAssetsTest.kt) — 13 tests: registry non-empty, every entry CC-BY 4.0, every entry has a non-blank author, every entry has a fallback, scale in `[0.05 m, 5 m]`, no duplicate uids, `requireValid` succeeds, `byUid`/`byCategory` agree with `all`, all 6 Stage 2 categories represented, constructor rejects non-CC-BY / blank author / non-positive scale.
+- [`SketchfabAssetResolverTest.kt`](samples/android-demo/src/test/java/io/github/sceneview/demo/sketchfab/SketchfabAssetResolverTest.kt) — 11 tests: `resolve` falls back without an API key, `Unknown` for slugs outside the registry, `boundsAreSane` rejects 0-byte/junk/missing files and accepts a real GLB header, `pruneCache` is a no-op sub-budget, `FallbackUnavailable` when the bundled asset is missing, `prefetchAll` returns 0 for unknown categories, singleton wiring.
+
+**Hard rules honoured (Stage 1 = pure plumbing):**
+
+- **NEVER ship a build that needs the network to render something useful.** Every `SketchfabSlug` carries a `fallbackBundledPath` that already lives in the demo APK / IPA. The resolver returns it whenever the API key is absent (App Store builds), the network fails, or the streamed asset fails the magic-byte sanity check.
+- **NEVER open a Sketchfab WebView / external link.** The resolver returns a local `File` / `URL` only; consumers feed it into `rememberModelInstance(modelLoader, file)` / RealityKit `Entity.load(...)`.
+- **CC-BY only.** Every entry's `licenseUrl` is `https://creativecommons.org/licenses/by/4.0/`. Other Creative Commons variants (NC, ND, SA) and the bespoke "Sketchfab Standard" license are rejected by `SketchfabSlug.init`.
+- **Cache survives across demos.** Resolver uses the same `cacheDir/sketchfab/` directory as `SketchfabService`, so a model warmed by the Explore tab is reused by Stage 2 demos.
+
+**Stage 1 status note.** The 20 placeholder uids in `SampleAssets` were curated at design time but are not yet validated against `GET /v3/models/<uid>`. Stage 2 PRs will replace each uid with one verified live (Sketchfab maintainer account check) AND add a weekly CI cron that pings each slug + opens a GitHub issue on 404 / license drift. The `licenseURL` + `fallbackBundledPath` columns are authoritative even today — they decide what the resolver hands a demo offline.
+
+Acceptance: Android `./gradlew :samples:android-demo:compileDebugKotlin` + `:samples:android-demo:testDebugUnitTest --tests "io.github.sceneview.demo.sketchfab.*"` GREEN (27 sketchfab tests passing — 24 new + 3 pre-existing). iOS `xcodebuild -scheme SceneViewDemo … build` GREEN (3 new Swift files compile, project added them to the SceneViewDemo target).
+
 ### Fixed — iOS: `SKETCHFAB_API_KEY` never reached TestFlight + App Store binaries ([#1157](https://github.com/sceneview/sceneview/issues/1157))
 
 Every iOS app-store ship since v3.6 silently degraded the Explore tab to bundled fallback models because the Sketchfab API key never made it into the `.ipa`. Two compounding root causes:
