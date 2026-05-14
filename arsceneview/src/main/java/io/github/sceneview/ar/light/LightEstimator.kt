@@ -44,6 +44,7 @@ class LightEstimator(
         var irradiance: FloatArray? = null
     )
 
+    @Volatile
     var isEnabled = true
 
     /**
@@ -58,6 +59,7 @@ class LightEstimator(
      * environment will reflect blue hues. Calculating the HDR cubemap requires a small amount of
      * additional CPU computation.
      */
+    @Volatile
     var environmentalHdrReflections = true
 
     /**
@@ -67,6 +69,7 @@ class LightEstimator(
      * harmonics, representing the overall ambient light coming in from all directions in the scene.
      * Add subtle cues that bring out the definition of virtual objects.
      */
+    @Volatile
     var environmentalHdrSphericalHarmonics = true
 
     /**
@@ -85,6 +88,7 @@ class LightEstimator(
      * Set `false` only on perf-budget-constrained devices where the materials are
      * known not to use roughness > 0 (e.g. unlit-only scenes).
      */
+    @Volatile
     var environmentalHdrSpecularFilter = true
 
     /**
@@ -96,11 +100,13 @@ class LightEstimator(
      * Directional shadows also adjust their length and direction relative to the position of the
      * main light source, just as they do in the real world.
      */
+    @Volatile
     var environmentalHdrMainLightDirection = true
 
     /**
      * Modulate the main directional light (sun) intensity
      */
+    @Volatile
     var environmentalHdrMainLightIntensity = true
 
     private var timestamp: Long? = null
