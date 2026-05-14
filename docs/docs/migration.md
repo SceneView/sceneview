@@ -7,6 +7,111 @@ description: "Migration guides for SceneView: 3.6.x to 4.0.0 Rerun integration, 
 
 ---
 
+## SceneView 4.3.x to 4.4.0 (iOS) — true camera motion + skybox renders + mirror retired
+
+### `Environment.showSkybox = true` now actually paints the HDR as background ([PR #1215](https://github.com/sceneview/sceneview/pull/1215))
+
+Pre-v4.4.0 the flag set up IBL lighting from the HDR but never rendered the HDR
+as the scene background — the void stayed neutral. v4.4.0 wires the HDR resource
+through `RealityViewContent.environment = .skybox(...)`.
+
+**Action**:
+
+- If your app set `showSkybox: false` to *explicitly* hide a background that was
+  already invisible, you can leave the code as-is — `false` continues to render
+  the neutral default.
+- If your app set `showSkybox: true` and was depending on the void-background
+  bug (e.g. compositing the scene over a custom SwiftUI background), explicitly
+  flip to `showSkybox: false`. The IBL still lights your scene.
+
+```swift
+// pre-v4.4.0 (the bug)
+.environment(.custom(name: "city", hdrFile: "city.hdr", showSkybox: true))
+//                                                       ^^^^ silently ignored
+
+// v4.4.0 (intended behaviour)
+.environment(.custom(name: "city", hdrFile: "city.hdr", showSkybox: true))
+//                                                       ^^^^ now renders HDR as background
+.environment(.custom(name: "city", hdrFile: "city.hdr", showSkybox: false))
+//                                                       ^^^^ neutral background, IBL still applies
+```
+
+### Orbit + pan modes now physically move the perspective camera ([PR #1215](https://github.com/sceneview/sceneview/pull/1215))
+
+Pre-v4.4.0 `applyCamera()` rotated + scaled the scene root while the perspective
+camera stayed pinned at `[0, 0.3, 2]`. v4.4.0 positions the camera in world-space
+via `CameraControls.cameraPosition()` so the skybox correctly wraps around the
+camera as it orbits.
+
+**Action**:
+
+- Most apps need no code change — the apparent on-screen framing of existing
+  scenes is preserved at the new defaults (the SceneView's internal `CameraControls`
+  default `orbitRadius` was bumped from `5.0` to `2.0` to match the old camera
+  distance, so a 1m model fills the same fraction of viewport).
+- If your code reads `entities.root.scale` / `.orientation` via reflection,
+  debug-overlay, or a custom modifier, those now stay at identity in orbit / pan
+  modes. Migrate to `CameraControls.cameraTransform()` to recover the camera
+  matrix.
+
+### `CameraControls` defaults changed (BREAKING for direct constructors)
+
+If your app constructs `CameraControls()` directly (rather than using the
+`.cameraControls(_:)` modifier):
+
+- `orbitRadius` default: `5.0` → `2.0` (camera-to-target distance, was unreachable
+  through any public modifier before so this aligns with the SceneView's
+  internal default)
+- `minRadius` default: `0.5` → `1.0` (pinch-in floor — `0.5` clipped into 1m-extent
+  models under the new true-camera path; `1.0` matches typical bundled demo content)
+
+**Action**:
+
+```swift
+// pre-v4.4.0 implicit defaults
+var controls = CameraControls()
+// controls.orbitRadius == 5.0, controls.minRadius == 0.5
+
+// v4.4.0 — bump explicitly if you want the pre-v4.4.0 framing for non-bundled content
+var controls = CameraControls()
+controls.orbitRadius = 5.0
+controls.minRadius = 0.5
+```
+
+### FOV no longer bleeds from `firstPerson` pinch into `orbit` / `pan`
+
+Pre-v4.4.0, pinching FOV down to e.g. 30° in `.firstPerson` then switching to
+`.orbit` kept the 30° pinched FOV on the perspective camera (visible as a stuck
+zoom-in). v4.4.0 writes the baseline `60°` FOV in orbit/pan regardless, and
+mirrors `camera.fov` only in `.firstPerson`. On `.firstPerson` exit, `camera.fov`
+itself is reset to `60` so the next entry starts fresh.
+
+**Action**: no code change required — the previous behaviour was a bug.
+
+### Swift Package Manager URL changed
+
+The `sceneview/sceneview-swift` mirror has been archived read-only. SPM consumers
+should re-add the package in Xcode pointing at the monorepo directly:
+
+```diff
+- .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.0.0")
++ .package(url: "https://github.com/sceneview/sceneview.git", from: "4.4.0")
+```
+
+The frozen `v4.0.0` tag on the mirror still resolves for any consumer that hasn't
+migrated, but no further releases will be cut there. The root `Package.swift` in
+the monorepo (added in [#920](https://github.com/sceneview/sceneview/pull/920))
+declares the `SceneViewSwift` product, so the import statement
+(`import SceneViewSwift`) is unchanged.
+
+### Attribution
+
+The skybox-renders + true-orbit camera fixes were ported with `Co-authored-by`
+credit from [@radcli14](https://github.com/radcli14)'s
+[sceneview-swift PR #1](https://github.com/sceneview/sceneview-swift/pull/1).
+
+---
+
 ## SceneView 4.2.x to 4.3.0 (iOS) — silent-stub modes now active
 
 ### `.cameraControls(.pan)` and `.cameraControls(.firstPerson)` no longer silently orbit ([#1034](https://github.com/sceneview/sceneview/issues/1034))

@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — iOS skybox renders + true-orbit camera + `sceneview-swift` mirror retired
+
+### Fixed — iOS rendering
+
+- **`SceneEnvironment.showSkybox = true` now actually paints the HDR as the scene background ([PR #1215](https://github.com/sceneview/sceneview/pull/1215), ported from [@radcli14](https://github.com/radcli14)'s [sceneview-swift#1](https://github.com/sceneview/sceneview-swift/pull/1))** — `SceneView` previously loaded the HDR and applied it as IBL via `ImageBasedLightComponent`, but never assigned it to `RealityViewContent.environment`, so the scene rendered against the default neutral void regardless of which environment preset was selected. The new path caches the loaded `EnvironmentResource` in a `@State` and applies it via `content.environment = .skybox(resource)` in the `RealityView.update:` closure with a diff guard against the last applied resource (no per-frame ARC churn). The `.task(id:)` keys on `(name, showSkybox)` so toggling the flag on the same env re-runs the loader, and clears the cached resource at the start of every task tick so cross-env transitions don't show stale skyboxes under a new IBL.
+
+- **Orbit + pan camera modes now physically move the perspective camera in world-space ([PR #1215](https://github.com/sceneview/sceneview/pull/1215))** — `applyCamera()` was faking the camera move by rotating + scaling `entities.root` while the perspective camera stayed pinned at `[0, 0.3, 2]`. With a global skybox, that made the background appear stationary while content visually orbited around the user — visually wrong from the camera's POV. Orbit and pan now position the camera via `CameraControls.cameraPosition()` + `look(at: target, ...)`, so the skybox correctly wraps. The scene root stays at identity for both modes; `camera.orbitRadius` is now the literal camera-to-target distance. `firstPerson` retains its rotate-the-root semantics (FOV pinch via [#1034](https://github.com/sceneview/sceneview/issues/1034)) — the true "stand still and look around" rewrite remains a v4.4.0 follow-up.
+
+- **FOV no longer bleeds from `firstPerson` pinch into `orbit` / `pan`** — switching to `firstPerson`, pinching FOV down to e.g. 30°, then back to `orbit` kept the 30° pinched FOV on the perspective camera (visible as a stuck zoom-in). `applyCamera()` now writes the baseline `60°` FOV in `orbit` / `pan` regardless of `camera.fov`, and only mirrors `camera.fov` in `firstPerson`. On `firstPerson` exit, `camera.fov` itself is reset to `60` so the next entry starts fresh.
+
+### Changed — `CameraControls` defaults (BREAKING for direct constructors)
+
+- **`CameraControls.orbitRadius` public default changed from `5.0` to `2.0`** — `5.0` was unreachable through any public modifier (`cameraControls(_:)` only accepts a `CameraControlMode`), and the internal `@State` already overrode to `2.0` so existing demos retain their on-screen framing. Callers constructing `CameraControls()` directly will see the same `2.0` default the SceneView uses internally; the apparent angular size of a 1m model at default state is identical to the pre-v4.4.0 fake-orbit framing (28.07° at 60° FOV).
+- **`CameraControls.minRadius` public default changed from `0.5` to `1.0`** — under the new true-camera path, `0.5` puts the perspective camera inside any model with extent >1m (which most demo content has). The old `0.5` was safe under the fake-orbit `scale = 5.0 / radius` scene-scale hack but clips into geometry now. Override for smaller content.
+
+### Changed — SPM URL retirement
+
+- **`sceneview-swift` SPM mirror retired in favour of monorepo-direct package resolution ([PR #1215](https://github.com/sceneview/sceneview/pull/1215))** — every install snippet across docs, codelabs, GPT prompts, `.github/copilot-instructions.md`, `SceneViewSwift/README.md`, `llms.txt` (4 copies — root, docs, website-static, well-known), the website (`index.html` / `docs.html` / `playground.html`), the PWA manifest, the schema.org `sameAs` graph, and the bundled MCP `llms-txt.ts` now points at `https://github.com/sceneview/sceneview(.git)`. The `sceneview/sceneview-swift` mirror has been archived read-only; its frozen `v4.0.0` tag still resolves for SPM consumers pinned to the old URL, but no further releases will be cut there. Existing consumers should re-add the package in Xcode pointing at the monorepo URL — the root `Package.swift` (added in [PR #920](https://github.com/sceneview/sceneview/pull/920)) declares the `SceneViewSwift` product.
+
+### Follow-ups (filed against the master polish-pipeline reference [#1218](https://github.com/sceneview/sceneview/issues/1218))
+
+- [#1219](https://github.com/sceneview/sceneview/issues/1219) — Bundle ambientCG NightSkyHDRI008 (CC0) as `night_sky` env preset (iOS + Android + Web)
+- [#1221](https://github.com/sceneview/sceneview/issues/1221) — Cross-platform 'Double Pendulum' physics demo (port of [@radcli14](https://github.com/radcli14)'s `twolinks`)
+- [#1222](https://github.com/sceneview/sceneview/issues/1222) — Recipe: Blender → glb → Reality Converter → usdz → Reality Composer Pro pipeline
+- [#1223](https://github.com/sceneview/sceneview/issues/1223) — Switch library-default material from `SimpleMaterial` to `PhysicallyBasedMaterial`
+
+Special thanks to **[Eliott Radcliffe (@radcli14)](https://github.com/radcli14)** — the skybox + true-orbit camera fixes were ported with `Co-authored-by` credit from his [sceneview-swift PR #1](https://github.com/sceneview/sceneview-swift/pull/1). The asset-pipeline tutorial referenced by #1222 is from his [`blender-to-realitykit`](https://github.com/radcli14/blender-to-realitykit) repo (MIT, 17⭐).
+
 ## v4.3.4 — Pixel 9 production hotfix: AR Face Mesh + Instant Placement UX + UTF-8 + iOS LightingDemo (2026-05-15)
 
 ### Fixed — Sketchfab Explore cosmetic & iOS demo gaps

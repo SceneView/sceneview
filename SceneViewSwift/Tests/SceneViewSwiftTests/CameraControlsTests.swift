@@ -10,8 +10,15 @@ final class CameraControlsTests: XCTestCase {
         let controls = CameraControls()
         XCTAssertEqual(controls.azimuth, 0.0)
         XCTAssertEqual(controls.elevation, Float.pi / 6, accuracy: 0.001)
-        XCTAssertEqual(controls.orbitRadius, 5.0)
-        XCTAssertEqual(controls.minRadius, 0.5)
+        // v4.4.0 BREAKING: orbitRadius default changed from 5.0 to 2.0 so
+        // direct constructors of CameraControls see the same default the
+        // SceneView uses internally (the old 5.0 was unreachable through
+        // any public modifier, producing a misleading split-brain default).
+        // minRadius default changed from 0.5 to 1.0 so pinch-in stops
+        // before clipping into 1m-extent content under the new true-camera
+        // motion (the old 0.5 was safe under the fake-orbit scale hack).
+        XCTAssertEqual(controls.orbitRadius, 2.0)
+        XCTAssertEqual(controls.minRadius, 1.0)
         XCTAssertEqual(controls.maxRadius, 50.0)
         XCTAssertEqual(controls.sensitivity, 0.005)
         XCTAssertFalse(controls.isAutoRotating)

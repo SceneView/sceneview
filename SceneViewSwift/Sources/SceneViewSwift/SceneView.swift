@@ -332,15 +332,13 @@ private struct SceneViewRepresentation: View {
     /// pivot. Closes #1026.
     let autoCenterContentEnabled: Bool
 
-    /// Default orbit radius `2.0` matches the camera distance of the
-    /// previous fake-orbit setup (`look(at: .zero, from: [0, 0.3, 2])`
-    /// + `scene scale = 5.0 / radius` ⇒ apparent size 0.5 at radius 5).
-    /// Now that orbit physically moves the camera (`cameraPosition()`),
-    /// the radius is the literal camera-to-target distance — so a 2m
-    /// default preserves the on-screen size of all existing demos.
-    /// `CameraControls.orbitRadius` keeps its 5.0 public-API default
-    /// for direct users who construct the struct themselves.
-    @State private var camera = CameraControls(mode: .orbit).withRadius(2.0)
+    /// Default `CameraControls(mode: .orbit)` — uses the struct's own
+    /// `orbitRadius = 2.0` public default, which matches the camera-
+    /// to-target distance of the pre-v4.4.0 fake-orbit `[0, 0.3, 2]`
+    /// so existing demos retain their on-screen framing. Direct
+    /// constructors of `CameraControls` see the same `2.0` value, so
+    /// there is no internal / external default split.
+    @State private var camera = CameraControls(mode: .orbit)
     @StateObject private var entities = SceneEntities()
     @State private var lastDragTranslation: CGSize = .zero
     @State private var initialPinchRadius: Float? = nil
@@ -367,6 +365,19 @@ private struct SceneViewRepresentation: View {
     /// when the IBL should light the scene but not render as a background.
     /// Ported from Eliott Radcliffe's sceneview-swift PR #1.
     @State private var loadedSkyboxResource: EnvironmentResource? = nil
+
+    /// Identity of the environment resource currently bound on the
+    /// `RealityViewContent.environment` setter — compared against
+    /// `loadedSkyboxResource` in `update:` so we only assign when the
+    /// value actually changes. Without the diff, every frame would
+    /// re-write the descriptor and bump the resource's reference count
+    /// (~10-50 µs/frame + ARC churn). Mirrors the `appliedMainSlot` /
+    /// `appliedFillSlot` cache discipline above. Also fixes the
+    /// cross-environment stale-skybox flash: clearing this on the new
+    /// task tick triggers a single `.default` write while the next IBL
+    /// is loading, instead of letting the OLD skybox show under the
+    /// NEW IBL for the load duration.
+    @State private var appliedSkyboxResource: EnvironmentResource? = nil
 
     var body: some View {
         realityViewContent
@@ -406,6 +417,16 @@ private struct SceneViewRepresentation: View {
                 // also tracks `showSkybox` so toggling the skybox flag on
                 // the same environment re-runs the loader and updates
                 // `loadedSkyboxResource` for the update: closure.
+                //
+                // Clear the cached resource BEFORE the await so the
+                // `update:` closure's diff falls back to `.default`
+                // during the load window — without this, switching
+                // from `.studio` → `.night` would keep the studio
+                // skybox visible under the night IBL for the 50-300 ms
+                // it takes the new HDR to decode (~30 MB at 4K). The
+                // next frame after `loadEnvironment` completes will
+                // diff the new resource in.
+                loadedSkyboxResource = nil
                 guard let env = sceneEnvironment else { return }
                 await loadEnvironment(env)
             }
@@ -437,11 +458,21 @@ private struct SceneViewRepresentation: View {
             // visionOS uses passthrough by default and ignores the
             // RealityKit `environment` API; gate to iOS + macOS only.
             // Ported from Eliott Radcliffe's sceneview-swift PR #1.
+            //
+            // Diff-write: only assign when the resource identity changed
+            // since the last applied value. Same `applied*` cache pattern
+            // as the light-slot reactive plumbing above. Saves an ARC
+            // bump + descriptor re-validation per frame (`content.environment`
+            // is not a free no-op — internally re-wraps the resource
+            // even when assigned an equal value).
             #if os(iOS) || os(macOS)
-            if let loadedSkyboxResource {
-                content.environment = .skybox(loadedSkyboxResource)
-            } else {
-                content.environment = .default
+            if loadedSkyboxResource !== appliedSkyboxResource {
+                if let resource = loadedSkyboxResource {
+                    content.environment = .skybox(resource)
+                } else {
+                    content.environment = .default
+                }
+                appliedSkyboxResource = loadedSkyboxResource
             }
             #endif
         }
@@ -669,6 +700,12 @@ private struct SceneViewRepresentation: View {
 
     // MARK: - Camera
 
+    /// Default field-of-view when not in `.firstPerson` mode. Used by
+    /// `applyCamera()` to keep orbit / pan FOV stable while `.firstPerson`
+    /// remains free to mutate `camera.fov` via pinch.
+    private static let baselineFov: Float = 60
+
+    @MainActor
     private func applyCamera() {
         // Sync the camera state's mode with the modifier-provided value. Done
         // every frame because the modifier propagates as a `let` while the
@@ -676,6 +713,16 @@ private struct SceneViewRepresentation: View {
         // `.cameraControls(.pan)` would be silently ignored. Closes #1034.
         if camera.mode != cameraControlMode {
             camera.mode = cameraControlMode
+            // Reset the pinched FOV back to baseline when LEAVING firstPerson,
+            // so the next firstPerson entry starts at 60° rather than at the
+            // last clamped value. Without this guard, a user who pinches FOV
+            // down to 30° in firstPerson then switches to orbit sees the
+            // 30° stick around (visible as a stuck zoom-in); switching back
+            // to firstPerson would then resume at 30° instead of resetting.
+            // R3 MAJOR finding.
+            if camera.mode != .firstPerson && camera.fov != Self.baselineFov {
+                camera.fov = Self.baselineFov
+            }
         }
 
         // Per-mode application of orientation, zoom, and translation.
@@ -708,10 +755,14 @@ private struct SceneViewRepresentation: View {
             #if os(iOS) || os(macOS)
             let pos = camera.cameraPosition()
             entities.perspCamera.look(at: camera.target, from: pos, relativeTo: nil)
-            // Reset FOV to the controls' baseline when leaving firstPerson —
-            // pinch in orbit/pan dollies the radius, not the FOV.
-            if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
-                entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
+            // Use the static baseline FOV for orbit / pan rather than
+            // mirroring `camera.fov`, which the firstPerson pinch mutates.
+            // Without this, switching firstPerson → orbit kept the 30°
+            // pinched FOV on the perspective camera (R3 MAJOR — "FOV
+            // bleed"). The static-baseline write is a no-op on identical
+            // values so the property doesn't churn.
+            if entities.perspCamera.camera.fieldOfViewInDegrees != Self.baselineFov {
+                entities.perspCamera.camera.fieldOfViewInDegrees = Self.baselineFov
             }
             #else
             // visionOS fallback: rotate the scene root since there's no
@@ -732,6 +783,13 @@ private struct SceneViewRepresentation: View {
             // eye — visually a tight orbit at radius `2`. NOT a true
             // "stand still and look around" camera-orientation rotation;
             // tracked as a v4.4.0 follow-up in ``CameraControlMode/firstPerson``.
+            //
+            // KNOWN LIMITATION (R3 MAJOR, deferred to v4.4.0): switching
+            // orbit → firstPerson teleports the perspective camera from
+            // its last orbit position to `[0, 0.3, 2]` without
+            // interpolation. The "true look-around" rewrite tracked under
+            // #1034 will resolve this by rotating the camera entity in
+            // place instead of repositioning it on mode entry.
             let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
             let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
             entities.root.orientation = yaw * pitch
@@ -740,7 +798,10 @@ private struct SceneViewRepresentation: View {
             #if os(iOS) || os(macOS)
             // Pin the camera at a fixed eye and reset to look at origin
             // so a mode switch from orbit doesn't strand the camera at
-            // the last orbit position. Sync FOV to the controls state.
+            // the last orbit position. Sync FOV to the controls state —
+            // this is the ONLY mode that mirrors `camera.fov` so pinch
+            // can dolly without affecting orbit's baseline (see orbit/pan
+            // case above for the corresponding non-write).
             entities.perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
             if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
                 entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
