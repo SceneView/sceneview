@@ -75,7 +75,10 @@ fi
 echo ""
 echo -e "${YELLOW}ℹ️  Reminder: production Cloud Anchors / Geospatial errors with ERROR_NOT_AUTHORIZED${NC}"
 echo -e "${YELLOW}   most often mean the Play App Signing key SHA-1 isn't whitelisted on the${NC}"
-echo -e "${YELLOW}   Cloud API key. Runbook: samples/android-demo/STREETSCAPE_SETUP.md → \"Play App Signing key\".${NC}"
+echo -e "${YELLOW}   Cloud API key. If the SHA-1 IS whitelisted and the error persists, walk the${NC}"
+echo -e "${YELLOW}   5-step checklist (billing / ARCore API enabled / API restrictions / propagation /${NC}"
+echo -e "${YELLOW}   project-id mismatch) in samples/android-demo/STREETSCAPE_SETUP.md →${NC}"
+echo -e "${YELLOW}   \"Troubleshooting — ERROR_NOT_AUTHORIZED persists after SHA-1 is whitelisted\".${NC}"
 
 if [ "$errors" -gt 0 ]; then
   echo ""
