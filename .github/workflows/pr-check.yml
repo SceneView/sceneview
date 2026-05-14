@@ -37,9 +37,11 @@ permissions:
 jobs:
   # ── Deprecated API regression detector ──────────────────────────────────
   # Sub-second guard against AI sessions reintroducing the pre-v3.6
-  # Scene{}/ARScene{} composable names. quality-gate.yml runs the same
-  # check, but a standalone job here surfaces the failure to PR authors
-  # without waiting for the full gate to finish.
+  # composable names (renamed in commit e6a26a06). quality-gate.yml runs
+  # the same check, but a standalone job here surfaces the failure to PR
+  # authors without waiting for the full gate to finish. Don't write the
+  # old names verbatim in this comment — the validator greps source files
+  # and would flag the comment itself, as it did on commit ae433620.
   check-deprecated-api:
     name: Check for deprecated SceneView API refs
     runs-on: ubuntu-latest
