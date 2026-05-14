@@ -48,10 +48,15 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: Unit tests
+        # `:samples:android-demo:testDebugUnitTest` runs `ARBundledRecordingsTest`
+        # (the ftyp + avc1 + mett contract suite added by #1060, moved to the
+        # `testDebug/` sourceSet by #1100). Without it CI silently drops the
+        # bundled-recording regression suite. See #1130.
         run: |
           ./gradlew \
             :sceneview:testDebugUnitTest \
             :arsceneview:testDebugUnitTest \
+            :samples:android-demo:testDebugUnitTest \
             --stacktrace
 
   # ── Lint check ────────────────────────────────────────────────────────────
@@ -100,6 +105,40 @@ jobs:
       - name: KMP unit tests (JS)
         continue-on-error: true
         run: ./gradlew :sceneview-core:jsTest --stacktrace
+
+  # ── Workflow shell-block validation ─────────────────────────────────────
+  # Pre-validates `script:` blocks in every .github/workflows/*.yml against
+  # `dash` so we catch bashisms before they ship to CI. The
+  # ReactiveCircus/android-emulator-runner@v2 action exec's each line via
+  # `sh -c`, which is dash on Linux runners — a `[[ ... ]]` or multi-line
+  # `while ... done` block silently fails there. Closes #1114.
+  check-workflow-scripts:
+    name: Validate workflow shell blocks (dash + shellcheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dash + shellcheck
+        shell: bash
+        run: |
+          # Both ship in ubuntu-latest, but pin explicitly so the job is
+          # self-contained on any runner image refresh.
+          if ! command -v dash >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq dash
+          fi
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+          fi
+          # PyYAML — already in the runner image, but assert.
+          python3 -c "import yaml" || pip install --quiet pyyaml
+
+      - name: Run check-workflow-scripts.sh
+        shell: bash
+        run: bash .claude/scripts/check-workflow-scripts.sh
 
   # ── Demo app asset integrity ────────────────────────────────────────────
   # Catches broken model/HDR references in any samples/* demo app, both
