@@ -291,6 +291,11 @@
     <string name="demo_ar_placement_picker_streamed">%1$s</string>
     <string name="demo_ar_placement_picker_subtitle">Le cycle intégré est livré avec l\'APK · les entrées en streaming sont des modèles CC-BY depuis Sketchfab.</string>
 
+    <!-- Physics Stage 2 picker (issue #1152) -->
+    <string name="demo_physics_picker_label">Quoi laisser tomber</string>
+    <string name="demo_physics_picker_spheres">Sphères intégrées</string>
+    <string name="demo_physics_picker_subtitle">Les corps de crash-test sont des modèles CC-BY depuis Sketchfab. Le picker réinitialise la scène pour que la nouvelle forme soit ce qui tombe.</string>
+
     <!-- Image Detection demo -->
     <string name="image_detection_title">Démo de détection d\'image</string>
     <string name="image_detection_desc">Utilise AugmentedImageDatabase pour détecter\ndes images imprimées et superposer du contenu 3D.</string>
