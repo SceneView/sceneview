@@ -29,6 +29,7 @@ import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.rememberUnlitMaterialInstance
 
 /**
  * Augmented face mesh tracking demo.
@@ -64,9 +65,7 @@ fun ARFaceDemo(onBack: () -> Unit) {
     // which is `doubleSided: true` — pairs with `culling(false)` on the face mesh.
     // We use a translucent overlay (not opaque blue) so the user can SEE their face
     // through the fitted topology — that's the entire point of a face-mesh demo.
-    val faceMaterial = remember(materialLoader) {
-        materialLoader.createUnlitColorInstance(SceneViewColors.PrimaryOverlay)
-    }
+    val faceMaterial = rememberUnlitMaterialInstance(materialLoader, SceneViewColors.PrimaryOverlay)
 
     DemoScaffold(
         title = "Face Mesh",
