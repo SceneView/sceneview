@@ -4,27 +4,36 @@ import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -39,12 +48,16 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.sketchfab.SampleAssets
+import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
+import io.github.sceneview.demo.sketchfab.SketchfabSlug
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberOnGestureListener
+import java.io.File
 
 /**
  * Instant Placement demo.
@@ -65,8 +78,10 @@ private data class InstantPlacedModel(
     val id: Int,
     val anchor: Anchor,
     val trackable: Any?,
-    val assetPath: String,
-    val displayName: String
+    /** Local file URI (`file://...`) for a streamed slug, OR `assets/`-relative path for a
+     *  bundled GLB. `rememberModelInstance` accepts both via its single-string overload. */
+    val assetLocation: String,
+    val displayName: String,
 )
 
 private data class InstantCycleEntry(val assetPath: String, val displayName: String)
@@ -83,6 +98,26 @@ private val INSTANT_MODEL_CYCLE = listOf(
 @Composable
 fun ARInstantPlacementDemo(onBack: () -> Unit) {
     var instantEnabled by remember { mutableStateOf(true) }
+
+    // Streamed `ar_placement` slugs from SampleAssets. selectedSlug == null
+    // means "Bundled cycle" (the v4.3.1 default behaviour).
+    val placementSlugs = remember { SampleAssets.byCategory["ar_placement"].orEmpty() }
+    var selectedSlug by remember { mutableStateOf<SketchfabSlug?>(null) }
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        runCatching {
+            SketchfabAssetResolver.getInstance(context).prefetchAll("ar_placement")
+        }
+    }
+
+    val selectedFile: File? = selectedSlug?.let { slug ->
+        produceState<File?>(initialValue = null, key1 = slug.uid) {
+            value = runCatching {
+                SketchfabAssetResolver.getInstance(context).resolve(slug)
+            }.getOrNull()
+        }.value
+    }
 
     DemoScaffold(
         title = stringResource(R.string.demo_ar_instant_placement_title),
@@ -112,6 +147,47 @@ fun ARInstantPlacementDemo(onBack: () -> Unit) {
                 )
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.demo_ar_placement_picker_label),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilterChip(
+                    selected = selectedSlug == null,
+                    onClick = { selectedSlug = null },
+                    label = {
+                        Text(stringResource(R.string.demo_ar_placement_picker_bundled))
+                    },
+                )
+                placementSlugs.forEach { slug ->
+                    FilterChip(
+                        selected = selectedSlug?.uid == slug.uid,
+                        onClick = { selectedSlug = slug },
+                        label = {
+                            Text(
+                                stringResource(
+                                    R.string.demo_ar_placement_picker_streamed,
+                                    slug.displayName,
+                                )
+                            )
+                        },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.demo_ar_placement_picker_subtitle),
+                style = MaterialTheme.typography.labelSmall,
+            )
+
             Text(
                 text = if (instantEnabled) {
                     "Tap anywhere on screen — ARCore guesses a pose ~1 m in front. The badge " +
@@ -129,13 +205,21 @@ fun ARInstantPlacementDemo(onBack: () -> Unit) {
         // session across instant-placement on/off blurs which placed models came from which mode
         // — a fresh session keeps the demo's state clean per toggle.
         key(instantEnabled) {
-            InstantPlacementScene(instantEnabled = instantEnabled)
+            InstantPlacementScene(
+                instantEnabled = instantEnabled,
+                selectedSlug = selectedSlug,
+                selectedFile = selectedFile,
+            )
         }
     }
 }
 
 @Composable
-private fun InstantPlacementScene(instantEnabled: Boolean) {
+private fun InstantPlacementScene(
+    instantEnabled: Boolean,
+    selectedSlug: SketchfabSlug?,
+    selectedFile: File?,
+) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
@@ -214,24 +298,32 @@ private fun InstantPlacementScene(instantEnabled: Boolean) {
                         }
                     } ?: return@rememberOnGestureListener
 
-                    val entry = INSTANT_MODEL_CYCLE[cycleIndex % INSTANT_MODEL_CYCLE.size]
+                    // Picker semantics mirror ARPlacementDemo — selected slug landed
+                    // → place that slug; selected slug still streaming OR no selection
+                    // → cycle through bundled INSTANT_MODEL_CYCLE.
+                    val (location, name) = if (selectedSlug != null && selectedFile != null) {
+                        "file://${selectedFile.absolutePath}" to selectedSlug.displayName
+                    } else {
+                        val entry = INSTANT_MODEL_CYCLE[cycleIndex % INSTANT_MODEL_CYCLE.size]
+                        cycleIndex = (cycleIndex + 1) % INSTANT_MODEL_CYCLE.size
+                        entry.assetPath to entry.displayName
+                    }
                     placedModels.add(
                         InstantPlacedModel(
                             id = nextId++,
                             anchor = hit.createAnchor(),
                             trackable = hit.trackable,
-                            assetPath = entry.assetPath,
-                            displayName = entry.displayName
+                            assetLocation = location,
+                            displayName = name,
                         )
                     )
-                    cycleIndex = (cycleIndex + 1) % INSTANT_MODEL_CYCLE.size
                 }
             )
         ) {
             placedModels.forEach { placed ->
                 key(placed.id) {
                     AnchorNode(anchor = placed.anchor) {
-                        val instance = rememberModelInstance(modelLoader, placed.assetPath)
+                        val instance = rememberModelInstance(modelLoader, placed.assetLocation)
                         instance?.let {
                             ModelNode(
                                 modelInstance = it,

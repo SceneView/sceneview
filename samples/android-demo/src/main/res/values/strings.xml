@@ -278,6 +278,13 @@
     <string name="control_gesture_drag_hint">Drag model to move · Pinch to resize · Twist to rotate</string>
     <string name="control_reset_position">Reset</string>
 
+    <!-- AR placement Stage 2 picker (issue #1152) -->
+    <string name="demo_ar_placement_picker_label">What to place</string>
+    <string name="demo_ar_placement_picker_bundled">Bundled cycle</string>
+    <string name="demo_ar_placement_picker_streaming">Streaming %1$s…</string>
+    <string name="demo_ar_placement_picker_streamed">%1$s</string>
+    <string name="demo_ar_placement_picker_subtitle">Bundled cycle ships with the APK · streamed entries are CC-BY models from Sketchfab.</string>
+
     <!-- Image Detection demo -->
     <string name="image_detection_title">Image Detection Demo</string>
     <string name="image_detection_desc">Uses AugmentedImageDatabase to detect\nprinted images and overlay 3D content.</string>

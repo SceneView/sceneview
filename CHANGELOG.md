@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Changed — Stage 2 demo migrations: `ARPlacementDemo` + `ARInstantPlacementDemo` gain a "Pick what to place" sheet ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+Both AR placement demos now expose the [`SampleAssets.byCategory["ar_placement"]`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt) chip row in their `DemoScaffold` v2 controls sheet (delivered in PR [#1169](https://github.com/sceneview/sceneview/pull/1169)). Selecting a streamed slug (coffee mug / houseplant / wooden crate / side table / floor lamp / picture frame — six entries CC-BY from Sketchfab) arms it as the next tap's payload; subsequent taps on a detected plane spawn a fresh AnchorNode + ModelNode using the streamed glTF resolved through [`SketchfabAssetResolver`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SketchfabAssetResolver.kt).
+
+A first "Bundled cycle" chip preserves the v4.3.1 behaviour — each tap rotates through the existing 5-model bundled GLB cycle (helmet / fox / lantern / toy car / shiba). This keeps the demo deterministic for QA / offline / store-listing screenshots and gives the user a clear "no surprises" mode side-by-side with the streamed picker.
+
+Behavioural contract:
+
+- **Selected slug, download landed.** Tap places the streamed slug. Multiple taps place multiple instances of the same slug.
+- **Selected slug, download still in flight.** Tap silently falls back to the bundled cycle so the tap is never lost. The picker subtitle shows "Streaming X…" so the user knows the streamed pick will activate on the next tap.
+- **"Bundled cycle" selected.** v4.3.1 behaviour preserved.
+
+Offline / no-key behaviour preserved — the resolver's per-slug fallback path still returns the registered bundled GLB even when `SketchfabConfig.apiKey == null`, so a tap on a streamed chip always renders something. The streamed slot will visually match the bundled fallback in that case, which is the same trade-off Stage 1 documented.
+
+**Files touched:**
+
+- `samples/android-demo/.../demos/ARPlacementDemo.kt` — adds the chip row, the slug resolver, the per-tap "selected vs cycle" decision. `PlacedModel.assetPath` renamed to `assetLocation` so both `assets/`-relative paths and `file://` URIs flow through the same `rememberModelInstance` call.
+- `samples/android-demo/.../demos/ARInstantPlacementDemo.kt` — same chip row, hoisted to the outer `ARInstantPlacementDemo` composable so it survives the `key(instantEnabled)` rebuild that re-creates the inner ARCore session.
+- `samples/android-demo/src/main/res/values/strings.xml` + `values-fr/strings.xml` — 5 new keys: `demo_ar_placement_picker_label`, `demo_ar_placement_picker_bundled`, `demo_ar_placement_picker_streaming`, `demo_ar_placement_picker_streamed`, `demo_ar_placement_picker_subtitle`.
+- `samples/android-demo/.../sketchfab/SampleAssets.kt` + `samples/ios-demo/.../Services/SampleAssets.swift` — grow `ar_placement` from 3 to 6 entries (Side Table, Floor Lamp, Picture Frame added) so the picker has IKEA-showroom variety. iOS registry mirrored 1:1 for future Swift port.
+
+**iOS counterpart not in this PR.** The iOS demo app (`samples/ios-demo`) does not currently have an `ARPlacementDemo.swift` — the iOS V1 didn't port the tap-to-place AR flow. The 3 new `ar_placement` slugs are registered in iOS `SampleAssets.swift` ready for a future port; the iOS demo file itself is deferred. ARKit's `RealityKit.AnchorEntity(plane:)` factory shipped in v4.2.0 ([#1025](https://github.com/sceneview/sceneview/pull/1025)) — the iOS port mostly needs a SwiftUI chip row + the existing resolver glue.
+
+**`SampleAssets` slugs added:** 6 — 3 new `ar_placement` (Side Table, Floor Lamp, Picture Frame) + 2 new `physics` (Wooden Barrel, Clay Amphora) + 1 ([Editor's note: see PhysicsDemo PR](#)) that pairs with the next Stage 2 PR. All CC-BY 4.0.
+
+**30 s screen recording deferred** — agent worktree has no Pixel device access; tracked in the [#1152](https://github.com/sceneview/sceneview/issues/1152) acceptance checklist.
+
 ### Changed — Stage 2 demo migrations: `MultiModelDemo` composes the streamed "Park" scene ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 `samples/android-demo/.../demos/MultiModelDemo.kt` swaps its tabletop arrangement of bundled assets (shiba + lantern + helmet + dragon) for the streamed "Park" scene composition — oak tree (backdrop) + park bench (foreground prop) + idle dog + perched songbird, all four resolved through [`SketchfabAssetResolver`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssetsResolver.kt) from the new `park` category of [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt).

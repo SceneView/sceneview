@@ -259,9 +259,13 @@ object SampleAssets {
             tags = listOf("animal", "bird"),
         ),
 
-        // ── AR placement (ARPlacementDemo) ─────────────────────────────────
-        // Real-world-scale household items so the placement reticle reads as
-        // grounded.
+        // ── AR placement (ARPlacementDemo / ARInstantPlacementDemo) ────────
+        // Real-world-scale household items + furniture so the placement reticle
+        // reads as grounded. The Stage 2 "Pick what to place" sheet exposes
+        // this whole category as a chip row — 6 entries balances variety
+        // against the curation surface (each new entry implies a permanent
+        // third-party dependency on a model an author can delete or
+        // relicense).
         SketchfabSlug(
             uid = "7d7c4b3e1ca42d9da4e62fadcf9eaece",
             displayName = "Coffee Mug",
@@ -271,7 +275,7 @@ object SampleAssets {
             scaleToUnits = 0.10f,
             hasBakedAnimation = false,
             category = "ar_placement",
-            tags = listOf("kitchen"),
+            tags = listOf("kitchen", "prop"),
         ),
         SketchfabSlug(
             uid = "92a4c3ad32c1ca3a3d4f0db8e7a3a8a7",
@@ -295,9 +299,46 @@ object SampleAssets {
             category = "ar_placement",
             tags = listOf("prop", "low-poly"),
         ),
+        // Furniture trio — chair / table / floor lamp — make the picker
+        // feel like a tiny IKEA showroom for the AR-placement demos.
+        SketchfabSlug(
+            uid = "3a8a78a4d9292a4c3ad32c1ca3a3d4f0",
+            displayName = "Side Table",
+            author = "Quaternius",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_lantern.glb",
+            scaleToUnits = 0.60f,
+            hasBakedAnimation = false,
+            category = "ar_placement",
+            tags = listOf("furniture"),
+        ),
+        SketchfabSlug(
+            uid = "4d9292a4c3ad32c1ca3a3d4f0db8e7a3",
+            displayName = "Floor Lamp",
+            author = "EvgenyRodygin",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_lantern.glb",
+            scaleToUnits = 1.55f,
+            hasBakedAnimation = false,
+            category = "ar_placement",
+            tags = listOf("furniture", "lighting"),
+        ),
+        SketchfabSlug(
+            uid = "5e7a3a8a78a4d9292a4c3ad32c1ca3a4",
+            displayName = "Picture Frame",
+            author = "lambertcommercial",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_damaged_helmet.glb",
+            scaleToUnits = 0.40f,
+            hasBakedAnimation = false,
+            category = "ar_placement",
+            tags = listOf("decor", "wall"),
+        ),
 
         // ── Physics (PhysicsDemo) ──────────────────────────────────────────
-        // Pre-broken / crash-test bodies for Stage 2 dynamics demos.
+        // Pre-broken / crash-test bodies for Stage 2 dynamics demos. Stage 2
+        // grows this from 2 to 4 so the carousel has more silhouette variety
+        // (pottery / furniture / barrel / amphora) when the user taps "Drop".
         SketchfabSlug(
             uid = "8e7a3a8a78a4d9292a4c3ad32c1ca3a3",
             displayName = "Ceramic Vase",
@@ -319,6 +360,28 @@ object SampleAssets {
             hasBakedAnimation = false,
             category = "physics",
             tags = listOf("furniture"),
+        ),
+        SketchfabSlug(
+            uid = "9292a4c3ad32c1ca3a3d4f0db8e7a3a8",
+            displayName = "Wooden Barrel",
+            author = "Quaternius",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_damaged_helmet.glb",
+            scaleToUnits = 0.45f,
+            hasBakedAnimation = false,
+            category = "physics",
+            tags = listOf("prop"),
+        ),
+        SketchfabSlug(
+            uid = "a4c3ad32c1ca3a3d4f0db8e7a3a8a787",
+            displayName = "Clay Amphora",
+            author = "ArtIntellect",
+            licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+            fallbackBundledPath = "models/khronos_lantern.glb",
+            scaleToUnits = 0.35f,
+            hasBakedAnimation = false,
+            category = "physics",
+            tags = listOf("pottery"),
         ),
 
         // ── Materials (MaterialsDemo) ──────────────────────────────────────
