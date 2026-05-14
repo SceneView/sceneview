@@ -11,8 +11,24 @@
 #    - Android device connected via USB/Wi-Fi with USB debugging ON
 #    - Java 17+ (for local build)
 #    - adb on PATH (comes with Android SDK)
+#
+#  Tip: if Google's `android` CLI is on your PATH
+#  (https://developer.android.com/tools/agents/android-cli), this script
+#  uses `android run` for atomic install + launch. Otherwise it falls
+#  back to the classic `adb install` + `am start` flow.
 # ─────────────────────────────────────────────────────────────────────
 set -euo pipefail
+
+# Source the shared helper if available — it provides
+# `android_cli_install_and_launch` which transparently picks `android run` or
+# the adb fallback. We DON'T auto-install the android CLI from this script
+# (that would surprise an end-user running `./try-demo` for the first time).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ANDROID_CLI_LIB="$SCRIPT_DIR/../.claude/scripts/lib/android-cli.sh"
+if [[ -f "$ANDROID_CLI_LIB" ]]; then
+  # shellcheck source=/dev/null
+  source "$ANDROID_CLI_LIB"
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -75,10 +91,16 @@ download_and_install() {
   echo -e "${GREEN}✓${RESET} Downloaded"
 
   echo -e "${CYAN}Installing on device...${RESET}"
-  adb install -r "$tmp_apk"
+  # `android run` installs AND launches in one call when the CLI is available;
+  # the helper falls back to `adb install` + `am start` otherwise.
+  if type android_cli_install_and_launch >/dev/null 2>&1 \
+     && { command -v android >/dev/null 2>&1 || [[ -x "$HOME/.local/bin/android" ]]; }; then
+    android_cli_install_and_launch "$tmp_apk" "${DEMO_PKG}/.MainActivity"
+  else
+    adb install -r "$tmp_apk"
+    launch_app
+  fi
   echo -e "${GREEN}✓${RESET} Installed"
-
-  launch_app
 }
 
 build_and_install() {
@@ -111,10 +133,15 @@ build_and_install() {
 
   echo -e "${GREEN}✓${RESET} Built: $(basename "$apk")"
   echo -e "${CYAN}Installing on device...${RESET}"
-  adb install -r "$apk"
+  # Atomic install+launch via `android run` when available; adb fallback otherwise.
+  if type android_cli_install_and_launch >/dev/null 2>&1 \
+     && { command -v android >/dev/null 2>&1 || [[ -x "$HOME/.local/bin/android" ]]; }; then
+    android_cli_install_and_launch "$apk" "${pkg}/.MainActivity"
+  else
+    adb install -r "$apk"
+    launch_app "$pkg"
+  fi
   echo -e "${GREEN}✓${RESET} Installed"
-
-  launch_app "$pkg"
 }
 
 launch_app() {

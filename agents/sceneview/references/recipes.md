@@ -1,0 +1,62 @@
+# SceneView recipes — pointers to verified demos
+
+**Do not improvise.** Every pattern below has a matching demo file in
+`samples/android-demo/src/main/java/io/github/sceneview/demo/demos/`. Read
+that file before writing code — the demo is the authoritative recipe.
+
+The repo also ships markdown recipes in
+[`samples/recipes/`](https://github.com/sceneview/sceneview/tree/main/samples/recipes)
+mirroring the same surface.
+
+## 1. Model viewer (3D, GLB)
+[`ModelViewerDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ModelViewerDemo.kt) — `ModelNode(modelInstance, scaleToUnits, centerOrigin)` with hero-orbit camera manipulator.
+
+## 2. Camera controls (orbit / zoom / pan)
+[`CameraControlsDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/CameraControlsDemo.kt) — pass a custom `cameraManipulator =` to `SceneView`, or `null` to lock the camera.
+
+## 3. AR tap-to-place
+[`ARPlacementDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARPlacementDemo.kt) — `rememberOnGestureListener(onSingleTapConfirmed = { event, node -> frame.hitTest(event)... })` + `AnchorNode(anchor = hit.createAnchor()) { ModelNode(isEditable = true) }`.
+
+## 4. Augmented image tracking
+[`ARImageDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARImageDemo.kt) — `AugmentedImageNode(referenceImage = …) { ModelNode(...) }`. Image database is configured via `sessionConfiguration`.
+
+## 5. Augmented face mesh
+[`ARFaceDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARFaceDemo.kt) — `AugmentedFaceNode { ModelNode(...) }`. `Config.AugmentedFaceMode.MESH3D` in `sessionConfiguration`.
+
+## 6. Movable light (drag the light source)
+[`MovableLightDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/MovableLightDemo.kt) — `LightNode(type = LightManager.Type.POINT, intensity = 30_000f, direction, position, color, apply = { falloff(6f) })`. Disable default main light via `mainLightNode = null` for clean drag effect.
+
+## 7. Multi-model and animation
+[`AnimationDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/AnimationDemo.kt) — `ModelNode` exposes `animationName`, `autoAnimate`, `animationLoop`, `animationSpeed`. For imperative control, call `node.playAnimation(name, speed = …, loop = …)` from `onFrame` or a button callback.
+
+## 8. Lights and environment
+[`LightingDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/LightingDemo.kt), [`EnvironmentDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/EnvironmentDemo.kt) — `environment = rememberEnvironment(environmentLoader) { environmentLoader.createHDREnvironment("env.hdr") }`.
+
+## 9. Procedural geometry
+[`GeometryDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/GeometryDemo.kt) — use the per-shape composables (`CubeNode`, `SphereNode`, `CylinderNode`, etc.) directly. Each takes `materialInstance` plus its shape parameter (e.g. `radius`, `size`).
+
+## 10. Custom geometry / mesh
+[`CustomMeshDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/CustomMeshDemo.kt) — composes the built-in shape nodes (`SphereNode` + `CylinderNode`) into a molecule. For a fully custom mesh from raw vertex/index buffers, use `MeshNode(primitiveType, vertexBuffer, indexBuffer, …)` directly — see `SceneScope.kt`.
+
+## 11. Physics (bouncing spheres)
+[`PhysicsDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/PhysicsDemo.kt) — `PhysicsNode(node, mass, restitution, floorY)`. Experimental; only handles sphere collisions on a Y=0 floor.
+
+## 12. Gesture editing (drag / pinch / rotate a node)
+[`GestureEditingDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/GestureEditingDemo.kt) — `ModelNode(isEditable = true)`. Listen via `rememberOnGestureListener(onMoveBegin = …, onScaleBegin = …, onRotateBegin = …)`.
+
+## 13. ViewNode (Compose UI inside 3D)
+[`ViewNodeDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ViewNodeDemo.kt) — `ViewNode { Card { Text("…") } }`. Requires `viewNodeWindowManager` on `SceneView`.
+
+## AR recording / playback
+[`ARRecordPlaybackDemo.kt`](https://github.com/sceneview/sceneview/blob/main/samples/android-demo/src/main/java/io/github/sceneview/demo/demos/ARRecordPlaybackDemo.kt) — `val recorder = rememberARRecorder(); recorder.start(file); recorder.stop()`. To replay, pass `playbackDataset = file` to `ARSceneView`.
+
+## Cross-platform parity
+
+Apple (`SceneViewSwift`) and Web (`sceneview-web`) expose the same node names
+but with platform-idiomatic shapes (SwiftUI `@SceneBuilder`, JavaScript
+declarative API). **Don't copy-paste between platforms.** The platform docs
+are:
+
+- iOS: [`docs/docs/cheatsheet-ios.md`](https://github.com/sceneview/sceneview/blob/main/docs/docs/cheatsheet-ios.md)
+- Web: [`sceneview-web README`](https://www.npmjs.com/package/sceneview-web)
+- Flutter / RN: bridge packages; both render via the native SceneView underneath.

@@ -11,6 +11,14 @@ Thanks for your interest in contributing! This guide covers everything you need 
 - **JDK 17** (for Android/KMP modules)
 - **Android Studio** (latest stable recommended)
 - **Xcode 15+** (for SceneViewSwift / iOS work only)
+- Optional but recommended: Google's [`android` CLI](https://developer.android.com/tools/agents/android-cli)
+  for agent-driven QA. Bootstrap in one shot:
+  ```bash
+  bash .claude/scripts/android-env-check.sh --fix
+  ```
+  This installs the binary to `~/.local/bin/android` and registers the SceneView
+  agent skill under `~/.android/cli/skills/xr/sceneview/`, so `android skills list`
+  exposes it to any AI agent on this host.
 
 ### Clone and open
 
@@ -42,6 +50,29 @@ For iOS (SceneViewSwift), open `SceneViewSwift/Package.swift` in Xcode and build
 # KMP core tests only
 ./gradlew :sceneview-core:allTests
 ```
+
+### Set up an emulator
+
+Google's `android` CLI creates and boots emulators with one command — no
+sdkmanager / avdmanager dance:
+
+```bash
+android emulator create medium_phone        # positional <profile>; device auto-named from it
+android emulator start medium_phone         # boots, waits for ready
+```
+
+`android emulator create` takes a single positional argument — the **profile**
+— and the resulting device is auto-named from the profile (so `medium_phone`
+above creates a device called `medium_phone`). v0.7 does not support a
+separate `--name` flag. List profiles with `android emulator create --list-profiles`,
+list existing devices with `android emulator list`, remove with
+`android emulator remove <name>`.
+
+The `medium_phone` profile matches the Pixel-7-class form factor most of the
+screenshot scripts assume.
+
+For SDK packages, prefer `android sdk install` / `android sdk list` over the
+legacy `sdkmanager` from `cmdline-tools`.
 
 ---
 

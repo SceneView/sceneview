@@ -105,6 +105,16 @@ fixtures under 50 MB each.
 adb shell am start -n io.github.sceneview.demo/.MainActivity --es demo ar-record-playback
 ```
 
+The same launch with [`android` CLI](https://developer.android.com/tools/agents/android-cli)
+(installs the APK as part of the same call if needed — pass `--apks`):
+
+```
+android run --activity=io.github.sceneview.demo/.MainActivity
+```
+
+Note: `android run` does not yet expose `--es` intent extras, so for the
+deep-link launch above stick with `adb shell am start` until v0.8+.
+
 In the demo:
 
 - Switch to the **Record** tab.

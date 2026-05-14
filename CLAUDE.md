@@ -105,6 +105,18 @@ The helper auto-installs the CLI to `~/.local/bin/android` on first use and fall
 has no `--device` flag in v0.7 — but `android layout --device=<serial>` does work).
 Telemetry is disabled via `--no-metrics` on every invocation.
 
+**SceneView agent skill.** This repo ships a `sceneview` skill at
+[`agents/sceneview/SKILL.md`](agents/sceneview/SKILL.md). Install it once with:
+
+```bash
+bash .claude/scripts/install-sceneview-skill.sh
+```
+
+After install, `android skills list` shows `sceneview` under the `xr` category,
+making the API contract, recipes, and migration guide available to any AI agent
+on the host. `bash .claude/scripts/android-env-check.sh --fix` does the same plus
+installs the `android` CLI itself.
+
 ## Samples
 
 One unified showcase app per platform — all features integrated into tabs.
@@ -499,6 +511,8 @@ Hooks trigger automatically on specific Claude Code actions:
 | `qa-android-demos.sh` | QA loop over every demo — uses `android layout`/`screen capture` for the UI dump and screenshots |
 | `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |
+| `android-env-check.sh` | Sanity check for the Android dev env — `--fix` installs the CLI + SceneView skill |
+| `install-sceneview-skill.sh` | Copies `agents/sceneview/` to `~/.android/cli/skills/xr/sceneview/` |
 
 ### Version location map
 
