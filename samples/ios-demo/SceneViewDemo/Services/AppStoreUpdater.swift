@@ -164,7 +164,11 @@ final class AppStoreUpdater: ObservableObject {
 
     /// Reads `CFBundleShortVersionString` from `Bundle.main` — the
     /// production default for the `currentVersion` injection point.
-    static func bundleVersion() -> String? {
+    /// `nonisolated` so the enclosing `@MainActor` class doesn't bleed
+    /// MainActor isolation into the `init`'s default expression, which
+    /// Swift 6 rejects with "loses global actor 'MainActor'" when the
+    /// param type is the un-isolated `() -> String?`.
+    nonisolated static func bundleVersion() -> String? {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
     }
 
