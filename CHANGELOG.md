@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Changed — Stage 2 demo migrations: `MultiModelDemo` composes the streamed "Park" scene ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+`samples/android-demo/.../demos/MultiModelDemo.kt` swaps its tabletop arrangement of bundled assets (shiba + lantern + helmet + dragon) for the streamed "Park" scene composition — oak tree (backdrop) + park bench (foreground prop) + idle dog + perched songbird, all four resolved through [`SketchfabAssetResolver`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssetsResolver.kt) from the new `park` category of [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt).
+
+The composed scene now actually showcases what "multi model" means in practice — a real outdoor vignette where each asset comes from a different author / source / tool, all unified by `studio_warm_2k.hdr` and the shared scene-yaw rotation. The dog + bird carry skeletal animations so the scene reads as alive instead of as a still life. Two models are static (tree, bench), two are animated (dog, bird) — the same 2/2 alive-vs-still ratio the original tabletop had.
+
+Visibility chips kept the same shape (one chip per node) but renamed Tree / Bench / Dog / Bird. The "Spin scene" toggle and the per-model rotation cancellation are unchanged.
+
+Offline behaviour preserved — each streamed slot falls back to its registered bundled GLB / USDZ (Android: `khronos_lantern.glb` for tree + bench, `shiba.glb` for the dog, `animated_dragon.glb` for the bird; iOS: `tree_scene.usdz` / `fantasy_book.usdz` / `animated_butterfly.usdz` / `phoenix_bird.usdz`). The scene composition stays four-distinct-nodes even when offline.
+
+**`SampleAssets` slugs added:** 4 new entries in a new `park` category — Oak Tree (`1ca42d9d…`), Park Bench (`92a4c3ad…`), Idle Dog (`62fadcf9…`), Songbird (`8e7a3a8a…`). All CC-BY 4.0. The `SampleAssetsTest.every Stage 2 category is represented` test now expects `park` in the category set.
+
+**`prefetchAll("park")`** is called from a `LaunchedEffect(Unit)` on first composition so the four streams kick off in parallel before the user has finished reading the controls panel. Each per-node `resolve` later picks up the cached file via the resolver's dedup logic.
+
+**iOS counterpart not in this PR.** The iOS demo app (samples/ios-demo) does not currently have a `MultiModelDemo.swift` — the iOS V1 didn't port the multi-model scene. The 4 `park` slugs are registered in iOS `SampleAssets.swift` ready for a future port, but the Swift demo file itself is deferred.
+
+**30 s screen recording deferred** — agent worktree has no Pixel / iPhone device access; tracked in the [#1152](https://github.com/sceneview/sceneview/issues/1152) acceptance checklist.
+
 ### Changed — Stage 2 demo migrations: `AnimationDemo` carousel of 5 animated models from the `animation` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 `samples/android-demo/.../demos/AnimationDemo.kt` is no longer locked to a single hard-coded `threejs_soldier.glb`. A new "Subject" chip row above the existing Camera row lets the user cycle through 5 animated models — the bundled soldier (slot 0, preserves the v4.3.1 default for visual stability) plus the four streamed entries of the `animation` category in [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt): Walking Robot, Dancing Knight, Idle Cat, Sleeping Fox.
