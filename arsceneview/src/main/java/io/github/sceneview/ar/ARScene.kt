@@ -33,6 +33,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import io.github.sceneview.utils.readBuffer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -268,6 +269,10 @@ fun ARSceneView(
     scene: Scene = rememberScene(engine),
     /**
      * Defines the lighting environment and the skybox of the scene.
+     *
+     * Defaults to [rememberAREnvironment] with an [EnvironmentLoader], which ships
+     * the neutral IBL baseline so PBR materials reflect something sensible until
+     * ARCore's `ENVIRONMENTAL_HDR` light estimate stabilises (#1063).
      */
     environment: Environment = rememberAREnvironment(engine),
     /**
@@ -396,6 +401,24 @@ fun ARSceneView(
 
     val prevTrackingFailureRef = remember { AtomicReference<TrackingFailureReason?>(null) }
     val isFrontFaceWindingInvertedRef = remember { AtomicBoolean(false) }
+
+    // Baseline mainLight color + intensity captured on the first frame the lightEstimator
+    // produces an estimate. Without this, ARScene's per-frame
+    // `light.color = light.color * estimate` reads back the PREVIOUS frame's value and
+    // multiplies by an already-absolute estimate → exponential decay to black within
+    // ~15 frames (#1062). With the baseline cached, the multiplication is
+    // `baseline * estimate` each frame, which is what the LightEstimator's docstring
+    // intends.
+    //
+    // Keyed on `mainLightNode` identity so swapping the light (e.g. via #1017's reactive
+    // `LightSlot` pattern) resets the baseline to the new light's defaults, not stale
+    // values from the previous light.
+    val baselineMainLightColorRef = remember(mainLightNode) {
+        AtomicReference<io.github.sceneview.math.Color?>(null)
+    }
+    val baselineMainLightIntensityRef = remember(mainLightNode) {
+        AtomicReference<Float?>(null)
+    }
 
     val arCore = remember {
         // Snapshotted at first composition. ARCore requires setPlaybackDataset() to be called
@@ -632,6 +655,8 @@ fun ARSceneView(
                                     prevTrackingFailureRef = prevTrackingFailureRef,
                                     onTrackingFailureChangedRef = onTrackingFailureChangedRef,
                                     onSessionUpdatedRef = onSessionUpdatedRef,
+                                    baselineMainLightColorRef = baselineMainLightColorRef,
+                                    baselineMainLightIntensityRef = baselineMainLightIntensityRef,
                                     session = session,
                                     frame = frame
                                 )
@@ -710,6 +735,8 @@ private fun onARFrame(
     prevTrackingFailureRef: AtomicReference<TrackingFailureReason?>,
     onTrackingFailureChangedRef: AtomicReference<((TrackingFailureReason?) -> Unit)?>,
     onSessionUpdatedRef: AtomicReference<((Session, Frame) -> Unit)?>,
+    baselineMainLightColorRef: AtomicReference<io.github.sceneview.math.Color?>,
+    baselineMainLightIntensityRef: AtomicReference<Float?>,
     session: Session,
     frame: Frame
 ) {
@@ -721,8 +748,21 @@ private fun onARFrame(
 
     lightEstimator?.update(session, frame, cameraNode.camera)?.let { estimation ->
         mainLightNode?.let { light ->
-            estimation.mainLightColor?.let { light.color = light.color * it }
-            estimation.mainLightIntensity?.let { light.intensity = light.intensity * it }
+            // Capture the baseline light color + intensity on the first frame the
+            // estimator produces a value, so subsequent frames multiply
+            // `baseline * estimate` (NOT `previous-frame * estimate`, which causes
+            // exponential decay to black within ~15 frames — see #1062).
+            //
+            // `compareAndSet(null, …)` is used so a future move to multi-frame
+            // dispatch can't double-snapshot — only one writer wins on the
+            // null→value transition. Today `onARFrame` is single-threaded
+            // (rendering thread), so this is belt + braces.
+            baselineMainLightColorRef.compareAndSet(null, light.color)
+            baselineMainLightIntensityRef.compareAndSet(null, light.intensity)
+            val baselineColor = baselineMainLightColorRef.get() ?: light.color
+            val baselineIntensity = baselineMainLightIntensityRef.get() ?: light.intensity
+            estimation.mainLightColor?.let { light.color = baselineColor * it }
+            estimation.mainLightIntensity?.let { light.intensity = baselineIntensity * it }
             estimation.mainLightDirection?.let { light.lightDirection = it }
         }
         val indirectLight = environment.indirectLight
@@ -813,14 +853,16 @@ fun rememberARCameraStream(
 }
 
 /**
- * Creates and remembers an AR-optimised [Environment].
+ * Creates and remembers an AR-optimised [Environment] with the bundled neutral IBL baseline.
  *
- * Unlike the standard [rememberEnvironment], this produces an environment with no skybox
- * (transparent background so the camera feed shows through) and a neutral IBL that works
- * well before ARCore's light estimation has a chance to run.
+ * Loads `assets/environments/neutral/neutral_ibl.ktx` so PBR materials have something
+ * sensible to reflect in the first frames before ARCore's `ENVIRONMENTAL_HDR` light
+ * estimate stabilises (#1063). ARCore replaces the IBL each frame in [ARScene]'s update
+ * loop once the estimate is available; without this baseline metals show up jet-black
+ * until ARCore has had a few frames of camera motion to learn the environment.
  *
- * The environment's `IndirectLight` intensity is updated each frame by `ARSceneView` using
- * ARCore's `LightEstimator` when `ENVIRONMENTAL_HDR` mode is active.
+ * The environment also has no skybox (transparent background so the camera feed shows
+ * through).
  *
  * @param engine The Filament [Engine] that owns the IBL texture.
  * @param apply  Optional configuration block applied after creation.
@@ -830,14 +872,23 @@ fun rememberARCameraStream(
 fun rememberAREnvironment(
     engine: Engine,
     apply: Environment.() -> Unit = {}
-) = remember(engine) {
-    createAREnvironment(engine).apply(apply)
-}.also { environment ->
-    DisposableEffect(environment) {
-        onDispose {
-            engine.safeDestroyEnvironment(environment)
-        }
+): Environment {
+    val context = LocalContext.current
+    // Read the bundled neutral IBL. `runCatching` so a missing asset (only possible
+    // if the consumer drops the `sceneview` AAR's assets) downgrades to no-IBL
+    // behaviour instead of crashing — same behaviour as the pre-#1063 path.
+    val iblBuffer = remember(context) {
+        runCatching {
+            context.assets.readBuffer("environments/neutral/neutral_ibl.ktx")
+        }.getOrNull()
     }
+    val environment = remember(engine, iblBuffer) {
+        createAREnvironment(engine, iblBuffer).apply(apply)
+    }
+    DisposableEffect(environment) {
+        onDispose { engine.safeDestroyEnvironment(environment) }
+    }
+    return environment
 }
 
 /**

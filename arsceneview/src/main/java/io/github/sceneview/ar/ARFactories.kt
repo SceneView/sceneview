@@ -1,10 +1,12 @@
 package io.github.sceneview.ar
 
 import com.google.android.filament.Engine
+import com.google.android.filament.utils.KTX1Loader
 import io.github.sceneview.ar.camera.ARCameraStream
 import io.github.sceneview.ar.node.ARCameraNode
 import io.github.sceneview.createEnvironment
 import io.github.sceneview.loaders.MaterialLoader
+import java.nio.Buffer
 
 // ── AR-specific factory functions ────────────────────────────────────────────────────────────────
 //
@@ -34,9 +36,27 @@ fun createARCameraStream(materialLoader: MaterialLoader) = ARCameraStream(materi
 
 /**
  * Creates an AR-optimised [io.github.sceneview.environment.Environment] with no skybox
- * (transparent background so the camera feed shows through) and a neutral IBL.
+ * (transparent background so the camera feed shows through) and an optional IBL baseline.
+ *
+ * Pass [iblBuffer] (e.g. read from `assets/environments/neutral/neutral_ibl.ktx`) to give
+ * PBR materials something sensible to reflect in the first frames before ARCore's
+ * `ENVIRONMENTAL_HDR` light estimate stabilises (#1063). ARCore replaces the IBL each frame
+ * in [ARScene]'s update loop once the estimate is available; without this baseline metals
+ * show up jet-black until ARCore has had several frames of camera motion to learn the
+ * environment.
+ *
+ * Prefer the [rememberAREnvironment] composable, which reads the bundled
+ * `environments/neutral/neutral_ibl.ktx` automatically.
  */
-fun createAREnvironment(engine: Engine) = createEnvironment(engine, isOpaque = true, skybox = null)
+fun createAREnvironment(
+    engine: Engine,
+    iblBuffer: Buffer? = null,
+) = createEnvironment(
+    engine = engine,
+    isOpaque = true,
+    indirectLight = iblBuffer?.let { KTX1Loader.createIndirectLight(engine, it).indirectLight },
+    skybox = null,
+)
 
 /**
  * Default AR camera node with exposure tuned for ARCore light estimation.
