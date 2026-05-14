@@ -265,7 +265,7 @@ fun ARRerunDemo(onBack: () -> Unit) {
                                 "Not enough detail — try a textured surface"
                             TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
                         }
-                    } ?: "Scanning for surfaces…",
+                    } ?: stringResource(R.string.ar_status_scanning),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
