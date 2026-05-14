@@ -65,6 +65,9 @@ class EnvironmentLoader(
      * @param indirectLightSpecularFilter Generates a prefiltered indirect light cubemap.
      * SpecularFilter is a GPU based implementation of the specular probe pre-integration filter.
      * ** Launch the heavier computation. Expect 100-200ms on the GPU.**
+     * @param indirectLightApply Builder hook applied AFTER the v4.1.0-balanced 10k default
+     * (see #1075). Use it to override the IBL intensity (e.g. bright outdoor HDRIs may want
+     * 30k+) or rotation without copying the buffer-loading boilerplate.
      * @param textureOptions texture loader options
      * @param createSkybox Disable the skybox creation if you don't need it.
      *
@@ -123,6 +126,9 @@ class EnvironmentLoader(
      * @param indirectLightSpecularFilter Generates a prefiltered indirect light cubemap.
      * SpecularFilter is a GPU based implementation of the specular probe pre-integration filter.
      * ** Launch the heavier computation. Expect 100-200ms on the GPU.**
+     * @param indirectLightApply Builder hook applied AFTER the v4.1.0-balanced 10k default
+     * (see #1075). Use it to override the IBL intensity (e.g. bright outdoor HDRIs may want
+     * 30k+) or rotation without copying the buffer-loading boilerplate.
      * @param textureOptions texture loader options
      * @param createSkybox Disable the skybox creation if you don't need it.
      *
@@ -133,11 +139,13 @@ class EnvironmentLoader(
     fun createHDREnvironment(
         assetFileLocation: String,
         indirectLightSpecularFilter: Boolean = true,
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         textureOptions: HDRLoader.Options = HDRLoader.Options(),
         createSkybox: Boolean = true,
     ): Environment? = createHDREnvironment(
         buffer = context.assets.readBuffer(assetFileLocation),
         indirectLightSpecularFilter = indirectLightSpecularFilter,
+        indirectLightApply = indirectLightApply,
         textureOptions = textureOptions,
         createSkybox = createSkybox
     )
@@ -151,6 +159,9 @@ class EnvironmentLoader(
      * @param indirectLightSpecularFilter Generates a prefiltered indirect light cubemap.
      * SpecularFilter is a GPU based implementation of the specular probe pre-integration filter.
      * ** Launch the heavier computation. Expect 100-200ms on the GPU.**
+     * @param indirectLightApply Builder hook applied AFTER the v4.1.0-balanced 10k default
+     * (see #1075). Use it to override the IBL intensity (e.g. bright outdoor HDRIs may want
+     * 30k+) or rotation without copying the buffer-loading boilerplate.
      * @param textureOptions texture loader options
      * @param createSkybox Disable the skybox creation if you don't need it.
      *
@@ -161,11 +172,13 @@ class EnvironmentLoader(
     fun createHDREnvironment(
         @RawRes rawResId: Int,
         indirectLightSpecularFilter: Boolean = true,
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         textureOptions: HDRLoader.Options = HDRLoader.Options(),
         createSkybox: Boolean = true,
     ): Environment? = createHDREnvironment(
         buffer = context.resources.readBuffer(rawResId),
         indirectLightSpecularFilter = indirectLightSpecularFilter,
+        indirectLightApply = indirectLightApply,
         textureOptions = textureOptions,
         createSkybox = createSkybox
     )
@@ -179,6 +192,9 @@ class EnvironmentLoader(
      * @param indirectLightSpecularFilter Generates a prefiltered indirect light cubemap.
      * SpecularFilter is a GPU based implementation of the specular probe pre-integration filter.
      * ** Launch the heavier computation. Expect 100-200ms on the GPU.**
+     * @param indirectLightApply Builder hook applied AFTER the v4.1.0-balanced 10k default
+     * (see #1075). Use it to override the IBL intensity (e.g. bright outdoor HDRIs may want
+     * 30k+) or rotation without copying the buffer-loading boilerplate.
      * @param textureOptions texture loader options
      * @param createSkybox Disable the skybox creation if you don't need it.
      *
@@ -189,11 +205,13 @@ class EnvironmentLoader(
     fun createHDREnvironment(
         file: File,
         indirectLightSpecularFilter: Boolean = true,
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         textureOptions: HDRLoader.Options = HDRLoader.Options(),
         createSkybox: Boolean = true,
     ): Environment? = createHDREnvironment(
         buffer = file.readBuffer(),
         indirectLightSpecularFilter = indirectLightSpecularFilter,
+        indirectLightApply = indirectLightApply,
         textureOptions = textureOptions,
         createSkybox = createSkybox
     )
@@ -207,6 +225,9 @@ class EnvironmentLoader(
      * @param indirectLightSpecularFilter Generates a prefiltered indirect light cubemap.
      * SpecularFilter is a GPU based implementation of the specular probe pre-integration filter.
      * ** Launch the heavier computation. Expect 100-200ms on the GPU.**
+     * @param indirectLightApply Builder hook applied AFTER the v4.1.0-balanced 10k default
+     * (see #1075). Use it to override the IBL intensity (e.g. bright outdoor HDRIs may want
+     * 30k+) or rotation without copying the buffer-loading boilerplate.
      * @param textureOptions texture loader options
      * @param createSkybox Disable the skybox creation if you don't need it.
      *
@@ -217,12 +238,14 @@ class EnvironmentLoader(
     suspend fun loadHDREnvironment(
         url: String,
         indirectLightSpecularFilter: Boolean = true,
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         textureOptions: HDRLoader.Options = HDRLoader.Options(),
         createSkybox: Boolean = true,
     ): Environment? = context.loadFileBuffer(url)?.let { buffer ->
         createHDREnvironment(
             buffer = buffer,
             indirectLightSpecularFilter = indirectLightSpecularFilter,
+            indirectLightApply = indirectLightApply,
             textureOptions = textureOptions,
             createSkybox = createSkybox
         )
@@ -379,12 +402,14 @@ class EnvironmentLoader(
     suspend fun loadKTX1Environment(
         url: String,
         indirectLightSpecularFilter: Boolean = true,
+        indirectLightApply: IndirectLight.Builder.() -> Unit = {},
         textureOptions: HDRLoader.Options = HDRLoader.Options(),
         createSkybox: Boolean = true,
     ): Environment? = context.loadFileBuffer(url)?.let { buffer ->
         createHDREnvironment(
             buffer = buffer,
             indirectLightSpecularFilter = indirectLightSpecularFilter,
+            indirectLightApply = indirectLightApply,
             textureOptions = textureOptions,
             createSkybox = createSkybox
         )

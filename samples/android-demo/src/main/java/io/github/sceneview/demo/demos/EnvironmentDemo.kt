@@ -41,6 +41,7 @@ import io.github.sceneview.rememberModelLoader
 @Composable
 fun EnvironmentDemo(onBack: () -> Unit) {
     data class EnvOption(val label: String, val file: String)
+    data class IntensityOption(val label: String, val lux: Float?)
 
     val environments = remember {
         listOf(
@@ -52,16 +53,32 @@ fun EnvironmentDemo(onBack: () -> Unit) {
             EnvOption("Rooftop Night", "environments/rooftop_night_2k.hdr")
         )
     }
+    // `lux = null` keeps the v4.1.0 balanced 10k default (#1075). The 30k preset
+    // demonstrates the `indirectLightApply` override (#1124) for bright outdoor HDRIs.
+    val intensities = remember {
+        listOf(
+            IntensityOption("Default (10k)", null),
+            IntensityOption("Bright (30k)", 30_000f),
+            IntensityOption("Dim (3k)", 3_000f),
+        )
+    }
     var selectedEnv by remember { mutableStateOf(environments[0]) }
+    var selectedIntensity by remember { mutableStateOf(intensities[0]) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
 
-    // Recreate the environment each time the user selects a different HDR.
-    val environment: Environment = remember(environmentLoader, selectedEnv) {
-        environmentLoader.createHDREnvironment(assetFileLocation = selectedEnv.file)
-            ?: createEnvironment(environmentLoader)
+    // Recreate the environment when the HDR or the intensity override changes.
+    // `indirectLightApply` is the v4.1.0 hook (#1124) that lets callers tweak the
+    // Filament `IndirectLight.Builder` without copying the buffer-loading boilerplate.
+    val environment: Environment = remember(environmentLoader, selectedEnv, selectedIntensity) {
+        environmentLoader.createHDREnvironment(
+            assetFileLocation = selectedEnv.file,
+            indirectLightApply = {
+                selectedIntensity.lux?.let { intensity(it) }
+            }
+        ) ?: createEnvironment(environmentLoader)
     }
     DisposableEffect(environment) {
         onDispose { environmentLoader.destroyEnvironment(environment) }
@@ -100,6 +117,25 @@ fun EnvironmentDemo(onBack: () -> Unit) {
                         selected = selectedEnv == env,
                         onClick = { selectedEnv = env },
                         label = { Text(env.label) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "IBL Intensity (indirectLightApply)",
+                style = MaterialTheme.typography.labelLarge
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                intensities.forEach { option ->
+                    FilterChip(
+                        selected = selectedIntensity == option,
+                        onClick = { selectedIntensity = option },
+                        label = { Text(option.label) }
                     )
                 }
             }
