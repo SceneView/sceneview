@@ -39,6 +39,7 @@ import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.rememberUnlitMaterialInstance
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -114,10 +115,10 @@ fun MovableLightDemo(onBack: () -> Unit) {
     }
 
     // Yellow unlit material for the marker sphere — see iOS rationale. Unlit
-    // = always glowing, regardless of the user-light's position.
-    val markerMaterial = remember(materialLoader) {
-        materialLoader.createUnlitColorInstance(color = Color(0xFFFFEB3B))
-    }
+    // = always glowing, regardless of the user-light's position. Helper has
+    // a DisposableEffect-backed onDispose → no JNI MaterialInstance leak on
+    // recompose / navigate-away (#979).
+    val markerMaterial = rememberUnlitMaterialInstance(materialLoader, Color(0xFFFFEB3B))
 
     DemoScaffold(
         title = "Movable Light",
