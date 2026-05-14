@@ -1,3 +1,7 @@
+## 4.3.2
+
+- Version alignment with SceneView v4.3.2. Patch release: completes [#1152](https://github.com/sceneview/sceneview/issues/1152) Sketchfab streaming umbrella — Stage 1 `SketchfabAssetResolver` foundations, Stage 2 demo migrations (`OrbitalARDemo`, `SceneGalleryDemo`, `AnimationDemo`, `ModelViewerDemo`, `MaterialsDemo`, `MultiModelDemo`, `ARPlacementDemo`, `ARInstantPlacementDemo`, `PhysicsDemo`), Stage 3 polish (APK slim-down, Credits sheet, offline-source chip), Stage 4 docs + MCP resources. Also: `DemoScaffold` v2 modal-bottom-sheet (#1154), iOS `SKETCHFAB_API_KEY` injected into TestFlight + App Store binaries (#1157), instrumented regression pins for v4.3.0 fixes (#1120 extension), and Dependabot security fix (`fast-xml-parser` bumped to 5.7.0+ via npm overrides — dev-only transitive, GHSA-gh4j-gqv2-49f6). No public Android API change.
+
 ## 4.3.1
 
 - Version alignment with SceneView v4.3.1. Patch release: CI hardening (Dokka config-cache + GitHub Release decoupled from Dokka, render-tests `android-demo-screenshots` job unblocked), Android CLI migration sweep across install/launch QA scripts, GeometryDemo lux retune (80k → 5k for v4.1.0 light defaults), i18n `stringResource(R.string.…)` migration for the Android demo, IBLPrefilter KDoc cost matrix, and iOS parity for `LightSlot` + `.fillLight(_:)` on `ARSceneView`. No public Android API change.
