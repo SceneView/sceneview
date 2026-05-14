@@ -156,15 +156,13 @@ jobs:
             # device-online but not for package-manager readiness — `android run`
             # would otherwise race the PM during cold boot.
             #
-            # POSIX-shell only: ReactiveCircus/android-emulator-runner runs this
-            # `script:` block under /usr/bin/sh (dash on Ubuntu runners), where
-            # `[[ ... ]]` is a syntax error. Use plain `[ ... ]` + `=`.
+            # The `script:` block is executed line-by-line by the action via
+            # `sh -c <line>` (not `bash <script>`), so a multi-line `while … done`
+            # gets sliced — the `while` opens a syntax that never sees its `done`
+            # on the same invocation. The whole loop must live on ONE physical
+            # line. POSIX-only (dash): `[ … ]` + `=`, no `[[ … ]]`.
             adb wait-for-device
-            attempts=0
-            while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do
-              sleep 2
-              attempts=$((attempts + 1))
-            done
+            attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
 
             # Install + launch atomically via the Android CLI.
             android --no-metrics run \
