@@ -35,34 +35,43 @@ class UpdateChecker extends ChangeNotifier {
 
   final http.Client _client;
 
-  /// App Store track id for the iOS build. Kept in sync with
-  /// `samples/ios-demo` via `.claude/scripts/sync-versions.sh`.
+  /// App Store track id used by the "Update" CTA on iOS. This points at the
+  /// Swift SceneView demo on purpose — the Flutter demo itself is dev-only
+  /// (template, not published), so when iOS users tap Update we bounce them
+  /// to the canonical 3D & AR Explorer listing rather than a non-existent
+  /// product page. If/when this Flutter demo is published to the App Store,
+  /// swap to its own track id.
   static const String _appStoreId = '6761329763';
 
   /// 12-hour throttle. Android in_app_update has its own debouncing but
   /// the iTunes lookup endpoint does not.
   static const Duration _throttle = Duration(hours: 12);
-  static const Duration _snoozeWindow = Duration(days: 7);
 
   DateTime? _lastCheck;
-  DateTime? _snoozedUntil;
+  /// Version string the user last dismissed. The banner stays hidden as long
+  /// as `_availableVersion == _snoozedVersion`. A different `_availableVersion`
+  /// (= a newer release has landed since the dismiss) invalidates the snooze
+  /// and re-surfaces the banner — same semantics as the web demo's
+  /// `sceneview.update.snoozedVersion` localStorage key.
+  String? _snoozedVersion;
   String? _availableVersion;
 
-  /// True when a newer version was detected and the user hasn't snoozed it.
-  bool get hasUpdate => _availableVersion != null && !_isSnoozed;
+  /// True when a newer version was detected and the user hasn't snoozed *this*
+  /// version. A newer release than the snoozed one re-surfaces the banner.
+  bool get hasUpdate =>
+      _availableVersion != null && _availableVersion != _snoozedVersion;
   String? get availableVersion => _availableVersion;
 
-  bool get _isSnoozed =>
-      _snoozedUntil != null && _snoozedUntil!.isAfter(DateTime.now());
-
-  /// Run a platform-specific update check. Pass `force: true` to bypass both
-  /// the throttle and snooze gates (e.g. a manual "Check now" CTA).
+  /// Run a platform-specific update check. Pass `force: true` to bypass the
+  /// 12 h throttle (e.g. a manual "Check now" CTA).
+  ///
+  /// `_lastCheck` is stamped ONLY after the platform call succeeds so a
+  /// transient failure (iTunes 503, ARCore-availability hiccup) doesn't
+  /// burn the 12 h budget for the next resume.
   Future<void> checkForUpdate({bool force = false}) async {
     if (!force) {
-      if (_isSnoozed) return;
       if (_lastCheck != null && DateTime.now().difference(_lastCheck!) < _throttle) return;
     }
-    _lastCheck = DateTime.now();
 
     try {
       if (Platform.isAndroid) {
@@ -70,6 +79,9 @@ class UpdateChecker extends ChangeNotifier {
       } else if (Platform.isIOS) {
         await _checkIos();
       }
+      // Only stamp on success — a `catch` below leaves `_lastCheck`
+      // untouched so the next resume retries immediately.
+      _lastCheck = DateTime.now();
     } catch (e, st) {
       // Silent failure on network / decode errors — the banner just stays
       // hidden. We log to debug so a curious dev can see what happened.
@@ -111,10 +123,10 @@ class UpdateChecker extends ChangeNotifier {
     }
   }
 
-  /// Hide the banner for 7 days.
+  /// Hide the banner for the currently-detected version. A future release
+  /// (where `_availableVersion` becomes a NEW string) re-surfaces the banner.
   void snooze() {
-    _snoozedUntil = DateTime.now().add(_snoozeWindow);
-    _availableVersion = null;
+    _snoozedVersion = _availableVersion;
     notifyListeners();
   }
 

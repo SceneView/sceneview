@@ -39,21 +39,23 @@ import SpInAppUpdates, {
 export function UpdateChecker(): React.ReactElement | null {
   const [available, setAvailable] = useState<string | null>(null);
   const lastCheck = useRef<number>(0);
-  const snoozedUntil = useRef<number>(0);
+  // Version-keyed snooze: the banner stays hidden while
+  // `available === snoozedVersion`. A NEW `available` (= newer release since
+  // the dismiss) re-surfaces the banner — matches the web demo semantics.
+  const snoozedVersion = useRef<string | null>(null);
   const updaterRef = useRef<SpInAppUpdates | null>(null);
 
   const THROTTLE_MS = 12 * 60 * 60 * 1000;
-  const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+  // App Store track id for the canonical Swift SceneView demo. The RN demo is
+  // dev-only (template, not published), so when iOS users tap Update we
+  // redirect them to the published 3D & AR Explorer rather than a 404 store
+  // page. Swap to this demo's own track id once it ships to the App Store.
   const APP_STORE_ID = '6761329763';
 
   const checkForUpdate = useCallback(
     async (force = false) => {
       const now = Date.now();
-      if (!force) {
-        if (snoozedUntil.current > now) return;
-        if (now - lastCheck.current < THROTTLE_MS) return;
-      }
-      lastCheck.current = now;
+      if (!force && now - lastCheck.current < THROTTLE_MS) return;
 
       try {
         if (Platform.OS === 'android') {
@@ -84,6 +86,10 @@ export function UpdateChecker(): React.ReactElement | null {
             setAvailable(null);
           }
         }
+        // Stamp `lastCheck` only on success so a transient failure (iTunes
+        // 503, Play Core hiccup) doesn't burn the 12 h budget for the next
+        // resume.
+        lastCheck.current = now;
       } catch (err) {
         // Silent — see header. The banner stays hidden, the user keeps using
         // the demo. We log so a curious dev can see why.
@@ -114,9 +120,11 @@ export function UpdateChecker(): React.ReactElement | null {
   }, []);
 
   const snooze = useCallback(() => {
-    snoozedUntil.current = Date.now() + SNOOZE_MS;
+    // Version-keyed snooze: a future `setAvailable('4.5.0')` will re-show
+    // the banner because `available !== snoozedVersion`.
+    snoozedVersion.current = available;
     setAvailable(null);
-  }, [SNOOZE_MS]);
+  }, [available]);
 
   useEffect(() => {
     // Initial check at mount.
@@ -131,7 +139,9 @@ export function UpdateChecker(): React.ReactElement | null {
     return () => sub.remove();
   }, [checkForUpdate]);
 
-  if (!available) return null;
+  // Hide while snoozed for THIS specific version. Newer releases set
+  // `available` to a new string, which won't match `snoozedVersion`.
+  if (!available || available === snoozedVersion.current) return null;
 
   return (
     <View style={styles.banner} accessibilityLiveRegion="polite">
@@ -149,7 +159,7 @@ export function UpdateChecker(): React.ReactElement | null {
       <TouchableOpacity
         style={styles.dismiss}
         onPress={snooze}
-        accessibilityLabel="Dismiss for 7 days"
+        accessibilityLabel="Dismiss until next release"
       >
         <Text style={styles.dismissLabel}>×</Text>
       </TouchableOpacity>

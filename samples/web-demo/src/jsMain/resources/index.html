@@ -670,7 +670,7 @@
         <a href="https://sceneview.github.io" target="_blank" class="logo" title="SceneView — 3D and AR for Compose and SwiftUI">
             <div class="logo-icon">S</div>
             <span class="logo-text">SceneView Web Demo</span>
-            <span class="logo-version">v4.3.1</span>
+            <span class="logo-version">v4.3.4</span>
         </a>
         <div class="top-right">
             <button id="auto-rotate-toggle" class="auto-rotate-btn active" title="Toggle auto-rotation">Auto-rotate</button>
@@ -911,7 +911,7 @@
             instance.setAutoRotate(autoRotate);
             instance.setQuality('medium');
             loadingOverlay.classList.add('hidden');
-            console.log('SceneView Web Demo initialized — v4.3.1');
+            console.log('SceneView Web Demo initialized — v4.3.4');
           })
           .catch(function(err) {
             console.error('SceneView init failed:', err);
@@ -1428,7 +1428,7 @@
       // No-op if version.json is missing (dev mode, no deploy yet, fetch
       // blocked by an ad-blocker, …) — the snackbar just stays hidden.
 
-      var BUILD_VERSION = '4.3.1';
+      var BUILD_VERSION = '4.3.4';
       var VERSION_URL = '/version.json';
       var UPDATE_THROTTLE_MS = 12 * 60 * 60 * 1000;     // 12 hours
       var UPDATE_LAST_CHECK_KEY = 'sceneview.update.lastCheckAt';
@@ -1485,7 +1485,6 @@
 
       function checkForUpdate(force) {
         if (!force && !shouldCheckUpdate()) return;
-        markChecked();
         // `cache: 'no-cache'` so a stale CDN copy doesn't pin us to an old
         // version after a deploy. The browser still uses ETag/If-Modified-Since
         // — 304s come back free.
@@ -1495,6 +1494,10 @@
             return r.json();
           })
           .then(function(data) {
+            // Mark checked ONLY after the JSON parses — a 503 / DNS fail
+            // leaves `lastCheckAt` untouched so the next visibilitychange
+            // can retry instead of burning the 12 h budget on a transient.
+            markChecked();
             var latest = data && data.version;
             if (!latest) return;
             if (compareVersions(latest, BUILD_VERSION) <= 0) return;

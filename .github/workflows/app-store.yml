@@ -372,8 +372,12 @@ jobs:
               attrs = {}
 
               # ── whatsNew (every tag) ──────────────────────────────────
+              # `gsub(/\./, "\\.", ver)` escapes the dots in `4.3.1` so the
+              # regex doesn't also match `4-3-1` etc. Same hygiene as
+              # play-store.yml's awk extractor.
               awk_out = subprocess.run(
                   ["awk", "-v", f"ver=## v{version_string}",
+                   r'BEGIN { gsub(/\./, "\\.", ver) } '
                    r'$0 ~ "^"ver"( |$)" { found=1; next } '
                    r'found && /^## v[0-9]/ { exit } '
                    r'found { print }',
@@ -459,10 +463,13 @@ jobs:
                       r.raise_for_status()
                       print(f"Localization PATCHed on en-US ({loc_id}): {field_summary}")
                   else:
-                      attrs["locale"] = "en-US"
+                      # Build a separate dict for POST: `locale` is read-only on
+                      # PATCH so leaking it back into `attrs` would 409 on a
+                      # future refactor that PATCHes from the same dict.
+                      post_attrs = {**attrs, "locale": "en-US"}
                       payload = {"data": {
                           "type": "appStoreVersionLocalizations",
-                          "attributes": attrs,
+                          "attributes": post_attrs,
                           "relationships": {"appStoreVersion": {
                               "data": {"type": "appStoreVersions", "id": version_id}
                           }},

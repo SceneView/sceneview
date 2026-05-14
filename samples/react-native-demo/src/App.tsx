@@ -48,7 +48,7 @@ interface PlaygroundShape {
 // Constants
 // ---------------------------------------------------------------------------
 
-const VERSION = '4.3.1';
+const VERSION = '4.3.4';
 
 const ENVIRONMENT = 'environments/studio_small.hdr';
 

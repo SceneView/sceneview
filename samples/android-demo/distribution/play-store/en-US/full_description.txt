@@ -7,7 +7,7 @@ AUGMENTED REALITY
 Place 3D objects in your real world using your camera. Point your camera at a flat surface, tap to place, then drag, pinch, and twist to position your model perfectly. Supports depth occlusion and environmental light estimation for a natural look.
 
 DISCOVER MORE
-Explore 14 interactive showcases:
+Explore interactive showcases:
 - Dynamic Sky: Watch the sky shift from dawn to dusk with atmospheric scattering
 - Volumetric Fog: Height-based atmospheric fog for immersive scenes
 - Physics: Rigid body simulation with bouncing balls

@@ -189,7 +189,7 @@ class _UpdateBanner extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.close),
-                tooltip: 'Dismiss for 7 days',
+                tooltip: 'Dismiss until next release',
                 color: colors.onSecondaryContainer,
                 onPressed: () => updater.snooze(),
               ),

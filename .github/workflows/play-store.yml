@@ -257,7 +257,12 @@ jobs:
           # canonical release lives in CHANGELOG.md.
           BASE_VERSION="${VERSION_NAME%-*}"
           mkdir -p whatsnew
+          # `ver` interpolates into a regex inside awk — the dots in `4.3.1`
+          # would otherwise match any character (so `## v4-3-1` would also
+          # hit). `gsub` escapes them before use. Same hygiene applied in
+          # app-store.yml's submission script.
           awk -v ver="## v$BASE_VERSION" '
+            BEGIN { gsub(/\./, "\\.", ver) }
             $0 ~ "^"ver"( |$)"   { found=1; next }
             found && /^## v[0-9]/ { exit }
             found                 { print }

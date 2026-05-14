@@ -94,6 +94,16 @@ class InAppUpdateManager(
     }
 
     fun checkForUpdate() {
+        // Early-return if a flow is already in progress: a second `onResume`
+        // landing here while we're DOWNLOADING / READY_TO_INSTALL would call
+        // `startUpdateFlow` again, re-prompting the user mid-download. Play
+        // Core surfaces this via `info.updateAvailability() ==
+        // DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS` AFTER the fact, but bailing
+        // out before the SDK round-trip is cheaper.
+        if (updateState == UpdateState.DOWNLOADING
+            || updateState == UpdateState.READY_TO_INSTALL
+        ) return
+
         updateState = UpdateState.CHECKING
         appUpdateManager.appUpdateInfo
             .addOnSuccessListener { info ->

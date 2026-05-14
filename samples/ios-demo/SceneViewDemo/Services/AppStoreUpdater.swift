@@ -48,20 +48,27 @@ final class AppStoreUpdater: ObservableObject {
     private let session: URLSession
     private let defaults: UserDefaults
     private let now: () -> Date
+    private let currentVersionProvider: () -> String?
 
     private static let lastCheckKey = "sceneview.update.lastCheckAt"
     private static let snoozedUntilKey = "sceneview.update.snoozedUntil"
     private static let throttle: TimeInterval = 12 * 60 * 60   // 12 hours
     private static let snoozeWindow: TimeInterval = 7 * 24 * 60 * 60 // 7 days
 
+    /// - Parameter currentVersion: Closure returning the running app's
+    ///   `CFBundleShortVersionString`. Defaults to `Bundle.main` — XCTest
+    ///   should pass a stub closure since the test runner's `Bundle.main` is
+    ///   the test harness bundle, not `SceneViewDemo`.
     init(
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        currentVersion: @escaping () -> String? = AppStoreUpdater.bundleVersion
     ) {
         self.session = session
         self.defaults = defaults
         self.now = now
+        self.currentVersionProvider = currentVersion
     }
 
     /// Run a lookup against the App Store unless the throttle / snooze window
@@ -74,7 +81,7 @@ final class AppStoreUpdater: ObservableObject {
 
         do {
             let latest = try await fetchLatestVersion()
-            guard let current = Self.currentVersion() else {
+            guard let current = currentVersionProvider() else {
                 state = .idle
                 return
             }
@@ -155,7 +162,9 @@ final class AppStoreUpdater: ObservableObject {
         }
     }
 
-    static func currentVersion() -> String? {
+    /// Reads `CFBundleShortVersionString` from `Bundle.main` — the
+    /// production default for the `currentVersion` injection point.
+    static func bundleVersion() -> String? {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
     }
 

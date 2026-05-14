@@ -64,12 +64,19 @@ final class AppStoreUpdaterTests: XCTestCase {
 
     private func makeUpdater(
         now: Date = Date(),
-        defaults: UserDefaults = makeDefaults()
+        defaults: UserDefaults = makeDefaults(),
+        currentVersion: String = "4.3.4"
     ) -> AppStoreUpdater {
+        // `currentVersion` defaults to a known string because the XCTest
+        // runner's `Bundle.main` is the test harness bundle, not
+        // `SceneViewDemo` — `Bundle.main.infoDictionary["CFBundleShortVersionString"]`
+        // returns nil in that context. Production code path uses
+        // `AppStoreUpdater.bundleVersion` as default.
         AppStoreUpdater(
             session: makeSession(),
             defaults: defaults,
-            now: { now }
+            now: { now },
+            currentVersion: { currentVersion }
         )
     }
 
@@ -137,13 +144,11 @@ final class AppStoreUpdaterTests: XCTestCase {
     }
 
     func testCheck_sameVersionSetsUpToDate() async throws {
-        let current = AppStoreUpdater.currentVersion() ?? "0.0.0"
-        let body = #"""
-        {"results":[{"version":"\#(current)","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}
-        """#
+        let current = "4.3.4"
+        let body = #"{"results":[{"version":"\#(current)","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
         StubURLProtocol.responses = [(200, Data(body.utf8))]
 
-        let updater = makeUpdater()
+        let updater = makeUpdater(currentVersion: current)
         await updater.checkForUpdate(force: true)
 
         XCTAssertEqual(updater.state, .upToDate)
@@ -173,7 +178,7 @@ final class AppStoreUpdaterTests: XCTestCase {
     // MARK: - Throttle + snooze
 
     func testCheck_secondCallWithinThrottleSkipsNetwork() async throws {
-        let body = #"""{"results":[{"version":"9.9.9","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"""#
+        let body = #"{"results":[{"version":"9.9.9","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
         // Only ONE response queued — second `checkForUpdate` would crash if it hit the network.
         StubURLProtocol.responses = [(200, Data(body.utf8))]
 
@@ -188,7 +193,7 @@ final class AppStoreUpdaterTests: XCTestCase {
     }
 
     func testSnooze_hidesBannerForOneWeek() async throws {
-        let body = #"""{"results":[{"version":"9.9.9","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"""#
+        let body = #"{"results":[{"version":"9.9.9","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
         StubURLProtocol.responses = [(200, Data(body.utf8))]
 
         let updater = makeUpdater()
