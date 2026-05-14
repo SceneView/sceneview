@@ -36,6 +36,9 @@
     <string name="explore_clear">Effacer</string>
     <string name="explore_clear_search">Effacer la recherche</string>
     <string name="explore_remove_query">Supprimer %s</string>
+    <string name="explore_search_results">Résultats de recherche</string>
+    <string name="explore_search_no_results">Aucun résultat pour « %s »</string>
+    <string name="explore_search_loading">Recherche en cours…</string>
 
     <!-- Sketchfab model viewer screen -->
     <string name="sketchfab_animated">Animé</string>
