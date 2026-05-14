@@ -152,7 +152,18 @@ private fun curatedSamplesForExplore(): List<DemoEntry> {
 private fun AboutTabContent() {
     val context = LocalContext.current
     val openLink: (String) -> Unit = { url ->
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        // Devices without a browser (Android Go, stripped AOSP, user uninstalled
+        // Chrome) throw ActivityNotFoundException → app crashes. runCatching +
+        // toast keeps the app alive and tells the user why nothing happened. #1208
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            android.widget.Toast.makeText(
+                context,
+                "No browser installed to open $url",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
     }
     // #1152 Stage 3 — CC-BY attribution for every streamed Sketchfab model
     // surfaces as a ModalBottomSheet anchored to the existing "Credits" card.
