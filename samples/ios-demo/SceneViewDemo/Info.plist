@@ -52,6 +52,18 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<!--
+		Sketchfab API key — injected at build time from the
+		`SKETCHFAB_API_KEY` user-defined build setting (passed by CI via
+		`-DSKETCHFAB_API_KEY=...` or `SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"`
+		on the `xcodebuild archive` command line). When the setting is unset
+		(forks without the secret, contributors building locally without
+		the env var), `SketchfabConfig.apiKey` falls back to the legacy
+		`ProcessInfo` env var path. See
+		`samples/ios-demo/SceneViewDemo/Services/SketchfabConfig.swift`.
+	-->
+	<key>SketchfabAPIKey</key>
+	<string>$(SKETCHFAB_API_KEY)</string>
+	<!--
 		Deep-link entry: scan a QR code on sceneview.github.io / README /
 		docs and land directly on the matching demo screen. Custom scheme
 		mirrors the Android intent-filter (`AndroidManifest.xml`).
