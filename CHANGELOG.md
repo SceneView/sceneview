@@ -4,6 +4,20 @@
 
 CI hardening + docs accuracy + one v4.1.0-stale demo light tune. No public API change.
 
+### Changed — Demo UX: `DemoScaffold` v2 ships the controls in a `ModalBottomSheet` ([#1154](https://github.com/sceneview/sceneview/issues/1154))
+
+The 35 Android demos no longer split their viewport 60 / 40 between scene and a side-panel of controls. The scene now fills the entire area below the top app bar, and the per-demo `controls = { ... }` block is rendered inside a Material 3 `ModalBottomSheet` launched by a "Tune" `FloatingActionButton` anchored bottom-end of the scene. A semi-transparent "Settings" peek chip sits above the FAB while the sheet is closed to advertise the gesture.
+
+- The 35 demo call-sites stay byte-identical: `DemoScaffold(title = …, controls = { … }, scene = { … })` — only the placement of the controls panel has changed.
+- The sheet supports the partial detent (`skipPartiallyExpanded = false`); drag-down, outside-tap, and back gesture all dismiss it.
+- AR demos keep tracking 6DOF while the sheet is at the partial detent — opening the sheet does **not** pause the AR session.
+- Long-press the peek chip toggles `DemoSettings.qaMode` (was previously a long-press on the top-app-bar title). The QA escape-hatch pill in the title bar stays unchanged.
+- New `DemoScaffoldTestTags` object exposes stable testTags (`demo-settings-fab`, `demo-settings-peek`, `demo-settings-sheet`, `demo-qa-pill`) consumed by `DemoInteractionTest` and any future visual smoke tooling.
+- `samples/android-demo/.../DemoInteractionTest.kt` lazy-opens the sheet inside `tap()` / `tapByDesc()` / `dragSlider()` / `typeInto()` when the target chip / slider isn't already visible — the 31 existing instrumentation tests work unchanged.
+- iOS — new `.demoSettingsSheet { … }` View modifier (`samples/ios-demo/SceneViewDemo/Views/Components/DemoSheet.swift`) mirrors the Android pattern: `.presentationDetents([.fraction(0.25), .medium, .large])`, `.presentationBackgroundInteraction(.enabled)` so AR stays live at the partial detent, and `.presentationBackground(.ultraThinMaterial)` for Liquid Glass. 4 demos migrated: `FogDemo`, `DynamicSkyDemo`, `MovableLightDemo` (drag-anywhere gesture preserved), `CameraControlsDemo` (was `OrbitCameraDemo`).
+
+Visual result: scene takes ~95 % of the viewport at the default detent on Pixel 9 vs ~60 % under v4.3.0. Documented design rationale: M3 spec for bottom sheets, HIG for `.sheet()` with `presentationDetents`. Implements the plan recorded in `plan_demo_settings_bottom_sheet` (Stage 1 + 2 of 4 — polish + AI-first docs stages are tracked separately).
+
 ### Fixed — release.yml: Dokka config-cache crash + GitHub Release decoupled from Dokka ([#1150](https://github.com/sceneview/sceneview/issues/1150))
 
 The v4.3.0 cut surfaced two latent `release.yml` issues that skipped the `Create GitHub Release` job (recovered manually):

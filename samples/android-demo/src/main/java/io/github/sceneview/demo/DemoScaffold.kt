@@ -4,14 +4,13 @@ package io.github.sceneview.demo
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -74,9 +74,11 @@ import kotlinx.coroutines.launch
  *
  * Gestures:
  * - **Tap FAB / tap peek chip** → opens the sheet at its partial detent.
- * - **Long-press FAB** → toggles `DemoSettings.qaMode` (deterministic captures
- *   for screenshot suites). Previously this gesture lived on the top-app-bar
- *   title; moved to the FAB so the title can carry the demo name verbatim.
+ * - **Long-press peek chip** → toggles `DemoSettings.qaMode` (deterministic
+ *   captures for screenshot suites). Previously this gesture lived on the
+ *   top-app-bar title; moved to the peek chip so the title can carry the demo
+ *   name verbatim and the QA toggle is hidden away from the primary FAB tap
+ *   target (long-pressing a FAB is a confusing dual-purpose pattern).
  * - **Drag handle / outside tap / back gesture** → dismiss the sheet.
  * - **AR**: opening the sheet does NOT pause the AR session (the sheet sits on
  *   top of the existing scene; AR keeps tracking 6DOF underneath).
@@ -101,7 +103,7 @@ fun DemoScaffold(
                         Text(title)
                         if (DemoSettings.qaMode) {
                             // Tappable QA pill: tap to disable, so a user who
-                            // long-pressed the FAB by accident has a
+                            // long-pressed the peek chip by accident has a
                             // single-tap escape hatch instead of having to
                             // guess that another long-press toggles it back
                             // off. See #951.
@@ -201,18 +203,28 @@ private fun BoxScope.DemoSettingsLayer(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Peek chip — only shown while the sheet is closed. Tap = open at the
-        // partial detent (same as tapping the FAB). The chip is intentionally
-        // semi-transparent so it disappears against busy 3D scenes but stays
-        // legible on plain backgrounds.
+        // Peek chip — only shown while the sheet is closed. Tap opens the sheet
+        // at the partial detent (same as tapping the FAB). Long-press toggles
+        // QA mode (deterministic captures for screenshot suites — previously
+        // on the top-bar title). The chip is intentionally semi-transparent so
+        // it disappears against busy 3D scenes but stays legible on plain
+        // backgrounds.
         if (!expanded) {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        expanded = true
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                expanded = true
+                            },
+                            onLongPress = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                DemoSettings.qaMode = !DemoSettings.qaMode
+                            },
+                        )
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
                     .semantics { contentDescription = "Open demo settings" }
@@ -233,6 +245,10 @@ private fun BoxScope.DemoSettingsLayer(
             }
         }
 
+        // Standard M3 FAB — single short tap opens the sheet. Long-press lives
+        // on the peek chip below (visible, discoverable, no hidden gesture on
+        // a clickable element). Wrapping the FAB in `Modifier.combinedClickable`
+        // collapsed its hit-target to ~24 dp on Compose Material3 1.5.x.
         FloatingActionButton(
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -240,21 +256,6 @@ private fun BoxScope.DemoSettingsLayer(
             },
             shape = CircleShape,
             modifier = Modifier
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        expanded = true
-                    },
-                    onLongClick = {
-                        // Long-press FAB = toggle QA mode (deterministic captures).
-                        // Previously on the top-bar title — moved here so the
-                        // title can carry the demo name verbatim. See #951.
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        DemoSettings.qaMode = !DemoSettings.qaMode
-                    },
-                )
                 .semantics { contentDescription = "Demo settings" }
                 .testTag(DemoScaffoldTestTags.SETTINGS_FAB),
         ) {
