@@ -59,6 +59,24 @@ class CollisionResponseTest {
         assertFalse(result.collided)
     }
 
+    /** Pinning #1097: contact point lands on the plane on either side. */
+    @Test
+    fun spherePlaneResponseContactPointLandsOnPlaneOnEitherSide() {
+        // Sphere on POSITIVE side of the y=0 plane, halfway intersecting.
+        val abovePlane = Sphere(1f, Vector3(0f, 0.3f, 0f))
+        val above = spherePlaneResponse(abovePlane, Vector3(0f, 1f, 0f), 0f)
+        // Contact point Y should be exactly 0 (on the plane).
+        assertTrue(abs(above.contactPoint.y) < 0.01f)
+
+        // Same sphere on NEGATIVE side (below). Pre-#1097 the bug moved the contact
+        // AWAY from the plane (into negative Y), which made physics integrators
+        // push the sphere further down → ball clipping floor.
+        val belowPlane = Sphere(1f, Vector3(0f, -0.3f, 0f))
+        val below = spherePlaneResponse(belowPlane, Vector3(0f, 1f, 0f), 0f)
+        // Contact point should ALSO land on the plane (y=0), not at y=-0.6 (the buggy result).
+        assertTrue(abs(below.contactPoint.y) < 0.01f)
+    }
+
     @Test
     fun reflectVector() {
         // Incoming direction: (1, -1, 0) hitting a floor (normal = 0,1,0)

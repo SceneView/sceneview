@@ -81,7 +81,12 @@ fun spherePlaneResponse(
     if (penetration <= 0f) return CollisionResult(collided = false)
 
     val normal = if (signedDist >= 0f) planeNormal else planeNormal.negated()
-    val contactPoint = Vector3.subtract(center, normal.scaled(signedDist))
+    // Project along the original `planeNormal` (NOT the flipped `normal`) so the
+    // contact point lands ON the plane regardless of which side the sphere is on
+    // (#1097). Using the flipped normal here moved the contact AWAY from the plane
+    // when the sphere was on the negative side → physics integrator pushed the
+    // sphere further out → ball clipping through floor.
+    val contactPoint = Vector3.subtract(center, planeNormal.scaled(signedDist))
     val bounce = reflect(velocity, normal)
 
     return CollisionResult(
