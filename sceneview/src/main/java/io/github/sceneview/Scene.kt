@@ -40,6 +40,7 @@ import com.google.android.filament.MaterialInstance
 import com.google.android.filament.Renderer
 import com.google.android.filament.Scene
 import com.google.android.filament.View
+import com.google.android.filament.View.BlendMode
 import io.github.sceneview.collision.CollisionSystem
 import io.github.sceneview.collision.HitResult
 import io.github.sceneview.environment.Environment
@@ -262,6 +263,11 @@ fun SceneView(
         view.camera = cameraNode.camera
         cameraNode.collisionSystem = collisionSystem
         cameraNode.setView(view)
+        // Pair with `uiHelper.isOpaque` set in SceneRenderer.attachToSurfaceView/
+        // TextureView (#1077). Without this, the fragment pipeline blends opaque
+        // even when the swap chain is CONFIG_TRANSPARENT — nothing under the
+        // SceneView shows through.
+        view.blendMode = if (isOpaque) BlendMode.OPAQUE else BlendMode.TRANSLUCENT
     }
     // Keyed `LaunchedEffect` so the preset is reapplied ONLY when `renderQuality`
     // actually changes (#1078). The previous unkeyed `SideEffect` ran on every

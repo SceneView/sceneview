@@ -109,6 +109,13 @@ class SceneRenderer(
         this.displayHelper = DisplayHelper(context)
 
         if (!isOpaque) surfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
+        // Wire UiHelper.isOpaque BEFORE `attachTo`. Without this the swap chain
+        // is built with `CONFIG_DEFAULT` (opaque) regardless of the SurfaceView's
+        // PixelFormat — fragments are rendered opaque + nothing under the SurfaceView
+        // shows through. Pre-#1077 the only "transparency" was the α=0 skybox at
+        // `SceneFactories.kt:206` which is itself rendered opaque. Pair with the
+        // `view.blendMode = BlendMode.TRANSLUCENT` set in `Scene.kt`.
+        uiHelper.isOpaque = isOpaque
 
         uiHelper.renderCallback = makeRendererCallback(viewHeight = { surfaceView.height })
         uiHelper.attachTo(surfaceView)
@@ -138,6 +145,7 @@ class SceneRenderer(
         this.displayHelper = DisplayHelper(context)
 
         textureView.isOpaque = isOpaque
+        uiHelper.isOpaque = isOpaque  // Pair with view.blendMode in Scene.kt (#1077).
 
         uiHelper.renderCallback = makeRendererCallback(viewHeight = { textureView.height })
         uiHelper.attachTo(textureView)
