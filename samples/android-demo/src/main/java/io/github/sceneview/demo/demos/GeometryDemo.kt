@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoPreviewPlaceholder
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.demo.demos.internal.DemoMath
@@ -128,7 +130,7 @@ fun GeometryDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Geometry Primitives",
+        title = stringResource(R.string.demo_geometry_title),
         onBack = onBack,
         controls = {
             // Controls extracted into a separate composable so a Roborazzi snapshot

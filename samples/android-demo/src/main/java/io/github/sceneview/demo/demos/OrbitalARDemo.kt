@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Anchor
@@ -26,6 +27,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberEngine
@@ -120,7 +122,7 @@ fun OrbitalARDemo(onBack: () -> Unit) {
     val orbitSeconds = orbitNanos / 1_000_000_000f
 
     DemoScaffold(
-        title = "Orbital AR",
+        title = stringResource(R.string.demo_ar_orbital_title),
         onBack = onBack,
         controls = {
             Text(

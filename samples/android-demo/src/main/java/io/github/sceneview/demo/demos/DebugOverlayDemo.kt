@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -45,6 +46,7 @@ import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.createDefaultCameraManipulator
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
@@ -178,7 +180,7 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Debug Overlay",
+        title = stringResource(R.string.demo_debug_overlay_title),
         onBack = onBack,
         controls = {
             Column(

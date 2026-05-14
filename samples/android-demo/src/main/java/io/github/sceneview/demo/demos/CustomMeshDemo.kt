@@ -19,11 +19,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import io.github.sceneview.demo.SceneViewColors
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.rememberPausableHeroYaw
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -60,7 +62,7 @@ fun CustomMeshDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Custom Mesh",
+        title = stringResource(R.string.demo_custom_mesh_title),
         onBack = onBack,
         controls = {
             Row(

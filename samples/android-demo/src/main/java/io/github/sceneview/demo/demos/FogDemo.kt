@@ -26,10 +26,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.node.FogNode
 import io.github.sceneview.rememberEngine
@@ -79,7 +81,7 @@ fun FogDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Fog",
+        title = stringResource(R.string.demo_fog),
         onBack = onBack,
         controls = {
             // Enable / disable toggle — toggleable on the whole row so tapping the

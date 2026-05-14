@@ -24,11 +24,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.View.AntiAliasing
 import com.google.android.filament.View.Dithering
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
@@ -91,7 +93,7 @@ fun PostProcessingDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Post-Processing",
+        title = stringResource(R.string.demo_post_processing_title),
         onBack = onBack,
         controls = {
             Text("Render Effects", style = MaterialTheme.typography.labelLarge)

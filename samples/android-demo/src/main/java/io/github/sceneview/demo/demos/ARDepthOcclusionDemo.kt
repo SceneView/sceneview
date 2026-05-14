@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +41,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.createARCameraStream
 import io.github.sceneview.ar.rememberARCameraStream
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -105,7 +107,7 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
     val depthOn = occlusionEnabled && (depthSupported != false)
 
     DemoScaffold(
-        title = "Depth Occlusion",
+        title = stringResource(R.string.demo_ar_depth_occlusion_title),
         onBack = onBack,
         controls = {
             Card(

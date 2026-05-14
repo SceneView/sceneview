@@ -12,9 +12,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.DynamicSkyNode
 import io.github.sceneview.rememberCameraManipulator
@@ -70,7 +72,7 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Dynamic Sky",
+        title = stringResource(R.string.demo_dynamic_sky),
         onBack = onBack,
         controls = {
             Text(

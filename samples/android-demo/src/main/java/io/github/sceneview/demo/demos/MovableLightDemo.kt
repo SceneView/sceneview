@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ import com.google.android.filament.LightManager
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
@@ -121,7 +123,7 @@ fun MovableLightDemo(onBack: () -> Unit) {
     val markerMaterial = rememberUnlitMaterialInstance(materialLoader, Color(0xFFFFEB3B))
 
     DemoScaffold(
-        title = "Movable Light",
+        title = stringResource(R.string.demo_movable_light_title),
         onBack = onBack,
         controls = {
             Row(

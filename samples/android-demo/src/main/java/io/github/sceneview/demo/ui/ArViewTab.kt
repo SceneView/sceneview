@@ -79,10 +79,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
@@ -93,6 +95,7 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.AnchorNode
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.rememberEngine
@@ -360,7 +363,7 @@ fun ArViewTabContent(
         ) {
             Icon(
                 imageVector = Icons.Filled.Close,
-                contentDescription = "Exit AR session",
+                contentDescription = stringResource(R.string.ar_exit_session),
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -397,13 +400,17 @@ fun ArViewTabContent(
                     },
                     modifier = Modifier.size(16.dp),
                 )
+                val scanningLabel = stringResource(R.string.ar_status_scanning)
+                val tapToPlaceLabel = stringResource(R.string.ar_status_tap_to_place, selectedModel.name)
+                val onePlacedLabel = stringResource(R.string.ar_status_one_placed)
+                val nPlacedLabel = stringResource(R.string.ar_status_n_placed, placed)
                 Text(
                     text = when {
                         !isTracking -> trackingFailureReason?.let { friendly(it) }
-                            ?: "Scanning for surfaces…"
-                        placed == 0 -> "Tap a surface to place ${selectedModel.name}"
-                        placed == 1 -> "1 placed · tap to add"
-                        else -> "$placed placed · tap to add"
+                            ?: scanningLabel
+                        placed == 0 -> tapToPlaceLabel
+                        placed == 1 -> onePlacedLabel
+                        else -> nPlacedLabel
                     },
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
@@ -440,7 +447,7 @@ fun ArViewTabContent(
                     text = {
                         Column {
                             Text(
-                                text = "Model",
+                                text = stringResource(R.string.ar_picker_model_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(
                                     alpha = 0.7f,
@@ -471,18 +478,19 @@ fun ArViewTabContent(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Refresh,
-                        contentDescription = "Reset scene",
+                        contentDescription = stringResource(R.string.ar_reset_scene),
                     )
                 }
 
                 // Screenshot — share-stub for now (live capture is out of scope
                 // for this UI refactor; ARSceneView GL readback requires
                 // Filament SwapChain plumbing).
+                val screenshotToast = stringResource(R.string.ar_screenshot_toast)
                 FilledIconButton(
                     onClick = {
                         android.widget.Toast.makeText(
                             context,
-                            "Screenshot capture: use system screenshot (Power + Volume Down)",
+                            screenshotToast,
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                     },
@@ -495,7 +503,7 @@ fun ArViewTabContent(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Share,
-                        contentDescription = "Share screenshot",
+                        contentDescription = stringResource(R.string.ar_share_screenshot),
                     )
                 }
             }
@@ -530,7 +538,7 @@ private fun ModelPickerGrid(
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
-            text = "Pick a model",
+            text = stringResource(R.string.ar_pick_a_model),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 12.dp),
@@ -631,26 +639,24 @@ private fun ArLauncherScreen(
         availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD
 
     val statusMessage = when (availability) {
-        ArCoreApk.Availability.SUPPORTED_INSTALLED -> "AR ready on this device."
+        ArCoreApk.Availability.SUPPORTED_INSTALLED -> stringResource(R.string.ar_status_ready)
         ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ->
-            "AR works on this device — ARCore will install on first launch."
+            stringResource(R.string.ar_status_not_installed)
         ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD ->
-            "AR works on this device — an ARCore update is available."
+            stringResource(R.string.ar_status_apk_old)
         ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE ->
-            "Live AR is not supported on this device, but you can still " +
-                "explore the AR demos below to see how the SDK is used."
+            stringResource(R.string.ar_status_unsupported)
         ArCoreApk.Availability.UNKNOWN_TIMED_OUT,
         ArCoreApk.Availability.UNKNOWN_ERROR ->
-            "Couldn't check AR availability. Try one of the demos below " +
-                "to see how the SDK is used."
+            stringResource(R.string.ar_status_unknown_error)
         ArCoreApk.Availability.UNKNOWN_CHECKING, null ->
-            "Checking AR availability…"
+            stringResource(R.string.ar_status_checking)
     }
 
     val ctaLabel = when {
-        isChecking -> "Checking…"
-        !cameraGranted -> "Grant Camera Access"
-        else -> "Start AR Camera"
+        isChecking -> stringResource(R.string.ar_cta_checking)
+        !cameraGranted -> stringResource(R.string.ar_cta_grant_camera)
+        else -> stringResource(R.string.ar_cta_start_camera)
     }
 
     // CTA enabled only when ARCore is positively supported. UNKNOWN_* and
@@ -703,13 +709,13 @@ private fun ArLauncherScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = "AR Experiences",
+                    text = stringResource(R.string.ar_experiences_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Place models, scan faces, anchor to terrain.",
+                    text = stringResource(R.string.ar_experiences_tagline),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp,
@@ -796,7 +802,7 @@ private fun ArLauncherScreen(
 
         // Section title
         Text(
-            text = "Try an AR demo",
+            text = stringResource(R.string.ar_try_an_ar_demo),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -810,8 +816,8 @@ private fun ArLauncherScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { demo ->
                         ArDemoCard(
-                            title = demo.title,
-                            subtitle = demo.subtitle,
+                            title = stringResource(demo.titleRes),
+                            subtitle = stringResource(demo.subtitleRes),
                             onClick = { onArDemoClick(demo.id) },
                             modifier = Modifier.weight(1f),
                         )
@@ -880,17 +886,17 @@ private fun ArDemoCard(
 
 private data class FeaturedArDemo(
     val id: String,
-    val title: String,
-    val subtitle: String,
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int,
 )
 
 private val FEATURED_AR_DEMOS = listOf(
-    FeaturedArDemo("ar-placement", "Tap to Place", "Drop 3D models on detected planes"),
-    FeaturedArDemo("ar-face", "Face Mesh", "Track and overlay the user's face"),
-    FeaturedArDemo("ar-cloud-anchor", "Cloud Anchor", "Persistent anchors shared across devices"),
-    FeaturedArDemo("ar-streetscape", "Streetscape", "Geospatial geometry of cities"),
-    FeaturedArDemo("ar-depth-occlusion", "Depth Occlusion", "Real objects hide virtual ones"),
-    FeaturedArDemo("ar-pose", "Pose Placement", "Free pose positioning in space"),
+    FeaturedArDemo("ar-placement", R.string.featured_ar_placement_title, R.string.featured_ar_placement_subtitle),
+    FeaturedArDemo("ar-face", R.string.featured_ar_face_title, R.string.featured_ar_face_subtitle),
+    FeaturedArDemo("ar-cloud-anchor", R.string.featured_ar_cloud_anchor_title, R.string.featured_ar_cloud_anchor_subtitle),
+    FeaturedArDemo("ar-streetscape", R.string.featured_ar_streetscape_title, R.string.featured_ar_streetscape_subtitle),
+    FeaturedArDemo("ar-depth-occlusion", R.string.featured_ar_depth_occlusion_title, R.string.featured_ar_depth_occlusion_subtitle),
+    FeaturedArDemo("ar-pose", R.string.featured_ar_pose_title, R.string.featured_ar_pose_subtitle),
 )
 
 @Composable
@@ -914,9 +920,9 @@ private fun ArPermissionPlaceholder(granted: Boolean) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = if (granted) {
-                    "Starting AR session…"
+                    stringResource(R.string.ar_starting_session)
                 } else {
-                    "Camera permission is required to run AR"
+                    stringResource(R.string.ar_permission_required_title)
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -924,9 +930,9 @@ private fun ArPermissionPlaceholder(granted: Boolean) {
             )
             Text(
                 text = if (granted) {
-                    "Hold up — initializing ARCore."
+                    stringResource(R.string.ar_starting_session_subtitle)
                 } else {
-                    "Grant the permission in system settings, then return to this tab."
+                    stringResource(R.string.ar_permission_required_subtitle)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -936,14 +942,15 @@ private fun ArPermissionPlaceholder(granted: Boolean) {
     }
 }
 
+@Composable
 private fun friendly(reason: TrackingFailureReason): String = when (reason) {
-    TrackingFailureReason.NONE -> "Scanning for surfaces…"
-    TrackingFailureReason.BAD_STATE -> "AR session error"
-    TrackingFailureReason.INSUFFICIENT_LIGHT -> "Not enough light"
-    TrackingFailureReason.EXCESSIVE_MOTION -> "Moving too fast"
+    TrackingFailureReason.NONE -> stringResource(R.string.ar_status_scanning)
+    TrackingFailureReason.BAD_STATE -> stringResource(R.string.ar_tracking_bad_state)
+    TrackingFailureReason.INSUFFICIENT_LIGHT -> stringResource(R.string.ar_tracking_insufficient_light)
+    TrackingFailureReason.EXCESSIVE_MOTION -> stringResource(R.string.ar_tracking_excessive_motion)
     TrackingFailureReason.INSUFFICIENT_FEATURES ->
-        "Not enough detail — try a textured surface"
-    TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
+        stringResource(R.string.ar_tracking_insufficient_features)
+    TrackingFailureReason.CAMERA_UNAVAILABLE -> stringResource(R.string.ar_tracking_camera_unavailable)
 }
 
 // ---------- Model catalogue ----------
