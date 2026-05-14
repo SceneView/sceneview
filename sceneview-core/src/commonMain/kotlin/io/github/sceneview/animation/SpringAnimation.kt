@@ -83,14 +83,18 @@ class SpringAnimator(
                     displacement * cosT +
                             ((velocity + zeta * omega0 * displacement) / dampedOmega) * sinT
                     )
+            // Analytical velocity of the damped harmonic oscillator (derivative of the
+            // displacement closed-form solution). Use this — not a finite-difference
+            // `(newDisplacement - displacement) / deltaSeconds` — so the result is
+            // frame-rate-independent. The critically-damped and overdamped branches below
+            // already follow the analytical pattern; this brings underdamped in line (#1126).
             val newVelocity = envelope * (
                     velocity * cosT -
                             (displacement * dampedOmega + velocity * zeta * omega0 / dampedOmega +
                                     zeta * omega0 * displacement * zeta * omega0 / dampedOmega) * sinT
                     )
-            // Recompute velocity via finite difference for stability
-            velocity = (newDisplacement - displacement) / deltaSeconds
             displacement = newDisplacement
+            velocity = newVelocity
         } else if (zeta == 1f) {
             // ── Critically damped ───────────────────────────────────────────
             val envelope = exp(-omega0 * deltaSeconds)
