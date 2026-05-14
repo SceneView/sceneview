@@ -1,5 +1,29 @@
 # Changelog
 
+## v4.3.1 — CI + docs + GeometryDemo light fixups (UNRELEASED)
+
+CI hardening + docs accuracy + one v4.1.0-stale demo light tune. No public API change.
+
+### Fixed — release.yml: Dokka config-cache crash + GitHub Release decoupled from Dokka ([#1150](https://github.com/sceneview/sceneview/issues/1150))
+
+The v4.3.0 cut surfaced two latent `release.yml` issues that skipped the `Create GitHub Release` job (recovered manually):
+
+- **Dokka step now passes `--no-configuration-cache`** — Dokka 1.x's `dokkaSourceSets` `FactoryNamedDomainObjectContainer` cannot be deserialized from the Gradle configuration cache, so the step crashed on `release.yml` run `25870464897`. The `--retry-with-backoff` wrapper from #1127 was a no-op because the error was config-cache deserialization, not a 503. Pin Dokka out of the config cache so config-cache stays enabled globally for the rest of the build.
+- **`create-release` job no longer veto-gated on `publish-api-docs`** — Maven Central + 3 npm packages + SPM tag are user-visible artifacts; Dokka HTML is secondary (users can still consume libraries on `mvnrepository` / `npm` without fresh API docs on the tag). A Dokka failure on a release tag now produces a workflow red X on the Dokka job but the GitHub Release still cuts.
+
+### Fixed — `IBLPrefilter.specularFilter` KDoc cost mismatch with `LightEstimator` ([#1103](https://github.com/sceneview/sceneview/issues/1103))
+
+The two KDocs disagreed by 10× on the same operation. Both are now accurate and cross-referenced:
+
+- [`IBLPrefilter.specularFilter`](sceneview/src/main/java/io/github/sceneview/environment/IBLPrefilter.kt) — clarified that cost scales with cubemap face count + resolution. First-build of a 1024×1024×6 HDR skybox runs 100–200 ms (the historical figure); incremental update of a 16×16×6 ARCore cubemap (the AR path) runs 5–15 ms on a Pixel 9.
+- [`LightEstimator.environmentalHdrSpecularFilter`](arsceneview/src/main/java/io/github/sceneview/ar/light/LightEstimator.kt) — cross-references the matrix in `IBLPrefilter.specularFilter` instead of contradicting it.
+
+Documentation-only — no behavioral change.
+
+### Fixed — `GeometryDemo` stacked 80 000-lux on v4.1.0 default lights ([#1146](https://github.com/sceneview/sceneview/issues/1146))
+
+Sibling of [#1125](https://github.com/sceneview/sceneview/issues/1125) (PhysicsDemo). [`samples/android-demo/.../GeometryDemo.kt`](samples/android-demo/src/main/java/io/github/sceneview/demo/demos/GeometryDemo.kt) added a 80 000-lux directional light on top of the v4.1.0 SceneView defaults (10 000-lux main + 3 000-lux fill + IBL @ 10 000), so the metallic/roughness sweep saturated to white at every slider value. Re-tuned to 5 000 lux to match PhysicsDemo's PR [#1144](https://github.com/sceneview/sceneview/pull/1144) retune — accent fill that complements the v4.1.0 defaults without dominating them. Acceptance #1125 only scanned for `100_000`, so 80 000 slipped through; this closes the gap.
+
 ## Unreleased
 
 ### Added — iOS parity: `LightSlot` + `.fillLight(_:)` on `ARSceneView` ([#1138](https://github.com/sceneview/sceneview/issues/1138))

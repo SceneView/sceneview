@@ -76,21 +76,28 @@ jobs:
       - uses: ./.github/actions/setup-gradle
 
       - name: Generate Dokka docs
-        # No `continue-on-error`/`|| echo` swallow — `create-release` now
-        # gates on this job's outcome (#1116), so a Dokka failure on a
-        # release tag must surface as a workflow red X, not a silent
-        # "Other Changes" GitHub Release with no API documentation.
+        # `--no-configuration-cache` works around a Dokka 1.x + Gradle config
+        # cache deserialization crash on `FactoryNamedDomainObjectContainer
+        # dokkaSourceSets` (release.yml run 25870464897 at v4.3.0 cut, see
+        # #1150). The base `setup-gradle` action enables the config cache
+        # globally for incremental builds, but Dokka can't serialize its
+        # source-set container — pin this single step out of the cache.
         #
         # Wrapped in nick-fields/retry@v3 so transient 503s from
         # `repo.maven.apache.org` during Dokka's dependency resolution don't
         # block the whole release. A genuine Dokka failure still surfaces
         # after 3 attempts; a network flake survives. See #1127.
+        #
+        # No `continue-on-error`/`|| echo` swallow — `create-release` runs
+        # independently now (#1150 decoupled the Dokka veto) but a Dokka
+        # failure should still surface as a workflow red X, not silently
+        # produce a release with no API docs.
         uses: nick-fields/retry@v3
         with:
           max_attempts: 3
           timeout_minutes: 15
           retry_on: error
-          command: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml
+          command: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml --no-configuration-cache
 
       - name: Upload Dokka artifact
         uses: actions/upload-artifact@v7
@@ -354,27 +361,24 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [publish-library, publish-api-docs, publish-mcp, publish-web, publish-rn, validate-spm]
-    # All three publishers must NOT have failed before the GitHub Release is
-    # cut. Previously the gate only checked `publish-library == 'success'`,
-    # so a Maven Central success with an npm publish failure still
-    # produced a "v4.0.9" GitHub Release advertising packages that never
-    # shipped — and users `npm i sceneview-mcp@4.0.9` would see the
-    # version was missing from the registry. Skipped (because the version
-    # is already on the registry) is OK — only an outright failure blocks.
-    # See #962.
-    # Skipped is OK (e.g. version already on the registry) — only outright
-    # failure blocks. Previously `publish-library` and `validate-spm` were
-    # checked with strict `== 'success'`, which made the GitHub Release
-    # unreachable on workflow_dispatch retries (publish-library would
-    # already-exists fail or validate-spm would skip). Now harmonised with
-    # the npm jobs' `!= 'failure' && != 'cancelled'` pattern. Closes FU13.
+    needs: [publish-library, publish-mcp, publish-web, publish-rn, validate-spm, publish-api-docs]
+    # User-visible artifacts (Maven Central + the 3 npm packages + SPM tag)
+    # must NOT have failed before we cut the GitHub Release — those are what
+    # users actually install. `publish-api-docs` (Dokka HTML) is secondary:
+    # if it fails (e.g. config-cache deserialization, see #1150), users can
+    # still consume the released libraries — they just won't get fresh API
+    # docs on this tag. A Dokka failure should not block the user-visible
+    # release. We keep `publish-api-docs` in `needs:` to enforce ordering and
+    # surface its status in the run, but the gate below does NOT veto on it.
+    #
+    # Skipped (because the version is already on the registry) is OK —
+    # only an outright failure blocks. Harmonised on the
+    # `!= 'failure' && != 'cancelled'` pattern across all publishers.
+    # Closes FU13 (#1003) and #1150.
     if: |
       always()
       && needs.publish-library.result != 'failure'
       && needs.publish-library.result != 'cancelled'
-      && needs.publish-api-docs.result != 'failure'
-      && needs.publish-api-docs.result != 'cancelled'
       && needs.publish-mcp.result != 'failure'
       && needs.publish-mcp.result != 'cancelled'
       && needs.publish-web.result != 'failure'
