@@ -24,6 +24,10 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { fetchKnownIssues } from "./issues.js";
+import {
+  DEMO_WITH_SETTINGS_EXAMPLE,
+  SKETCHFAB_STREAMING_EXAMPLE,
+} from "./examples.js";
 import { recordClientInit, recordToolCall } from "./telemetry.js";
 import { isProTool, getToolTier } from "./tiers.js";
 import {
@@ -91,6 +95,20 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
         "Live list of open issues from the SceneView GitHub repository. Check this before reporting a bug or when something isn't working — there may already be a known workaround.",
       mimeType: "text/markdown",
     },
+    {
+      uri: "examples://demo-with-settings",
+      name: "Example — DemoScaffold v2 (full-screen scene + ModalBottomSheet)",
+      description:
+        "Pattern for full-screen 3D / AR scene + Material 3 ModalBottomSheet controls. The DemoScaffold v2 contract used by every demo in samples/android-demo (issue #1154, PR #1169). Read this before adding a new demo with settings.",
+      mimeType: "text/markdown",
+    },
+    {
+      uri: "examples://sketchfab-streaming",
+      name: "Example — Stream Sketchfab CC-BY models into a SceneView demo",
+      description:
+        "Pattern for streaming CC-BY licensed glTF models from Sketchfab on demand instead of bundling 30 MB of GLBs in the APK. Uses SketchfabAssetResolver + SampleAssets registry + per-slug bundled fallback (Stage 2 of umbrella issue #1152). Read this before adding a streamed demo.",
+      mimeType: "text/markdown",
+    },
   ],
 }));
 
@@ -107,6 +125,24 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         contents: [{ uri: "sceneview://known-issues", mimeType: "text/markdown", text: issues }],
       };
     }
+
+    case "examples://demo-with-settings":
+      return {
+        contents: [{
+          uri: "examples://demo-with-settings",
+          mimeType: "text/markdown",
+          text: DEMO_WITH_SETTINGS_EXAMPLE,
+        }],
+      };
+
+    case "examples://sketchfab-streaming":
+      return {
+        contents: [{
+          uri: "examples://sketchfab-streaming",
+          mimeType: "text/markdown",
+          text: SKETCHFAB_STREAMING_EXAMPLE,
+        }],
+      };
 
     default:
       throw new Error(`Unknown resource: ${request.params.uri}`);

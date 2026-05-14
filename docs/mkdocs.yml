@@ -58,7 +58,10 @@ nav:
     - API Cheatsheet: cheatsheet.md
     - API Cheatsheet (Apple): cheatsheet-ios.md
     - Nodes Reference: nodes.md
-    - Recipes: recipes.md
+    - Recipes:
+      - Overview: recipes.md
+      - Sketchfab streaming: recipes/sketchfab-streaming.md
+      - Demo settings sheet: recipes/demo-settings-sheet.md
     - FAQ: faq.md
     - Troubleshooting: troubleshooting.md
   - Platforms: platforms.md
