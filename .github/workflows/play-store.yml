@@ -155,6 +155,11 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > samples/android-demo/release.keystore
 
+      - name: Verify ARCore Cloud key wiring (#1177)
+        env:
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
+        run: bash .claude/scripts/verify-arcore-key.sh
+
       - name: Build release AAB
         env:
           SCENEVIEW_DEMO_KEYSTORE_FILE: release.keystore

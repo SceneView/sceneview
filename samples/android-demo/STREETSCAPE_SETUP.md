@@ -45,6 +45,24 @@ Restrict the key:
   - SHA-1 fingerprint: your debug keystore's SHA-1 (`keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey`) and/or your Play App Signing SHA-1 from Play Console.
 - **API restrictions** → restrict key → ARCore API only.
 
+#### Play App Signing key (production blocker — issue #1177)
+
+When Google Play **App Signing** is enabled (default on the SceneView demo), the upload bundle is re-signed by Google before it hits user devices. The on-device APK is signed with the **App Signing key**, NOT the upload key — so the upload key SHA-1 doesn't match anything at runtime.
+
+To unblock Cloud Anchors / Geospatial / Streetscape on Play Store production builds:
+
+1. **Play Console** → your app → **Setup** → **App integrity** → **App signing**.
+2. Copy the **App signing key certificate SHA-1** (the one labelled "App signing key", not "Upload key").
+3. **Google Cloud Console** → **APIs & Services** → **Credentials** → click the ARCore API key.
+4. Under **Application restrictions** → **Android apps** → **+ ADD AN ITEM**:
+   - Package name: `io.github.sceneview.demo`
+   - SHA-1: paste the App signing key SHA-1 from step 2.
+5. Save. Propagation is ~1 minute. No new APK/AAB cut needed — the running production build will start authorizing immediately.
+
+Symptom when this is missing: Cloud Anchors `Host` / `Resolve` returns `ERROR_NOT_AUTHORIZED`; Terrain / Rooftop / Streetscape demos report "API key not authorized". The in-app status banner surfaces this specific case so users see actionable guidance instead of a raw enum.
+
+If you rotate the App Signing key (Play Console → Use Play App Signing → rotate), the SHA-1 changes — re-do steps 2–5.
+
 ### 4. Wire the key locally
 
 Append to `local.properties` at the repo root (this file is gitignored):

@@ -155,7 +155,13 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                                 cloudAnchorId = resolveId
                                 statusMessage = "Resolved $resolveId"
                             } else {
-                                statusMessage = "Resolve failed: $state"
+                                statusMessage = when (state) {
+                                    Anchor.CloudAnchorState.ERROR_NOT_AUTHORIZED ->
+                                        "Resolve failed: ERROR_NOT_AUTHORIZED. The ARCore Cloud " +
+                                            "API key is rejecting this APK's SHA-1. See " +
+                                            "STREETSCAPE_SETUP.md → \"Play App Signing key\"."
+                                    else -> "Resolve failed: $state"
+                                }
                             }
                         }
                     },
@@ -237,7 +243,18 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                                 cloudAnchorId = id
                                 statusMessage = "Hosted! ID: $id"
                             } else {
-                                statusMessage = "Hosting failed: $state"
+                                // Surface ERROR_NOT_AUTHORIZED with actionable guidance: the
+                                // most common cause on a fresh Play Store deploy is that the
+                                // App Signing key SHA-1 (post-Play-resign) isn't whitelisted on
+                                // the Google Cloud API key. See samples/android-demo/STREETSCAPE_SETUP.md
+                                // for the runbook. Generic states still get the bare label.
+                                statusMessage = when (state) {
+                                    Anchor.CloudAnchorState.ERROR_NOT_AUTHORIZED ->
+                                        "Hosting failed: ERROR_NOT_AUTHORIZED. The ARCore Cloud " +
+                                            "API key is rejecting this APK's SHA-1. See " +
+                                            "STREETSCAPE_SETUP.md → \"Play App Signing key\"."
+                                    else -> "Hosting failed: $state"
+                                }
                             }
                         },
                         apply = { cloudNode = this },

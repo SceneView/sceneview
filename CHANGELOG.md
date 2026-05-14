@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.3.3 — AR production hotfix: actionable Cloud Anchor error + CI key guard (2026-05-14)
+
+### Fixed — AR production blockers (Pixel 9 v4.3.0 audit umbrella [#1176](https://github.com/sceneview/sceneview/issues/1176))
+
+This hotfix follows the v4.3.0 production audit. The umbrella's P0 / P1 code bugs all landed by v4.3.2 ([PR #1136](https://github.com/sceneview/sceneview/pull/1136) AR IBL baseline + [#1086](https://github.com/sceneview/sceneview/pull/1086) HDR specular filter + [#1088](https://github.com/sceneview/sceneview/pull/1088) AR exposure + [#1075](https://github.com/sceneview/sceneview/pull/1075) 3D IBL intensity + [#1190](https://github.com/sceneview/sceneview/pull/1190) R8 keep rules for Fused Location Provider). v4.3.3 closes the remaining production-blocker gap that requires a Cloud-Console-side change to fully unblock end users.
+
+- **Cloud Anchor `ERROR_NOT_AUTHORIZED` now surfaces actionable guidance ([#1177](https://github.com/sceneview/sceneview/issues/1177))** — When `host()` or `resolve()` comes back with `ERROR_NOT_AUTHORIZED`, the demo status banner now says `"The ARCore Cloud API key is rejecting this APK's SHA-1. See STREETSCAPE_SETUP.md → \"Play App Signing key\"."` instead of the raw enum. The root cause on a fresh Play Store deploy is that the App Signing key SHA-1 (post-Play-resign) isn't whitelisted on the Google Cloud API key — a manual Cloud Console step that the demo can't perform itself.
+
+- **`STREETSCAPE_SETUP.md` adds a "Play App Signing key" runbook** — Step-by-step for maintainers to add the post-resign SHA-1 fingerprint to the ARCore API key restrictions, eliminating the production blocker without re-cutting a release.
+
+- **CI guard for ARCore key wiring (`.claude/scripts/verify-arcore-key.sh`)** — `play-store.yml` now fails fast if `ARCORE_API_KEY` secret is missing, if `samples/android-demo/build.gradle` no longer injects the `arcoreApiKey` manifest placeholder, or if `AndroidManifest.xml` drops the `${arcoreApiKey}` reference. Catches the silent-regression class that ships an AAB with an unwired Cloud key.
+
+### Verified fixed (closing tracker issues)
+
+- **[#1097](https://github.com/sceneview/sceneview/issues/1097) `spherePlaneResponse` wrong contact point on negative side** — fixed in [`CollisionResponse.kt`](sceneview-core/src/commonMain/kotlin/io/github/sceneview/collision/CollisionResponse.kt#L89) (`contactPoint = center - planeNormal * signedDist` projects along the original unflipped normal). JVM regression test `spherePlaneResponseContactPointLandsOnPlaneOnEitherSide` pins the behaviour on both sides of the plane.
+
+- **[#1178](https://github.com/sceneview/sceneview/issues/1178) AR Terrain & Rooftop Anchors fail in release builds (R8 strip)** — fixed in [`arsceneview/consumer-rules.pro`](arsceneview/consumer-rules.pro) via [PR #1190](https://github.com/sceneview/sceneview/pull/1190). Consumer-side R8 now keeps `com.google.android.gms.location.**`, `common.api.**`, and `tasks.**` so ARCore can reflectively link Fused Location Provider when `Config.GeospatialMode.ENABLED`.
+
+- **[#1061](https://github.com/sceneview/sceneview/issues/1061) AR rendering quality umbrella (multiplicative drift, no default IBL, mirror reflections, EV15 vs EV11.6 exposure)** — all P0 / P1 sub-issues closed: [#1062](https://github.com/sceneview/sceneview/issues/1062) (baseline-relative light apply pattern in [`ARScene.kt`](arsceneview/src/main/java/io/github/sceneview/ar/ARScene.kt#L817), `AtomicReference` baselines), [#1063](https://github.com/sceneview/sceneview/issues/1063) (neutral IBL fallback in [`createAREnvironment`](arsceneview/src/main/java/io/github/sceneview/ar/ARFactories.kt#L65)), [#1064](https://github.com/sceneview/sceneview/issues/1064) (`environmentalHdrSpecularFilter = true` default in [`LightEstimator.kt`](arsceneview/src/main/java/io/github/sceneview/ar/light/LightEstimator.kt#L128)), [#1067](https://github.com/sceneview/sceneview/issues/1067) (AR exposure aligned to v4.1.0 3D defaults). `Config.LightEstimationMode.ENVIRONMENTAL_HDR` is the default in [`ARScene.kt`](arsceneview/src/main/java/io/github/sceneview/ar/ARScene.kt#L482) so PBR materials read ARCore's HDR cubemap + spherical harmonics + main-light estimate from frame one. Remaining sub-issues [#1065](https://github.com/sceneview/sceneview/issues/1065) (recording resolution) and [#1066](https://github.com/sceneview/sceneview/issues/1066) (camera-stream double-gamma) stay open as P1 polish for v4.4.
+
 ## v4.3.2 — #1152 Sketchfab streaming complete + iOS key + DemoScaffold v2 + APK slim (2026-05-14)
 
 ### Security — `fast-xml-parser` bumped to 5.7.0+ via npm overrides ([Dependabot alert #139](https://github.com/sceneview/sceneview/security/dependabot/139) — [PR #1162](https://github.com/sceneview/sceneview/pull/1162))
