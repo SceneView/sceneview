@@ -35,6 +35,14 @@ struct DynamicSkyDemo: View {
     }
 
     var body: some View {
+        sceneContent
+            .demoSettingsSheet {
+                controlsSheet
+            }
+    }
+
+    @ViewBuilder
+    private var sceneContent: some View {
         ZStack {
             SceneView { root in
                 // Ground plane
@@ -65,47 +73,41 @@ struct DynamicSkyDemo: View {
             .cameraControls(.orbit)
             .id("sky-\(Int(timeOfDay * 10))-\(skyEnvironment.name)")
             .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: timeIcon)
-                            .foregroundStyle(.yellow)
-                        Text(timeLabel)
-                            .font(.title2).bold()
-                            .foregroundStyle(.white)
-                            .monospacedDigit()
-                        Text(periodLabel)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.white.opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-
-                    Slider(value: $timeOfDay, in: 0...24, step: 0.25)
-                        .tint(.orange)
-                        .accessibilityLabel("Time of day slider")
-                        .accessibilityValue("\(timeLabel), \(periodLabel)")
-
-                    HStack {
-                        Text("00:00").font(.caption2).foregroundStyle(.white.opacity(0.4))
-                        Spacer()
-                        Text("12:00").font(.caption2).foregroundStyle(.white.opacity(0.4))
-                        Spacer()
-                        Text("24:00").font(.caption2).foregroundStyle(.white.opacity(0.4))
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding()
-            }
         }
         .background(Color.black)
+    }
+
+    @ViewBuilder
+    private var controlsSheet: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Image(systemName: timeIcon)
+                    .foregroundStyle(.yellow)
+                Text(timeLabel)
+                    .font(.title2).bold()
+                    .monospacedDigit()
+                Text(periodLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.gray.opacity(0.15))
+                    .clipShape(Capsule())
+            }
+
+            Slider(value: $timeOfDay, in: 0...24, step: 0.25)
+                .tint(.orange)
+                .accessibilityLabel("Time of day slider")
+                .accessibilityValue("\(timeLabel), \(periodLabel)")
+
+            HStack {
+                Text("00:00").font(.caption2).foregroundStyle(.secondary)
+                Spacer()
+                Text("12:00").font(.caption2).foregroundStyle(.secondary)
+                Spacer()
+                Text("24:00").font(.caption2).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var timeIcon: String {

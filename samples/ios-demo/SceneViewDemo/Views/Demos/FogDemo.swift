@@ -11,6 +11,14 @@ struct FogDemo: View {
     private let modeIcons = ["line.diagonal", "waveform", "mountain.2.fill"]
 
     var body: some View {
+        sceneContent
+            .demoSettingsSheet {
+                controlsSheet
+            }
+    }
+
+    @ViewBuilder
+    private var sceneContent: some View {
         ZStack {
             SceneView { root in
                 // Forest of cylinders (trees)
@@ -52,61 +60,56 @@ struct FogDemo: View {
             .cameraControls(.orbit)
             .id("fog-\(fogMode)-\(Int(density * 100))")
             .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-
-                VStack(spacing: 10) {
-                    // Mode selector
-                    HStack(spacing: 8) {
-                        ForEach(0..<3, id: \.self) { i in
-                            Button {
-                                fogMode = i
-                                #if os(iOS)
-                                HapticManager.selectionChanged()
-                                #endif
-                            } label: {
-                                VStack(spacing: 4) {
-                                    Image(systemName: modeIcons[i])
-                                    Text(modeNames[i])
-                                        .font(.caption2)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    i == fogMode
-                                        ? AnyShapeStyle(.blue)
-                                        : AnyShapeStyle(.white.opacity(0.15))
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .foregroundStyle(.white)
-                            }
-                            .accessibilityLabel("\(modeNames[i]) fog")
-                            .accessibilityAddTraits(i == fogMode ? .isSelected : [])
-                        }
-                    }
-
-                    // Density slider
-                    HStack {
-                        Text("Density")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.7))
-                        Slider(value: $density, in: 0.05...0.8)
-                            .tint(.blue)
-                            .accessibilityLabel("Fog density")
-                        Text("\(Int(density * 100))%")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.7))
-                            .monospacedDigit()
-                            .frame(width: 36)
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding()
-            }
         }
         .background(Color.black)
+    }
+
+    @ViewBuilder
+    private var controlsSheet: some View {
+        VStack(spacing: 12) {
+            // Mode selector
+            HStack(spacing: 8) {
+                ForEach(0..<3, id: \.self) { i in
+                    Button {
+                        fogMode = i
+                        #if os(iOS)
+                        HapticManager.selectionChanged()
+                        #endif
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: modeIcons[i])
+                            Text(modeNames[i])
+                                .font(.caption2)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            i == fogMode
+                                ? AnyShapeStyle(.blue)
+                                : AnyShapeStyle(.gray.opacity(0.15))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(i == fogMode ? .white : .primary)
+                    }
+                    .accessibilityLabel("\(modeNames[i]) fog")
+                    .accessibilityAddTraits(i == fogMode ? .isSelected : [])
+                }
+            }
+
+            // Density slider
+            HStack {
+                Text("Density")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(value: $density, in: 0.05...0.8)
+                    .tint(.blue)
+                    .accessibilityLabel("Fog density")
+                Text("\(Int(density * 100))%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .frame(width: 36)
+            }
+        }
     }
 }

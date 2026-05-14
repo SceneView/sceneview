@@ -11,6 +11,14 @@ struct CameraControlsDemo: View {
     @State private var mode: CameraControlMode = .orbit
 
     var body: some View {
+        sceneContent
+            .demoSettingsSheet {
+                controlsSheet
+            }
+    }
+
+    @ViewBuilder
+    private var sceneContent: some View {
         ZStack {
             SceneView { root in
                 // Central object — orange PBR cube
@@ -53,32 +61,26 @@ struct CameraControlsDemo: View {
             }
             .cameraControls(mode)
             .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-
-                // Mode picker — segmented so users feel the live mode switch.
-                Picker("Camera mode", selection: $mode) {
-                    Text("Orbit").tag(CameraControlMode.orbit)
-                    Text("Pan").tag(CameraControlMode.pan)
-                    Text("Look").tag(CameraControlMode.firstPerson)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 6)
-
-                VStack(spacing: 6) {
-                    instructionRow(icon: gestureIconForMode, text: dragHintForMode)
-                    instructionRow(icon: "hand.pinch.fill", text: pinchHintForMode)
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.bottom, 30)
-                .padding(.horizontal, 40)
-            }
         }
         .background(Color.black)
+    }
+
+    @ViewBuilder
+    private var controlsSheet: some View {
+        VStack(spacing: 16) {
+            // Mode picker — segmented so users feel the live mode switch.
+            Picker("Camera mode", selection: $mode) {
+                Text("Orbit").tag(CameraControlMode.orbit)
+                Text("Pan").tag(CameraControlMode.pan)
+                Text("Look").tag(CameraControlMode.firstPerson)
+            }
+            .pickerStyle(.segmented)
+
+            VStack(spacing: 8) {
+                instructionRow(icon: gestureIconForMode, text: dragHintForMode)
+                instructionRow(icon: "hand.pinch.fill", text: pinchHintForMode)
+            }
+        }
     }
 
     // MARK: - Per-mode hints
@@ -110,12 +112,12 @@ struct CameraControlsDemo: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.body)
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(.secondary)
                 .frame(width: 24)
                 .accessibilityHidden(true)
             Text(text)
                 .font(.caption)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
         }
     }
 }
