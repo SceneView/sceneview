@@ -272,6 +272,13 @@ struct ExploreTab: View {
                 }
             }
             .task { await loadSketchfabFeeds() }
+            // Pull-to-refresh on the Sketchfab carousels — matches the Android
+            // ExploreTabScreen.PullToRefreshBox added in #1203. Only fires
+            // when an API key is configured (loadSketchfabFeeds early-returns
+            // otherwise) so builds without the key don't spin a useless
+            // spinner. `force: true` bypasses the "already loaded" guard so
+            // a manual refresh actually re-fetches.
+            .refreshable { await loadSketchfabFeeds(force: true) }
             .navigationDestination(item: $selectedModel) { model in
                 ModelViewerScreen(model: model)
             }
@@ -310,12 +317,15 @@ struct ExploreTab: View {
 
     /// Loads the three curated feeds in parallel. Falls back silently to the bundled
     /// `featuredModels` carousel when no API key is configured or the network call fails.
-    private func loadSketchfabFeeds() async {
-        guard SketchfabConfig.apiKey != nil,
-              sketchfabStaffPicks.isEmpty,
-              sketchfabMostLiked.isEmpty,
-              sketchfabRecent.isEmpty
-        else { return }
+    ///
+    /// Pass `force: true` from `.refreshable {}` so manual pull-to-refresh
+    /// bypasses the "already loaded" guard and actually re-fetches.
+    private func loadSketchfabFeeds(force: Bool = false) async {
+        guard SketchfabConfig.apiKey != nil else { return }
+        if !force,
+           !sketchfabStaffPicks.isEmpty || !sketchfabMostLiked.isEmpty || !sketchfabRecent.isEmpty {
+            return
+        }
         isLoadingFeeds = true
         defer { isLoadingFeeds = false }
 
