@@ -20,6 +20,9 @@ That's it. The script builds the demo app and installs it on your connected Andr
     - Android device with **USB debugging** enabled
     - **Java 17+** installed
     - **adb** on your PATH (comes with Android Studio)
+    - Optional: Google's [`android` CLI](https://developer.android.com/tools/agents/android-cli)
+      for atomic install + launch. When detected, the `try-demo.sh` script uses
+      it automatically.
 
 ### Try a specific platform demo
 

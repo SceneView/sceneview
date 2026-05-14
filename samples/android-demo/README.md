@@ -23,6 +23,14 @@ Install the APK on a connected device:
 adb install -r samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk
 ```
 
+…or, with Google's [`android` CLI](https://developer.android.com/tools/agents/android-cli) (atomic install + launch):
+
+```bash
+android run \
+  --apks=samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk \
+  --activity=io.github.sceneview.demo/.MainActivity
+```
+
 ## Requirements
 
 - Android device or emulator (API 28+)
