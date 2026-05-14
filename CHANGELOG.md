@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Changed — Stage 2 demo migrations: `PhysicsDemo` drops streamed crash-test bodies ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+`samples/android-demo/.../demos/PhysicsDemo.kt` keeps the existing `PhysicsNode`-driven simulation but replaces the coloured spheres carousel with the four streamed entries from [`SampleAssets.byCategory`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt)`["physics"]` — Ceramic Vase, Wooden Stool, Wooden Barrel, Clay Amphora (all CC-BY from Sketchfab). A first "Bundled spheres" chip preserves the v4.3.1 visual default for QA / offline / store-listing screenshot determinism.
+
+**Behavioural contract.** The simulation is unchanged — every dropped body is treated as a bounding-sphere of `collisionRadius = 0.08 m` so the bounce reads naturally regardless of mesh shape. The visual mesh is a `ModelNode` parented to the simulated `SphereNode`; the parent sphere is still drawn (the colour ramp gives a soft pad underneath the streamed mesh) so the simulation feels like "spheres with mesh skins" rather than abstract solids. This honours `feedback_demo_quality` — the demo's value is the SDK simulation hook-up, not a custom physics engine that handles convex-hull colliders.
+
+Switching the picker resets the scene (`bodyCount = 5; generation++`) so the new shape is what falls — useful because mixed scenes confuse what the user is supposed to be observing.
+
+Offline / no-key behaviour preserved — the resolver's per-slug fallback path returns the registered bundled GLB even when `SketchfabConfig.apiKey == null`, so the carousel always renders something visible. The streamed slot will visually match the bundled fallback in that case.
+
+**Files touched:**
+
+- `samples/android-demo/.../demos/PhysicsDemo.kt` — full rewrite of the composable. Adds the chip row, the slug resolver, and the streamed-mesh-as-child pattern.
+- `samples/android-demo/src/main/res/values/strings.xml` + `values-fr/strings.xml` — 3 new keys: `demo_physics_picker_label`, `demo_physics_picker_spheres`, `demo_physics_picker_subtitle`.
+
+**iOS counterpart not in this PR.** The iOS demo app does not currently have a `PhysicsDemo.swift` — RealityKit's built-in `PhysicsBodyComponent` makes the SceneView wrapper less interesting on iOS, and the iOS V1 doesn't expose a SceneView `PhysicsNode` analogue. The 4 `physics` slugs (2 new in the AR-placement PR, 2 from Stage 1) are registered in `samples/ios-demo/.../Services/SampleAssets.swift` ready for a future port.
+
+**`SampleAssets` slugs added:** 0 — the 2 new `physics` entries (Wooden Barrel, Clay Amphora) shipped in the previous Stage 2 PR (PR [#1187](https://github.com/sceneview/sceneview/pull/1187) AR placement); this PR consumes them for the first time.
+
+**30 s screen recording deferred** — agent worktree has no Pixel device access; tracked in the [#1152](https://github.com/sceneview/sceneview/issues/1152) acceptance checklist.
+
 ### Changed — Stage 2 demo migrations: `ARPlacementDemo` + `ARInstantPlacementDemo` gain a "Pick what to place" sheet ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
 
 Both AR placement demos now expose the [`SampleAssets.byCategory["ar_placement"]`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt) chip row in their `DemoScaffold` v2 controls sheet (delivered in PR [#1169](https://github.com/sceneview/sceneview/pull/1169)). Selecting a streamed slug (coffee mug / houseplant / wooden crate / side table / floor lamp / picture frame — six entries CC-BY from Sketchfab) arms it as the next tap's payload; subsequent taps on a detected plane spawn a fresh AnchorNode + ModelNode using the streamed glTF resolved through [`SketchfabAssetResolver`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SketchfabAssetResolver.kt).
