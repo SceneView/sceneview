@@ -22,6 +22,18 @@ First Stage 2 migration on top of the [Stage 1 resolver foundations](#added--sam
 
 **Acceptance:** Android `./gradlew :samples:android-demo:compileDebugKotlin` GREEN. `:samples:android-demo:testDebugUnitTest --tests "io.github.sceneview.demo.sketchfab.*"` GREEN (27 sketchfab tests passing unchanged from Stage 1). iOS `xcodebuild` skipped in this batch (CHANGELOG entry kept honest — Stage 1 ran the Xcode build; the SceneGalleryDemo iOS rewrite is a small file replacement with no new Swift symbols).
 
+### Changed — Stage 2 demo migrations: `OrbitalARDemo` streams 4 animated creatures from the `solar` category ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 2)
+
+`samples/android-demo/.../demos/OrbitalARDemo.kt` + `samples/ios-demo/SceneViewDemo/Views/Demos/OrbitalARDemo.swift` now stream four of their eight orbiting planets via [`SketchfabAssetResolver`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SketchfabAssetResolver.kt) from the `solar` category of [`SampleAssets`](samples/android-demo/src/main/java/io/github/sceneview/demo/sketchfab/SampleAssets.kt) — butterfly, hummingbird, bee, koi fish. The remaining four planets (`khronos_damaged_helmet`, `khronos_lantern`, `khronos_toy_car`, `animated_dragon` on Android; `red_car`, `game_boy_classic`, `animated_dragon`, `nintendo_switch` on iOS) stay bundled.
+
+Before: the 7-planet formation had to duplicate `animated_dragon` + `threejs_soldier` to fill the ring because only seven distinct GLBs ship in the APK — visible as "clones" in the [#978](https://github.com/sceneview/sceneview/issues/978) audit screenshot. After: eight distinct themed planets, every "alive" slot has a real baked animation, and Sketchfab is invisible to the user (no WebView, no "loading Sketchfab" UI — just `rememberModelInstance(modelLoader, "file://...")` once the resolver returns).
+
+Offline behaviour preserved — when `SketchfabConfig.apiKey == null` (App Store builds, cold-cache first launch, network down), each streamed slot falls back to its registered bundled GLB / USDZ, so the orbit always renders eight models. No "Asset unavailable" placeholder ever surfaces from this demo.
+
+**`SampleAssets` slugs added:** 0. The four `solar` slugs shipped in Stage 1 already and are consumed by this PR for the first time.
+
+**30 s screen recording deferred** — agent worktree has no Pixel / iPhone device access; tracked in the [#1152](https://github.com/sceneview/sceneview/issues/1152) acceptance checklist.
+
 ### Added — Samples Sketchfab streaming foundations ([#1152](https://github.com/sceneview/sceneview/issues/1152) — Stage 1)
 
 Stage 1 of the [`#1152`](https://github.com/sceneview/sceneview/issues/1152) umbrella — `SketchfabAssetResolver` foundations that the Stage 2 demo migrations (`OrbitalARDemo`, `SceneGalleryDemo`, `AnimationDemo`, `MultiModelDemo`, `ARPlacementDemo`, `PhysicsDemo`, `MaterialsDemo`) will build on. **No demo is migrated in this PR** — the bundled GLBs/USDZs stay as they are. The resolver, registry, and tests are the foundation; demo migrations land 1 PR per demo.
