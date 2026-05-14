@@ -103,6 +103,16 @@ Apps with intentionally off-centre content will see the centroid re-centred at t
 - [#884](https://github.com/sceneview/sceneview/issues/884) RN+Flutter version drift — `@sceneview-sdk/react-native@4.2.0` and `sceneview_flutter@4.2.0` aligned with the monorepo on npm/pub.
 - [#1004](https://github.com/sceneview/sceneview/issues/1004) iOS parity v4.2.0 umbrella — SHIPPED end-to-end; deferred items split into focused #1032 / #1033 / #1034 / #1035 / #1036.
 
+### Tests — Regression pins for the 14-PR rendering burst (CORR-C batch)
+
+Pins for **5 of the 14** fixes shipped on 2026-05-14 (the highest-impact ones; remaining 7 batched for a follow-up). Each pin lives next to the fix it protects:
+
+- **`BoxTest.kt`** — 5 new methods (1 perpendicular + 4 parallel-branch on x and z axes) pin `Box.rayIntersection` correct behaviour for thin-slab boxes. Acceptance criterion oublié de [#1096](https://github.com/sceneview/sceneview/issues/1096).
+- **`MeshColliderTest.kt`** — 5 new methods pin the twin parallel-ray epsilon fix in `MeshCollider.AABB.rayIntersection` across x and z axes. Acceptance criterion oublié de [#1100](https://github.com/sceneview/sceneview/issues/1100).
+- **`SceneFactoriesTest.kt`** (new file) — pins `DEFAULT_IBL_INTENSITY = 10_000f`, the 1:1 ratio with `DEFAULT_MAIN_LIGHT_COLOR_INTENSITY`, and the 3D `DefaultCameraNode.DEFAULT_APERTURE/SHUTTER_SPEED/ISO` triple ([#1067](https://github.com/sceneview/sceneview/issues/1067), [#1075](https://github.com/sceneview/sceneview/issues/1075)).
+- **`ARDefaultCameraNodeTest.kt`** (new file) — pins `ARDefaultCameraNode` exposure via the new companion constants, cross-checks parity with 3D `DefaultCameraNode`, and asserts ≥1 stop brighter than sunny-16 ([#1067](https://github.com/sceneview/sceneview/issues/1067)). 3D `DefaultCameraNode` was refactored in the same PR to expose matching `DEFAULT_APERTURE/SHUTTER_SPEED/ISO` companion constants; AR aliases them at compile time to eliminate drift risk.
+- **`RenderQualityLaunchedEffectTest.kt`** (new file) — pins the `LaunchedEffect(view, renderQuality)` re-keying contract via a 25-line JVM simulator. Pins the contract (key-equality semantics) rather than the production call site — a separate follow-up will add a Compose UI test that verifies `Scene.kt:278` actually keys on both `view` and `renderQuality` ([#1078](https://github.com/sceneview/sceneview/issues/1078)).
+
 ### CI — Batch B0 ([#1116](https://github.com/sceneview/sceneview/issues/1116), [#1117](https://github.com/sceneview/sceneview/issues/1117), [#1118](https://github.com/sceneview/sceneview/issues/1118))
 
 - **`publish-api-docs` now gates `create-release`** (#1116) — a Dokka build failure on a tag push now produces a workflow red X instead of a silent "Other Changes" GitHub Release with no API documentation. `continue-on-error: true` and `|| echo` swallow removed.

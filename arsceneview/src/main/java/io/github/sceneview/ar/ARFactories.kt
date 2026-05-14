@@ -77,6 +77,20 @@ fun createAREnvironment(
  */
 class ARDefaultCameraNode(engine: Engine) : ARCameraNode(engine) {
     init {
-        setExposure(12.0f, 1.0f / 200.0f, 200.0f)
+        setExposure(DEFAULT_APERTURE, DEFAULT_SHUTTER_SPEED, DEFAULT_ISO)
+    }
+
+    companion object {
+        /**
+         * Aperture (f-stop). Re-exports the 3D [io.github.sceneview.DefaultCameraNode]
+         * value so the AR camera stays in cross-mode parity even if the 3D side bumps it.
+         */
+        const val DEFAULT_APERTURE = io.github.sceneview.DefaultCameraNode.DEFAULT_APERTURE
+
+        /** Shutter speed in seconds. See [DEFAULT_APERTURE] for the parity rule. */
+        const val DEFAULT_SHUTTER_SPEED = io.github.sceneview.DefaultCameraNode.DEFAULT_SHUTTER_SPEED
+
+        /** ISO sensitivity. See [DEFAULT_APERTURE] for the parity rule. */
+        const val DEFAULT_ISO = io.github.sceneview.DefaultCameraNode.DEFAULT_ISO
     }
 }
