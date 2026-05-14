@@ -77,6 +77,14 @@ enum class RenderQuality {
  *
  * Individual settings can still be overridden after the call (e.g. set a custom
  * [View.colorGrading] or tweak [View.bloomOptions.strength] to a non-preset value).
+ *
+ * **Important — re-application semantics**: [io.github.sceneview.SceneView] wires this
+ * call into a `LaunchedEffect(view, renderQuality)` (#1078) so the preset is reapplied
+ * ONLY when `renderQuality` changes. Tweaks made AFTER the preset are preserved across
+ * recompositions — but a renderQuality change (e.g. `Default → Cinematic` toggle) WILL
+ * clobber them, since the new preset writes the full set of fields. To keep custom
+ * tweaks across preset changes, re-apply them in a `LaunchedEffect(view, renderQuality)`
+ * that runs after this one.
  */
 fun View.applyRenderQuality(quality: RenderQuality) {
     when (quality) {
