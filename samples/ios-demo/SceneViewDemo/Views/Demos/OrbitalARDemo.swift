@@ -4,23 +4,33 @@ import RealityKit
 import ARKit
 import SceneViewSwift
 
-/// Personal-solar-system AR demo — bundled USDZ models orbit around the user.
+/// Personal-solar-system AR demo — 8 themed models orbit around the user.
 ///
 /// On session start, anchors a world-space `AnchorNode` at the camera's initial
-/// position. Loads 8 bundled USDZ assets at equirepartie angles (45° apart) on a
-/// ~1.5 m radius circle around the origin, each at a different height (between
-/// -0.5 m and +0.5 m relative to the user). A `Timer` ticks at 60 Hz and updates
-/// per-model orbital angles (planetary speeds, between 0.05 and 0.30 rad/s).
+/// position. Loads 8 assets at equirepartie angles (45° apart) on a ~1.5 m radius
+/// circle around the origin, each at a different height (between -0.5 m and
+/// +0.5 m relative to the user). A `Timer` ticks at 60 Hz and updates per-model
+/// orbital angles (planetary speeds, between 0.05 and 0.30 rad/s).
 ///
-/// Models with a baked animation (`animated_dragon`, `phoenix_bird`) face the
-/// orbit tangent so they "fly the orbit" naturally — their own animation does
-/// the wing flap / locomotion. Static models keep a local Y spin (between 0.5
-/// and 2.0 rad/s) so they don't look frozen.
+/// Models with a baked animation (4 streamed creatures from the `solar`
+/// `SampleAssets` category — butterfly, hummingbird, bee, fish — plus the bundled
+/// `animated_dragon`) face the orbit tangent so they "fly the orbit" naturally —
+/// their own animation does the wing flap / locomotion. Static models (red_car,
+/// nintendo_switch, retro_piano) keep a local Y spin (between 0.5 and 2.0 rad/s)
+/// so they don't look frozen.
 ///
 /// The user stays fixed in AR — turning the phone reveals each model as it
 /// passes through view.
+///
+/// ### Streaming pipeline (Stage 2, issue #1152)
+///
+/// Four of the eight planets are streamed via `SketchfabAssetResolver` from the
+/// curated `solar` category of `SampleAssets`. When `SketchfabConfig.apiKey` is
+/// missing (App Store / first-launch / no-network) the resolver returns the
+/// bundled fallback (`animated_butterfly.usdz`) so the demo always renders eight
+/// orbiting models — no broken slots.
 struct OrbitalARDemo: View {
-    /// Bundled USDZ assets + per-model orbital/spin tuning.
+    /// Per-model orbital/spin tuning.
     ///
     /// Speeds are deliberately varied so the formation looks like a real solar
     /// system rather than a single rigid ring — slow at 0.05 rad/s (~125 s per
@@ -30,29 +40,76 @@ struct OrbitalARDemo: View {
     /// `scale` is a hand-tuned absolute scale (NOT `scaleToUnits` — the goal is
     /// for each model to feel realistic-sized at 1.5 m, so e.g. a Ferrari at
     /// 0.15 m total length reads as a toy car on your kitchen table).
+    ///
+    /// Exactly one of `streamedSlug` / `bundledAsset` is non-nil. Streamed
+    /// entries resolve through `SketchfabAssetResolver.resolve(_:)` and fall
+    /// back to the registry's bundled USDZ when no API key is configured.
     private struct Planet {
-        let asset: String
+        let streamedSlug: SketchfabSlug?
+        let bundledAsset: String?
         let scale: Float
         let initialAngle: Float
         let orbitSpeed: Float       // rad/s around the user
         let spinSpeed: Float        // rad/s local Y spin — ignored when hasBakedAnimation = true
         let height: Float           // y offset relative to user
-        // True when the USDZ ships its own baked animation (wing flap, etc.).
+        // True when the model ships its own baked animation (wing flap, etc.).
         // For these we skip the Y spin and orient the model along the orbit
         // tangent so it "flies the orbit" naturally — its own anim does the rest.
         let hasBakedAnimation: Bool
+
+        init(
+            streamedSlug: SketchfabSlug? = nil,
+            bundledAsset: String? = nil,
+            scale: Float,
+            initialAngle: Float,
+            orbitSpeed: Float,
+            spinSpeed: Float,
+            height: Float,
+            hasBakedAnimation: Bool
+        ) {
+            precondition(
+                (streamedSlug == nil) != (bundledAsset == nil),
+                "Planet must define exactly one of streamedSlug or bundledAsset."
+            )
+            self.streamedSlug = streamedSlug
+            self.bundledAsset = bundledAsset
+            self.scale = scale
+            self.initialAngle = initialAngle
+            self.orbitSpeed = orbitSpeed
+            self.spinSpeed = spinSpeed
+            self.height = height
+            self.hasBakedAnimation = hasBakedAnimation
+        }
     }
 
-    private static let planets: [Planet] = [
-        Planet(asset: "red_car",          scale: 0.18, initialAngle: 0,                orbitSpeed: 0.08, spinSpeed: 0.7,  height:  0.0, hasBakedAnimation: false),
-        Planet(asset: "ferrari_f40",      scale: 0.15, initialAngle: .pi * 2 / 8 * 1,  orbitSpeed: 0.12, spinSpeed: 0.5,  height:  0.3, hasBakedAnimation: false),
-        Planet(asset: "game_boy_classic", scale: 0.12, initialAngle: .pi * 2 / 8 * 2,  orbitSpeed: 0.20, spinSpeed: 1.6,  height: -0.2, hasBakedAnimation: false),
-        Planet(asset: "retro_piano",      scale: 0.20, initialAngle: .pi * 2 / 8 * 3,  orbitSpeed: 0.06, spinSpeed: 0.9,  height:  0.4, hasBakedAnimation: false),
-        Planet(asset: "animated_dragon",  scale: 0.15, initialAngle: .pi * 2 / 8 * 4,  orbitSpeed: 0.15, spinSpeed: 0,    height: -0.4, hasBakedAnimation: true),
-        Planet(asset: "nintendo_switch",  scale: 0.18, initialAngle: .pi * 2 / 8 * 5,  orbitSpeed: 0.10, spinSpeed: 2.0,  height:  0.2, hasBakedAnimation: false),
-        Planet(asset: "tree_scene",       scale: 0.30, initialAngle: .pi * 2 / 8 * 6,  orbitSpeed: 0.05, spinSpeed: 0.6,  height: -0.5, hasBakedAnimation: false),
-        Planet(asset: "phoenix_bird",     scale: 0.20, initialAngle: .pi * 2 / 8 * 7,  orbitSpeed: 0.30, spinSpeed: 0,    height:  0.5, hasBakedAnimation: true),
-    ]
+    private static let planets: [Planet] = {
+        // The four streamed entries — order matches the SampleAssets `solar`
+        // category (butterfly, hummingbird, bee, koi fish). Looked up by uid
+        // so a registry re-ordering doesn't silently break the per-slot tuning.
+        let butterfly = SampleAssets.byUID["78d8345fffe54a55ae62fadcf9eaece6"]!
+        let hummingbird = SampleAssets.byUID["9c54b62d3c2f4f0db8e7a3a8a78a4d92"]!
+        let bee = SampleAssets.byUID["6cb9f9a4c6e94f9da5b7c8a85e8a5c2d"]!
+        let koi = SampleAssets.byUID["d1ca3a3ddf3845abb98f4e5d62ae34c6"]!
+
+        return [
+            // Slot 0 — bundled red car, static spinning (hero anchor at angle 0).
+            Planet(bundledAsset: "red_car",         scale: 0.18, initialAngle: 0,               orbitSpeed: 0.08, spinSpeed: 0.7, height:  0.0, hasBakedAnimation: false),
+            // Slot 1 — streamed butterfly (flies the orbit tangent).
+            Planet(streamedSlug: butterfly,         scale: 0.20, initialAngle: .pi * 2 / 8 * 1, orbitSpeed: 0.20, spinSpeed: 0,   height: -0.2, hasBakedAnimation: true),
+            // Slot 2 — bundled game boy, static spinning.
+            Planet(bundledAsset: "game_boy_classic", scale: 0.12, initialAngle: .pi * 2 / 8 * 2, orbitSpeed: 0.20, spinSpeed: 1.6, height:  0.4, hasBakedAnimation: false),
+            // Slot 3 — streamed hummingbird, baked anim.
+            Planet(streamedSlug: hummingbird,       scale: 0.15, initialAngle: .pi * 2 / 8 * 3, orbitSpeed: 0.15, spinSpeed: 0,   height: -0.4, hasBakedAnimation: true),
+            // Slot 4 — bundled animated dragon (baked walk cycle).
+            Planet(bundledAsset: "animated_dragon", scale: 0.15, initialAngle: .pi * 2 / 8 * 4, orbitSpeed: 0.05, spinSpeed: 0,   height:  0.2, hasBakedAnimation: true),
+            // Slot 5 — streamed bee, baked anim.
+            Planet(streamedSlug: bee,               scale: 0.10, initialAngle: .pi * 2 / 8 * 5, orbitSpeed: 0.25, spinSpeed: 0,   height: -0.5, hasBakedAnimation: true),
+            // Slot 6 — bundled nintendo switch, static spinning.
+            Planet(bundledAsset: "nintendo_switch", scale: 0.18, initialAngle: .pi * 2 / 8 * 6, orbitSpeed: 0.10, spinSpeed: 2.0, height:  0.5, hasBakedAnimation: false),
+            // Slot 7 — streamed koi fish, baked anim (closes the ring).
+            Planet(streamedSlug: koi,               scale: 0.25, initialAngle: .pi * 2 / 8 * 7, orbitSpeed: 0.30, spinSpeed: 0,   height:  0.3, hasBakedAnimation: true),
+        ]
+    }()
 
     private static let orbitRadius: Float = 1.5
 
@@ -104,10 +161,24 @@ struct OrbitalARDemo: View {
 
             // Kick off model loads — order them so the closest-to-front planet
             // (index 0, angle 0) lands first for the most visible drop-in.
+            //
+            // Bundled-only planets call `ModelNode.load(name:)` directly; streamed
+            // planets go through `SketchfabAssetResolver.resolve(_:)` which gives
+            // us either the downloaded USDZ or the registered bundled fallback,
+            // then loads it via `ModelNode.load(contentsOf:)`. Resolver failures
+            // are logged silently — the slot just stays empty (matches Android).
             for (index, planet) in Self.planets.enumerated() {
                 Task { @MainActor in
                     do {
-                        let node = try await ModelNode.load(planet.asset)
+                        let node: ModelNode
+                        if let slug = planet.streamedSlug {
+                            let url = try await SketchfabAssetResolver.shared.resolve(slug)
+                            node = try await ModelNode.load(contentsOf: url)
+                        } else if let bundled = planet.bundledAsset {
+                            node = try await ModelNode.load(bundled)
+                        } else {
+                            return
+                        }
                         _ = node.scaleToUnits(planet.scale)
                         node.entity.position = position(for: planet, time: 0)
                         // Auto-play any baked animation (dragon, phoenix, etc.)
@@ -117,7 +188,8 @@ struct OrbitalARDemo: View {
                         anchor.add(node.entity)
                         loadedNodes[index] = node
                     } catch {
-                        print("[OrbitalAR] Failed to load \(planet.asset): \(error)")
+                        let label = planet.streamedSlug?.displayName ?? planet.bundledAsset ?? "(unknown)"
+                        print("[OrbitalAR] Failed to load \(label): \(error)")
                     }
                 }
             }
