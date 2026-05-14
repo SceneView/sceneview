@@ -3658,7 +3658,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.3.4
+  sceneview_flutter: ^4.3.5
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).
