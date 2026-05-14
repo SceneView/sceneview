@@ -125,6 +125,21 @@ Contributions to any part of the project are welcome — Android (`sceneview/`, 
 
 After your changes are merged, the Discord bot will award you the **Contributor** role.
 
+### CI on docs-only PRs
+
+**Docs-only PRs** — changes confined to `*.md`, `docs/**`, `website-static/**`,
+`marketing/**`, `branding/**`, `llms*.txt`, or `LICENSE` — skip the Android +
+MCP `quality-gate.yml`, `ci.yml`, and `render-tests.yml` checks by design.
+The diff cannot affect runtime behaviour, so spending 10-20 min of emulator
+time to re-render the same screenshots is pure noise. You will see fewer
+green checks than on a code PR; this is correct.
+
+If your docs PR needs to force a full CI run (for example, you suspect a
+markdown change has accidentally invalidated an example referenced from
+runtime code), trigger the gates manually from the Actions tab —
+`Run workflow` on `quality-gate.yml` / `ci.yml` / `render-tests.yml`
+accepts your PR's branch as input.
+
 ### Code style
 
 - **Kotlin**: follow the official [Kotlin style guide](https://developer.android.com/kotlin/style-guide) and existing Compose API conventions (composable functions, `remember*` helpers, named parameters). The code style is stored in the repository and auto-configured by Android Studio.

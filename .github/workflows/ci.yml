@@ -59,7 +59,17 @@ jobs:
         # `outputs/unit_test_code_coverage/`, then generates XML + HTML
         # reports. Replaces the previous `testDebugUnitTest`-only call so
         # we don't run the test suite twice. See #964.
-        run: ./gradlew :sceneview:jacocoTestReport :arsceneview:jacocoTestReport --stacktrace
+        #
+        # `:samples:android-demo:testDebugUnitTest` runs
+        # `ARBundledRecordingsTest` (the bundled-recording ftyp/avc1/mett
+        # contract suite from #1060/#1100). Not under JaCoCo because the
+        # samples module has no coverage gate. See #1130.
+        run: |
+          ./gradlew \
+            :sceneview:jacocoTestReport \
+            :arsceneview:jacocoTestReport \
+            :samples:android-demo:testDebugUnitTest \
+            --stacktrace
 
       - name: Coverage summary
         if: always()

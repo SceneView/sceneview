@@ -207,7 +207,11 @@ if [ "$QUICK_MODE" != "--quick" ]; then
     if [ -f "gradlew" ]; then
         echo -e "  Running unit tests..."
         UT_LOG=/tmp/qg-unit-tests.log
-        if ./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest --console=plain > "$UT_LOG" 2>&1; then
+        # `:samples:android-demo:testDebugUnitTest` runs ARBundledRecordingsTest
+        # (the ftyp + avc1 + mett contract suite added by #1060, moved to
+        # `testDebug/` sourceSet by #1100). Without it the gate silently drops
+        # the bundled-recording regression suite. See #1130.
+        if ./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest :samples:android-demo:testDebugUnitTest --console=plain > "$UT_LOG" 2>&1; then
             check "Android unit tests" "PASS" ""
         else
             check "Android unit tests" "FAIL" "Tests failed — see $UT_LOG"

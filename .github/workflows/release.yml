@@ -80,7 +80,17 @@ jobs:
         # gates on this job's outcome (#1116), so a Dokka failure on a
         # release tag must surface as a workflow red X, not a silent
         # "Other Changes" GitHub Release with no API documentation.
-        run: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml
+        #
+        # Wrapped in nick-fields/retry@v3 so transient 503s from
+        # `repo.maven.apache.org` during Dokka's dependency resolution don't
+        # block the whole release. A genuine Dokka failure still surfaces
+        # after 3 attempts; a network flake survives. See #1127.
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 15
+          retry_on: error
+          command: ./gradlew :sceneview:dokkaHtml :arsceneview:dokkaHtml
 
       - name: Upload Dokka artifact
         uses: actions/upload-artifact@v7
