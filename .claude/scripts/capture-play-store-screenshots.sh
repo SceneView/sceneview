@@ -153,8 +153,20 @@ fi
 [[ -f "$APK_PATH" ]] || { echo "[capture] APK missing at $APK_PATH" >&2; exit 1; }
 
 # ── 3. Install ───────────────────────────────────────────────────────────────
-echo "[capture] adb install -r $APK_PATH" >&2
-adb install -r "$APK_PATH" >/dev/null
+# Use `android run` (atomic install+launch) when available; force-stop right
+# after so the `--es demo` deep-link launch on each iteration starts cold.
+# Falls back to `adb install` when the android CLI is missing or on multi-device
+# hosts (the `run` subcommand has no `--device` flag in v0.7).
+if android_cli_locate && [[ "$DEVICE_LINES" -eq 1 ]]; then
+  echo "[capture] android run --apks=$APK_PATH (install+launch)" >&2
+  android_cli_install_and_launch "$APK_PATH" "$PKG/.MainActivity" >/dev/null || {
+    echo "[capture] android run failed, falling back to adb install" >&2
+    adb install -r "$APK_PATH" >/dev/null
+  }
+else
+  echo "[capture] adb install -r $APK_PATH" >&2
+  adb install -r "$APK_PATH" >/dev/null
+fi
 
 # ── 4. Capture loop ──────────────────────────────────────────────────────────
 mkdir -p "$OUT_DIR"
@@ -167,8 +179,11 @@ for DEMO in "${DEMO_ARR[@]}"; do
   DEMO="${DEMO// /}"  # trim whitespace
   echo "[capture] [$INDEX] $DEMO" >&2
 
+  # `am force-stop` + `--es demo <id>` stay on adb: `android run` in v0.7 has no
+  # equivalent for either (no `--force-stop` flag, no intent-extras forwarding).
+  # Re-evaluate when CLI v0.8+ ships those flags. Same allow-listed ingress
+  # channel as the QA flow + #958.
   adb shell am force-stop "$PKG"
-  # Same `--es demo <id>` allow-listed ingress channel as the QA flow + #958.
   adb shell am start -n "$PKG/.MainActivity" --es demo "$DEMO" >/dev/null
   sleep "$SETTLE_SECONDS"
 

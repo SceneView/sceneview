@@ -79,7 +79,9 @@ if ! adb get-state &>/dev/null; then
     exit 1
 fi
 
-# Install if requested
+# Install if requested. Uses `android run` for atomic install+launch when the
+# CLI is available, otherwise falls back to `adb install` + the launch block
+# below (`am start` is needed regardless to ensure a fresh process).
 if $INSTALL; then
     APK="samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk"
     if [[ ! -f "$APK" ]]; then
@@ -87,7 +89,16 @@ if $INSTALL; then
         ./gradlew :samples:android-demo:assembleDebug -q
     fi
     echo "Installing APK..."
-    adb install -r "$APK"
+    if android_cli_locate; then
+        # `android run` installs AND launches. We still force-stop below so the
+        # subsequent demo-list flow starts from a known-cold state.
+        android_cli_install_and_launch "$APK" "${PACKAGE}/${ACTIVITY}" >/dev/null || {
+            echo -e "${YELLOW}[qa] android run failed, falling back to adb install${NC}"
+            adb install -r "$APK"
+        }
+    else
+        adb install -r "$APK"
+    fi
 fi
 
 # Create screenshot directory
@@ -98,6 +109,9 @@ echo "=== SceneView Android Demo QA ==="
 echo "Testing ${#DEMOS[@]} demos..."
 echo ""
 
+# `am force-stop` + `am start` have no `android` CLI equivalent in v0.7 (the
+# `run` subcommand does not accept `--es` intent extras nor a force-stop flag),
+# so they stay on adb. See CLAUDE.md "Android CLI (preferred for agent-driven QA)".
 adb shell "am force-stop $PACKAGE" 2>/dev/null
 sleep 1
 adb shell "am start -n ${PACKAGE}/${ACTIVITY}" 2>/dev/null

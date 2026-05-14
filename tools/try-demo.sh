@@ -10,12 +10,15 @@
 #  Requirements:
 #    - Android device connected via USB/Wi-Fi with USB debugging ON
 #    - Java 17+ (for local build)
-#    - adb on PATH (comes with Android SDK)
+#    - Google's `android` CLI on PATH (preferred — atomic install+launch,
+#      JSON layouts, LF/CRLF-safe screenshots).
+#      Install: https://developer.android.com/tools/agents/android-cli
+#    - …or `adb` on PATH (legacy fallback, comes with Android SDK platform-tools).
 #
-#  Tip: if Google's `android` CLI is on your PATH
-#  (https://developer.android.com/tools/agents/android-cli), this script
-#  uses `android run` for atomic install + launch. Otherwise it falls
-#  back to the classic `adb install` + `am start` flow.
+#  When both are present, this script uses `android run` for atomic install +
+#  launch. Otherwise it falls back to the classic `adb install` + `am start`
+#  flow. The device-count check requires `adb` (the `android` CLI in v0.7 has
+#  no `devices` subcommand).
 # ─────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -51,13 +54,32 @@ banner() {
 }
 
 check_device() {
-  if ! command -v adb &>/dev/null; then
-    echo -e "${RED}Error: adb not found. Install Android SDK platform-tools.${RESET}"
-    echo "  brew install android-platform-tools   # macOS"
-    echo "  sudo apt install adb                  # Linux"
+  # We need at least one of `android` or `adb` on PATH. The `android` CLI ships
+  # its own bundled adb and is the preferred entry point for agent workflows;
+  # `adb` standalone is the legacy fallback. Either is fine for this script.
+  local has_android has_adb
+  command -v android &>/dev/null && has_android=1 || has_android=0
+  [[ "$has_android" -eq 0 ]] && [[ -x "$HOME/.local/bin/android" ]] && has_android=1
+  command -v adb &>/dev/null && has_adb=1 || has_adb=0
+
+  if [[ "$has_android" -eq 0 ]] && [[ "$has_adb" -eq 0 ]]; then
+    echo -e "${RED}Error: neither \`android\` CLI nor \`adb\` found.${RESET}"
+    echo "  Install Google's android CLI (preferred):"
+    echo "    https://developer.android.com/tools/agents/android-cli"
+    echo "  Or install Android SDK platform-tools (provides adb):"
+    echo "    brew install android-platform-tools   # macOS"
+    echo "    sudo apt install adb                  # Linux"
     exit 1
   fi
 
+  # Device count — uses adb because `android` v0.7 has no `devices` subcommand.
+  # If `adb` is not present but `android` is, the bundled adb is still callable
+  # via the android CLI's own helpers, but the bare `adb` shim suffices here.
+  if [[ "$has_adb" -eq 0 ]]; then
+    echo -e "${RED}Error: adb not on PATH (required to count connected devices).${RESET}"
+    echo "  The android CLI bundles adb but does not expose a top-level devices subcommand in v0.7."
+    exit 1
+  fi
   local devices
   devices=$(adb devices | grep -c 'device$' || true)
   if [[ "$devices" -eq 0 ]]; then
