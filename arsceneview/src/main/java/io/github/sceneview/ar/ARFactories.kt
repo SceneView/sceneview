@@ -81,13 +81,16 @@ class ARDefaultCameraNode(engine: Engine) : ARCameraNode(engine) {
     }
 
     companion object {
-        /** Aperture (f-stop) — must match the 3D `DefaultCameraNode` for parity. */
-        const val DEFAULT_APERTURE = 12.0f
+        /**
+         * Aperture (f-stop). Re-exports the 3D [io.github.sceneview.DefaultCameraNode]
+         * value so the AR camera stays in cross-mode parity even if the 3D side bumps it.
+         */
+        const val DEFAULT_APERTURE = io.github.sceneview.DefaultCameraNode.DEFAULT_APERTURE
 
-        /** Shutter speed in seconds — must match the 3D `DefaultCameraNode`. */
-        const val DEFAULT_SHUTTER_SPEED = 1.0f / 200.0f
+        /** Shutter speed in seconds. See [DEFAULT_APERTURE] for the parity rule. */
+        const val DEFAULT_SHUTTER_SPEED = io.github.sceneview.DefaultCameraNode.DEFAULT_SHUTTER_SPEED
 
-        /** ISO sensitivity — must match the 3D `DefaultCameraNode`. */
-        const val DEFAULT_ISO = 200.0f
+        /** ISO sensitivity. See [DEFAULT_APERTURE] for the parity rule. */
+        const val DEFAULT_ISO = io.github.sceneview.DefaultCameraNode.DEFAULT_ISO
     }
 }

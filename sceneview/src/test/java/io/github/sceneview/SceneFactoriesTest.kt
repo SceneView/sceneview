@@ -11,7 +11,7 @@ import org.junit.Test
  * BREAKING visual change because the carefully balanced
  * 10k main + 3k fill + 10k IBL three-point setup depends on them.
  *
- * If a refactor needs to move the constant, update this test in the same
+ * If a refactor needs to move the constants, update this test in the same
  * PR with a CHANGELOG entry under "Breaking changes".
  */
 class SceneFactoriesTest {
@@ -29,5 +29,31 @@ class SceneFactoriesTest {
             DEFAULT_IBL_INTENSITY,
             0.0f,
         )
+    }
+
+    @Test
+    fun defaultIblIntensityMatchesMainLightIntensity() {
+        // The 1:1 ratio between IBL and direct main light is the actual contract
+        // #1075 enforces. A future bump of the main light without a matching IBL
+        // bump (or vice versa) re-opens the ambient-dominated washout. Pin both
+        // values together so this test fires regardless of which side drifts.
+        assertEquals(
+            "DEFAULT_IBL_INTENSITY and DEFAULT_MAIN_LIGHT_COLOR_INTENSITY must stay " +
+                "1:1 — the v4.3.0 three-point lighting balance depends on direct + " +
+                "indirect contributing equally (#1075).",
+            DEFAULT_MAIN_LIGHT_COLOR_INTENSITY,
+            DEFAULT_IBL_INTENSITY,
+            0.0f,
+        )
+    }
+
+    @Test
+    fun defaultCameraNodeExposureValuesArePinned() {
+        // Pin #1067 — 3D DefaultCameraNode exposure. ARDefaultCameraNode mirrors
+        // these via the `arsceneview` module's companion constants; the cross-
+        // module parity test lives at `arsceneview/src/test/.../ARDefaultCameraNodeTest`.
+        assertEquals(12.0f, DefaultCameraNode.DEFAULT_APERTURE, 0.0f)
+        assertEquals(1.0f / 200.0f, DefaultCameraNode.DEFAULT_SHUTTER_SPEED, 0.0f)
+        assertEquals(200.0f, DefaultCameraNode.DEFAULT_ISO, 0.0f)
     }
 }

@@ -229,13 +229,26 @@ fun createCollisionSystem(view: View) = CollisionSystem(view)
 class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     init {
         transform = io.github.sceneview.math.Transform(position = Position(0.0f, 0.0f, 1.0f))
-        // Neutral, less photographic exposure (~EV 11.6).
+        // Neutral, less photographic exposure.
         // The previous setting (`f/16, 1/125 s, ISO 100` ≈ EV 15) is "sunny-16" — a real-world
         // outdoor exposure that makes Filament renders look much darker than the iOS
         // RealityKit defaults. Opening up the aperture, slowing the shutter and bumping
         // the ISO produces a brighter, more predictable baseline that matches the
-        // RealityKit look out of the box.
-        setExposure(12.0f, 1.0f / 200.0f, 200.0f)
+        // RealityKit look out of the box. AR mirrors these values via
+        // `ARDefaultCameraNode.DEFAULT_APERTURE/SHUTTER_SPEED/ISO`; the pin lives in
+        // `SceneFactoriesTest.defaultExposureMatchesAR()`.
+        setExposure(DEFAULT_APERTURE, DEFAULT_SHUTTER_SPEED, DEFAULT_ISO)
+    }
+
+    companion object {
+        /** Aperture (f-stop). AR mirrors via `ARDefaultCameraNode.DEFAULT_APERTURE`. */
+        const val DEFAULT_APERTURE = 12.0f
+
+        /** Shutter speed (seconds). AR mirrors via `ARDefaultCameraNode.DEFAULT_SHUTTER_SPEED`. */
+        const val DEFAULT_SHUTTER_SPEED = 1.0f / 200.0f
+
+        /** ISO sensitivity. AR mirrors via `ARDefaultCameraNode.DEFAULT_ISO`. */
+        const val DEFAULT_ISO = 200.0f
     }
 }
 

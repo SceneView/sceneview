@@ -185,4 +185,27 @@ class MeshColliderTest {
             "Ray parallel to x but inside the y-slab should hit"
         )
     }
+
+    @Test
+    fun aabbRayParallelToZFaceInsideZSlabHits() {
+        // Z-axis variant — exercise the parallel branch on the z axis of the
+        // 0..2 loop in `AABB.rayIntersection`. A regression that revives the
+        // 1e-10f epsilon only for the z axis would slip past the x/y tests above.
+        val aabb = AABB(Vector3(-1f, -1f, -0.0005f), Vector3(1f, 1f, 0.0005f))
+        val ray = Ray(Vector3(0f, 0f, -5f), Vector3(0f, 0f, 1f))
+        assertTrue(
+            aabb.rayIntersection(ray),
+            "Ray along +z, parallel to x and y faces, inside the thin z-slab should hit"
+        )
+    }
+
+    @Test
+    fun aabbRayParallelToZFaceOutsideZSlabMisses() {
+        val aabb = AABB(Vector3(-1f, -1f, -0.0005f), Vector3(1f, 1f, 0.0005f))
+        val ray = Ray(Vector3(0f, 0f, 5f), Vector3(1f, 0f, 0f))
+        assertFalse(
+            aabb.rayIntersection(ray),
+            "Ray outside the z-extent of a thin z-slab should miss"
+        )
+    }
 }

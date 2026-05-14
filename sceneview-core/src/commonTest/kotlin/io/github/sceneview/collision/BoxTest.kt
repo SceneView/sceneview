@@ -2,7 +2,6 @@ package io.github.sceneview.collision
 
 import kotlin.math.abs
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -214,10 +213,18 @@ class BoxTest {
     // depending on rounding. Fixed by lifting the epsilon to `1e-6f` so the
     // parallel branch correctly catches the degenerate case for flat (thin-slab)
     // boxes commonly used as collision proxies for plane-like geometry.
+    //
+    // Naming convention: `rayParallelTo<X>AxisFace…` reads "ray's direction is
+    // parallel to the face whose normal is the X axis" (i.e. `f = 0` for that
+    // axis's slab). This exercises the parallel branch at Box.rayIntersection
+    // lines 85, 107, 129 — one test per axis to catch a regression that revives
+    // `1e-10f` on a single branch.
 
     @Test
-    fun rayParallelToFaceOnFlatBoxHits() {
-        // 0.001 m flat box (thin slab in y axis) at the origin.
+    fun rayPerpendicularToYFaceHits_exercisesParallelOnXAndZ() {
+        // 0.001 m flat box (thin slab in y axis) at the origin. Direction (0,-1,0)
+        // is perpendicular to the y face (f = 1 for that slab → divide branch)
+        // but parallel to the x and z faces (f = 0 → parallel branch on both).
         val box = Box(Vector3(2f, 0.001f, 2f), Vector3(0f, 0f, 0f))
         val ray = Ray(Vector3(0f, 5f, 0f), Vector3(0f, -1f, 0f))
         val hit = RayHit()
@@ -230,11 +237,11 @@ class BoxTest {
     }
 
     @Test
-    fun rayParallelButOutsideMisses() {
-        // Same flat slab, but ray travels along +x (parallel to top/bottom face)
-        // and is outside the y-slab. Pre-#1096 the "parallel" branch never
-        // fired so the slab math accepted any ray whose y was outside the box
-        // through divide-by-near-zero.
+    fun rayParallelToXAxisFaceButOutsideYSlabMisses() {
+        // Same flat slab, but ray travels along +x (parallel to top/bottom faces
+        // ⇒ f = 0 for x AND y axes) and origin is 5 m above the slab. Pre-#1096
+        // the parallel branch never fired so the slab math fell into divide-by-
+        // near-zero and accepted any ray whose y was outside the box.
         val box = Box(Vector3(2f, 0.001f, 2f), Vector3(0f, 0f, 0f))
         val ray = Ray(Vector3(0f, 5f, 0f), Vector3(1f, 0f, 0f))
         val hit = RayHit()
@@ -245,18 +252,45 @@ class BoxTest {
     }
 
     @Test
-    fun rayParallelToXAxisInsideSlabHits() {
-        // Same flat slab, ray parallel to +x and inside the y-slab (y = 0).
-        // The new epsilon correctly takes the `else if (-e + min.y > 0 ...)`
-        // branch and stays inside the box. Slab is x∈[-1, 1], so origin (-3, 0, 0)
-        // hits at distance 2.
+    fun rayParallelToXAxisFaceInsideYSlabHits() {
+        // Ray parallel to +x (f = 0 for x slab → parallel branch), at y = 0
+        // (inside the thin slab). Distance from x=-3 to box face at x=-1 is 2.
         val box = Box(Vector3(2f, 0.001f, 2f), Vector3(0f, 0f, 0f))
         val ray = Ray(Vector3(-3f, 0f, 0f), Vector3(1f, 0f, 0f))
         val hit = RayHit()
         assertTrue(
             box.rayIntersection(ray, hit),
-            "Ray parallel to x but starting inside the thin y-slab should hit"
+            "Ray parallel to x face but starting inside the thin y-slab should hit"
         )
         assertClose(2f, hit.getDistance(), 0.01f)
+    }
+
+    @Test
+    fun rayParallelToZAxisFaceInsideZSlabHits() {
+        // Z-axis variant of the parallel-branch coverage. Thin slab in z (extent
+        // 0.0005), ray traveling along +z parallel to the y face (f = 0 for y
+        // slab → parallel branch on the y axis) and the x face (f = 0 for x).
+        // Box at origin: z slab is [-0.0005, 0.0005], x/y extents are 1 each.
+        // Origin (0, 0, -3) → near z face at z=-0.0005 → distance ~2.9995.
+        val box = Box(Vector3(2f, 2f, 0.001f), Vector3(0f, 0f, 0f))
+        val ray = Ray(Vector3(0f, 0f, -3f), Vector3(0f, 0f, 1f))
+        val hit = RayHit()
+        assertTrue(
+            box.rayIntersection(ray, hit),
+            "Ray parallel to x and y faces inside the thin z-slab should hit"
+        )
+        assertClose(2.9995f, hit.getDistance(), 0.01f)
+    }
+
+    @Test
+    fun rayParallelToZAxisFaceOutsideZSlabMisses() {
+        // Same thin-z slab, but ray origin outside the z-extent.
+        val box = Box(Vector3(2f, 2f, 0.001f), Vector3(0f, 0f, 0f))
+        val ray = Ray(Vector3(0f, 5f, 0f), Vector3(1f, 0f, 0f))
+        val hit = RayHit()
+        assertFalse(
+            box.rayIntersection(ray, hit),
+            "Ray outside the y-extent of a thin z-slab should miss"
+        )
     }
 }

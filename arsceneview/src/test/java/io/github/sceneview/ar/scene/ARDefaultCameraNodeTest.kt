@@ -60,13 +60,42 @@ class ARDefaultCameraNodeTest {
     }
 
     @Test
-    fun defaultExposureIsBrighterThanSunny16() {
+    fun arExposureMatches3dDefaultCameraNodeExposure() {
+        // Cross-module parity pin for #1067. Today the AR companion `const val`s
+        // alias the 3D ones at compile time — so if anyone in-lines the literals
+        // back into either node OR re-introduces drift via a typo, this test
+        // fires. This is the actual contract (AR ↔ 3D parity) the previous
+        // "≥1 stop brighter than sunny-16" check only approximated.
+        assertEquals(
+            "Aperture must match 3D DefaultCameraNode (#1067)",
+            io.github.sceneview.DefaultCameraNode.DEFAULT_APERTURE,
+            ARDefaultCameraNode.DEFAULT_APERTURE,
+            0.0f,
+        )
+        assertEquals(
+            "Shutter speed must match 3D DefaultCameraNode (#1067)",
+            io.github.sceneview.DefaultCameraNode.DEFAULT_SHUTTER_SPEED,
+            ARDefaultCameraNode.DEFAULT_SHUTTER_SPEED,
+            0.0f,
+        )
+        assertEquals(
+            "ISO must match 3D DefaultCameraNode (#1067)",
+            io.github.sceneview.DefaultCameraNode.DEFAULT_ISO,
+            ARDefaultCameraNode.DEFAULT_ISO,
+            0.0f,
+        )
+    }
+
+    @Test
+    fun defaultExposureIsAtLeastOneStopBrighterThanSunny16() {
         // Cross-check the three components combine to a brighter exposure than
-        // Filament's default "sunny-16" (f/16, 1/125 s, ISO 100). This was the
-        // crux of #1067 — the old defaults assumed a 100k lux main light, so
-        // after the v4.1.0 rebalance every AR demo had to opt out with
-        // `cameraExposure = -1.0f`. The new defaults must be at least ~3 stops
-        // brighter (lower EV) to match the 10k lux main light.
+        // Filament's default "sunny-16" (f/16, 1/125 s, ISO 100). The new
+        // defaults compute to ≈1.15 stops brighter (EV 13.81 vs 14.97), which
+        // is the actual #1067 target — sunny-16 assumed a 100k lux main light,
+        // and the v4.1.0 rebalance dropped that to 10k lux. Restoring sunny-16
+        // would reopen the workaround spiral that drove 11 AR demos to set
+        // `cameraExposure = -1.0f`. The strict ≥1 stop threshold catches any
+        // partial regression (e.g. f/14 + 1/160 + ISO 125 ≈ 0.95 stops fails).
         val newEv = exposureValue(
             ARDefaultCameraNode.DEFAULT_APERTURE,
             ARDefaultCameraNode.DEFAULT_SHUTTER_SPEED,
@@ -76,8 +105,8 @@ class ARDefaultCameraNodeTest {
         val stopsBrighter = sunny16Ev - newEv
         assertTrue(
             "New AR camera defaults must be ≥1 stop brighter than sunny-16 (saw " +
-                "${"%.2f".format(stopsBrighter)} stops). Reverting to f/16+1/125+ISO100 reopens " +
-                "the #1067 workaround spiral.",
+                "${"%.2f".format(stopsBrighter)} stops). Reverting toward f/16+1/125+ISO100 " +
+                "reopens the #1067 workaround spiral.",
             stopsBrighter >= 1.0,
         )
     }
