@@ -50,42 +50,58 @@ class Matrix {
     }
 
     fun decomposeRotation(decomposedScale: Vector3, destRotation: Quaternion) {
-        val m00 = data[0]
-        val m01 = data[1]
-        val m02 = data[2]
-        val m03 = data[3]
-        val m10 = data[4]
-        val m11 = data[5]
-        val m12 = data[6]
-        val m13 = data[7]
-        val m20 = data[8]
-        val m21 = data[9]
-        val m22 = data[10]
-        val m23 = data[11]
-        val m30 = data[12]
-        val m31 = data[13]
-        val m32 = data[14]
-        val m33 = data[15]
+        // Pre-#1126 this method used `this` as scratch: called the destMatrix overload
+        // with `this` to normalize in-place, ran extractQuaternion off the now-normalized
+        // data, then restored from a 16-field snapshot. Any concurrent read of `data`
+        // during those ~30 instructions saw a normalized (rotation-only) matrix instead
+        // of the full TRS — silently wrong matrices on hot frames where Compose and the
+        // render thread both touch the same node transform.
+        //
+        // Fix: compute the normalized rotation values into immutable locals and run the
+        // quaternion extraction off those. `data` is now read-only within this method
+        // (single snapshot at call entry), so concurrent readers never observe a partial
+        // state. The destMatrix overload below is unchanged and remains safe as long as
+        // callers don't pass `this` (the only such caller was the buggy block above).
+        val sx = decomposedScale.x
+        val sy = decomposedScale.y
+        val sz = decomposedScale.z
+        val nm0 = if (sx != 0f) data[0] / sx else 0f
+        val nm1 = if (sx != 0f) data[1] / sx else 0f
+        val nm2 = if (sx != 0f) data[2] / sx else 0f
+        val nm4 = if (sy != 0f) data[4] / sy else 0f
+        val nm5 = if (sy != 0f) data[5] / sy else 0f
+        val nm6 = if (sy != 0f) data[6] / sy else 0f
+        val nm8 = if (sz != 0f) data[8] / sz else 0f
+        val nm9 = if (sz != 0f) data[9] / sz else 0f
+        val nm10 = if (sz != 0f) data[10] / sz else 0f
 
-        decomposeRotation(decomposedScale, this)
-        extractQuaternion(destRotation)
-
-        data[0] = m00
-        data[1] = m01
-        data[2] = m02
-        data[3] = m03
-        data[4] = m10
-        data[5] = m11
-        data[6] = m12
-        data[7] = m13
-        data[8] = m20
-        data[9] = m21
-        data[10] = m22
-        data[11] = m23
-        data[12] = m30
-        data[13] = m31
-        data[14] = m32
-        data[15] = m33
+        val trace = nm0 + nm5 + nm10
+        if (trace > 0) {
+            val s = sqrt(trace + 1.0).toFloat() * 2.0f
+            destRotation.w = 0.25f * s
+            destRotation.x = (nm6 - nm9) / s
+            destRotation.y = (nm8 - nm2) / s
+            destRotation.z = (nm1 - nm4) / s
+        } else if (nm0 > nm5 && nm0 > nm10) {
+            val s = sqrt(1.0f + nm0 - nm5 - nm10.toDouble()).toFloat() * 2.0f
+            destRotation.w = (nm6 - nm9) / s
+            destRotation.x = 0.25f * s
+            destRotation.y = (nm4 + nm1) / s
+            destRotation.z = (nm8 + nm2) / s
+        } else if (nm5 > nm10) {
+            val s = sqrt(1.0f + nm5 - nm0 - nm10.toDouble()).toFloat() * 2.0f
+            destRotation.w = (nm8 - nm2) / s
+            destRotation.x = (nm4 + nm1) / s
+            destRotation.y = 0.25f * s
+            destRotation.z = (nm9 + nm6) / s
+        } else {
+            val s = sqrt(1.0f + nm10 - nm0 - nm5.toDouble()).toFloat() * 2.0f
+            destRotation.w = (nm1 - nm4) / s
+            destRotation.x = (nm8 + nm2) / s
+            destRotation.y = (nm9 + nm6) / s
+            destRotation.z = 0.25f * s
+        }
+        destRotation.normalize()
     }
 
     fun decomposeRotation(decomposedScale: Vector3, destMatrix: Matrix) {

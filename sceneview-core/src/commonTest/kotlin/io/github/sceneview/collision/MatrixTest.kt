@@ -414,4 +414,35 @@ class MatrixTest {
         val dot = kotlin.math.abs(q.x * extractedQ.x + q.y * extractedQ.y + q.z * extractedQ.z + q.w * extractedQ.w)
         assertTrue(dot > 0.99f, "decomposeRotation failed: dot=$dot")
     }
+
+    @Test
+    fun decomposeRotationLeavesDataUntouched() {
+        // Pre-#1126: decomposeRotation(scale, Quaternion) used `this` as scratch space,
+        // transiently writing the normalized rotation matrix into `this.data` before
+        // restoring the original. Any concurrent reader of `data` during those ~30
+        // instructions saw a normalized matrix instead of the full TRS — silently
+        // wrong matrices on hot frames where Compose and the render thread both touch
+        // the same node transform.
+        //
+        // Post-fix: `data` is now read-only within decomposeRotation(scale, Quaternion).
+        // This test pins that the method never mutates `data`, eliminating the
+        // visibility race.
+        val m = Matrix()
+        val q = Quaternion.axisAngle(Vector3.up(), 45f)
+        m.makeTrs(Vector3(1f, 2f, 3f), q, Vector3(2f, 2f, 2f))
+        val snapshotBefore = m.data.copyOf()
+
+        val scale = Vector3()
+        m.decomposeScale(scale)
+        val extractedQ = Quaternion()
+        m.decomposeRotation(scale, extractedQ)
+
+        for (i in snapshotBefore.indices) {
+            assertTrue(
+                kotlin.math.abs(snapshotBefore[i] - m.data[i]) < 1e-6f,
+                "decomposeRotation must not mutate this.data — index $i changed " +
+                        "from ${snapshotBefore[i]} to ${m.data[i]}"
+            )
+        }
+    }
 }
