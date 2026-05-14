@@ -1,6 +1,22 @@
 # Changelog
 
-## v4.3.4 — Pixel 9 production hotfix: AR Face Mesh + Instant Placement UX + UTF-8 + iOS LightingDemo (2026-05-15)
+## Unreleased — v4.3.5 hotfix (in progress)
+
+### Fixed — Pixel 9 v4.3.0 production audit follow-ups ([umbrella #1176](https://github.com/sceneview/sceneview/issues/1176))
+
+Five demo polish bugs caught in the Pixel 9 production audit. All are scoped to `samples/android-demo/` and `samples/android-demo/src/main/res/values-fr/strings.xml` — no library APIs change.
+
+- **AR Instant Placement — "Initializing camera" pill overlapped Clear All at startup ([#1199](https://github.com/sceneview/sceneview/issues/1199))** — `ARInstantPlacementDemo.kt` now hides the bottom-start "Clear All" button until at least one anchor has been placed (dead affordance pre-tap), and moves the "Initializing camera — you can already tap to place" toast pill from `BottomCenter` to `TopCenter` (56 dp below the stats pill). Before, the two competed for the bottom anchor area and the user saw what looked like two half-overlapping buttons. Now: top of screen carries the transient init message, bottom is empty until an anchor exists.
+
+- **AR Pose Placement — primitives appeared unlit on Pixel 9 ([#1200](https://github.com/sceneview/sceneview/issues/1200))** — `ARPoseDemo.kt` retunes both cube and sphere PBR materials from `roughness=0.85, reflectance=0.1` to `roughness=0.55, reflectance=0.2`. The previous values were pinned all the way to "matte safety" to avoid an IBL specular blowout on the original metallic=0.5 setup, but swung too far the other way under ARCore `ENVIRONMENTAL_HDR` — the sphere lost all visible diffuse falloff and read as a flat 2D circle next to a barely-shaded cube. The new mid-rough setting keeps the IBL safe (no blowout, metallic stays 0) while restoring the diffuse gradient that makes the sphere read as a 3D sphere.
+
+- **Sketchfab model viewer — initial expand rendered model inside a circular crop ([#1201](https://github.com/sceneview/sceneview/issues/1201))** — `SketchfabModelViewerScreen.kt::RenderContent` now defers mounting `SceneView` until `rememberModelInstance` resolves (`instance != null`). Before, the SceneView was always composed and an opaque-surface loading placeholder was layered on top with a centered `CircularProgressIndicator`. During the bottom-sheet expand transition, the opaque surface faded relative to the still-rendering SceneView surface underneath, producing a brief "model visible inside a circular porthole" frame (the user could see the model through the fading surface overlay, with the centered spinner ring framing the visible area). Now the placeholder owns the full 440 dp box cleanly until the GLB is ready, then the SceneView mounts in one swap.
+
+- **i18n: missing French translations for streamed-model credits sheet + asset-source chips ([#1204](https://github.com/sceneview/sceneview/issues/1204))** — `values-fr/strings.xml` adds the 7 keys flagged by the post-#1099/#1160 audit: `credits_sheet_title` / `credits_sheet_subtitle` / `credits_sheet_footer` / `credits_row_open_cd` for the streamed-model attribution sheet, and `demo_chip_bundled` / `demo_chip_streamed` / `demo_chip_streaming` for the DemoScaffold asset-source chip. The `demo_ar_streetscape_*` keys called out in the original issue body were already translated; this PR closes the broader audit gap discovered by `comm -23 used_keys.txt fr_keys.txt` (139 used keys, 7 had EN entries but no FR entries).
+
+- **Debug Overlay — single-sphere case spawned off-screen at (-0.9, -0.9, 0) ([#1212](https://github.com/sceneview/sceneview/issues/1212))** — `DebugOverlayDemo.kt` now computes the grid footprint from the *actual* node count: `cols = min(10, count)`, `rows = min(10, ceil(count / cols))`, `layers = ceil(count / (cols × rows))`, then offsets each sphere by `-(axisLen - 1) / 2 × NODE_SPACING` so the cluster mean is *always* at origin. At count=1 → cols=rows=layers=1 → offsets all zero → sphere lands at (0, 0, 0) where the camera is looking. At count=100..1000 the new formula collapses to the same 10×10×N centered footprint as before. The previous formula `(i % 10) - 5` baked in a "10 wide" assumption that put count=1 at (-0.9, -0.9, 0) — 3.6× outside the camera frustum at the SINGLE_SPHERE_DISTANCE = 0.8 m camera distance. `autoFitDistance(...)` updated to read the new grid footprint so framing stays consistent.
+
+
 
 ### Fixed — Sketchfab Explore cosmetic & iOS demo gaps
 
