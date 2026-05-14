@@ -137,6 +137,56 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
     val recordingsDir = remember(context) {
         context.getExternalFilesDir("ar-recordings")!!.also { it.mkdirs() }
     }
+    // Extract any bundled recordings shipped in `src/debug/assets/ar-recordings/`
+    // into `recordingsDir` on first launch — gives emulator + ARCore-less
+    // debug-build devices a known-good playback dataset out of the box, so the
+    // AR demos are reproducible without a physical capture session. The bundle
+    // lives in the `debug` sourceSet so the release APK doesn't ship it (#934).
+    // See `samples/android-demo/src/debug/assets/ar-recordings/README.md`.
+    LaunchedEffect(recordingsDir) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val assetMgr = context.assets
+                val bundled = assetMgr.list("ar-recordings")?.filter {
+                    it.endsWith(".mp4", ignoreCase = true)
+                } ?: emptyList()
+                for (name in bundled) {
+                    val target = File(recordingsDir, name)
+                    val expectedBytes = assetMgr.openFd("ar-recordings/$name").use { it.length }
+                    // Skip if already present AND length matches the bundled
+                    // asset — a future release that ships an updated recording
+                    // (e.g. bumped to a newer ARCore SDK) will re-extract.
+                    if (target.exists() && target.length() == expectedBytes) continue
+                    // Write to a `.tmp` first then rename, so a kill / process
+                    // death mid-copy can't leave a half-written file that the
+                    // next `target.exists()` check would silently accept.
+                    val tmp = File(recordingsDir, "$name.tmp")
+                    try {
+                        assetMgr.open("ar-recordings/$name").use { input ->
+                            tmp.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        if (!tmp.renameTo(target)) {
+                            tmp.delete()
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        // Re-throw to keep structured concurrency intact — the
+                        // parent LaunchedEffect cancel must propagate (lesson
+                        // from #980). Drop the partial tmp file first.
+                        tmp.delete()
+                        throw e
+                    } catch (_: Throwable) {
+                        tmp.delete()
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Bundled extraction is a nice-to-have; missing files just
+                // mean the user sees an empty Playback list and can record
+                // their own session.
+            }
+        }
+    }
     val recordings = remember { mutableStateListOf<File>() }
     fun refreshRecordings() {
         recordings.clear()
