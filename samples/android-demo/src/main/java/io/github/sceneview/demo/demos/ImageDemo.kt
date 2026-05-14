@@ -10,8 +10,10 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Scale
 import io.github.sceneview.rememberCameraManipulator
@@ -30,7 +32,7 @@ fun ImageDemo(onBack: () -> Unit) {
     val materialLoader = rememberMaterialLoader(engine)
 
     DemoScaffold(
-        title = "Image Planes",
+        title = stringResource(R.string.demo_image_title),
         onBack = onBack,
         controls = {
             Text(

@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Anchor
@@ -37,6 +38,7 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -83,7 +85,7 @@ fun ARInstantPlacementDemo(onBack: () -> Unit) {
     var instantEnabled by remember { mutableStateOf(true) }
 
     DemoScaffold(
-        title = "Instant Placement",
+        title = stringResource(R.string.demo_ar_instant_placement_title),
         onBack = onBack,
         controls = {
             Text(

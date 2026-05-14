@@ -38,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +58,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.rerun.RerunBridge
 import io.github.sceneview.ar.rerun.rememberRerunBridge
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -118,7 +120,7 @@ fun ARRerunDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Rerun Debug",
+        title = stringResource(R.string.demo_ar_rerun_title),
         onBack = onBack,
         controls = {
             // ── Primary action ──────────────────────────────────────────────

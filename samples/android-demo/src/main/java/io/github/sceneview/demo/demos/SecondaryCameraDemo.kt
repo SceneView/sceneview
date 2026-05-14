@@ -13,9 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
@@ -47,7 +49,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
     val target = remember { Position(0f, 0f, 0f) }
 
     DemoScaffold(
-        title = "Camera Presets",
+        title = stringResource(R.string.demo_secondary_camera_title),
         onBack = onBack,
         controls = {
             Text("Camera Angle", style = MaterialTheme.typography.labelLarge)

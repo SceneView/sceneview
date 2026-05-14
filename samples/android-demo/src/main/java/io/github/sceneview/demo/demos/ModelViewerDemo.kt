@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -42,7 +44,7 @@ fun ModelViewerDemo(onBack: () -> Unit) {
         durationMillis = 20_000,
     )
 
-    DemoScaffold(title = "Model Viewer", onBack = onBack) {
+    DemoScaffold(title = stringResource(R.string.demo_model_viewer), onBack = onBack) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),

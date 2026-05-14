@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,12 +85,12 @@ fun DemoListScreen(
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("Samples") },
+                title = { Text(stringResource(R.string.samples_title)) },
                 actions = {
                     IconButton(onClick = onAboutClick) {
                         Icon(
                             Icons.Outlined.Info,
-                            contentDescription = "About",
+                            contentDescription = stringResource(R.string.samples_back_about),
                         )
                     }
                 },
@@ -126,7 +127,7 @@ fun DemoListScreen(
                     span = { GridItemSpan(2) },
                 ) {
                     Text(
-                        text = category,
+                        text = stringResource(categoryDisplayNameRes(category)),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -145,6 +146,8 @@ fun DemoListScreen(
                         onClick = { onDemoClick(demo.id) },
                     )
                 }
+                // intentionally pinned to demos.size so the LazyGrid skips an
+                // empty section without leaving stray padding
             }
 
             item(
@@ -159,13 +162,14 @@ fun DemoListScreen(
                     Text(
                         // BuildConfig.VERSION_NAME comes from gradle.properties /
                         // CI build args — hard-coding here would drift every
-                        // release.
-                        text = "SceneView v${BuildConfig.VERSION_NAME}",
+                        // release. The formatted resource carries the "v" prefix
+                        // and label in the active locale.
+                        text = stringResource(R.string.samples_footer_version, BuildConfig.VERSION_NAME),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "github.com/sceneview/sceneview",
+                        text = stringResource(R.string.samples_footer_repo),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -232,14 +236,14 @@ private fun DemoCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = demo.title,
+                        text = stringResource(demo.titleRes),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                     )
                     Text(
-                        text = demo.subtitle,
+                        text = stringResource(demo.subtitleRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -268,8 +272,8 @@ private fun DemoCard(
 @Composable
 private fun StatusChip(status: DemoStatus, modifier: Modifier = Modifier) {
     val label = when (status) {
-        DemoStatus.KnownIssue -> "Preview"
-        DemoStatus.ComingSoon -> "Soon"
+        DemoStatus.KnownIssue -> stringResource(R.string.samples_chip_preview)
+        DemoStatus.ComingSoon -> stringResource(R.string.samples_chip_soon)
         DemoStatus.Working -> return // Caller already gates; defensive no-op.
     }
     Surface(

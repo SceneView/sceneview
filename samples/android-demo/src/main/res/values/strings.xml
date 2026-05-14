@@ -7,26 +7,100 @@
     <string name="tab_ar">AR</string>
     <string name="tab_samples">Samples</string>
     <string name="tab_about">About</string>
+    <string name="tab_explore">Explore</string>
+    <string name="tab_ar_view">AR View</string>
 
     <!-- Explore screen -->
     <string name="explore_title">SceneView</string>
     <string name="explore_subtitle">3D &amp; AR for Jetpack Compose</string>
-    <string name="explore_gesture_hint">Pinch to zoom \u00B7 Drag to orbit \u00B7 Double-tap to enlarge</string>
+    <string name="explore_gesture_hint">Pinch to zoom · Drag to orbit · Double-tap to enlarge</string>
     <string name="explore_pause">Pause animation</string>
     <string name="explore_play">Play animation</string>
     <string name="explore_animation_count">%d animations</string>
     <string name="explore_loading">Loading 3D model</string>
+    <string name="explore_heading">Explore</string>
+    <string name="explore_search_placeholder">Search 3D models on Sketchfab</string>
+    <string name="explore_filter_animated">Animated</string>
+    <string name="explore_try_a_sample">Try a sample</string>
+    <string name="explore_trending_models">Trending models</string>
+    <string name="explore_staff_picks">Staff picks</string>
+    <string name="explore_recently_added">Recently added</string>
+    <string name="explore_categories">Categories</string>
+    <string name="explore_recent_searches">Recent searches</string>
+    <string name="explore_clear">Clear</string>
+    <string name="explore_clear_search">Clear search</string>
+    <string name="explore_remove_query">Remove %s</string>
+
+    <!-- Sketchfab model viewer screen -->
+    <string name="sketchfab_animated">Animated</string>
+    <string name="sketchfab_open_in_sceneview">Open in SceneView</string>
+    <string name="sketchfab_rendered_locally">Rendered locally by Filament — no external viewer.</string>
+    <string name="sketchfab_loading_model">Loading %s…</string>
+    <string name="sketchfab_streaming_from">Streaming from Sketchfab · rendering in SceneView</string>
+    <string name="sketchfab_rendered_by">Rendered by SceneView · %s polys</string>
+    <string name="sketchfab_could_not_open">Couldn\'t open this model</string>
+    <string name="sketchfab_try_again">Try again</string>
+    <string name="sketchfab_download_failed">Download failed</string>
 
     <!-- AR screen -->
     <string name="ar_scan_surface">Point your camera at a flat surface</string>
-    <string name="ar_model_placed">Model placed \u2014 tap to reposition</string>
+    <string name="ar_model_placed">Model placed — tap to reposition</string>
     <string name="ar_not_available_title">AR Not Available</string>
     <string name="ar_not_available_description">This device does not support ARCore.\nAR features require a compatible Android device with Google Play Services for AR installed.</string>
     <string name="ar_drag_to_move">Drag to move</string>
     <string name="ar_pinch_to_scale">Pinch to scale</string>
     <string name="ar_twist_to_rotate">Twist to rotate</string>
     <string name="ar_remove">Remove</string>
-    <string name="ar_model_load_failed">Model could not load \u2014 check your connection</string>
+    <string name="ar_model_load_failed">Model could not load — check your connection</string>
+
+    <!-- AR launcher screen -->
+    <string name="ar_experiences_title">AR Experiences</string>
+    <string name="ar_experiences_tagline">Place models, scan faces, anchor to terrain.</string>
+    <string name="ar_status_ready">AR ready on this device.</string>
+    <string name="ar_status_not_installed">AR works on this device — ARCore will install on first launch.</string>
+    <string name="ar_status_apk_old">AR works on this device — an ARCore update is available.</string>
+    <string name="ar_status_unsupported">Live AR is not supported on this device, but you can still explore the AR demos below to see how the SDK is used.</string>
+    <string name="ar_status_unknown_error">Couldn\'t check AR availability. Try one of the demos below to see how the SDK is used.</string>
+    <string name="ar_status_checking">Checking AR availability…</string>
+    <string name="ar_cta_checking">Checking…</string>
+    <string name="ar_cta_grant_camera">Grant Camera Access</string>
+    <string name="ar_cta_start_camera">Start AR Camera</string>
+    <string name="ar_try_an_ar_demo">Try an AR demo</string>
+    <string name="ar_exit_session">Exit AR session</string>
+    <string name="ar_reset_scene">Reset scene</string>
+    <string name="ar_share_screenshot">Share screenshot</string>
+    <string name="ar_screenshot_toast">Screenshot capture: use system screenshot (Power + Volume Down)</string>
+    <string name="ar_pick_a_model">Pick a model</string>
+    <string name="ar_picker_model_label">Model</string>
+    <string name="ar_status_scanning">Scanning for surfaces…</string>
+    <string name="ar_status_tap_to_place">Tap a surface to place %s</string>
+    <string name="ar_status_one_placed">1 placed · tap to add</string>
+    <string name="ar_status_n_placed">%d placed · tap to add</string>
+    <string name="ar_starting_session">Starting AR session…</string>
+    <string name="ar_starting_session_subtitle">Hold up — initializing ARCore.</string>
+    <string name="ar_permission_required_title">Camera permission is required to run AR</string>
+    <string name="ar_permission_required_subtitle">Grant the permission in system settings, then return to this tab.</string>
+
+    <!-- Tracking failure reasons -->
+    <string name="ar_tracking_bad_state">AR session error</string>
+    <string name="ar_tracking_insufficient_light">Not enough light</string>
+    <string name="ar_tracking_excessive_motion">Moving too fast</string>
+    <string name="ar_tracking_insufficient_features">Not enough detail — try a textured surface</string>
+    <string name="ar_tracking_camera_unavailable">Camera unavailable</string>
+
+    <!-- Featured AR demos on the AR launcher -->
+    <string name="featured_ar_placement_title">Tap to Place</string>
+    <string name="featured_ar_placement_subtitle">Drop 3D models on detected planes</string>
+    <string name="featured_ar_face_title">Face Mesh</string>
+    <string name="featured_ar_face_subtitle">Track and overlay the user\'s face</string>
+    <string name="featured_ar_cloud_anchor_title">Cloud Anchor</string>
+    <string name="featured_ar_cloud_anchor_subtitle">Persistent anchors shared across devices</string>
+    <string name="featured_ar_streetscape_title">Streetscape</string>
+    <string name="featured_ar_streetscape_subtitle">Geospatial geometry of cities</string>
+    <string name="featured_ar_depth_occlusion_title">Depth Occlusion</string>
+    <string name="featured_ar_depth_occlusion_subtitle">Real objects hide virtual ones</string>
+    <string name="featured_ar_pose_title">Pose Placement</string>
+    <string name="featured_ar_pose_subtitle">Free pose positioning in space</string>
 
     <!-- Samples screen -->
     <string name="samples_title">Samples</string>
@@ -34,8 +108,13 @@
     <string name="samples_badge_live">LIVE</string>
     <string name="samples_badge_soon">SOON</string>
     <string name="samples_back">Back</string>
+    <string name="samples_back_about">About</string>
+    <string name="samples_chip_preview">Preview</string>
+    <string name="samples_chip_soon">Soon</string>
+    <string name="samples_footer_version">SceneView v%s</string>
+    <string name="samples_footer_repo">github.com/sceneview/sceneview</string>
 
-    <!-- Sample categories -->
+    <!-- Sample categories (legacy keys kept for accessibility / cross-platform docs) -->
     <string name="category_3d">3D</string>
     <string name="category_effects">Effects</string>
     <string name="category_content">Content</string>
@@ -43,7 +122,13 @@
     <string name="category_ar">AR</string>
     <string name="category_interactive">Interactive</string>
 
-    <!-- Sample demo titles -->
+    <!-- Sample categories (stable display labels used by DemoListScreen) -->
+    <string name="category_3d_basics">3D Basics</string>
+    <string name="category_lighting_environment">Lighting &amp; Environment</string>
+    <string name="category_interaction">Interaction</string>
+    <string name="category_augmented_reality">Augmented Reality</string>
+
+    <!-- Sample demo titles (legacy keys preserved for backwards compatibility) -->
     <string name="demo_model_viewer">Model Viewer</string>
     <string name="demo_model_viewer_desc">Load and render glTF/GLB 3D models with orbit camera</string>
     <string name="demo_geometry">Geometry Nodes</string>
@@ -83,15 +168,95 @@
     <string name="demo_gesture_editing">Gesture Editing</string>
     <string name="demo_gesture_editing_desc">Drag, rotate, and scale models with touch gestures</string>
 
+    <!-- Sample demo titles + subtitles (canonical keys consumed by DemoRegistry) -->
+    <string name="demo_model_viewer_subtitle">Load and display 3D models</string>
+    <string name="demo_geometry_title">Geometry Primitives</string>
+    <string name="demo_geometry_subtitle">Cube, Sphere, Cylinder, Plane</string>
+    <string name="demo_animation_title">Auto Rotate</string>
+    <string name="demo_animation_subtitle">Play, pause, and control animations</string>
+    <string name="demo_multi_model_title">Multi Model</string>
+    <string name="demo_multi_model_subtitle">Multiple models in one scene</string>
+    <string name="demo_lighting_title">Light Types</string>
+    <string name="demo_lighting_subtitle">Directional, point, and spot lights</string>
+    <string name="demo_movable_light_title">Movable Light</string>
+    <string name="demo_movable_light_subtitle">Drag to orbit the light around the model</string>
+    <string name="demo_dynamic_sky_subtitle">Time-of-day sun simulation</string>
+    <string name="demo_fog_subtitle">Atmospheric fog effects</string>
+    <string name="demo_environment_title">Environment Gallery</string>
+    <string name="demo_environment_subtitle">HDR environment switching</string>
+    <string name="demo_text_title">Text Nodes</string>
+    <string name="demo_text_subtitle">3D text in the scene</string>
+    <string name="demo_lines_paths_title">Lines &amp; Paths</string>
+    <string name="demo_lines_paths_subtitle">Line segments and polylines</string>
+    <string name="demo_image_title">Image Planes</string>
+    <string name="demo_image_subtitle">Image planes in 3D space</string>
+    <string name="demo_billboard_title">Billboard</string>
+    <string name="demo_billboard_subtitle">Camera-facing quads</string>
+    <string name="demo_video_title">Video</string>
+    <string name="demo_video_subtitle">Video playback on 3D surface</string>
+    <string name="demo_camera_controls_title">Camera Controls</string>
+    <string name="demo_camera_controls_subtitle">Orbit, fly, and free camera modes</string>
+    <string name="demo_gesture_editing_title">Gesture Editing</string>
+    <string name="demo_gesture_editing_subtitle">Move, scale, rotate with gestures</string>
+    <string name="demo_collision_title">Collision &amp; Hit Test</string>
+    <string name="demo_collision_subtitle">Hit testing and collision detection</string>
+    <string name="demo_view_node_title">ViewNode</string>
+    <string name="demo_view_node_subtitle">Compose UI embedded in 3D space</string>
+    <string name="demo_physics_title">Physics</string>
+    <string name="demo_physics_subtitle">Gravity, collisions, rigid bodies</string>
+    <string name="demo_post_processing_title">Post Processing</string>
+    <string name="demo_post_processing_subtitle">SSAO, anti-aliasing, tone mapping</string>
+    <string name="demo_custom_mesh_title">Custom Mesh</string>
+    <string name="demo_custom_mesh_subtitle">Custom vertex and index buffers</string>
+    <string name="demo_shape_title">All Shapes</string>
+    <string name="demo_shape_subtitle">Extruded 2D polygons</string>
+    <string name="demo_reflection_probes_title">Reflection Probes</string>
+    <string name="demo_reflection_probes_subtitle">Local cubemap reflections</string>
+    <string name="demo_secondary_camera_title">Camera Presets</string>
+    <string name="demo_secondary_camera_subtitle">Picture-in-picture camera view</string>
+    <string name="demo_debug_overlay_title">Debug Overlay</string>
+    <string name="demo_debug_overlay_subtitle">Performance stats overlay</string>
+    <string name="demo_ar_placement_title">Tap to Place</string>
+    <string name="demo_ar_placement_subtitle">Place 3D models in AR</string>
+    <string name="demo_ar_image_title">Augmented Image</string>
+    <string name="demo_ar_image_subtitle">Detect and track images</string>
+    <string name="demo_ar_face_title">Face Mesh</string>
+    <string name="demo_ar_face_subtitle">Facial mesh tracking</string>
+    <string name="demo_ar_cloud_anchor_title">Cloud Anchor</string>
+    <string name="demo_ar_cloud_anchor_subtitle">Persistent cloud anchors</string>
+    <string name="demo_ar_streetscape_title">Streetscape Geometry</string>
+    <string name="demo_ar_streetscape_subtitle">Urban geometry overlay</string>
+    <string name="demo_ar_pose_title">Pose Placement</string>
+    <string name="demo_ar_pose_subtitle">Free pose positioning</string>
+    <string name="demo_ar_rerun_title">Rerun Debug</string>
+    <string name="demo_ar_rerun_subtitle">AR debug streaming to Rerun.io</string>
+    <string name="demo_ar_record_playback_title">Record &amp; Playback</string>
+    <string name="demo_ar_record_playback_subtitle">Record an AR session and replay it without a phone</string>
+    <string name="demo_ar_depth_occlusion_title">Depth Occlusion</string>
+    <string name="demo_ar_depth_occlusion_subtitle">Real objects hide virtual ones — Depth API</string>
+    <string name="demo_ar_instant_placement_title">Instant Placement</string>
+    <string name="demo_ar_instant_placement_subtitle">Place models before plane detection converges</string>
+    <string name="demo_ar_terrain_title">Terrain Anchors</string>
+    <string name="demo_ar_terrain_subtitle">Geospatial anchor that snaps to outdoor terrain</string>
+    <string name="demo_ar_rooftop_title">Rooftop Anchors</string>
+    <string name="demo_ar_rooftop_subtitle">Geospatial anchor that snaps to building rooftops</string>
+    <string name="demo_ar_image_stabilization_title">Image Stabilization (EIS)</string>
+    <string name="demo_ar_image_stabilization_subtitle">Smooth shaky camera with one config flag</string>
+    <string name="demo_ar_orbital_title">Orbital AR</string>
+    <string name="demo_ar_orbital_subtitle">Models orbit around you in a personal solar system</string>
+
+    <!-- Demo placeholder -->
+    <string name="demo_coming_soon">Coming soon</string>
+
     <!-- Demo UI controls -->
     <string name="control_sun_intensity">Sun Intensity: %d lux</string>
     <string name="control_fog_density">Fog Density: %s</string>
     <string name="control_drop_again">Drop Again</string>
     <string name="control_camera_label">Camera: %s</string>
-    <string name="control_orbit_instruction">1 finger \u2014 Orbit</string>
-    <string name="control_pan_instruction">2 fingers \u2014 Pan</string>
-    <string name="control_zoom_instruction">Pinch \u2014 Zoom</string>
-    <string name="control_double_tap_reset">Double tap \u2014 Reset</string>
+    <string name="control_orbit_instruction">1 finger — Orbit</string>
+    <string name="control_pan_instruction">2 fingers — Pan</string>
+    <string name="control_zoom_instruction">Pinch — Zoom</string>
+    <string name="control_double_tap_reset">Double tap — Reset</string>
     <string name="control_environment_reflections">Environment Reflections</string>
     <string name="control_environment_reflections_desc">Switch environments to see how reflections change on the model surface.</string>
     <string name="control_light_color">Light Color</string>
@@ -99,7 +264,7 @@
     <string name="control_light_type">Light Type</string>
     <string name="control_animation_speed">Speed: %.1fx</string>
     <string name="control_animation_loop">Loop</string>
-    <string name="control_gesture_drag_hint">Drag model to move \u00B7 Pinch to resize \u00B7 Twist to rotate</string>
+    <string name="control_gesture_drag_hint">Drag model to move · Pinch to resize · Twist to rotate</string>
     <string name="control_reset_position">Reset</string>
 
     <!-- Image Detection demo -->
@@ -114,6 +279,7 @@
     <string name="about_sceneview">SceneView</string>
     <string name="about_version">v%s</string>
     <string name="about_tagline">3D &amp; AR as declarative UI\nfor Android, iOS, Web &amp; more</string>
+    <string name="about_tagline_hero">3D &amp; AR for Jetpack Compose, SwiftUI, and the Web.\nDeclarative, AI-friendly, open source.</string>
     <string name="about_feature_3d_title">3D Scenes</string>
     <string name="about_feature_3d_desc">Full Jetpack Compose integration with Filament rendering engine. Load glTF/GLB models, procedural geometry, dynamic skies, and more.</string>
     <string name="about_feature_ar_title">Augmented Reality</string>
@@ -129,10 +295,26 @@
     <string name="about_credits_models_link">View 3D asset credits</string>
     <string name="about_credits_models_url">https://github.com/sceneview/sceneview/blob/main/assets/CREDITS.md</string>
     <string name="about_credits_license">SceneView itself is open source under the Apache License 2.0. Model licenses are separate and attached to each individual asset.</string>
+    <string name="about_card_open_source_title">Open Source</string>
+    <string name="about_card_open_source_subtitle">Apache 2.0 — free for any project, forever</string>
+    <string name="about_card_docs_title">Documentation</string>
+    <string name="about_card_docs_subtitle">Guides, API reference, recipes</string>
+    <string name="about_card_github_title">GitHub</string>
+    <string name="about_card_github_subtitle">Source, issues, releases</string>
+    <string name="about_card_playground_title">3D Playground</string>
+    <string name="about_card_playground_subtitle">Try every feature in the browser</string>
+    <string name="about_card_sponsor_title">Sponsor</string>
+    <string name="about_card_sponsor_subtitle">Help keep the project free &amp; active</string>
+    <string name="about_card_credits_title">Credits</string>
+    <string name="about_card_credits_subtitle">Built with Filament, ARCore, Jetpack Compose</string>
+    <string name="about_star_on_github">Star on GitHub</string>
+    <string name="about_made_with">Made with</string>
+    <string name="about_made_by"> by Thomas Gorisse</string>
+    <string name="about_made_by_team">and the SceneView contributors</string>
 
     <!-- Update banner -->
     <string name="update_available">Update available</string>
-    <string name="update_downloading">Downloading update\u2026</string>
+    <string name="update_downloading">Downloading update…</string>
     <string name="update_ready">Update ready!</string>
     <string name="update_restart">Restart</string>
     <string name="update_check">Check for updates</string>
@@ -142,7 +324,7 @@
     <string name="ar_not_installed">Google Play Services for AR is not installed</string>
     <string name="ar_camera_permission">Camera permission is required for AR</string>
     <string name="ar_grant_permission">Grant Camera Permission</string>
-    <string name="model_loading">Loading 3D model\u2026</string>
+    <string name="model_loading">Loading 3D model…</string>
     <string name="model_loading_error">Failed to load model</string>
     <string name="scene_error">Something went wrong rendering the scene</string>
 

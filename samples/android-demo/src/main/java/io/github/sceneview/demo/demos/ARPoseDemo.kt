@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
@@ -24,6 +25,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.demo.common.Axes3DNode
 import io.github.sceneview.math.Size
@@ -86,7 +88,7 @@ fun ARPoseDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Pose Placement",
+        title = stringResource(R.string.demo_ar_pose_title),
         onBack = onBack,
         controls = {
             Text("Position Controls", style = MaterialTheme.typography.labelLarge)

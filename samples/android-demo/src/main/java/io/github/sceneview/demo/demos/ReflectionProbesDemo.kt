@@ -14,11 +14,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import io.github.sceneview.SceneView
 import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.math.Position
@@ -78,7 +80,7 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Reflection Probes",
+        title = stringResource(R.string.demo_reflection_probes_title),
         onBack = onBack,
         controls = {
             Text(

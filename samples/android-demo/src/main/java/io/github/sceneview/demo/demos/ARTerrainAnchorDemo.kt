@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -40,6 +41,7 @@ import dev.romainguy.kotlin.math.Quaternion
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.TerrainAnchorNode
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -113,7 +115,7 @@ fun ARTerrainAnchorDemo(onBack: () -> Unit) {
     }
 
     if (!permissionsResolved || !cameraGranted || !fineLocationGranted) {
-        DemoScaffold(title = "Terrain Anchors", onBack = onBack) {
+        DemoScaffold(title = stringResource(R.string.demo_ar_terrain_title), onBack = onBack) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = permissionDeniedReason ?: "Requesting permissions…",
@@ -166,7 +168,7 @@ fun ARTerrainAnchorDemo(onBack: () -> Unit) {
     val helmetInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
     DemoScaffold(
-        title = "Terrain Anchors",
+        title = stringResource(R.string.demo_ar_terrain_title),
         onBack = onBack,
         controls = {
             Text(

@@ -15,10 +15,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
@@ -53,7 +55,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Physics",
+        title = stringResource(R.string.demo_physics_title),
         onBack = onBack,
         controls = {
             Text("Spheres: $sphereCount", style = MaterialTheme.typography.labelLarge)

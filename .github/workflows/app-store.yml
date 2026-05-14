@@ -157,6 +157,16 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages
 
       - name: Build archive
+        # Inject the Sketchfab API key as a user-defined build setting so it
+        # gets substituted into `Info.plist`'s `SketchfabAPIKey =
+        # $(SKETCHFAB_API_KEY)` placeholder at archive time. Environment
+        # variables set on the runner don't survive `xcodebuild archive` into
+        # the shipped `.ipa`, so the legacy `ProcessInfo` lookup in
+        # `SketchfabConfig.swift` would return nil for every TestFlight +
+        # App Store build (issue #1157). Mirrors the Android pattern in
+        # `play-store.yml:170` / `build-apks.yml:47`.
+        env:
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           xcodebuild archive \
             -project SceneViewDemo.xcodeproj \
@@ -172,7 +182,8 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=5G3DZ3TH45 \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
-            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
+            SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"
 
       - name: Export IPA and upload to TestFlight
         env:
@@ -420,6 +431,12 @@ jobs:
             -clonedSourcePackagesDirPath SourcePackages
 
       - name: Build archive
+        # See iOS variant above for the rationale on `SKETCHFAB_API_KEY=` —
+        # mirrored here so macOS App Store binaries also ship the
+        # Sketchfab key substituted into `Info.plist` rather than the
+        # unsubstituted `$(SKETCHFAB_API_KEY)` literal.
+        env:
+          SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
           xcodebuild archive \
             -project SceneViewDemo.xcodeproj \
@@ -434,7 +451,8 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=5G3DZ3TH45 \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
-            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
+            SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"
 
       - name: Export and upload to App Store
         env:

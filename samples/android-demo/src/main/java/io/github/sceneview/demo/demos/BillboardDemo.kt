@@ -17,10 +17,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Scale
 import io.github.sceneview.rememberCameraManipulator
@@ -48,7 +50,7 @@ fun BillboardDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Billboard",
+        title = stringResource(R.string.demo_billboard_title),
         onBack = onBack,
         controls = {
             Text("Visible Nodes", style = MaterialTheme.typography.labelLarge)

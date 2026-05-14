@@ -25,10 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.common.Axes3DNode
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
@@ -156,7 +158,7 @@ fun GestureEditingDemo(onBack: () -> Unit) {
     }
 
     DemoScaffold(
-        title = "Gesture Editing",
+        title = stringResource(R.string.demo_gesture_editing_title),
         onBack = onBack,
         controls = {
             Row(

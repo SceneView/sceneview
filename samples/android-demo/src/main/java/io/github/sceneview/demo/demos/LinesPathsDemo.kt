@@ -17,9 +17,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
@@ -48,7 +50,7 @@ fun LinesPathsDemo(onBack: () -> Unit) {
     val materialLoader = rememberMaterialLoader(engine)
 
     DemoScaffold(
-        title = "Lines & Paths",
+        title = stringResource(R.string.demo_lines_paths_title),
         onBack = onBack,
         controls = {
             Text("Visibility", style = MaterialTheme.typography.labelLarge)

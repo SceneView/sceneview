@@ -69,6 +69,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 
 class MainActivity : ComponentActivity() {
 
@@ -297,7 +298,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
 fun PlaceholderDemo(id: String, onBack: () -> Unit) {
     val entry = ALL_DEMOS.find { it.id == id }
     DemoScaffold(
-        title = entry?.title ?: id,
+        title = entry?.titleRes?.let { stringResource(it) } ?: id,
         onBack = onBack
     ) {
         Box(
@@ -305,7 +306,7 @@ fun PlaceholderDemo(id: String, onBack: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Coming soon",
+                text = stringResource(R.string.demo_coming_soon),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

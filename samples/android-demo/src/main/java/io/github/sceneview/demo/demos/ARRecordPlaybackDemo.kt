@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +59,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.recording.ARRecorder
 import io.github.sceneview.ar.recording.rememberARRecorder
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -198,7 +200,7 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
     LaunchedEffect(currentMode) { refreshRecordings() }
 
     DemoScaffold(
-        title = "Record & Playback",
+        title = stringResource(R.string.demo_ar_record_playback_title),
         onBack = onBack,
         controls = {
             // ── About card ─────────────────────────────────────────────────

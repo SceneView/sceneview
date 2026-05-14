@@ -32,12 +32,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.romainguy.kotlin.math.Float3
 import dev.romainguy.kotlin.math.lookAt
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
@@ -144,7 +146,7 @@ fun VideoDemo(onBack: () -> Unit) {
     )
 
     DemoScaffold(
-        title = "Video",
+        title = stringResource(R.string.demo_video_title),
         onBack = onBack,
         controls = {
             Text("Playback", style = MaterialTheme.typography.labelLarge)

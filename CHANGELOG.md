@@ -1,8 +1,44 @@
 # Changelog
 
-## v4.3.1 — CI + docs + GeometryDemo light fixups (UNRELEASED)
+## Unreleased
 
-CI hardening + docs accuracy + one v4.1.0-stale demo light tune. No public API change.
+### Fixed — iOS: `SKETCHFAB_API_KEY` never reached TestFlight + App Store binaries ([#1157](https://github.com/sceneview/sceneview/issues/1157))
+
+Every iOS app-store ship since v3.6 silently degraded the Explore tab to bundled fallback models because the Sketchfab API key never made it into the `.ipa`. Two compounding root causes:
+
+- **`SketchfabConfig.swift` read the key via `ProcessInfo.processInfo.environment["SKETCHFAB_API_KEY"]`** — that path only works under Xcode's "Run" scheme. CI env vars set on the runner don't survive `xcodebuild archive` into the shipped binary, so `SketchfabConfig.apiKey == nil` for every TestFlight + App Store build → `SketchfabError.missingApiKey` → `ExploreTab` `runCatching` swallow → empty / fallback results with no error banner.
+- **`.github/workflows/app-store.yml` and `ios.yml` never referenced `SKETCHFAB_API_KEY`** — confirmed by `grep`. The Android pipelines (`play-store.yml:170`, `build-apks.yml:47`) inject the secret correctly and Android's `BuildConfig.SKETCHFAB_API_KEY` bakes it in at compile time, which is why Play Store builds were unaffected.
+
+Fix (single PR, 4 files):
+
+- [`samples/ios-demo/SceneViewDemo/Services/SketchfabConfig.swift`](samples/ios-demo/SceneViewDemo/Services/SketchfabConfig.swift) — `apiKey` now resolves from `Bundle.main.object(forInfoDictionaryKey: "SketchfabAPIKey")` first, with a guard that rejects the unsubstituted `$(SKETCHFAB_API_KEY)` xcconfig token literal. Legacy `ProcessInfo` lookup stays as a fallback so the Xcode "Run" scheme env-var workflow keeps working for contributors.
+- [`samples/ios-demo/SceneViewDemo/Info.plist`](samples/ios-demo/SceneViewDemo/Info.plist) — added `SketchfabAPIKey = $(SKETCHFAB_API_KEY)` placeholder. `xcodebuild` substitutes it from the user-defined build setting at archive time.
+- [`.github/workflows/app-store.yml`](.github/workflows/app-store.yml) — both iOS and macOS `xcodebuild archive` steps now pass `SKETCHFAB_API_KEY="$SKETCHFAB_API_KEY"` (sourced from the `SKETCHFAB_API_KEY` repo secret).
+- [`.github/workflows/ios.yml`](.github/workflows/ios.yml) — same injection on the CI demo-build step so the `Info.plist` substitution path is exercised on every PR, not just on release tags.
+
+Verified locally on Xcode 26.3 / iPhone 16e simulator: `xcodebuild build … SKETCHFAB_API_KEY=dummy_key_for_test` produces a `SceneViewDemo.app/Info.plist` with `SketchfabAPIKey = dummy_key_for_test` (vs. the literal `$(SKETCHFAB_API_KEY)` placeholder without the build setting). Acceptance: next TestFlight build of v4.3.2+ surfaces non-empty `SketchfabConfig.apiKey` and `ExploreTab` shows live Sketchfab categories + search.
+
+Long-term proxy via `mcp-gateway` so end-user binaries don't ship the master key is tracked by the V1.1 TODO in `SketchfabConfig.swift` — this fix is the immediate "Explore tab works again" patch.
+
+### Tests — Regression pins for v4.3.0 rendering-burst fixes that shipped without coverage ([#1120](https://github.com/sceneview/sceneview/issues/1120) extension)
+
+Follow-up to the CORR-C regression-pin batch ([PR #1137](https://github.com/sceneview/sceneview/pull/1137)). Three of the v4.3.0 fixes shipped without test coverage because the failure modes required Filament JNI (CORR-C's pure-JVM batch couldn't reach them). This extension adds the missing instrumented tests so a future refactor catches the regression at `./gradlew :connectedDebugAndroidTest` time:
+
+- **`sceneview/src/androidTest/.../RenderQualityComposeTest.kt`** — Filament-grounded companion to the JVM `RenderQualityLaunchedEffectTest`. Pins the [#1078](https://github.com/sceneview/sceneview/issues/1078) keyed-`LaunchedEffect(view, renderQuality)` contract using a real `View`: apply the preset, mutate `view.bloomOptions.strength = 0.4f`, simulate 5 unchanged recompositions, assert the user tweak survived. Pre-#1078 (unkeyed `SideEffect`), the 0.4f would have been clobbered back to the preset value on every recomposition. 3 test methods. The two pure-JVM `RenderQualityLaunchedEffectTest` + instrumented `RenderQualityComposeTest` cover the contract from both angles — JVM catches the LaunchedEffect re-keying semantics, instrumented catches the Filament-side preset-application invariants.
+- **`sceneview/src/androidTest/.../node/CameraNodeLifecycleTest.kt`** — Pins the `DisposableEffect(cameraNode)` rewire shipped in [PR #1147](https://github.com/sceneview/sceneview/pull/1147) (`Scene.kt:293`, closes [#1143](https://github.com/sceneview/sceneview/issues/1143)). Three tests: 5 sequential `SceneNodeManager` lifecycles sharing one Filament `Scene` leak zero cameras, parent → child HUD-node propagation cascades on dispose, and the `cameraNode` swap path replaces cleanly without leaking the previous instance. Same-family check as the [#1122](https://github.com/sceneview/sceneview/issues/1122) light-node leak fix (PR [#1131](https://github.com/sceneview/sceneview/pull/1131)).
+- **`samples/android-demo/src/androidTest/.../MaterialInstanceLeakTest.kt`** — Pins the `destroyMaterialsOnDispose: Boolean = false` flag added to `RenderableNode` + `GeometryNode` constructors in PR [#1132](https://github.com/sceneview/sceneview/pull/1132) (closes [#1123](https://github.com/sceneview/sceneview/issues/1123)). Four tests: the flag actually destroys the constructor-passed `MaterialInstance` (its `nativeObject` handle drops to `0`), default `false` preserves the instance for external owners (`rememberMaterialInstance`, `DisposableEffect`), multi-primitive lists with `null` entries are handled without NPE, and the destroy path is idempotent across double-destroy via the `runCatching`-wrapped `safeDestroyMaterialInstance`.
+- **`arsceneview/src/androidTest/.../light/LightEstimatorConcurrentDestroyTest.kt`** — already shipped as part of [PR #1148](https://github.com/sceneview/sceneview/pull/1148) ([#1094](https://github.com/sceneview/sceneview/issues/1094) acceptance #3); listed here for traceability.
+
+The pure-JVM `RenderQualityLaunchedEffectTest` and `LightEstimatorConcurrentDestroyTest` from CORR-C continue to run on every `:sceneview:test` invocation; the instrumented tests above run on `./gradlew :sceneview:connectedDebugAndroidTest` / `:samples:android-demo:connectedDebugAndroidTest`. Net +3 instrumented test files / +10 test methods.
+
+#1123 acceptance criterion "at least 1 demo migrated to use `destroyMaterialsOnDispose = true`" stays open — surfacing the flag through the Compose `SceneScope.CubeNode` / `SphereNode` / etc. factories is a separate API extension. `MaterialInstanceLeakTest` pins the library-level contract those factories will eventually wire up.
+
+## v4.3.1 — CI hardening + iOS AR LightSlot parity + i18n migration (2026-05-14)
+
+CI hardening + docs accuracy + Android CLI migration + one v4.1.0-stale demo light tune,
+plus the second half of #1063 ported to iOS (`LightSlot` + `.fillLight(_:)` on `ARSceneView`)
+and a full `android-demo` UI migration to `stringResource(R.string.…)` so French locale
+actually flips at runtime. No new Android public API; one new iOS surface.
 
 ### Fixed — release.yml: Dokka config-cache crash + GitHub Release decoupled from Dokka ([#1150](https://github.com/sceneview/sceneview/issues/1150))
 
@@ -45,20 +81,22 @@ The v4.3.0 cut commit `efc168bc` introduced a multi-line backslash continuation 
 - **Validator extension**: `.claude/scripts/check-workflow-scripts.sh` (shipped by [#1145](https://github.com/sceneview/sceneview/pull/1145)) now runs a per-line slicing simulation on every `with.script:` block — `dash -n` passes a `\<EOL>` because the whole-file parser splices continuations together first, but the runtime action does not. The new pass flags any trailing-backslash continuation and fails the PR check, so this class of bug can no longer ship to `main` undetected. Sanity-tested by reintroducing the original break locally — validator exits `1` with a pointed error message.
 - **Backwards compatibility**: `run:` blocks (which GitHub Actions defaults to `bash -e {0}`, executed as one script) are untouched; backslash continuations remain valid there. Only `with.script:` blocks (per-line `sh -c` semantics) are checked.
 
-### Tests — Regression pins for v4.3.0 rendering-burst fixes that shipped without coverage ([#1120](https://github.com/sceneview/sceneview/issues/1120) extension)
+### Fixed — i18n: migrate `android-demo` UI to `stringResource(R.string.…)` ([#1099](https://github.com/sceneview/sceneview/issues/1099), closes [#955](https://github.com/sceneview/sceneview/issues/955))
 
-Follow-up to the CORR-C regression-pin batch ([PR #1137](https://github.com/sceneview/sceneview/pull/1137)). Three of the v4.3.0 fixes shipped without test coverage because the failure modes required Filament JNI (CORR-C's pure-JVM batch couldn't reach them). This extension adds the missing instrumented tests so a future refactor catches the regression at `./gradlew :connectedDebugAndroidTest` time:
+PR [#1073](https://github.com/sceneview/sceneview/pull/1073) added `samples/android-demo/src/main/res/values-fr/strings.xml` (164 keys) but the Compose UI never read them — every `Text("…")` was a hardcoded English literal, so switching the device locale to French at runtime had zero visible effect.
 
-- **`sceneview/src/androidTest/.../RenderQualityComposeTest.kt`** — Filament-grounded companion to the JVM `RenderQualityLaunchedEffectTest`. Pins the [#1078](https://github.com/sceneview/sceneview/issues/1078) keyed-`LaunchedEffect(view, renderQuality)` contract using a real `View`: apply the preset, mutate `view.bloomOptions.strength = 0.4f`, simulate 5 unchanged recompositions, assert the user tweak survived. Pre-#1078 (unkeyed `SideEffect`), the 0.4f would have been clobbered back to the preset value on every recomposition. 3 test methods. The two pure-JVM `RenderQualityLaunchedEffectTest` + instrumented `RenderQualityComposeTest` cover the contract from both angles — JVM catches the LaunchedEffect re-keying semantics, instrumented catches the Filament-side preset-application invariants.
-- **`sceneview/src/androidTest/.../node/CameraNodeLifecycleTest.kt`** — Pins the `DisposableEffect(cameraNode)` rewire shipped in [PR #1147](https://github.com/sceneview/sceneview/pull/1147) (`Scene.kt:293`, closes [#1143](https://github.com/sceneview/sceneview/issues/1143)). Three tests: 5 sequential `SceneNodeManager` lifecycles sharing one Filament `Scene` leak zero cameras, parent → child HUD-node propagation cascades on dispose, and the `cameraNode` swap path replaces cleanly without leaking the previous instance. Same-family check as the [#1122](https://github.com/sceneview/sceneview/issues/1122) light-node leak fix (PR [#1131](https://github.com/sceneview/sceneview/pull/1131)).
-- **`samples/android-demo/src/androidTest/.../MaterialInstanceLeakTest.kt`** — Pins the `destroyMaterialsOnDispose: Boolean = false` flag added to `RenderableNode` + `GeometryNode` constructors in PR [#1132](https://github.com/sceneview/sceneview/pull/1132) (closes [#1123](https://github.com/sceneview/sceneview/issues/1123)). Four tests: the flag actually destroys the constructor-passed `MaterialInstance` (its `nativeObject` handle drops to `0`), default `false` preserves the instance for external owners (`rememberMaterialInstance`, `DisposableEffect`), multi-primitive lists with `null` entries are handled without NPE, and the destroy path is idempotent across double-destroy via the `runCatching`-wrapped `safeDestroyMaterialInstance`.
-- **`arsceneview/src/androidTest/.../light/LightEstimatorConcurrentDestroyTest.kt`** — already shipped as part of [PR #1148](https://github.com/sceneview/sceneview/pull/1148) ([#1094](https://github.com/sceneview/sceneview/issues/1094) acceptance #3); listed here for traceability.
+This PR fully closes [#955](https://github.com/sceneview/sceneview/issues/955) by migrating every public-facing UI surface to `stringResource(R.string.…)`:
 
-The pure-JVM `RenderQualityLaunchedEffectTest` and `LightEstimatorConcurrentDestroyTest` from CORR-C continue to run on every `:sceneview:test` invocation; the instrumented tests above run on `./gradlew :sceneview:connectedDebugAndroidTest` / `:samples:android-demo:connectedDebugAndroidTest`. Net +3 instrumented test files / +10 test methods.
+- **`DemoEntry` data class refactor** — `title: String, subtitle: String` → `@StringRes titleRes: Int, @StringRes subtitleRes: Int`. The `category` field stays a stable non-translated key (used as map key + accent-colour lookup) with a parallel `categoryDisplayNameRes(category)` helper that returns the localized header.
+- **37-demo registry rewritten** to thread `R.string.demo_*_title` / `R.string.demo_*_subtitle` IDs through to the Samples grid and the Explore "Try a sample" carousel.
+- **39 per-demo `DemoScaffold(title = "…")` callsites** migrated to `stringResource(R.string.demo_*_title)` — every demo's `TopAppBar` title now follows the active locale.
+- **Top-level UI surfaces migrated**: `RootScreen.kt` (4 tab labels, About-tab 6 cards + hero tagline + footer + Star CTA), `ArViewTab.kt` (full launcher screen — status messages, CTA labels, featured-demo card titles, status pill, model picker, share toast, tracking-failure friendly names), `DemoListScreen.kt` (Samples title, "About" action, status chips, footer), `DemoScaffold.kt` (back-button content description), `MainActivity.kt` (`PlaceholderDemo` "Coming soon" + entry title fallback), `ExploreTabScreen.kt` (Explore heading, search placeholder, Animated filter chip, all carousel section titles, Categories, Recent searches, Clear, Remove $query), `SketchfabModelViewerScreen.kt` (Animated pill, Open-in-SceneView CTA, loading / streaming / rendered-by labels, error screen + Try again, download-failed fallback).
+- **`strings.xml` expanded** from 164 → 270+ keys, covering every public-facing UI string in the priority surfaces. FR `values-fr/strings.xml` mirrors 1-to-1.
+- **Locale-flip verified end-to-end** on Pixel_7a emulator using Android 13+ per-app locale (`adb shell cmd locale set-app-locales io.github.sceneview.demo --locales fr-FR`). 4 tabs + AR launcher + Samples list + a demo AppBar all flip between EN ⇄ FR, with no regressions. Sketchfab category chips still come from `SketchfabCategories.kt` and stay English — out of scope for #1099, separate larger refactor.
+- **Existing legacy keys preserved** (e.g. `demo_lighting`, `demo_geometry`, etc.) for backwards compatibility with any external consumer holding refs to them.
+- **`DeepLinkRouterTest.kt`** updated to pass `R.string.*` IDs instead of literal `"Title", "Subtitle"` strings — title / subtitle are not part of the route, so any pair satisfies the type.
 
-#1123 acceptance criterion "at least 1 demo migrated to use `destroyMaterialsOnDispose = true`" stays open — surfacing the flag through the Compose `SceneScope.CubeNode` / `SphereNode` / etc. factories is a separate API extension. `MaterialInstanceLeakTest` pins the library-level contract those factories will eventually wire up.
-
-## Unreleased
+Build green: `:samples:android-demo:compileDebugKotlin` + `:assembleDebug` + `:testDebugUnitTest` + `:sceneview:compileReleaseKotlin` + `:arsceneview:compileReleaseKotlin` all succeed locally.
 
 ### Added — iOS parity: `LightSlot` + `.fillLight(_:)` on `ARSceneView` ([#1138](https://github.com/sceneview/sceneview/issues/1138))
 
