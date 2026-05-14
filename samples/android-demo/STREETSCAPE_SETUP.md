@@ -63,6 +63,28 @@ Symptom when this is missing: Cloud Anchors `Host` / `Resolve` returns `ERROR_NO
 
 If you rotate the App Signing key (Play Console → Use Play App Signing → rotate), the SHA-1 changes — re-do steps 2–5.
 
+#### Troubleshooting — `ERROR_NOT_AUTHORIZED` persists after SHA-1 is whitelisted
+
+If the App Signing key SHA-1 IS in the Cloud Console "Application restrictions" list but `Host` / `Resolve` still returns `ERROR_NOT_AUTHORIZED` on production, walk this checklist in order. Each step has a direct deep-link — replace `<PROJECT_ID>` with the Cloud project that owns the ARCore API key (find it at the top-right of the Cloud Console; for the SceneView demo it's `pc-api-4638313286439917620-648`).
+
+1. **Billing is enabled and active** on the Cloud project. Geospatial / Cloud Anchors / Streetscape **all hit paid backends** and silently return `ERROR_NOT_AUTHORIZED` if billing is missing, disabled, or in a free-tier-exhausted state.
+   - Check: https://console.cloud.google.com/billing/linkedaccount?project=<PROJECT_ID>
+   - Must show "Billing is enabled" with a linked account in good standing.
+
+2. **"ARCore API" is enabled** on the project (not the legacy "ARCore Cloud Anchor API").
+   - Check: https://console.cloud.google.com/apis/api/arcore.googleapis.com/overview?project=<PROJECT_ID>
+   - Must show "API enabled" with a recent traffic graph. If you see "Cloud Anchor API (Legacy)" enabled instead, disable it and enable "ARCore API" — they are different products.
+
+3. **API restrictions on the key** (this is a SEPARATE section from "Application restrictions"). Open the key edit page and scroll past Application restrictions:
+   - If "API restrictions" is set to **"Restrict key"**, the explicit allow-list MUST contain **"ARCore API"** by name. If only "Cloud Anchor API (Legacy)" is listed, every call to the modern Geospatial / Cloud Anchor endpoints returns `ERROR_NOT_AUTHORIZED`.
+   - The safest setting is **"Don't restrict key"** — Application restrictions (Android package + SHA-1) already gate the key to your APK, so API restrictions are belt-and-braces. If you keep "Restrict key", verify the list every time you enable a new ARCore feature.
+
+4. **Propagation delay**. Google says ~1 minute but in practice we've observed `ERROR_NOT_AUTHORIZED` for 5-15 minutes after a fresh SHA-1 addition. Force-stop the app and retry; if still failing after 30 minutes, the cause is one of 1-3 above.
+
+5. **Multiple Cloud projects**. If your account has multiple projects, double-check that the API key you whitelisted the SHA-1 on is the SAME key whose value is in the `ARCORE_API_KEY` env var / GitHub secret. A common pitfall: the runbook is followed against project A while the GitHub secret holds a key from project B (which has no SHA-1 whitelist).
+
+If all five pass and the error persists, capture the failing device's `adb logcat | grep -i arcore` output during a `Host` attempt — the ARCore client library logs the HTTP status from Google's auth backend and the exact request URL, which pinpoints whether the rejection is on the key itself or on a downstream service.
+
 ### 4. Wire the key locally
 
 Append to `local.properties` at the repo root (this file is gitignored):

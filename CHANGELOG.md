@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — v4.3.6 docs hotfix: Cloud Anchor ERROR_NOT_AUTHORIZED post-SHA-1 troubleshooting ([#1177](https://github.com/sceneview/sceneview/issues/1177) follow-up)
+
+Production Cloud Anchor users still hitting `ERROR_NOT_AUTHORIZED` on v4.3.5 after the App Signing key SHA-1 was added to the Google Cloud API key restrictions. v4.3.3 ([PR #1197](https://github.com/sceneview/sceneview/pull/1197)) shipped the SHA-1 runbook + actionable in-app error pointing only at that one cause, but field experience showed there are 4 other Cloud-Console-side causes that look identical at the device.
+
+Investigation confirmed every code-side surface is healthy:
+- `ARCORE_API_KEY` GitHub secret present (39 chars, last rotated 2026-05-06)
+- `samples/android-demo/build.gradle` injects `manifestPlaceholders["arcoreApiKey"]` from env / `local.properties`
+- `AndroidManifest.xml` carries `<meta-data android:name="com.google.android.ar.API_KEY" android:value="${arcoreApiKey}" />`
+- `ARCloudAnchorDemo.kt` enables `Config.CloudAnchorMode.ENABLED` in `sessionConfiguration`
+- `play-store.yml`'s `verify-arcore-key.sh` CI guard passed green on the v4.3.5 release run (run 25891143675, 2026-05-14 23:24 UTC)
+- Package name `io.github.sceneview.demo` matches the Cloud Console restriction (no `applicationIdSuffix`)
+
+So the bug is Cloud-Console-side configuration drift, not an APK-side regression. v4.3.6 expands the docs surface so the next maintainer / contributor hitting this can self-diagnose without escalating.
+
+### Changed
+
+- **`samples/android-demo/STREETSCAPE_SETUP.md` adds a new "Troubleshooting — `ERROR_NOT_AUTHORIZED` persists after SHA-1 is whitelisted" subsection** under the existing "Play App Signing key" block. Five-step checklist with direct Cloud Console deep-links (replace `<PROJECT_ID>` with `pc-api-4638313286439917620-648` for the SceneView demo project):
+  1. Billing enabled and active on the Cloud project (Geospatial / Cloud Anchors hit paid backends; silently rejects without billing).
+  2. "ARCore API" enabled (not the legacy "ARCore Cloud Anchor API" — different products).
+  3. API restrictions on the key separate from Application restrictions — must include "ARCore API" by name, or be set to "Don't restrict key".
+  4. Propagation delay — observed up to 30 min in practice despite Google's "~1 min" claim.
+  5. Project-ID mismatch — verify the API key whose SHA-1 you whitelisted is the same key in the GitHub secret.
+
+- **`ARCloudAnchorDemo.kt` host/resolve error messages broadened**. The in-app banner for `ERROR_NOT_AUTHORIZED` no longer presumes the SHA-1 is the cause — it now reads "Check SHA-1 + billing + ARCore API restrictions in STREETSCAPE_SETUP.md.". This matches the v4.3.3 hotfix's actionable-error spirit but covers the full failure mode space surfaced post-#1177.
+
+- **`.claude/scripts/verify-arcore-key.sh` reminder footer broadened** to direct maintainers reading the CI log at the new 5-step checklist rather than only the SHA-1 runbook.
+
+No library APIs change. No new releases of `:sceneview` / `:arsceneview` / `:sceneview-core` are required — the on-device fix is entirely Cloud Console configuration.
+
 ## v4.3.5 — Pixel 9 production polish: AR demo UX fixes + FR i18n + CI dedup + iOS pull-to-refresh (2026-05-15)
 
 ### Added — iOS pull-to-refresh on Explore feeds ([#1211](https://github.com/sceneview/sceneview/issues/1211) item 1 — [PR #1225](https://github.com/sceneview/sceneview/pull/1225))
