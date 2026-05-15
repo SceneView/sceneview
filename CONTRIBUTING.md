@@ -123,6 +123,24 @@ for full API context in any chat:
 
 Contributions to any part of the project are welcome — Android (`sceneview/`, `arsceneview/`), iOS (`SceneViewSwift/`), shared KMP core (`sceneview-core/`), samples, documentation, or the MCP server.
 
+### Changelog entries
+
+**Do not edit `CHANGELOG.md` directly.** Changelog entries go in `changelog.d/`
+as a small fragment file — one per PR. Add a file named
+`changelog.d/<issue-or-pr-number>-<short-slug>.md` containing your release-note
+bullet(s), prefixed with a category tag:
+
+```markdown
+<!-- category: Fixed -->
+- **Short headline ([#1234](https://github.com/sceneview/sceneview/issues/1234)).** What changed and why.
+```
+
+Recognised categories: `Added`, `Changed`, `Fixed`, `Removed`, `Tests`, `Docs`.
+Distinct filenames mean parallel PRs never conflict on the changelog. At release
+time `.claude/scripts/collate-changelog.sh` collates all fragments into a new
+`## vX.Y.Z` section. See [`changelog.d/README.md`](changelog.d/README.md) for
+the full convention.
+
 After your changes are merged, the Discord bot will award you the **Contributor** role.
 
 ### CI on docs-only PRs
