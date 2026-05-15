@@ -21,9 +21,9 @@
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const __filename = fileURLToPath(import.meta.url);
 const SRC_DIR = dirname(__filename);
@@ -88,27 +88,39 @@ function toDistPaths(srcPaths: Set<string>): string[] {
  * Run `npm pack --dry-run --json` and return the list of files that would
  * ship in the tarball. Fast: no actual tarball is written.
  *
- * `--ignore-scripts` prevents the `prepare` hook from polluting stdout with
- * non-JSON log lines (e.g. the generate-llms-txt script).
+ * Determinism note (#1113): `npm pack` ALWAYS runs the package's own
+ * `prepare` lifecycle script — the `--ignore-scripts` flag only suppresses
+ * *dependency* scripts, not the package's own. `prepare` here regenerates
+ * `src/generated/{llms-txt,version}.ts` and runs `tsc`. Both generator
+ * scripts now log exclusively to stderr (see scripts/generate-llms-txt.js),
+ * so the stdout `npm pack --json` writes is guaranteed to be pure JSON with
+ * no interleaved banner. The earlier `indexOf("\n[")` heuristic was racy:
+ * when a banner landed on stdout it could truncate the JSON stream and
+ * surface as an `EOF` parse error. We keep `--ignore-scripts` as a
+ * belt-and-braces signal and `beforeAll` pre-runs the build so `prepare`
+ * is a no-op-ish fast path by the time pack walks the tree.
  */
 function getTarballFiles(): string[] {
   const stdout = execFileSync(
     "npm",
     ["pack", "--dry-run", "--json", "--ignore-scripts"],
-    { cwd: MCP_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    { cwd: MCP_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
   );
-  // Some tooling leaks non-JSON lifecycle banners onto stdout (e.g. the
-  // generate-llms-txt prebuild script). Find the start of the real JSON array
-  // by looking for the first newline followed by '['.
-  let jsonStart = stdout.indexOf("\n[");
-  if (jsonStart >= 0) {
-    jsonStart += 1; // skip the newline
-  } else if (stdout.trimStart().startsWith("[")) {
-    jsonStart = stdout.indexOf("[");
-  } else {
-    throw new Error(`Cannot locate JSON array in npm pack output:\n${stdout.slice(0, 400)}`);
+  const trimmed = stdout.trim();
+  if (!trimmed.startsWith("[")) {
+    throw new Error(
+      `npm pack --json did not return a JSON array on stdout:\n${trimmed.slice(0, 400)}`,
+    );
   }
-  const parsed = JSON.parse(stdout.slice(jsonStart)) as Array<{ files: Array<{ path: string }> }>;
+  let parsed: Array<{ files: Array<{ path: string }> }>;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (err) {
+    throw new Error(
+      `Failed to parse npm pack --json stdout (len=${trimmed.length}): ${(err as Error).message}\n` +
+        `First 400 chars:\n${trimmed.slice(0, 400)}`,
+    );
+  }
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error("npm pack --dry-run returned unexpected output");
   }
@@ -119,8 +131,22 @@ describe("npm tarball includes every runtime module imported by src/index.ts", (
   const entrySrc = resolve(SRC_DIR, "index.ts");
   const requiredSrcPaths = collectLocalImports(entrySrc);
   const requiredDistPaths = toDistPaths(requiredSrcPaths);
-  const tarballFiles = getTarballFiles();
-  const tarballSet = new Set(tarballFiles);
+  let tarballFiles: string[];
+  let tarballSet: Set<string>;
+
+  beforeAll(() => {
+    // Build deterministically and to completion BEFORE invoking `npm pack`.
+    // `npm pack` re-runs `prepare` regardless, but with the generated files
+    // and `dist/` already fully written the run is stable — there is no
+    // half-written state for the pack file-walk to observe.
+    execFileSync("npm", ["run", "build"], {
+      cwd: MCP_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "inherit"],
+    });
+    tarballFiles = getTarballFiles();
+    tarballSet = new Set(tarballFiles);
+  });
 
   it("all transitively-imported modules are present in the tarball", () => {
     const missing = requiredDistPaths.filter((p) => !tarballSet.has(p));

@@ -36,6 +36,9 @@ const EXPECTED_FREE_TOOLS = [
   "get_migration_guide",
   "get_model_optimization_guide",
   "get_web_rendering_guide",
+  // Android docs tools (added for #1083)
+  "search_android_docs",
+  "fetch_android_doc",
 ];
 
 // ─── isProTool ──────────────────────────────────────────────────────────────

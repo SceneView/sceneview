@@ -6,6 +6,10 @@
 
 - **`release.yml` now deploys the generated Dokka API docs to `sceneview.github.io/api/sceneview/<version>/` + `/latest/` and wraps Dokka generation in a 3× retry to tolerate transient Maven Central 503s ([#1252](https://github.com/sceneview/sceneview/issues/1252), [#1127](https://github.com/sceneview/sceneview/issues/1127)).**
 
+### Changed — MCP
+
+- **`sceneview-mcp` adds `search_android_docs` / `fetch_android_doc` tools wrapping Google's `android docs` CLI, and makes the `package-files` regression test deterministic by routing the `generate-llms-txt` banner to stderr ([#1083](https://github.com/sceneview/sceneview/issues/1083), [#1113](https://github.com/sceneview/sceneview/issues/1113)).**
+
 ### Added — Double Pendulum demo (shared KMP physics)
 
 - **New `DoublePendulum` simulation in `sceneview-core` ([Addresses #1221](https://github.com/sceneview/sceneview/issues/1221))** — a pure-Kotlin, platform-independent two-link (double) pendulum in `io.github.sceneview.physics`. `DoublePendulumState` holds two `DoublePendulumLink`s (length, mass, angle, angular velocity), a fixed `pivot`, `gravity` and `damping`; `DoublePendulum.step(state, dt)` advances it with a symplectic (semi-implicit) Euler integrator, sub-stepped at `1/240 s` so the chaotic motion stays numerically stable at any frame rate. Exposes `joint` / `tip` joint positions and a `totalEnergy` accessor; covered by 12 `commonTest` cases including energy-conservation (bounded energy band with `damping = 0`) and rest-state stability. Adapted from [@radcli14](https://github.com/radcli14)'s MIT-licensed [`twolinks`](https://github.com/radcli14/twolinks).
