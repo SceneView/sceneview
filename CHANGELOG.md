@@ -33,6 +33,7 @@
 
 - **`release.yml` now deploys the generated Dokka API docs to `sceneview.github.io/api/sceneview/<version>/` + `/latest/` and wraps Dokka generation in a 3× retry to tolerate transient Maven Central 503s ([#1252](https://github.com/sceneview/sceneview/issues/1252), [#1127](https://github.com/sceneview/sceneview/issues/1127)).**
 - `Deploy iOS App to App Store` is now tag-only — fixes Apple upload-limit failures on every main merge ([#1318](https://github.com/sceneview/sceneview/issues/1318)).
+- Lighter `main` CI: `Deploy Demo to Play Store` is now tag-only ([#1321](https://github.com/sceneview/sceneview/issues/1321)), `Deploy website + docs` is path-gated to docs/website/markdown changes, and `Render Tests` / `Build sample APKs` path filters were tightened to skip doc-only, CI-only and `mcp/`-only merges ([#1311](https://github.com/sceneview/sceneview/issues/1311)).
 
 ### Changed — MCP
 
