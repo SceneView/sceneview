@@ -22,7 +22,18 @@ runs:
       with:
         distribution: ${{ inputs.java-distribution }}
         java-version: ${{ inputs.java-version }}
-        cache: gradle
+
+    # Build-cache-aware Gradle setup. Replaces the lightweight
+    # `cache: gradle` shortcut on setup-java (wrapper + deps only) with the
+    # official gradle/actions/setup-gradle@v6, which also caches the Gradle
+    # build cache (compiled task outputs) for richer hit rates across
+    # ci/pr-check/build-apks/render-tests. Mirrors quality-gate.yml.
+    # `cache-read-only` on every non-push event so PRs (incl. forks) read
+    # but never write the cache; pushes to main repopulate it.
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v6
+      with:
+        cache-read-only: ${{ github.event_name != 'push' }}
 
     # Verify the checked-in gradle-wrapper.jar matches the SHA of a known-good
     # Gradle distribution. A malicious PR can otherwise sneak a tampered

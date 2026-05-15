@@ -130,7 +130,9 @@ jobs:
       - name: Install Android CLI
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -fsSL https://dl.google.com/android/cli/latest/linux_x86_64/android \
+          # --retry guards against cold-CDN flake on dl.google.com.
+          curl -fsSL --retry 3 --retry-delay 5 \
+            https://dl.google.com/android/cli/latest/linux_x86_64/android \
             -o "$HOME/.local/bin/android"
           chmod +x "$HOME/.local/bin/android"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
