@@ -66,9 +66,13 @@ class SceneView private constructor(
      */
     var autoCenterContent: Boolean = true
 
-    /** Set once [refreshContentCentering] has translated the content roots so
-     * subsequent frames are a cheap no-op. Mirrors iOS's `didCenterContent`. */
-    private var didCenterContent = false
+    /**
+     * One-shot gate for [refreshContentCentering]: tracks whether the current
+     * content generation has been centred so subsequent frames are a cheap
+     * no-op, and is [AutoCenterGate.reset] whenever new content is loaded so a
+     * 2nd model re-centres (regression #1357). Mirrors iOS's `didCenterContent`.
+     */
+    private val autoCenterGate = AutoCenterGate()
 
     /** Tracks a loaded glTF asset with its animation state. */
     private class LoadedModel(
@@ -290,7 +294,7 @@ class SceneView private constructor(
                 // pass must run again — otherwise a 2nd model loaded after the 1st
                 // centered would stay off-center. Mirrors Android's
                 // `SceneAutoCenterState.reset()`.
-                didCenterContent = false
+                autoCenterGate.reset()
 
                 // Load external resources (textures, buffers) referenced by the glTF.
                 // This is REQUIRED for models to render with correct materials.
@@ -489,7 +493,7 @@ class SceneView private constructor(
      * instead — the visual result is identical. Closes #1052.
      */
     private fun refreshContentCentering() {
-        if (didCenterContent || !autoCenterContent || models.isEmpty()) return
+        if (!autoCenterGate.shouldCenter(autoCenterContent, models.isNotEmpty())) return
 
         // Gather each asset's bounding box. `getBoundingBox()` reports the
         // asset-space AABB, which is empty/degenerate until loadResources()
@@ -537,7 +541,7 @@ class SceneView private constructor(
                 console.error("SceneView: auto-center failed for a model", e)
             }
         }
-        didCenterContent = true
+        autoCenterGate.markCentered()
         console.log("SceneView: auto-centered content (offset ${offset[0]}, ${offset[1]}, ${offset[2]})")
     }
 
