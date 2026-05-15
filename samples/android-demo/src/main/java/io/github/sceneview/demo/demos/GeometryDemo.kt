@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import io.github.sceneview.sample.LifecycleAwareLaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -37,8 +36,6 @@ import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.demo.theme.SceneViewDemoTheme
-import io.github.sceneview.material.setMetallic
-import io.github.sceneview.material.setRoughness
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -47,6 +44,7 @@ import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 
 /**
  * Shows the four built-in geometry primitives: Cube, Sphere, Cylinder, Plane.
@@ -86,10 +84,12 @@ fun GeometryDemo(onBack: () -> Unit) {
 
     // On-brand ramp — Primary blue, Accent purple, light blue, soft purple — so the four
     // primitives stay visually distinct while all reading as SceneView.
-    val cubeMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[0]) }
-    val sphereMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[1]) }
-    val cylinderMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[2]) }
-    val planeMaterial = remember(materialLoader) { materialLoader.createColorInstance(SceneViewColors.Ramp4[3]) }
+    // metallic / roughness are pushed into each instance by rememberMaterialInstance
+    // itself (via a paired DisposableEffect) — no extra slider-sync LaunchedEffect needed.
+    val cubeMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[0], metallic, roughness)
+    val sphereMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[1], metallic, roughness)
+    val cylinderMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[2], metallic, roughness)
+    val planeMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[3], metallic, roughness)
 
     // Continuous Y-axis spin shared by all primitives. withFrameNanos drives the
     // angle off the Choreographer so it runs at the display's refresh rate without
@@ -119,14 +119,6 @@ fun GeometryDemo(onBack: () -> Unit) {
                 lastNanos = nanos
             }
         }
-    }
-
-    // Apply metallic/roughness to all 4 materials whenever the sliders change.
-    LaunchedEffect(metallic, roughness) {
-        cubeMaterial.setMetallic(metallic); cubeMaterial.setRoughness(roughness)
-        sphereMaterial.setMetallic(metallic); sphereMaterial.setRoughness(roughness)
-        cylinderMaterial.setMetallic(metallic); cylinderMaterial.setRoughness(roughness)
-        planeMaterial.setMetallic(metallic); planeMaterial.setRoughness(roughness)
     }
 
     DemoScaffold(
