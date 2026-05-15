@@ -179,6 +179,17 @@ One unified showcase app per platform — all features integrated into tabs.
 | `buildSrc/` | Gradle build logic + detekt config |
 | `.github/` | CI workflows + community docs (CoC, Security, Support, Governance, Sponsors, Privacy) |
 
+## Changelog entries
+
+**Changelog entries go in `changelog.d/`, not `CHANGELOG.md`.** Each PR adds one
+fragment file `changelog.d/<issue-or-pr>-<slug>.md` with its release-note
+bullet(s) and a `<!-- category: Fixed -->` tag (Added/Changed/Fixed/Removed/
+Tests/Docs). Distinct filenames mean parallel PRs never conflict on the
+changelog. At release time `bash .claude/scripts/collate-changelog.sh X.Y.Z`
+collates every fragment into a new `## vX.Y.Z` section and deletes them. Never
+hand-edit the `## Unreleased` anchor — it is kept empty for backward-compat.
+See [`changelog.d/README.md`](changelog.d/README.md).
+
 ## Version Location Map
 
 **Source of truth:** `gradle.properties` -> `VERSION_NAME=X.Y.Z`
