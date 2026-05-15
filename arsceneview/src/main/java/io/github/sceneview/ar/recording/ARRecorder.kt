@@ -89,6 +89,14 @@ public class ARRecorder {
 
     private val sessionRef = AtomicReference<Session?>(null)
 
+    /**
+     * The session's camera config captured immediately before [start] swapped in a
+     * higher-resolution one for `recordingResolution`. `null` when no swap happened — [stop]
+     * only restores the config if this is non-null, so a [start] without `recordingResolution`
+     * (or one where no matching config was found) leaves the session untouched on [stop].
+     */
+    private val previousCameraConfig = AtomicReference<CameraConfig?>(null)
+
     private var _state by mutableStateOf(State.IDLE)
     private var _recordingFile by mutableStateOf<File?>(null)
     private var _errorMessage by mutableStateOf<String?>(null)
@@ -236,7 +244,15 @@ public class ARRecorder {
             // the session has been created and configured by ARSceneView); applying it just
             // before startRecording() is the valid window.
             recordingResolution?.let { requested ->
-                selectCameraConfig(session, requested)?.let { session.cameraConfig = it }
+                selectCameraConfig(session, requested)?.let { newConfig ->
+                    // Remember the config in effect BEFORE the swap so stop() can restore it —
+                    // otherwise the higher-res CPU image stream (and its perf cost) silently
+                    // persists for the rest of the AR session (#1358). Captured via runCatching
+                    // because Session.getCameraConfig is JNI-backed and must never abort the
+                    // recording; on failure we just skip the restore.
+                    previousCameraConfig.set(runCatching { session.cameraConfig }.getOrNull())
+                    session.cameraConfig = newConfig
+                }
             }
             val config = RecordingConfig(session)
                 .setMp4DatasetFilePath(file.absolutePath)
@@ -249,11 +265,16 @@ public class ARRecorder {
             true
         } catch (e: RecordingFailedException) {
             logWarning("startRecording failed: ${e.message}")
+            // The camera-config swap happens before startRecording() — if the start fails,
+            // restore the prior config so a failed recording doesn't leak the high-res
+            // stream (#1358).
+            restoreCameraConfig(session)
             _errorMessage = e.message ?: "RecordingFailedException"
             _state = State.ERROR
             false
         } catch (e: Exception) {
             logWarning("start failed: ${e.message}")
+            restoreCameraConfig(session)
             _errorMessage = e.message ?: e::class.java.simpleName
             _state = State.ERROR
             false
@@ -263,6 +284,10 @@ public class ARRecorder {
     /**
      * Stop the current recording. Returns the file that was written, or `null` if no
      * recording was active. Safe to call when idle — it's a no-op.
+     *
+     * If [start] swapped the session's camera config to satisfy a `recordingResolution`
+     * request, the prior config is restored here so the higher-res CPU image stream does not
+     * outlive the recording (#1358).
      */
     public fun stop(): File? {
         val session = sessionRef.get() ?: run {
@@ -283,6 +308,27 @@ public class ARRecorder {
             _errorMessage = e.message ?: e::class.java.simpleName
             _state = State.ERROR
             null
+        } finally {
+            // Restore the camera config even if stopRecording() threw — leaking the
+            // higher-res CPU image stream for the rest of the session is worse than the
+            // stop failure itself (#1358).
+            restoreCameraConfig(session)
+        }
+    }
+
+    /**
+     * Restore the camera config captured by [start] before it swapped in a higher-resolution
+     * one for `recordingResolution`. No-op when no swap happened (the [AtomicReference] holds
+     * `null`). The swapped-out config is cleared so a subsequent recording without
+     * `recordingResolution` does not erroneously restore a stale config.
+     *
+     * Wrapped in `runCatching` because [Session.setCameraConfig] is JNI-backed; a failure to
+     * restore must not surface as a recording error — the recording has already stopped.
+     */
+    private fun restoreCameraConfig(session: Session) {
+        previousCameraConfig.getAndSet(null)?.let { prior ->
+            runCatching { session.cameraConfig = prior }
+                .onFailure { logWarning("restoring camera config failed: ${it.message}") }
         }
     }
 

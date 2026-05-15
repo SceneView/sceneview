@@ -68,6 +68,10 @@
 
 - **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
 
+### Fixed — arsceneview
+
+- **`ARRecorder.start(recordingResolution=…)` now restores the session's camera config on `stop()` ([#1358](https://github.com/sceneview/sceneview/issues/1358)).** The higher-resolution CPU image stream raised for a recording no longer silently persists for the rest of the AR session — the prior config is captured before the swap and restored on `stop()` (and on a failed `start()`).
+
 ### Fixed — Docs
 
 - **Reconciled stale version refs that survived the v4.4.0 release and hardened `sync-versions.sh` to catch them ([#1356](https://github.com/sceneview/sceneview/issues/1356)).** README badges/CDN/SPM snippets, `ai-context.md`, `android-xr-emulator.md`, `website-static/js/package.json`, the Kotlin toolchain version in `llms.txt`, and the root↔docs `llms.txt` `ARRecorder.saveToPhotoLibrary` paragraph now all read 4.4.0 / 2.3.21; `sync-versions.sh` gained checks for every one of those off-map locations.
