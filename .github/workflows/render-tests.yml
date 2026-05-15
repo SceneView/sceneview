@@ -24,6 +24,9 @@ on:
       - 'SceneViewSwift/**'
       - 'gradle/**'
   workflow_dispatch:
+  # Invoked by nightly-ci.yml so the scheduled full-validation run reuses
+  # this render-test definition rather than duplicating it. See #1324.
+  workflow_call:
 
 concurrency:
   group: render-tests-${{ github.ref }}
