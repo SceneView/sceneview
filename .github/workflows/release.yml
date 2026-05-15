@@ -161,11 +161,11 @@ jobs:
       # finally serves a browseable API reference (was 404 since v4.3.3).
       #
       # Auth: SSH `deploy_key` (secrets.PAGES_DEPLOY_KEY) — the SAME deploy key
-      # `deploy-website.yml` already uses for the cross-repo Pages push, so no
+      # `docs.yml` already uses for the cross-repo Pages push, so no
       # new secret is required.
       #
       # `keep_files: true` is critical: the target repo also hosts the
-      # marketing site (deployed by deploy-website.yml) and previously-released
+      # marketing site + docs (deployed by docs.yml) and previously-released
       # API versions — without it, actions-gh-pages would wipe everything not
       # in `publish_dir`. With `destination_dir: api/sceneview`, only that
       # subtree is touched; the site root and other `/api/sceneview/<ver>/`
