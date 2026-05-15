@@ -127,10 +127,17 @@ echo ""
 echo -e "${CYAN}--- CHANGELOG ---${NC}"
 
 if [ -f "CHANGELOG.md" ]; then
-    CL_V=$(grep -m1 '^## ' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "MISSING")
-    [ "$CL_V" = "$TARGET_VERSION" ] && check "CHANGELOG entry" "PASS" "" || check "CHANGELOG entry" "FAIL" "Latest entry is $CL_V"
+    # First versioned section (## vX.Y.Z ...), skipping the ## Unreleased placeholder.
+    CL_V=$(grep -m1 '^## v[0-9]' CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "MISSING")
+    [ "$CL_V" = "$TARGET_VERSION" ] && check "CHANGELOG entry" "PASS" "" || check "CHANGELOG entry" "FAIL" "Latest entry is $CL_V — run collate-changelog.sh $TARGET_VERSION"
 else
     check "CHANGELOG.md exists" "FAIL" "File not found"
+fi
+
+# changelog.d/ fragments must be collated into CHANGELOG.md before tagging.
+if [ -d "changelog.d" ]; then
+    PENDING=$(find changelog.d -maxdepth 1 -name '*.md' ! -name 'README.md' 2>/dev/null | wc -l | tr -d ' ')
+    [ "$PENDING" -eq 0 ] && check "changelog.d/ fragments collated" "PASS" "" || check "changelog.d/ fragments collated" "FAIL" "$PENDING pending — run collate-changelog.sh $TARGET_VERSION"
 fi
 echo ""
 

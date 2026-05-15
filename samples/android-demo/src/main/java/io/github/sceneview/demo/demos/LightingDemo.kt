@@ -44,6 +44,7 @@ import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 
 /**
  * Demonstrates directional, point, and spot lights with interactive controls.
@@ -94,23 +95,21 @@ fun LightingDemo(onBack: () -> Unit) {
     // the same way because the helmet alone gets fully lit by any of them. The wall
     // makes the light's *shape in space* visible: directional = uniform wash, point
     // = radial gradient (1/r²), spot = sharp circular disc with cone edge.
-    val backdropMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = Color(0xFF424448),
-            metallic = 0.0f,
-            roughness = 0.85f,
-        )
-    }
-    val sourceMaterial = remember(materialLoader, selectedColor) {
-        // Bright unlit-looking ball to mark the light position. PBR can't be true
-        // self-emissive without an emissive material, but a low-roughness saturated
-        // colour with the IBL fallback reads convincingly as a glowing source.
-        materialLoader.createColorInstance(
-            color = selectedColor.color,
-            metallic = 0.0f,
-            roughness = 0.0f,
-        )
-    }
+    val backdropMaterial = rememberMaterialInstance(
+        materialLoader,
+        color = Color(0xFF424448),
+        metallic = 0.0f,
+        roughness = 0.85f,
+    )
+    // Bright unlit-looking ball to mark the light position. PBR can't be true
+    // self-emissive without an emissive material, but a low-roughness saturated
+    // colour with the IBL fallback reads convincingly as a glowing source.
+    val sourceMaterial = rememberMaterialInstance(
+        materialLoader,
+        color = selectedColor.color,
+        metallic = 0.0f,
+        roughness = 0.0f,
+    )
 
     // Camera orbits the helmet; the model itself stays fixed so the directional /
     // point / spot light hits the exact same surface every frame — otherwise the

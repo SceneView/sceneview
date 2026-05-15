@@ -286,6 +286,12 @@ class SceneView private constructor(
                 val loadedModel = LoadedModel(asset, animator)
                 models.add(loadedModel)
 
+                // A new model changes the content bounds, so the one-shot auto-center
+                // pass must run again — otherwise a 2nd model loaded after the 1st
+                // centered would stay off-center. Mirrors Android's
+                // `SceneAutoCenterState.reset()`.
+                didCenterContent = false
+
                 // Load external resources (textures, buffers) referenced by the glTF.
                 // This is REQUIRED for models to render with correct materials.
                 asset.loadResources(
@@ -506,6 +512,10 @@ class SceneView private constructor(
                     ),
                 )
             } catch (e: Throwable) {
+                // The asset's bounds are not readable yet (resources still loading) — skip this
+                // model for now. Surface it once so a genuine failure is not invisible; the pass
+                // re-runs on later frames until `didCenterContent` is set.
+                console.warn("SceneView: skipping a model in auto-center (bounds not ready)", e)
                 null
             }
         }

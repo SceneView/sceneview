@@ -23,18 +23,17 @@ public enum CameraControlMode: Sendable {
     /// rather than expecting 2-finger detection.
     case pan
 
-    /// First-person look-around. Drag rotates the scene content around the
-    /// world origin (the default perspective camera at `[0, 0.3, 2]` stays
-    /// fixed); pinch adjusts the camera's field of view — mirrors
-    /// Android's `FovZoomCameraManipulator`.
+    /// First-person look-around. Drag yaws / pitches the perspective
+    /// camera **about its own position** — the camera stands still and
+    /// looks around, it does not orbit and does not move the scene root.
+    /// Pinch adjusts the camera's field of view — mirrors Android's
+    /// `FovZoomCameraManipulator`.
     ///
-    /// **Limitation (#1034)**: true first-person look — rotating the
-    /// camera *about its own position* instead of rotating world content —
-    /// is not yet implemented because the orbit pivot is shared with
-    /// ``orbit`` mode. The visual effect is a tight orbit at radius `2`
-    /// rather than a stationary look-around; this is good enough for
-    /// inspection demos but not for FPS-style navigation. Tracked as a
-    /// v4.4.0 follow-up.
+    /// Entering ``firstPerson`` keeps the camera at whatever world-space
+    /// position it had in ``orbit`` / ``pan`` (no teleport): the look-around
+    /// pivots around that fixed eye. Switching back to ``orbit`` re-derives
+    /// the orbit angles from the look direction, so the transition is
+    /// continuous in both directions. Closes #1236 / #1034.
     case firstPerson
 }
 
@@ -205,6 +204,90 @@ public struct CameraControls: Sendable {
         let yaw = simd_quatf(angle: -azimuth, axis: [0, 1, 0])
         let pitch = simd_quatf(angle: -elevation, axis: [1, 0, 0])
         return yaw * pitch
+    }
+
+    /// Fixed world-space eye position for ``CameraControlMode/firstPerson``.
+    ///
+    /// `nil` until the first time ``firstPerson`` is entered. While in
+    /// firstPerson the camera stays pinned at this point and only its
+    /// orientation changes (true "stand still and look around"). It is
+    /// captured from the current orbit camera position at the mode switch
+    /// so there is no teleport. Closes #1236.
+    public var firstPersonEye: SIMD3<Float>? = nil
+
+    /// World-space orientation of the perspective camera for the current
+    /// look angles.
+    ///
+    /// RealityKit cameras look down their local `-Z`. A yaw of `azimuth`
+    /// about `+Y` followed by a pitch of `elevation` about the camera's
+    /// local `+X` reproduces the same forward vector that
+    /// ``cameraPosition()`` / ``cameraTransform()`` look toward in orbit
+    /// mode, so deriving orbit angles back from this orientation is exact
+    /// (no drift across orbit ↔ firstPerson switches).
+    public func lookOrientation() -> simd_quatf {
+        let yaw = simd_quatf(angle: azimuth, axis: [0, 1, 0])
+        let pitch = simd_quatf(angle: -elevation, axis: [1, 0, 0])
+        return yaw * pitch
+    }
+
+    /// Unit forward vector (the direction the camera looks) for the
+    /// current ``azimuth`` / ``elevation``.
+    public func lookForward() -> SIMD3<Float> {
+        let cosElev = cos(elevation)
+        // -Z forward, consistent with `cameraPosition()`: in orbit the
+        // camera sits at `+radius` along this axis and looks back at the
+        // target, so the look direction is the negated offset.
+        return SIMD3<Float>(
+            -cosElev * sin(azimuth),
+            -sin(elevation),
+            -cosElev * cos(azimuth)
+        )
+    }
+
+    /// Captures the current orbit camera position as the fixed
+    /// ``firstPersonEye``. Call this when entering ``firstPerson`` so the
+    /// look-around pivots around exactly where the camera already is —
+    /// switching orbit → firstPerson never teleports. Idempotent within a
+    /// firstPerson session: only the first call (when `firstPersonEye` is
+    /// `nil`) takes effect.
+    public mutating func enterFirstPerson() {
+        guard firstPersonEye == nil else { return }
+        firstPersonEye = cameraPosition()
+    }
+
+    /// Re-derives the orbit ``target`` from the fixed firstPerson eye and
+    /// the current look direction, then clears ``firstPersonEye``. Call
+    /// this when leaving ``firstPerson`` so orbit resumes around a pivot
+    /// directly in front of the camera — the orbit camera position
+    /// recomputed from `(target, azimuth, elevation, orbitRadius)` equals
+    /// the firstPerson eye exactly, so the transition is continuous.
+    public mutating func exitFirstPerson() {
+        if let eye = firstPersonEye {
+            // The camera looks *toward* the target, so the pivot sits one
+            // `orbitRadius` ahead of the eye along the look direction.
+            // `cameraPosition()` recomputed from this target then lands
+            // back exactly on `eye` (the orbit offset is `-lookForward()`).
+            target = eye + lookForward() * orbitRadius
+        }
+        firstPersonEye = nil
+    }
+
+    /// Resets the orbit ``target`` (pivot) to the given world point —
+    /// typically the content centroid.
+    ///
+    /// Pan moves ``target`` laterally; over repeated pan-then-orbit cycles
+    /// the pivot drifts away from the content centroid (#1236 limitation 2).
+    /// Call this — e.g. from a "recenter" affordance — to snap the orbit
+    /// pivot back. The camera keeps its current ``azimuth`` / ``elevation``
+    /// / ``orbitRadius`` so only the framing recenters, not the viewing
+    /// angle.
+    ///
+    /// - Parameter centroid: World-space point to orbit around. Defaults
+    ///   to the world origin, which is where ``SceneView``'s auto-centering
+    ///   places the content centroid (#1026).
+    public mutating func recenterTarget(_ centroid: SIMD3<Float> = .zero) {
+        target = centroid
+        firstPersonEye = nil
     }
 
     // MARK: - Gesture Handling

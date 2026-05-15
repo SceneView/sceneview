@@ -116,7 +116,8 @@ jobs:
             sudo apt-get install -y -qq shellcheck
           fi
           # PyYAML — already in the runner image, but assert.
-          python3 -c "import yaml" || pip install --quiet pyyaml
+          # Fallback deps live in a requirements file so Dependabot tracks them (#1286).
+          python3 -c "import yaml" || pip install --quiet -r .github/workflows/requirements/pr-check.txt
 
       - name: Validate workflow shell blocks (dash + shellcheck)
         if: always()

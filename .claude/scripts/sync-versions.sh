@@ -395,6 +395,123 @@ if [ -f "$BUG_TEMPLATE" ]; then
     fi
 fi
 
+# ─── 12. Off-map version refs surfaced by the v4.4.0 audit (#1356) ──────
+# These locations carried stale strings through several releases because
+# they sat outside the Version Location Map and no check covered them.
+# Each is wired in below so a future release catches the drift via --fix.
+echo -e "${CYAN}--- Off-map Version Refs (#1356) ---${NC}"
+
+# website-static/js/package.json — the npm `sceneview-web` manifest shipped
+# alongside the CDN-hosted JS. Same package as sceneview-web/package.json,
+# so it must track VERSION_NAME (not an independent track).
+WEBSITE_JS_PKG="$REPO_ROOT/website-static/js/package.json"
+if [ -f "$WEBSITE_JS_PKG" ]; then
+    V=$(python3 -c "import json; print(json.load(open('$WEBSITE_JS_PKG'))['version'])" 2>/dev/null || echo "MISSING")
+    add_check "website-static/js/package.json" "$V"
+fi
+
+# docs/docs/ai-context.md — the AI quick-context block users paste into
+# assistants. Pins `io.github.sceneview:sceneview:X.Y.Z`. Stale here means
+# AI assistants actively generate code against the wrong artifact version.
+AI_CONTEXT="$REPO_ROOT/docs/docs/ai-context.md"
+if [ -f "$AI_CONTEXT" ]; then
+    V=$(grep -m1 'io\.github\.sceneview:sceneview:' "$AI_CONTEXT" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "docs/docs/ai-context.md" "$V"
+    fi
+fi
+
+# docs/docs/android-xr-emulator.md — Gradle install snippet.
+XR_EMULATOR="$REPO_ROOT/docs/docs/android-xr-emulator.md"
+if [ -f "$XR_EMULATOR" ]; then
+    V=$(grep -m1 'io\.github\.sceneview:sceneview:' "$XR_EMULATOR" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "docs/docs/android-xr-emulator.md" "$V"
+    fi
+fi
+
+# Extra docs-site pages carrying Maven artifact refs that section 5 misses.
+for docfile in docs/docs/nodes.md docs/docs/comparison.md docs/docs/quickstart-tv.md \
+               docs/docs/codelabs/codelab-3d-compose.md docs/docs/codelabs/codelab-ar-compose.md; do
+    F="$REPO_ROOT/$docfile"
+    if [ -f "$F" ]; then
+        V=$(grep -m1 'io\.github\.sceneview:sceneview:' "$F" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+        if [ "$V" != "NOT FOUND" ]; then
+            add_check "$docfile" "$V"
+        fi
+    fi
+done
+
+# Website static pages carrying Maven artifact refs (index.html, web.html,
+# geometry-demo.html, playground.html) and the AI-context llms.txt mirrors.
+for webfile in website-static/index.html website-static/web.html \
+               website-static/geometry-demo.html website-static/playground.html \
+               website-static/llms.txt website-static/llms-full.txt \
+               website-static/.well-known/llms.txt; do
+    F="$REPO_ROOT/$webfile"
+    if [ -f "$F" ]; then
+        V=$(grep -m1 'io\.github\.sceneview:sceneview:' "$F" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+        if [ "$V" != "NOT FOUND" ]; then
+            add_check "$webfile (artifact refs)" "$V"
+        fi
+    fi
+done
+
+# README.md badge URLs — Flutter & React Native shields.io badges encode
+# the version in the badge text (`badge/Flutter-vX.Y.Z-...`).
+if [ -f "$README" ]; then
+    V=$(grep -oE 'badge/(Flutter|React%20Native)-v[0-9]+\.[0-9]+\.[0-9]+' "$README" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "README.md (Flutter/RN badges)" "$V"
+    fi
+fi
+
+# Web CDN refs — `cdn.jsdelivr.net/gh/sceneview/sceneview@vX.Y.Z` and
+# `cdn.jsdelivr.net/npm/sceneview-web@X.Y.Z` pinned in README + docs.
+for cdnfile in README.md docs/docs/index.md website-static/index.html website-static/web.html; do
+    F="$REPO_ROOT/$cdnfile"
+    if [ -f "$F" ]; then
+        V=$(grep -oE 'sceneview(-web)?@v?[0-9]+\.[0-9]+\.[0-9]+' "$F" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "NOT FOUND")
+        if [ "$V" != "NOT FOUND" ]; then
+            add_check "$cdnfile (CDN @version)" "$V"
+        fi
+    fi
+done
+
+# SceneViewJS.kt — `SCENEVIEW_VERSION` constant stamped into the Kotlin/JS
+# bundle. The .kt file lives in a library module other agents own, so this
+# check is REPORT-ONLY (critical=false) and never auto-fixed here — bumping
+# the constant is tracked separately (#1357).
+SCENEVIEWJS_KT=$(find "$REPO_ROOT/sceneview-web" -name 'SceneViewJS.kt' 2>/dev/null | head -1 || true)
+if [ -n "$SCENEVIEWJS_KT" ] && [ -f "$SCENEVIEWJS_KT" ]; then
+    V=$(grep -E 'SCENEVIEW_VERSION' "$SCENEVIEWJS_KT" | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | tr -d '"' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "sceneview-web SceneViewJS.kt SCENEVIEW_VERSION" "$V" "false"
+    fi
+fi
+
+# Kotlin toolchain version — gradle/libs.versions.toml `kotlin = "X.Y.Z"` is
+# the source of truth; llms.txt + llms-full.txt quote it in prose and drift.
+# Reported under a separate "Kotlin" banner since it's not VERSION_NAME.
+KOTLIN_TOML=$(grep -m1 '^kotlin = ' "$REPO_ROOT/gradle/libs.versions.toml" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+if [ -n "$KOTLIN_TOML" ]; then
+    for kfile in llms.txt docs/docs/llms.txt docs/docs/llms-full.txt; do
+        F="$REPO_ROOT/$kfile"
+        [ -f "$F" ] || continue
+        V=$(grep -oE 'Kotlin:\*\* [0-9]+\.[0-9]+\.[0-9]+' "$F" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+        if [ -n "$V" ]; then
+            LOCATIONS+=("$kfile (Kotlin version)")
+            VERSIONS+=("$V")
+            if [ "$V" = "$KOTLIN_TOML" ]; then
+                STATUSES+=("OK")
+            else
+                STATUSES+=("MISMATCH")
+                ERRORS=$((ERRORS + 1))
+            fi
+        fi
+    done
+fi
+
 # ─── Report ────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}=== Version Alignment Report ===${NC}"
@@ -598,6 +715,53 @@ with open('$RN_DEMO_PKG', 'w') as f:
                 echo -e "  Fixed: $spm_file (SPM from: -> $SOURCE_VERSION)"
             fi
         fi
+    done
+
+    # Fix website-static/js/package.json (#1356)
+    if [ -f "$WEBSITE_JS_PKG" ]; then
+        CURRENT=$(python3 -c "import json; print(json.load(open('$WEBSITE_JS_PKG'))['version'])" 2>/dev/null || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            python3 -c "
+import json
+with open('$WEBSITE_JS_PKG', 'r') as f:
+    data = json.load(f)
+data['version'] = '$SOURCE_VERSION'
+with open('$WEBSITE_JS_PKG', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+            echo -e "  Fixed: website-static/js/package.json ($CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+
+    # Fix off-map docs/website Maven artifact refs (#1356) — same per-old-version
+    # sweep as section "Fix docs files", extended to the locations wired in
+    # under section 12. The replacement is scoped to `io.github.sceneview:NAME:`
+    # so it never touches unrelated version strings on the same line.
+    for OLD_V in $OLD_VERSIONS; do
+        [ "$OLD_V" = "$SOURCE_VERSION" ] && continue
+        for f in docs/docs/ai-context.md docs/docs/android-xr-emulator.md \
+                 docs/docs/nodes.md docs/docs/comparison.md docs/docs/quickstart-tv.md \
+                 docs/docs/codelabs/codelab-3d-compose.md docs/docs/codelabs/codelab-ar-compose.md \
+                 website-static/index.html website-static/web.html \
+                 website-static/geometry-demo.html website-static/playground.html \
+                 website-static/llms.txt website-static/llms-full.txt \
+                 website-static/.well-known/llms.txt; do
+            F="$REPO_ROOT/$f"
+            if [ -f "$F" ] && grep -q "io\.github\.sceneview:[^:]*:$OLD_V" "$F" 2>/dev/null; then
+                _sed_inplace "s/io\.github\.sceneview:\([^:]*\):$OLD_V/io.github.sceneview:\1:$SOURCE_VERSION/g" "$F"
+                echo -e "  Fixed: $f (artifact refs $OLD_V -> $SOURCE_VERSION)"
+            fi
+        done
+        # README + docs badge URLs and CDN @version pins.
+        for f in README.md docs/docs/index.md website-static/web.html; do
+            F="$REPO_ROOT/$f"
+            [ -f "$F" ] || continue
+            if grep -qE "(badge/(Flutter|React%20Native)-v$OLD_V|sceneview(-web)?@v?$OLD_V|sceneview\.js\?v=$OLD_V)" "$F" 2>/dev/null; then
+                _sed_inplace "s/-v$OLD_V/-v$SOURCE_VERSION/g; s/@v$OLD_V/@v$SOURCE_VERSION/g; s/@$OLD_V/@$SOURCE_VERSION/g; s/?v=$OLD_V/?v=$SOURCE_VERSION/g" "$F"
+                echo -e "  Fixed: $f (badge/CDN $OLD_V -> $SOURCE_VERSION)"
+            fi
+        done
     done
 
     echo ""

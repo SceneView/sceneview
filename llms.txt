@@ -9,7 +9,7 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview.git` (from: "4.4.0")
 
-**Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.20 | **Compose BOM compatible**
+**Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.21 | **Compose BOM compatible**
 
 **API reference (Dokka):** browse the full generated API docs at
 `https://sceneview.github.io/api/sceneview/latest/sceneview/` (3D) and
@@ -1106,8 +1106,8 @@ Most are default parameter values in `SceneView`/`ARSceneView` — call them exp
 | `rememberEnvironment(environmentLoader, isOpaque)` | `Environment` | IBL + skybox environment |
 | `rememberEnvironment(environmentLoader) { ... }` | `Environment` | Custom environment from lambda |
 | `rememberCameraNode(engine) { ... }` | `CameraNode` | Custom camera with apply block |
-| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default |
-| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat |
+| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default; apply block is reactive (re-runs on recomposition, so Compose-state-driven intensity/direction/color update live) |
+| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat; apply block is reactive (same as `rememberMainLightNode`) |
 | `rememberCameraManipulator(orbitHomePosition?, targetPosition?)` | `CameraManipulator?` | Orbit/pan/zoom camera controller |
 | `rememberOnGestureListener(...)` | `OnGestureListener` | Gesture callbacks for tap/drag/pinch |
 | `rememberViewNodeManager()` | `ViewNode.WindowManager` | Required for ViewNode composables |
@@ -3108,6 +3108,7 @@ View modifiers (chainable):
 ```swift
 .environment(_ environment: SceneEnvironment) -> SceneView  // IBL lighting
 .cameraControls(_ mode: CameraControlMode) -> SceneView     // .orbit (default), .pan, .firstPerson
+.recentersTargetOnOrbit(_ enabled: Bool) -> SceneView       // v4.4.0+ — re-pivot on content centroid when (re-)entering orbit; default false
 .onEntityTapped(_ handler: @escaping (Entity) -> Void) -> SceneView   // real entity hit-test (v4.2.0+)
 .autoRotate(speed: Float = 0.3) -> SceneView                // radians/s, default 0.3
 .mainLight(_ slot: LightSlot) -> SceneView                  // v4.2.0+ — see LightSlot below
@@ -3559,7 +3560,7 @@ public protocol EntityProvider {
 public enum CameraControlMode: Sendable {
     case orbit         // drag rotates the scene around the orbit pivot, pinch dollies (default)
     case pan           // drag translates the target laterally, pinch dollies
-    case firstPerson   // drag rotates the view (no orbit translation), pinch adjusts FOV
+    case firstPerson   // v4.4.0+ true look-around: drag yaws/pitches the camera IN PLACE (no orbit, no teleport on mode switch), pinch adjusts FOV
 }
 
 public struct CameraControls: Sendable {

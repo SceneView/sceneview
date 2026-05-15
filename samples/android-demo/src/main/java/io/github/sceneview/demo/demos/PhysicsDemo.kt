@@ -30,6 +30,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
 import io.github.sceneview.demo.sketchfab.SketchfabSlug
@@ -120,9 +121,12 @@ fun PhysicsDemo(onBack: () -> Unit) {
         lookAt(Position(0f, 0f, 0f))
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_physics_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Bodies: $bodyCount", style = MaterialTheme.typography.labelLarge)
             Row(
@@ -198,6 +202,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
                 cameraNode = cameraNode,
+                onFrame = firstFrame.onFrame,
                 cameraManipulator = rememberCameraManipulator(
                     orbitHomePosition = cameraNode.worldPosition
                 )
@@ -213,9 +218,14 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 val groundMaterial = rememberMaterialInstance(
                     materialLoader, SceneViewColors.SurfaceDim
                 )
-                val sphereMaterials = remember(materialLoader) {
-                    SceneViewColors.Ramp4.map { materialLoader.createColorInstance(it) }
-                }
+                // Ramp4 is a fixed 4-colour list — call the helper once per slot so
+                // each MaterialInstance gets the same disposal hygiene as the rest.
+                val sphereMaterials = listOf(
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[0]),
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[1]),
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[2]),
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[3]),
+                )
 
                 // Ground plane — must use Size(x, y=0, z) for a HORIZONTAL floor
                 PlaneNode(

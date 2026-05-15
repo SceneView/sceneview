@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -36,10 +37,12 @@ fun TextDemo(onBack: () -> Unit) {
 
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
+    val firstFrame = rememberFirstFrameState()
 
     DemoScaffold(
         title = stringResource(R.string.demo_text_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Text Content", style = MaterialTheme.typography.labelLarge)
             OutlinedTextField(
@@ -62,6 +65,7 @@ fun TextDemo(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
+            onFrame = firstFrame.onFrame,
             // Dolly the camera closer — 3 stacked 0.18 m-tall labels at the origin read
             // cramped at the default z = 4. z = 1.2 fills the portrait viewport.
             cameraManipulator = rememberCameraManipulator(

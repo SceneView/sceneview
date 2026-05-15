@@ -1,6 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 import XCTest
 import simd
+import RealityKit
 @testable import SceneViewSwift
 
 // Test classes run on the main actor: their RealityKit node factories
@@ -155,6 +156,47 @@ final class ShapeNodeTests: XCTestCase {
         let shape = ShapeNode.regularPolygon(sides: 6, radius: 0.3)
         XCTAssertNotNil(shape.sceneEntity)
         XCTAssert(shape.sceneEntity === shape.entity)
+    }
+
+    // MARK: - `unlit:` parameter (#1359)
+
+    private static let triangle: [SIMD2<Float>] = [
+        SIMD2<Float>(0, 0.5),
+        SIMD2<Float>(-0.5, -0.5),
+        SIMD2<Float>(0.5, -0.5)
+    ]
+
+    /// `unlit: true` must produce an `UnlitMaterial` — a flat fill that does
+    /// not respond to image-based lighting — not a lit `SimpleMaterial`.
+    func testUnlitParameterYieldsUnlitMaterial() {
+        let shape = ShapeNode(points: Self.triangle, color: .red, unlit: true)
+        let material = shape.entity.model?.materials.first
+        XCTAssertNotNil(material)
+        XCTAssertTrue(
+            material is UnlitMaterial,
+            "unlit: true must yield an UnlitMaterial (no lighting response), got \(type(of: material))"
+        )
+        XCTAssertFalse(material is SimpleMaterial, "unlit material must not be a lit SimpleMaterial")
+    }
+
+    /// The `unlit:` contract holds for extruded shapes too.
+    func testExtrudedUnlitParameterYieldsUnlitMaterial() {
+        let shape = ShapeNode(
+            points: Self.triangle,
+            extrusionDepth: 0.1,
+            color: .red,
+            unlit: true
+        )
+        XCTAssertTrue(shape.entity.model?.materials.first is UnlitMaterial)
+    }
+
+    /// The default (`unlit: false`) path stays physically-based.
+    func testDefaultParameterYieldsPBRMaterial() {
+        let shape = ShapeNode(points: Self.triangle, color: .red)
+        XCTAssertTrue(
+            shape.entity.model?.materials.first is PhysicallyBasedMaterial,
+            "default material must be physically-based"
+        )
     }
 
     // MARK: - Concave polygon
