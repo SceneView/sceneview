@@ -51,6 +51,25 @@ class SceneView private constructor(
     private var assetLoader: AssetLoader? = null
     private val lightEntities = mutableListOf<Entity>()
 
+    /**
+     * When `true` (default), the first render frame where the loaded content's
+     * union bounding box becomes non-degenerate triggers a one-time translation
+     * of every loaded asset's root entity so the scene's centroid lands at the
+     * world origin — i.e. at the orbit-camera target.
+     *
+     * Library-level port of the iOS `autoCenterContent` (issue #1026): demos
+     * that place models at non-origin positions (e.g. `z = -2`) then render
+     * visually centred in the canvas without each demo having to re-centre
+     * itself. Set to `false` for narrative scenes that rely on intentional
+     * off-centre placement. Cross-platform parity with iOS #1026 and the
+     * Android sibling #1051. Closes #1052.
+     */
+    var autoCenterContent: Boolean = true
+
+    /** Set once [refreshContentCentering] has translated the content roots so
+     * subsequent frames are a cheap no-op. Mirrors iOS's `didCenterContent`. */
+    private var didCenterContent = false
+
     /** Tracks a loaded glTF asset with its animation state. */
     private class LoadedModel(
         val asset: FilamentAsset,
@@ -449,6 +468,85 @@ class SceneView private constructor(
         controller.maxDistance = radius * 10.0
     }
 
+    /**
+     * Translate every loaded asset's root entity so the union bounding box of
+     * all content lands centred on the world origin (the orbit-camera target).
+     *
+     * Runs once, on the first render frame where the content bounds are
+     * non-degenerate — most async model loads complete within a handful of
+     * frames after [loadModel]. A no-op once [didCenterContent] is set, and a
+     * no-op entirely when [autoCenterContent] is `false`.
+     *
+     * Library-level port of the iOS `refreshContentCentering` (#1026): on iOS
+     * an intermediate `contentRoot` Entity is translated; the web Filament
+     * `Scene` has no parent root, so each asset's own root entity is offset
+     * instead — the visual result is identical. Closes #1052.
+     */
+    private fun refreshContentCentering() {
+        if (didCenterContent || !autoCenterContent || models.isEmpty()) return
+
+        // Gather each asset's bounding box. `getBoundingBox()` reports the
+        // asset-space AABB, which is empty/degenerate until loadResources()
+        // has populated the renderables.
+        val boxes = models.mapNotNull { model ->
+            try {
+                val aabb = model.asset.getBoundingBox()
+                val mn: dynamic = aabb.min
+                val mx: dynamic = aabb.max
+                ContentCentering.Aabb(
+                    doubleArrayOf(
+                        (mn[0] as Number).toDouble(),
+                        (mn[1] as Number).toDouble(),
+                        (mn[2] as Number).toDouble(),
+                    ),
+                    doubleArrayOf(
+                        (mx[0] as Number).toDouble(),
+                        (mx[1] as Number).toDouble(),
+                        (mx[2] as Number).toDouble(),
+                    ),
+                )
+            } catch (e: Throwable) {
+                null
+            }
+        }
+
+        val offset = ContentCentering.centeringOffset(ContentCentering.union(boxes)) ?: return
+
+        // Apply the centring translation to each asset's root entity via the
+        // TransformManager. Composing onto the existing transform keeps any
+        // per-model scale/position the consumer set themselves intact.
+        val tm = engine.getTransformManager()
+        for (model in models) {
+            try {
+                val root = model.asset.getRoot()
+                if (!tm.hasComponent(root)) tm.create(root)
+                val instance = tm.getInstance(root)
+                val current: dynamic = tm.getTransform(instance)
+                tm.setTransform(instance, translatedMat4(current, offset))
+            } catch (e: Throwable) {
+                console.error("SceneView: auto-center failed for a model", e)
+            }
+        }
+        didCenterContent = true
+        console.log("SceneView: auto-centered content (offset ${offset[0]}, ${offset[1]}, ${offset[2]})")
+    }
+
+    /**
+     * Return a copy of the column-major 4x4 [mat] with [offset] added to its
+     * translation column (indices 12, 13, 14). Filament.js represents a mat4
+     * as a flat 16-element `number[]`.
+     */
+    private fun translatedMat4(mat: dynamic, offset: DoubleArray): dynamic {
+        val out = js("[]")
+        for (i in 0 until 16) {
+            out.push((mat[i] as Number).toDouble())
+        }
+        out[12] = (out[12] as Number).toDouble() + offset[0]
+        out[13] = (out[13] as Number).toDouble() + offset[1]
+        out[14] = (out[14] as Number).toDouble() + offset[2]
+        return out
+    }
+
     /** Clean up all Filament resources. */
     fun destroy() {
         stopRendering()
@@ -496,6 +594,11 @@ class SceneView private constructor(
                 resize(w, h)
             }
         }
+
+        // Auto-center content on the first frame its bounds are non-degenerate
+        // (i.e. async-loaded models have populated). No-op once centered or
+        // when autoCenterContent is disabled. Port of iOS #1026 — closes #1052.
+        refreshContentCentering()
 
         // Update orbit camera
         cameraController?.update()
@@ -554,6 +657,7 @@ class SceneViewBuilder(private val sceneView: SceneView) {
     private var cameraControlsEnabled = true
     private var autoRotateEnabled = false
     private var useDefaultEnvironment = true
+    private var autoCenterContentEnabled = true
 
     /** Configure the camera. */
     fun camera(block: CameraConfig.() -> Unit) {
@@ -597,7 +701,19 @@ class SceneViewBuilder(private val sceneView: SceneView) {
         autoRotateEnabled = enabled
     }
 
+    /**
+     * Auto-centre loaded content on the world origin once it has finished
+     * loading. Enabled by default — pass `false` for narrative scenes that
+     * rely on intentional off-centre placement.
+     *
+     * Library-level port of iOS `autoCenterContent` (#1026). Closes #1052.
+     */
+    fun autoCenterContent(enabled: Boolean = true) {
+        autoCenterContentEnabled = enabled
+    }
+
     internal fun apply() {
+        sceneView.autoCenterContent = autoCenterContentEnabled
         cameraConfig?.applyTo(sceneView.camera)
 
         // If no explicit light was configured, add model-viewer-like 3-point lighting

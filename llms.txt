@@ -2870,6 +2870,9 @@ SceneView.create(canvas, configure = {
     noEnvironment()                // skip IBL loading entirely
     cameraControls(true)           // orbit controls (default: true)
     autoRotate(true)               // auto-spin camera
+    autoCenterContent(true)        // center loaded content on the camera target
+                                   //  (default: true) — port of iOS autoCenterContent.
+                                   //  Pass false for intentional off-center scenes.
 }) { sceneView -> /* onReady */ }
 ```
 
@@ -2931,6 +2934,7 @@ sv.setAutoRotate(enabled)   // Boolean
 sv.setAutoRotateSpeed(radiansPerFrame)
 sv.setZoomLimits(min, max)
 sv.setBackgroundColor(r, g, b, a)  // 0-1 range
+sv.setAutoCenterContent(enabled)   // Boolean — center loaded content (default true)
 sv.fitToModels()
 sv.startRendering()
 sv.stopRendering()
