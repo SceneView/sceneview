@@ -69,6 +69,51 @@ final class GeometryNodeTests: XCTestCase {
         XCTAssertEqual(sphere.entity.model?.materials.count, 1)
     }
 
+    // MARK: - `unlit:` parameter (#1359)
+
+    /// `unlit: true` must produce an `UnlitMaterial` — a flat fill that does
+    /// not respond to image-based lighting — not a lit `SimpleMaterial`.
+    func testCubeUnlitParameterYieldsUnlitMaterial() {
+        let cube = GeometryNode.cube(size: 1.0, color: .red, unlit: true)
+        let material = cube.entity.model?.materials.first
+        XCTAssertNotNil(material)
+        XCTAssertTrue(
+            material is UnlitMaterial,
+            "unlit: true must yield an UnlitMaterial (no lighting response), got \(type(of: material))"
+        )
+        XCTAssertFalse(material is SimpleMaterial, "unlit material must not be a lit SimpleMaterial")
+    }
+
+    /// The default (`unlit: false`) path stays physically-based so shapes
+    /// react to scene lighting.
+    func testCubeDefaultParameterYieldsPBRMaterial() {
+        let cube = GeometryNode.cube(size: 1.0, color: .red)
+        let material = cube.entity.model?.materials.first
+        XCTAssertTrue(
+            material is PhysicallyBasedMaterial,
+            "default material must be physically-based, got \(type(of: material))"
+        )
+    }
+
+    /// Every procedural primitive honours the `unlit:` contract identically.
+    func testAllPrimitivesUnlitParameterYieldsUnlitMaterial() {
+        let nodes: [GeometryNode] = [
+            .cube(size: 1.0, unlit: true),
+            .sphere(radius: 0.5, unlit: true),
+            .cylinder(radius: 0.3, height: 1.0, unlit: true),
+            .plane(width: 1.0, depth: 1.0, unlit: true),
+            .cone(height: 1.0, radius: 0.5, unlit: true),
+            .torus(unlit: true),
+            .capsule(unlit: true)
+        ]
+        for node in nodes {
+            XCTAssertTrue(
+                node.entity.model?.materials.first is UnlitMaterial,
+                "unlit: true must yield an UnlitMaterial for every primitive"
+            )
+        }
+    }
+
     // MARK: - Transform helpers
 
     func testPositionSetsEntityPosition() {

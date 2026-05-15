@@ -56,15 +56,18 @@ public struct GeometryNode: Sendable {
     /// (the HDR environment that `SceneView` wires by default). This is the single
     /// biggest visual-quality jump over RealityKit's unlit-flat `SimpleMaterial`.
     ///
-    /// Pass `unlit: true` to opt back into the legacy flat-fill `SimpleMaterial`
-    /// look — useful for debug visualizations and overlays that should not react
-    /// to scene lighting.
+    /// Pass `unlit: true` to opt into a flat-fill `UnlitMaterial` look — useful
+    /// for debug visualizations and overlays that should not react to scene
+    /// lighting.
     static func defaultMaterial(
         color: SimpleMaterial.Color,
         unlit: Bool = false
     ) -> any RealityKit.Material {
         if unlit {
-            return SimpleMaterial(color: color, isMetallic: false)
+            // UnlitMaterial renders a flat fill that ignores IBL/scene lighting.
+            // SimpleMaterial(isMetallic: false) is still lit, so it would
+            // contradict the `unlit` contract.
+            return UnlitMaterial(color: color)
         }
         var pbr = PhysicallyBasedMaterial()
         pbr.baseColor = .init(tint: color)
