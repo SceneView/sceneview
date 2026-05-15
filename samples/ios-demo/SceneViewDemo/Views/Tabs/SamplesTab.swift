@@ -306,6 +306,13 @@ struct SamplesTab: View {
                 subtitle: "Local environment reflections",
                 category: .advanced
             ),
+            DemoItem(
+                comingSoonTitle: "Secondary Camera (PiP)",
+                icon: "pip.fill",
+                subtitle: "Picture-in-picture from a second camera",
+                category: .advanced,
+                version: "4.4"
+            ),
         ]
 
         // MARK: AR -- iOS only platform-wise; most features still ported from Android
