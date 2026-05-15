@@ -99,6 +99,10 @@ Two regressions from `cd4034ff` (PR #1224) that the #1241 emulator QA sweep prov
 
 - **New recipe: Blender → SceneView asset pipeline ([#1222](https://github.com/sceneview/sceneview/issues/1222))** — `samples/recipes/blender-to-sceneview.md` and `docs/docs/recipes/blender-pipeline.md` walk contributors through authoring a custom 3D model in Blender and shipping it in a SceneView app: `.glb` is native on Android, while Apple platforms go `.glb` → Reality Converter → `.usdz` → Reality Composer Pro (Blender's own USDZ exporter produces broken materials). Adapted from [@radcli14](https://github.com/radcli14)'s [`blender-to-realitykit`](https://github.com/radcli14/blender-to-realitykit) tutorial (MIT, 17⭐), with a SceneView-specific call-out on the Android Filament JNI main-thread rule. Cross-linked from both quickstarts and the API cheatsheet. Closes [#1222](https://github.com/sceneview/sceneview/issues/1222).
 
+### Added — Android library-level `autoCenterContent` ([#1051](https://github.com/sceneview/sceneview/issues/1051))
+
+- **`SceneView(autoCenterContent = true)`** — port of the iOS `autoCenterContent` feature ([#1026](https://github.com/sceneview/sceneview/issues/1026) / [PR #1038](https://github.com/sceneview/sceneview/pull/1038)). DSL `content` nodes are parented to an intermediate content-root node which the library translates once — on the first frame their union bounding box is non-empty — so the content centroid lands at the orbit pivot and renders centred without per-node `ModelNode(centerOrigin = …)`. Lights / camera are `SceneView` parameters (never DSL children) so they stay put. Opt out with `autoCenterContent = false` for intentional off-centre composition.
+
 ### Follow-ups (filed against the master polish-pipeline reference [#1218](https://github.com/sceneview/sceneview/issues/1218))
 
 - [#1219](https://github.com/sceneview/sceneview/issues/1219) — Bundle ambientCG NightSkyHDRI008 (CC0) as `night_sky` env preset (iOS + Android + Web)

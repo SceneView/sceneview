@@ -69,12 +69,15 @@ fun SceneView(
     permissionHandler: ARPermissionHandler? = /* auto from ComponentActivity */,
     lifecycle: Lifecycle = LocalLifecycleOwner.current.lifecycle,
     renderQuality: RenderQuality = RenderQuality.Default,   // Cinematic / Default / Performance — see "Render Quality"
+    autoCenterContent: Boolean = true,   // library-level auto-center — see note below
     onFrame: ((frameTimeNanos: Long) -> Unit)? = null,
     content: (@Composable SceneScope.() -> Unit)? = null
 )
 ```
 
 **Defaults changed in v4.0.10+:** shadows ON (mainLight + fillLight), SSAO + bloom enabled, neutral exposure (~1.0), dual-light setup out-of-the-box. No more "flat-lit chrome look" — drop a model in and it renders cinematic by default.
+
+**`autoCenterContent` (default `true`):** all DSL `content` nodes are parented to an intermediate content-root node which the library translates once — on the first frame their union bounding box is non-empty — so the content centroid lands at the orbit pivot and renders centred without per-node `ModelNode(centerOrigin = …)`. Lights / camera are `SceneView` parameters (never DSL children) so they stay put. Pass `autoCenterContent = false` for scenes with intentional off-centre placement. Mirrors the iOS `autoCenterContent` modifier.
 
 Minimal usage:
 ```kotlin
