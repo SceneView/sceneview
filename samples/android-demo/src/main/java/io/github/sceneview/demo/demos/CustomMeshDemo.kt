@@ -26,6 +26,7 @@ import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberPausableHeroYaw
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -61,9 +62,12 @@ fun CustomMeshDemo(onBack: () -> Unit) {
         trigger = rotating, durationMillis = 8_000, staticYaw = 0f,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_custom_mesh_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Row(
                 modifier = Modifier
@@ -89,6 +93,7 @@ fun CustomMeshDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             // Dolly closer — molecule spans ±0.6 m and renders at scale 0.5–2.5x, so at

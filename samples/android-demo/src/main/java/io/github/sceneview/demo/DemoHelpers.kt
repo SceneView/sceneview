@@ -69,6 +69,46 @@ fun LoadingScrim(loading: Boolean, label: String = "Loading…") {
 }
 
 /**
+ * First-frame signal for the [DemoScaffold] loading scrim.
+ *
+ * Cold-starting a SceneView demo leaves the viewport jet-black for 5–12 s while
+ * Filament compiles shaders and uploads buffers — it reads as a crash to a
+ * first-time user (#1022). [rememberFirstFrameState] returns this pair so a demo
+ * can flip the scrim off exactly when the first Filament frame is presented:
+ *
+ * ```kotlin
+ * val firstFrame = rememberFirstFrameState()
+ * DemoScaffold(title = …, onBack = onBack, firstFrameRendered = firstFrame.rendered) {
+ *     SceneView(onFrame = firstFrame.onFrame, …) { … }
+ * }
+ * ```
+ *
+ * @property rendered Read in the scaffold — `false` until the first frame, then `true`.
+ * @property onFrame Pass straight to `SceneView(onFrame = …)`. Cheap after the first call.
+ */
+class FirstFrameState internal constructor(
+    private val renderedState: androidx.compose.runtime.MutableState<Boolean>,
+) {
+    val rendered: androidx.compose.runtime.State<Boolean> get() = renderedState
+
+    val onFrame: (frameTimeNanos: Long) -> Unit = {
+        if (!renderedState.value) renderedState.value = true
+    }
+}
+
+/**
+ * Remembers a [FirstFrameState] for wiring the [DemoScaffold] loading scrim to a
+ * SceneView's first presented frame. See [FirstFrameState] for the usage pattern.
+ */
+@Composable
+fun rememberFirstFrameState(): FirstFrameState {
+    val rendered = androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
+    return androidx.compose.runtime.remember { FirstFrameState(rendered) }
+}
+
+/**
  * Idle auto-orbit state for a camera that sweeps slowly around a target.
  *
  * Returns a [OrbitState] whose [yaw][OrbitState.yaw] advances from 0° to 360° in

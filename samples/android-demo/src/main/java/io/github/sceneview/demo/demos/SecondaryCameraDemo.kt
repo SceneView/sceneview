@@ -36,6 +36,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.SurfaceType
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.model.ModelInstance
@@ -114,9 +115,12 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
         pipCameraNode.lookAt(Position(0f, 0f, 0f))
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_secondary_camera_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Mark the section label as a heading so TalkBack users can
             // navigate to it and understand the chip row that follows.
@@ -155,6 +159,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,
             environment = environment,
+            onFrame = firstFrame.onFrame,
         ) {
             mainInstance?.let { instance ->
                 ModelNode(

@@ -40,6 +40,7 @@ import dev.romainguy.kotlin.math.lookAt
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.math.Position
@@ -146,9 +147,12 @@ fun VideoDemo(onBack: () -> Unit) {
         cinematic = cinematic,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_video_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Playback", style = MaterialTheme.typography.labelLarge)
             Spacer(modifier = Modifier.height(8.dp))
@@ -221,6 +225,7 @@ fun VideoDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,

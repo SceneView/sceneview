@@ -34,6 +34,10 @@
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
 
+### Fixed — Android demo
+
+- **Demo viewports no longer flash black for 5–12 s on cold start ([#1022](https://github.com/sceneview/sceneview/issues/1022)).** `DemoScaffold` now shows a surface-tinted loading scrim over the 3D viewport until the SceneView presents its first Filament frame, wired via the new `rememberFirstFrameState()` helper.
+
 ### Fixed — ViewNode rendering
 
 - **`ViewNode` no longer renders as a permanent black rectangle after a background → foreground cycle ([#984](https://github.com/sceneview/sceneview/issues/984)).** `ViewNode.WindowManager` now retries the off-screen window attach via an owner-View attach listener when the owner is not yet attached at resume time, instead of silently dropping the attach.

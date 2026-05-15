@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.DynamicSkyNode
 import io.github.sceneview.rememberCameraManipulator
@@ -71,9 +72,12 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
         else                    -> "🌙 Night"
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_dynamic_sky),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text(
                 "Time of Day: %.1f h  ·  $periodLabel".format(timeOfDay),
@@ -98,6 +102,7 @@ fun DynamicSkyDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             modelLoader = modelLoader,
             environmentLoader = environmentLoader,
