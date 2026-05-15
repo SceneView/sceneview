@@ -421,13 +421,29 @@ class EnvironmentLoader(
         environments -= environment
     }
 
+    /**
+     * Releases every [Environment] produced by this loader.
+     *
+     * Does **not** cancel the loader's coroutine scope — the loader stays usable and a
+     * subsequent `loadHDREnvironment`/`loadKTX1Environment` still launches correctly.
+     * Scope cancellation happens only in [destroy] (#933), so calling `clear()` to drop
+     * environments mid-life never leaves the loader with a dead scope.
+     */
     fun clear() {
-        runCatching { coroutineScope.cancel() }
         environments.toList().forEach { destroyEnvironment(it) }
         environments.clear()
     }
 
+    /**
+     * Destroys this loader and cancels its coroutine scope.
+     *
+     * Cancelling the scope stops any in-flight `loadHDREnvironment`/`loadKTX1Environment`
+     * job so it cannot touch a destroyed [Engine] after disposal (#933). Wired to
+     * `rememberEnvironmentLoader`'s `DisposableEffect.onDispose`, so the scope never
+     * outlives the owning composition.
+     */
     fun destroy() {
+        runCatching { coroutineScope.cancel() }
         clear()
 
         iblPrefilter.destroy()
