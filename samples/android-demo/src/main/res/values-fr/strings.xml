@@ -236,6 +236,12 @@
     <string name="demo_reflection_probes_subtitle">Réflexions cubemap locales</string>
     <string name="demo_secondary_camera_title">Caméra secondaire (PiP)</string>
     <string name="demo_secondary_camera_subtitle">Vue caméra incrustée</string>
+    <string name="demo_secondary_camera_chip_section">Angle de la caméra PiP</string>
+    <string name="demo_secondary_camera_chip_top">Dessus</string>
+    <string name="demo_secondary_camera_chip_side">Côté</string>
+    <string name="demo_secondary_camera_chip_front">Face</string>
+    <string name="demo_secondary_camera_chip_corner">Coin</string>
+    <string name="demo_secondary_camera_pip_cd">Vue caméra incrustée : %1$s</string>
     <string name="demo_debug_overlay_title">Surcouche de débogage</string>
     <string name="demo_debug_overlay_subtitle">Surcouche de statistiques de performance</string>
     <string name="demo_ar_placement_title">Placer en tapant</string>

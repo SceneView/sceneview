@@ -1,5 +1,6 @@
 package io.github.sceneview.demo.demos
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.SurfaceType
@@ -90,7 +95,10 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
         title = stringResource(R.string.demo_secondary_camera_title),
         onBack = onBack,
         controls = {
-            Text("PiP Camera Angle", style = MaterialTheme.typography.labelLarge)
+            Text(
+                stringResource(R.string.demo_secondary_camera_chip_section),
+                style = MaterialTheme.typography.labelLarge
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -99,7 +107,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
                     FilterChip(
                         selected = cameraPreset == preset,
                         onClick = { cameraPreset = preset },
-                        label = { Text(preset.label) }
+                        label = { Text(stringResource(preset.labelRes)) }
                     )
                 }
             }
@@ -121,6 +129,10 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             }
         }
 
+        val pipDescription = stringResource(
+            R.string.demo_secondary_camera_pip_cd,
+            stringResource(cameraPreset.labelRes)
+        )
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -132,6 +144,14 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
                     MaterialTheme.colorScheme.outline,
                     RoundedCornerShape(12.dp)
                 )
+                // The PiP renders into a TextureView that TalkBack cannot
+                // introspect — describe it explicitly, and mark it a polite
+                // live region so the angle change is announced when the user
+                // picks a different chip.
+                .semantics {
+                    contentDescription = pipDescription
+                    liveRegion = LiveRegionMode.Polite
+                }
         ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
@@ -155,11 +175,11 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
     }
 }
 
-private enum class CameraPreset(val label: String, val eye: Position) {
+private enum class CameraPreset(@StringRes val labelRes: Int, val eye: Position) {
     // Y=1.8 with X=0.01 to avoid a gimbal singularity in lookAt's up-vector
     // resolution when the camera sits exactly above the origin.
-    TOP("Top", Position(0.01f, 1.8f, 0f)),
-    SIDE("Side", Position(1.8f, 0.2f, 0f)),
-    FRONT("Front", Position(0f, 0.2f, 1.8f)),
-    CORNER("Corner", Position(1.3f, 0.9f, 1.3f)),
+    TOP(R.string.demo_secondary_camera_chip_top, Position(0.01f, 1.8f, 0f)),
+    SIDE(R.string.demo_secondary_camera_chip_side, Position(1.8f, 0.2f, 0f)),
+    FRONT(R.string.demo_secondary_camera_chip_front, Position(0f, 0.2f, 1.8f)),
+    CORNER(R.string.demo_secondary_camera_chip_corner, Position(1.3f, 0.9f, 1.3f)),
 }

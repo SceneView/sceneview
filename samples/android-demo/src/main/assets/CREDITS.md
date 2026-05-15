@@ -59,6 +59,7 @@ Website: https://polyhaven.com
 | `outdoor_cloudy_2k.hdr` | Outdoor Cloudy | Outdoor / Cloudy | 6.2 MB |
 | `sunset_2k.hdr` | Sunset | Outdoor / Sunset | 4.1 MB |
 | `autumn_field_2k.hdr` | Autumn Field | Nature / Field | 4.2 MB |
+| `night_sky_2k.hdr` | Dikhololo Night | Outdoor / Night sky (Milky Way) | 6.7 MB |
 
 ## License Summary
 

@@ -113,15 +113,22 @@ echo ""
 echo -e "${CYAN}--- SPM version consistency ---${NC}"
 
 GRADLE_VERSION=$(grep '^VERSION_NAME=' gradle.properties 2>/dev/null | cut -d= -f2)
+# Migration guides + changelogs legitimately quote the legacy
+# `sceneview-swift` mirror coordinate with an OLD version inside a diff
+# snippet (the whole point is to document the deprecation) — exclude them
+# so they're never flagged stale.
 SPM_STALE=$(grep -rl "sceneview-swift.*from.*\"[0-9]" --include='*.md' --include='*.txt' . 2>/dev/null | \
-    grep -v 'node_modules\|build/\|.git/\|docs/site/\|.claude/worktrees/\|.claude/plans/' | \
+    grep -vE 'node_modules|build/|\.git/|docs/site/|\.claude/worktrees/|\.claude/plans/|docs/docs/migration|CHANGELOG\.md|MIGRATION\.md' | \
     xargs grep -l "sceneview-swift" 2>/dev/null | \
     xargs grep -L "from.*\"$GRADLE_VERSION\"" 2>/dev/null || true)
 
 if [ -z "$SPM_STALE" ]; then
     check "SPM version refs match $GRADLE_VERSION" "PASS" ""
 else
-    check "SPM version refs stale" "FAIL" "$(echo "$SPM_STALE" | wc -l | tr -d ' ') file(s)"
+    # `printf | grep -c .` counts non-empty lines — `echo "" | wc -l`
+    # returns 1 for an empty string and would report a phantom "1 file".
+    STALE_COUNT=$(printf '%s\n' "$SPM_STALE" | grep -c .)
+    check "SPM version refs stale" "FAIL" "$STALE_COUNT file(s)"
 fi
 
 # ─── 5. Emulator build check ─────────────────────────────────────────────

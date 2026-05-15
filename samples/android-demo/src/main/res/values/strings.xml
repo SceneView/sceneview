@@ -230,6 +230,12 @@
     <string name="demo_reflection_probes_subtitle">Local cubemap reflections</string>
     <string name="demo_secondary_camera_title">Secondary Camera (PiP)</string>
     <string name="demo_secondary_camera_subtitle">Picture-in-picture camera view</string>
+    <string name="demo_secondary_camera_chip_section">PiP Camera Angle</string>
+    <string name="demo_secondary_camera_chip_top">Top</string>
+    <string name="demo_secondary_camera_chip_side">Side</string>
+    <string name="demo_secondary_camera_chip_front">Front</string>
+    <string name="demo_secondary_camera_chip_corner">Corner</string>
+    <string name="demo_secondary_camera_pip_cd">Picture-in-picture camera view: %1$s</string>
     <string name="demo_debug_overlay_title">Debug Overlay</string>
     <string name="demo_debug_overlay_subtitle">Performance stats overlay</string>
     <string name="demo_ar_placement_title">Tap to Place</string>
