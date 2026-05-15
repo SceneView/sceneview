@@ -188,6 +188,22 @@ jobs:
             -PversionCode=${{ steps.version.outputs.code }} \
             -PversionName=${{ steps.version.outputs.name }}
 
+      # Manifest validation gate (#1301) — fail fast on a stale or wrong-variant
+      # AAB before it reaches the Play Store. Asserts the built bundle's
+      # package / versionName / versionCode match what gradle was told to build,
+      # so a misconfigured artifact is caught here (~1 s) instead of as a Play
+      # Console rejection minutes later. `aapt2` is on PATH via the Android SDK
+      # build-tools that `setup-gradle` provisions.
+      - name: Validate AAB manifest before upload
+        env:
+          EXPECT_PKG: io.github.sceneview.demo
+          EXPECT_NAME: ${{ steps.version.outputs.name }}
+          EXPECT_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          AAB=$(ls samples/android-demo/build/outputs/bundle/release/*.aab | head -n1)
+          bash .claude/scripts/validate-release-artifact.sh \
+            "$AAB" "$EXPECT_PKG" "$EXPECT_NAME" "$EXPECT_CODE"
+
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v7
         with:

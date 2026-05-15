@@ -33,6 +33,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.colorOf
@@ -122,9 +123,12 @@ fun MovableLightDemo(onBack: () -> Unit) {
     // recompose / navigate-away (#979).
     val markerMaterial = rememberUnlitMaterialInstance(materialLoader, Color(0xFFFFEB3B))
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_movable_light_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -191,6 +195,7 @@ fun MovableLightDemo(onBack: () -> Unit) {
         ) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

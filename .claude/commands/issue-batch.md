@@ -1,196 +1,261 @@
 ---
-description: "Rapporteur / Correcteur" workflow — parallel audit, toast-spawned batches per category, Tier 1 child self-review + Tier 2 orchestrator post-merge audit, mandatory visual QA.
+description: Launch-and-go continuous issue-processing cycle — a replace-on-completion pipeline of 6-8 lean-clone background agents, fire-and-forget merge, disk-gated spawn, release checkpoint per iteration.
 ---
 
-# /issue-batch — SceneView batched issue workflow
+# /issue-batch — SceneView continuous issue cycle
 
-You are the **orchestrator** of the "Rapporteur / Correcteur" workflow. Your job is to dispatch — not to code. Treat each batch as a self-contained child session that you launch via `mcp__ccd_session__spawn_task` (toast notification). Each child session must auto-signal end-of-work so it can be closed.
+You are the **orchestrator** of SceneView's continuous issue-processing cycle. Your
+job is to **audit, dispatch, and monitor — never to code yourself**. A maintainer
+starts a session, says "run the cycle", and you keep a steady pipeline of background
+agents flowing until the backlog is drained or they ask you to stop.
 
-⛔ **Harness limitation (issue #1243)** — child agents launched via `spawn_task` or `Agent(isolation="worktree")` **cannot themselves spawn nested `Agent()` reviewers**. The harness silently rejects nested `Agent` calls and the child ends up self-reviewing. This means the multi-Agent parallel review **must happen at the orchestrator level (this session)**, not inside the child. The skill therefore splits review into two tiers:
+The validated operating model (formalized 2026-05-15) is:
 
-- **Tier 1 (pre-merge, inside child)** — child agent runs a single self-review pass against a 5-angle checklist (security, threading, API consistency, performance, docs). No nested Agent spawning.
-- **Tier 2 (post-merge, in orchestrator — Phase 3.5 below)** — orchestrator spawns 5-7 Opus reviewers in parallel via real top-level `Agent` calls, against the merged commit SHA. Any blocker found becomes a follow-up issue (PRs are atomic; no force-revert).
+```
+AUDIT → AUTO-FILE ISSUES → BATCH → DISPATCH PIPELINE → SELF-REVIEW + CI → MERGE → TIER-2 (risky only) → re-AUDIT
+```
 
-See memory file `feedback_issue_workflow.md` for the rationale and `feedback_pr_review_workflow.md` for the Tier 1 / Tier 2 split details.
+**Master playbook:** the full rationale lives in agent memory
+`feedback_continuous_issue_cycle.md`. Supporting detail: `feedback_issue_workflow.md`
+(Rapporteur/Correcteur split), `feedback_pr_review_workflow.md` (Tier 1 / Tier 2),
+`feedback_resource_hygiene.md` (disk gating). Read those for the *why*; this file is
+the *how* — keep it as the executable checklist.
+
+⛔ **Harness limitation (issue #1243)** — background agents launched via `spawn_task`
+or `Agent(isolation="worktree")` **cannot spawn nested `Agent()` reviewers**. The
+harness silently rejects nested calls. So real multi-agent review only happens at the
+**orchestrator level** (Tier 2). Each background agent does a single self-review pass
+(Tier 1).
 
 ---
 
-## Phase 0 — Setup (skip if already done this cycle)
+## Core operating rules (the launch-and-go contract)
 
-Verify:
-- `feedback_issue_workflow.md` exists in memory.
-- `.claude/handoff.md` reflects current state.
-- Git status clean OR uncommitted work is owned by the current orchestrator only (cf. `feedback_agent_isolation.md`).
-
-If a previous `/issue-batch` cycle is mid-flight (open spawn_task children), STOP and finish those first.
+1. **Pipeline, not waves.** Keep **6-8 background agents running at all times**.
+   The moment one signals done, immediately dispatch the next batch into the freed
+   slot — no idle gap waiting for a whole wave to finish.
+2. **Disjoint modules only.** Concurrent agents must touch non-overlapping module
+   trees: `sceneview/` ≠ `arsceneview/` ≠ `sceneview-core/` ≠ `samples/ios-demo/` ≠
+   `samples/android-demo/` ≠ `mcp/` ≠ `sceneview-web/` ≠ `.github/workflows/` ≠
+   `docs/`. If two ready batches collide, serialize them.
+3. **Lean clone per agent.** Every agent works in its OWN shallow sparse clone and
+   deletes it on exit. A full clone is ~2.3 GB; a lean one is ~0.3-0.6 GB — this is
+   the disk-bloat fix. See the agent brief template below.
+4. **Disk-gated spawn.** Before spawning, check free disk. **Refuse to spawn a new
+   agent if free space < 15 GB** — wait for an in-flight agent to return and clean
+   up first. (`df -g / | tail -1`.)
+5. **Fire-and-forget merge.** Each agent pushes, opens its PR, runs
+   `gh pr merge --squash --auto`, then exits. It does **not** sit watching CI. The
+   orchestrator monitors for stuck PRs (see Phase 4).
+6. **Release checkpoint each iteration.** At the end of every cycle iteration, run a
+   release checkpoint (`/release` or `release-checklist.sh`). **Semver is capped at
+   minor — major `4` is frozen** (cf. `feedback_version_policy.md`). v5 is a
+   deliberate milestone, never an auto-bump.
+7. **Autonomous dispatch; consult only on non-trivial decisions.** Routine batching
+   and dispatch needs no approval. Pause and ask the maintainer only for: scope
+   ambiguity, breaking-change strategy, a revert, or a cross-cutting design call.
+8. **Verify before dispatch.** Confirm each issue is still OPEN and not already
+   fixed on `main`. Stale issues are common — don't dispatch a no-op batch.
+9. **Auto-file everything.** Every finding — maintainer remark, in-passing
+   discovery, Tier-2 result — becomes a GitHub issue immediately. Track in GitHub,
+   never just remember.
 
 ---
 
-## Phase 1 — Audit (Rapporteur, ~30 min)
+## Phase 0 — Setup (once per session)
+
+- `df -g / | tail -1` — record free disk. If < 15 GB, clean stale `/tmp/sv-*`
+  clones and worktrees before starting.
+- Confirm `feedback_continuous_issue_cycle.md` + `feedback_issue_workflow.md` exist
+  in memory.
+- `.claude/handoff.md` reflects current state; git status of the orchestrator
+  checkout is clean.
+
+---
+
+## Phase 1 — Audit (Rapporteur)
 
 Launch in parallel via `Agent` `subagent_type=Explore` (read-only, fast):
 
-1. **Issue triage agent** — `gh issue list -L 100 --state open` → categorize into `BUG_CRITICAL / BUG / PARITY / REFACTO / CI / DOCS / TEST`. Identify natural batches. Flag stale candidates for closing.
-2. **Parity gaps agent** — compare Android (Filament) vs iOS (RealityKit) vs Web (Filament.js) public API surface. List gaps NOT yet tracked. Don't redocument umbrellas #1004, #1033, #1034, #1036.
-3. **CI optimization agent** — audit `.github/workflows/*.yml` for parallelization, cache, path-guards, sharding. Cross-reference recent `gh run list` failures.
-4. **Code smells agent** — `rg "TODO|FIXME|XXX|HACK"`, threading violations, coroutine leaks, resource cleanup gaps, deprecated APIs used in our own code, low-coverage modules.
+1. **Issue triage** — `gh issue list -L 100 --state open` → categorize into
+   `BUG_CRITICAL / BUG / PARITY / REFACTO / CI / DOCS / TEST`. Identify natural
+   batches by module. Flag stale issues already fixed on `main`.
+2. **Parity gaps** — Android (Filament) vs iOS (RealityKit) vs Web (Filament.js)
+   public API surface. List untracked gaps. Don't redocument umbrellas.
+3. **CI optimization** — audit `.github/workflows/*.yml` for parallelization,
+   cache, path-guards, sharding. Cross-reference recent `gh run list` failures.
+4. **Code smells** — `rg "TODO|FIXME|XXX|HACK"`, threading violations, coroutine
+   leaks, resource-cleanup gaps, our own deprecated-API usage, low-coverage modules.
 
-Each agent reports under 1000 words, markdown, ready to pipe.
-
-After audit:
-- **File new issues** for parity gaps + CI wins + refacto candidates not yet tracked.
-- **Close stale issues** identified by agent #1.
-- Build a single batching table.
+Each agent reports under 1000 words, markdown. After audit: **file new issues** for
+every untracked finding; **close stale issues**; build the batching table.
 
 ---
 
 ## Phase 2 — Batching
 
-Group issues by category + module touched. Rules:
-- 1 batch = 1 worktree = 1 toast `spawn_task`.
-- 3-8 issues per batch (smaller = inline fix in orchestrator session, not batch-worthy).
-- Order: **CI > BUG_CRITICAL > BUG > PARITY > REFACTO > DOCS > TEST**.
-- Mark inter-batch dependencies explicitly (e.g. CI parallelization batch must finish before release-related batches).
+Group issues by category + module. Rules:
+- 1 batch = 1 background agent = 1 lean clone.
+- 3-8 issues per batch (a 1-2 issue fix the orchestrator can do inline isn't a batch).
+- Priority order: **CI > BUG_CRITICAL > BUG > PARITY > REFACTO > DOCS > TEST**.
+- Mark inter-batch dependencies (e.g. a CI-parallelization batch lands before
+  release-related batches).
+- Modules must be disjoint across concurrently-running agents (rule 2).
 
-Present the table to Thomas. Get approval on order. Don't spawn until confirmed.
+No approval gate for routine batches — dispatch straight into Phase 3. Pause only
+for the non-trivial decisions in rule 7.
 
 ---
 
-## Phase 3 — Execution (one toast per batch)
+## Phase 3 — Pipeline dispatch (replace-on-completion)
 
-For each approved batch, call `mcp__ccd_session__spawn_task` with:
+Maintain 6-8 agents in flight. For each free slot, while disk ≥ 15 GB and a
+disjoint batch is ready, call `mcp__ccd_session__spawn_task` with:
 
 - **title** : `Fix batch <name> (#<issues>)`
 - **tldr** : 1-2 sentences, no file paths
-- **prompt** : full self-contained brief. **MUST END WITH** this verbatim block:
+- **prompt** : full self-contained brief ending **verbatim** with this block:
 
 ```
 === INSTRUCTIONS DE SESSION ENFANT (NE PAS IGNORER) ===
 
-1. Branche : crée une worktree dédiée. Ne touche jamais aux fichiers d'une autre branche.
+## ⛔ LEAN CLONE ISOLATION (disk-constrained machine)
 
-2. Workflow obligatoire :
-   a. Implémente le batch (refacto clean, breaking changes OK si justifié).
-   b. Compile : `./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin` (+ iOS/Web si touché).
-   c. Tests : `./gradlew :sceneview:test :arsceneview:testDebugUnitTest` (+ MCP si touché).
-   d. **Tier 1 — Self-review pass with 5-angle checklist** (DO NOT attempt nested `Agent()` calls — the harness silently rejects them, cf. issue #1243):
-      - **Security** : input validation, secrets exposure, permission scopes, deserialization.
-      - **Threading** : Filament JNI on main thread, coroutine leaks, race conditions, lifecycle.
-      - **API consistency** : naming parity (Android/iOS/Web), KDoc, deprecation hygiene, signature stability.
-      - **Performance** : allocations in hot paths, draw-call counts, resource destroy order, regression vs baseline.
-      - **Docs** : `llms.txt`, KDoc, cheatsheet, migration notes, MCP examples up to date.
-      Document findings inline in the commit message or PR description. Fix anything actionable before merge. Real multi-Agent parallel review happens at Tier 2 (orchestrator post-merge audit).
-   e. Triage 4-buckets : MERGE / FIX-MERGE / HOLD-COMMENT / FOLLOW-UP. Applique FIX-MERGE, file FOLLOW-UP en issues.
-   f. **QA visuel obligatoire** avec interactions utilisateur réelles : Android emulator (`bash .claude/scripts/qa-android-demos.sh`), iOS simulator (`xcrun simctl` + computer-use tier "click"), Playwright/Chrome MCP pour web.
-   g. Sync : `bash .claude/scripts/impact-check.sh` + update CLAUDE.md handoff + llms.txt + MCP + cheatsheet + version-bump si breaking.
-   h. Merge sur main + push (cf. `feedback_merge_direct_main.md`).
+Work ONLY in your own shallow sparse clone — never a full clone:
 
-3. Respect des règles existantes :
-   - PAS de polling/sleep loops (cf. `feedback_no_infinite_loop_polling.md`)
-   - PAS de full `connectedDebugAndroidTest` après commit trivial
-   - PAS d'image > 1800 px
-   - Email git = thomas.gorisse@gmail.com
+  git clone --depth 1 https://github.com/sceneview/sceneview.git /tmp/sv-<issue>
+  cd /tmp/sv-<issue>
+  git sparse-checkout set <module dirs you need, e.g. sceneview arsceneview docs>
+  git checkout -b claude/<issue>-<slug> origin/main
 
-4. **Signal de fin obligatoire** : quand tout est mergé sur main + follow-ups filés + handoff mis à jour, termine ton DERNIER message par EXACTEMENT ce bloc (pas de variation, pas de texte après) :
+If a script needs a missing path: `git sparse-checkout add <path>`.
+⛔ When done (after the PR is merging), `rm -rf /tmp/sv-<issue>`. A full clone is
+~2.3 GB; a lean one ~0.3-0.6 GB — keeping it lean is mandatory.
+
+## Workflow
+
+a. Verify each issue is still OPEN and not already fixed on `main`. Skip no-ops.
+b. Implement the batch (clean refactor; breaking changes OK if justified — but
+   never bump major: 4 is frozen, cf. feedback_version_policy.md).
+c. Compile: `./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin`
+   (+ iOS/Web targets if touched).
+d. Tests: `./gradlew :sceneview:test :arsceneview:testDebugUnitTest` (+ MCP if touched).
+e. Tier 1 — single self-review pass, 5 angles (DO NOT spawn nested Agent(),
+   harness rejects it — issue #1243):
+   - Security: input validation, secrets, permission scopes, deserialization.
+   - Threading: Filament JNI on main thread, coroutine leaks, races, lifecycle.
+   - API consistency: Android/iOS/Web naming parity, KDoc, deprecation hygiene.
+   - Performance: hot-path allocations, draw calls, resource destroy order.
+   - Docs: llms.txt, KDoc, cheatsheet, migration notes, MCP examples.
+   Document findings in the PR description; fix anything actionable before merge.
+f. QA visuel obligatoire with real interactions: Android emulator
+   (`bash .claude/scripts/qa-android-demos.sh`), iOS simulator, Chrome MCP for web.
+g. Sync: `bash .claude/scripts/impact-check.sh` + update CLAUDE.md handoff +
+   llms.txt + MCP + cheatsheet. Changelog: add a `changelog.d/<issue>-<slug>.md`
+   fragment (NOT an edit to CHANGELOG.md — see changelog.d/README.md).
+h. FIRE-AND-FORGET MERGE: `git push -u origin <branch>` →
+   `gh pr create --repo sceneview/sceneview` (English, `Closes #<issue>`) →
+   `gh pr merge <PR#> --repo sceneview/sceneview --squash --auto` → exit.
+   Do NOT sit watching CI — the orchestrator monitors stuck PRs.
+i. `rm -rf /tmp/sv-<issue>`.
+
+## Rules
+- No polling/sleep loops (feedback_no_infinite_loop_polling.md).
+- No full `connectedDebugAndroidTest` after a trivial commit.
+- No image > 1800 px.
+- Email git = thomas.gorisse@gmail.com. Remote = origin. English everywhere.
+
+## Signal de fin obligatoire
+End your LAST message with EXACTLY this block (no variation, no text after):
 
    ✅ SESSION TERMINÉE — vous pouvez fermer cet onglet.
    Batch: <nom>
-   Branche: <claude/...>
    Commits: <SHAs>
    Issues fermées: #<n1>, #<n2>, ...
    Follow-ups filés: #<n3>, #<n4>, ...
-   PR/Merge: <URL ou "direct main">
+   PR: <#num>
 
-   Ne poll pas pour d'autre travail. Ne cherche pas à enchaîner sur un autre batch. La session principale orchestre.
+Ne poll pas pour d'autre travail. La session principale orchestre.
 ```
-
-Spawn parallel batches if they are truly independent (different modules, no merge conflict risk). Otherwise sequential.
 
 ---
 
-## Phase 3.5 — Post-merge audit (Tier 2, orchestrator-side)
+## Phase 3.5 — Tier-2 audit (risky PRs only)
 
-Once a child session signals `✅ SESSION TERMINÉE` AND the merge to `main` is confirmed (commit SHA captured), **the orchestrator (this session) spawns 5-7 Opus reviewers in parallel** for real independent multi-agent review. This is where the multi-Agent pattern of `feedback_pr_review_workflow.md` actually executes — at the top level, not inside the child.
+Run a Tier-2 multi-reviewer audit **only on risky merges**: umbrella issues,
+rendering-pipeline changes, breaking changes, anything touching threading or
+release plumbing. Routine fixes (docs, single-module bug, CI tweak) skip Tier 2 —
+their Tier-1 self-review + green CI is enough.
 
-Why post-merge: child agents cannot spawn nested `Agent()` (harness limitation, cf. issue #1243). Pre-merge multi-agent review would require the orchestrator to block on the child, defeating the toast/dispatch model. Post-merge audit accepts that PRs are atomic and trades pre-merge gating for post-merge follow-up issues.
-
-**How to spawn** (orchestrator-only — this is YOU, not the child):
-
-For each merged commit `<SHA>`, dispatch 5 parallel reviewers, each with a single angle:
+For a risky merged commit `<SHA>`, the orchestrator (this session — agents cannot)
+spawns 5-7 parallel Opus reviewers, one angle each
+(Security / Threading / API consistency / Performance / Docs):
 
 ```
-Agent(
-  subagent_type="general-purpose",
-  model="opus",
-  run_in_background=true,
-  prompt="""
-You are a post-merge reviewer for SceneView commit <SHA> on main (batch <name>).
-Review angle: <Security|Threading|API consistency|Performance|Docs>.
-
-Read-only audit. Inspect:
-- `git show <SHA>` and `git diff <SHA>^..<SHA>`
-- Any file touched by the commit
-- Cross-platform parity if API surface changed
-
-Deliverable (<= 500 words, markdown):
-1. Verdict: 🟢 ship-as-is | 🟡 follow-up issue recommended | 🔴 hotfix required
-2. Concrete blockers (file:line citations) if any
-3. Suggested follow-up issue title + body if 🟡 or 🔴
-
-Do NOT push commits. Do NOT spawn nested agents. Report only.
-"""
-)
+Agent(subagent_type="general-purpose", model="opus", run_in_background=true,
+  prompt="Post-merge reviewer for SceneView commit <SHA> on main (batch <name>).
+  Review angle: <angle>. Read-only: `git show <SHA>`, touched files, cross-platform
+  parity. Deliver <=500 words: verdict 🟢 ship | 🟡 follow-up | 🔴 hotfix, blockers
+  with file:line, suggested follow-up issue. Do NOT push or spawn nested agents.")
 ```
 
-**Process the 5 outputs**:
-- 🟢 only → close batch, done.
-- 🟡 → file follow-up issue(s) on GitHub via `gh issue create`. Link the batch issues. No revert.
-- 🔴 → spawn a fresh `spawn_task` hotfix batch immediately (do NOT amend the merged commit — atomic PR principle).
+Process: 🟢 → done. 🟡 → `gh issue create` follow-up, no revert (PRs are atomic).
+🔴 → spawn a fresh hotfix batch (never amend the merged commit).
 
 ---
 
-## Phase 4 — Closeout
+## Phase 4 — Monitor & iterate
 
-Main session monitors:
-- Pour chaque toast ouvert : attend le signal `✅ SESSION TERMINÉE`.
-- Collecte : commits SHAs, issues fermées, follow-ups filés.
-- **Pour chaque SHA, confirme que Phase 3.5 (post-merge audit Tier 2) a tourné** et que les follow-up issues sont filées.
-- Update `.claude/handoff.md` avec section "Cycle N : batches X-Y closed" (inclut les follow-ups de Phase 3.5).
-- Update `MEMORY.md` metrics file (`metrics_<date>.md`) si fin de journée.
-- Décide : nouveau cycle Phase 1 OU pause.
+The orchestrator runs continuously:
+- **Refill the pipeline** — as each agent signals `✅ SESSION TERMINÉE`, immediately
+  dispatch the next disjoint batch into the freed slot (disk permitting).
+- **Watch for stuck PRs** — since agents fire-and-forget, periodically
+  `gh pr list --repo sceneview/sceneview --state open`. A PR whose `--auto` merge is
+  blocked by a red check or conflict is the orchestrator's to triage: re-dispatch a
+  fix batch, or escalate to the maintainer if it's a non-trivial decision.
+- **Collect** commits, closed issues, follow-ups from each returning agent.
+- **Release checkpoint** — at the end of each iteration run `/release` (or
+  `release-checklist.sh`). Cut a minor/patch release if the batch warrants it;
+  never a major (rule 6).
+- **Re-audit** — when the current batch table is drained, loop back to Phase 1.
+- Update `.claude/handoff.md` with a `Cycle N: batches X-Y closed` section.
+- Continue until the backlog is empty or the maintainer says stop.
 
 ---
 
 ## Workflow diagram
 
 ```
-Phase 1 (Audit, Explore agents in parallel)
-   ↓
-Phase 2 (Batching table — Thomas approves order)
-   ↓
-Phase 3 (Execution — toast spawn_task per batch)
-   • Child does the work + Tier 1 self-review (5-angle checklist, NO nested Agent)
-   • Child signals ✅ SESSION TERMINÉE with SHA + issues closed
-   ↓
-Phase 3.5 (Post-merge audit — orchestrator-side Tier 2)
-   • Orchestrator spawns 5-7 Opus Agent reviewers in parallel against the merged SHA
-   • Findings → follow-up GitHub issues (no force-revert; PRs are atomic)
-   ↓
-Phase 4 (Closeout — handoff, metrics, decide next cycle)
+Phase 1  Audit (Explore agents) ──► auto-file issues, close stale
+Phase 2  Batching table (disjoint modules, priority order)
+Phase 3  Pipeline dispatch — 6-8 lean-clone agents, replace-on-completion
+         • agent: lean clone → fix → Tier-1 self-review → QA → fragment changelog
+         • agent: push → gh pr merge --squash --auto → rm -rf clone → exit
+Phase 3.5  Tier-2 audit — orchestrator spawns 5-7 Opus reviewers (RISKY PRs only)
+Phase 4  Monitor: refill freed slots, triage stuck PRs, release checkpoint
+         └─► re-audit (back to Phase 1) until backlog empty
 ```
 
 ---
 
-## Anti-patterns à éviter
+## Anti-patterns to avoid
 
-- ❌ Spawner un batch sans l'audit Phase 1 (= fait du flow-of-the-day)
-- ❌ **Demander au child agent de spawn 5-7 reviewers Opus** (= no-op silencieux, cf. issue #1243). La multi-Agent review se fait **en Phase 3.5 côté orchestrateur**, jamais à l'intérieur du child.
-- ❌ Skipper la Phase 3.5 (post-merge audit Tier 2) sous prétexte que la Tier 1 self-review a tourné — les deux sont nécessaires (cf. `feedback_review_update_visual_triptych.md`).
-- ❌ Skipper la QA visuelle (= démos cassées, cf. v4.1.2 recovery)
-- ❌ Laisser sessions enfant tourner sans signal de fin (= zombies)
-- ❌ Burst de PRs externes (cf. `feedback_no_pr_burst.md`)
-- ❌ Self-evaluate (le rapporteur n'est pas le correcteur — mais la Tier 1 self-review reste OK, elle est complétée par Tier 2)
+- ❌ Wave-batching — waiting for a whole batch of agents to finish before
+  spawning the next. Use replace-on-completion: refill freed slots immediately.
+- ❌ Full `git clone` for an agent — bloats the disk-constrained machine. Always
+  `--depth 1` + `git sparse-checkout`, and `rm -rf` on exit.
+- ❌ Spawning past the disk gate — never start a new agent below 15 GB free.
+- ❌ Concurrent agents on overlapping modules — guaranteed merge conflicts.
+- ❌ Agent watching CI after `gh pr merge --auto` — that's fire-and-forget; the
+  orchestrator owns stuck-PR triage.
+- ❌ Asking the child agent to spawn nested reviewers (silent no-op, issue #1243).
+- ❌ Skipping the release checkpoint at iteration end.
+- ❌ Auto-bumping major version — 4 is frozen (feedback_version_policy.md).
+- ❌ Dispatching a stale issue already fixed on `main`.
+- ❌ Editing `CHANGELOG.md` directly — use a `changelog.d/` fragment.
+- ❌ Letting child sessions run without the `✅ SESSION TERMINÉE` end signal.
 
 ---
 
-**Tone** : direct, autonome. Pause uniquement avant `spawn_task` pour approval de l'ordre des batches.
+**Tone**: direct, autonomous. Keep the pipeline full; pause only for the
+non-trivial decisions in rule 7.

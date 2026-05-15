@@ -241,7 +241,14 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
 
 /**
  * Routes a demo [id] to the corresponding composable.
- * Demos not yet implemented show a placeholder.
+ *
+ * Every id in [ALL_DEMOS] has an explicit branch below, and both ingress
+ * channels ([MainActivity.onCreate] deep-links and the `--es demo` QA extra)
+ * validate against [ALL_DEMOS] via [DeepLinkRouter] before an id ever reaches
+ * here — so the `else` branch is unreachable in a correct build. It is kept
+ * only as a registry/router drift guard: a debug build crashes loudly if a new
+ * demo is added to [ALL_DEMOS] without a matching branch, while a release build
+ * degrades gracefully to [PlaceholderDemo] rather than crashing a shipped app.
  */
 @Composable
 fun DemoRouter(id: String, onBack: () -> Unit) {
@@ -295,8 +302,14 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "ar-rooftop" -> ARRooftopAnchorDemo(onBack)
         "ar-image-stabilization" -> ARImageStabilizationDemo(onBack)
         "ar-orbital" -> OrbitalARDemo(onBack)
-        // Fallback
-        else -> PlaceholderDemo(id = id, onBack = onBack)
+        // Drift guard — see the KDoc above. Unreachable in a correct build.
+        else -> {
+            check(!BuildConfig.DEBUG) {
+                "DemoRouter has no branch for demo id '$id'. Every ALL_DEMOS entry " +
+                    "must be routed — add a `when` branch in DemoRouter."
+            }
+            PlaceholderDemo(id = id, onBack = onBack)
+        }
     }
 }
 

@@ -4,14 +4,14 @@
 # Extracts REAL public API from source files on each platform and compares them.
 #
 # With --with-apk, additionally builds (or reuses) the android-demo debug APK and
-# runs Google's `android describe` on it to verify the manifest's exposed
-# activities / intent filters match expectations, and cross-checks the demo set
-# declared in DemoRegistry against the iOS SamplesTab inventory (drift = a
-# platform is missing a demo).
+# inspects its manifest (via the `aapt2`-backed android_cli_describe helper) to
+# verify the exposed activities / intent filters match expectations, and
+# cross-checks the demo set declared in DemoRegistry against the iOS SamplesTab
+# inventory (drift = a platform is missing a demo).
 #
 # Usage:
 #   ./cross-platform-check.sh             # fast source-only check (default)
-#   ./cross-platform-check.sh --with-apk  # also build + `android describe` the APK manifest
+#   ./cross-platform-check.sh --with-apk  # also build + inspect the APK manifest
 
 set -eo pipefail
 
@@ -289,11 +289,16 @@ else
 fi
 echo ""
 
-# ─── 11. APK Manifest Cross-Check (`android describe`) ──────────────────
+# ─── 11. APK Manifest Cross-Check (aapt2 via android_cli_describe) ──────
 # Opt-in: needs a built APK so the fast source-only path stays the default.
+#
+# NOTE: Google's `android` CLI v0.7 `describe` subcommand analyzes a *project
+# directory*, not a built artifact. The android_cli_describe helper in
+# lib/android-cli.sh therefore inspects the artifact with `aapt2` —
+# `aapt2 dump badging` for an `.apk`. This section parses that badging output.
 APK_ISSUES=0
 if [ "$WITH_APK" -eq 1 ]; then
-    echo -e "${CYAN}=== APK Manifest Cross-Check (android describe) ===${NC}"
+    echo -e "${CYAN}=== APK Manifest Cross-Check (aapt2) ===${NC}"
     echo ""
 
     # shellcheck source=lib/android-cli.sh
@@ -316,54 +321,63 @@ if [ "$WITH_APK" -eq 1 ]; then
     fi
 
     if [ -f "$APK" ]; then
-        android_cli_ensure || echo -e "  ${YELLOW}android CLI unavailable — describe step skipped${NC}"
         DESCRIBE_OUT="$(mktemp -t sv-describe.XXXXXX)"
-        if android_cli_describe "$APK" "$DESCRIBE_OUT" >/dev/null 2>&1; then
+        # android_cli_describe <apk-or-aab> echoes `aapt2 dump badging` for an APK.
+        if android_cli_describe "$APK" >"$DESCRIBE_OUT" 2>/dev/null; then
             echo ""
-            echo -e "  ${CYAN}Exposed (launchable / browsable) entries:${NC}"
+            echo -e "  ${CYAN}Manifest badging (aapt2):${NC}"
 
-            # `android describe` prints the manifest's activities, intent
-            # filters and exported flags. Cross-check against expectations:
-            # the android-demo is a single-Activity app whose extra demos are
-            # reached via deep links, not separate exported activities.
+            # `aapt2 dump badging` reports the package line, the single
+            # `launchable-activity:` entry and uses-permission/feature lines.
+            # The android-demo is a single-Activity app whose extra demos are
+            # reached via the `sceneview://` deep link, not separate activities.
 
-            # 1. Exactly one exported activity (MainActivity).
-            EXPORTED_ACTIVITIES="$(grep -ciE 'activity.*exported|exported.*true' "$DESCRIBE_OUT" 2>/dev/null || echo 0)"
-            if grep -qiE 'MainActivity' "$DESCRIBE_OUT" 2>/dev/null; then
-                echo -e "    ${GREEN}MainActivity present${NC}"
-            else
-                echo -e "    ${RED}MainActivity NOT found in manifest${NC}"
-                APK_ISSUES=$((APK_ISSUES + 1))
-            fi
-
-            # 2. LAUNCHER intent — the app must be launchable.
-            if grep -qiE 'android.intent.category.LAUNCHER|LAUNCHER' "$DESCRIBE_OUT" 2>/dev/null; then
-                echo -e "    ${GREEN}LAUNCHER intent present${NC}"
-            else
-                echo -e "    ${RED}No LAUNCHER intent — app not launchable${NC}"
-                APK_ISSUES=$((APK_ISSUES + 1))
-            fi
-
-            # 3. Deep-link scheme `sceneview://demo` — used by QR codes on the
-            #    website / README / docs to land on a specific demo.
-            if grep -qiE 'sceneview' "$DESCRIBE_OUT" 2>/dev/null \
-               && grep -qiE 'VIEW|BROWSABLE' "$DESCRIBE_OUT" 2>/dev/null; then
-                echo -e "    ${GREEN}Deep-link VIEW/BROWSABLE intent present${NC}"
-            else
-                echo -e "    ${YELLOW}sceneview:// deep-link intent not detected in describe output${NC}"
-                APK_ISSUES=$((APK_ISSUES + 1))
-            fi
-
-            # 4. Package id matches the published demo app.
-            if grep -qiE 'io\.github\.sceneview\.demo' "$DESCRIBE_OUT" 2>/dev/null; then
+            # 1. Package id matches the published demo app.
+            #    badging line: package: name='io.github.sceneview.demo' ...
+            PKG="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" "$DESCRIBE_OUT" | head -1)"
+            if [ "$PKG" = "io.github.sceneview.demo" ]; then
                 echo -e "    ${GREEN}Package id io.github.sceneview.demo confirmed${NC}"
             else
-                echo -e "    ${YELLOW}Expected package id io.github.sceneview.demo not found${NC}"
+                echo -e "    ${YELLOW}Unexpected package id: ${PKG:-<none>} (expected io.github.sceneview.demo)${NC}"
                 APK_ISSUES=$((APK_ISSUES + 1))
             fi
-            echo "    (exported-activity matches in describe output: $EXPORTED_ACTIVITIES)"
+
+            # 2. A launchable activity must be declared — the app must be
+            #    launchable from the home screen.
+            #    badging line: launchable-activity: name='...MainActivity' ...
+            LAUNCH_ACTIVITY="$(sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p" "$DESCRIBE_OUT" | head -1)"
+            if [ -n "$LAUNCH_ACTIVITY" ]; then
+                echo -e "    ${GREEN}Launchable activity: ${LAUNCH_ACTIVITY}${NC}"
+                if printf '%s' "$LAUNCH_ACTIVITY" | grep -qiE 'MainActivity'; then
+                    echo -e "    ${GREEN}MainActivity is the launcher entry point${NC}"
+                else
+                    echo -e "    ${YELLOW}Launcher entry point is not MainActivity${NC}"
+                    APK_ISSUES=$((APK_ISSUES + 1))
+                fi
+            else
+                echo -e "    ${RED}No launchable-activity — app not launchable${NC}"
+                APK_ISSUES=$((APK_ISSUES + 1))
+            fi
+
+            # 3. Deep-link scheme `sceneview://` — used by QR codes on the
+            #    website / README / docs to land on a specific demo.
+            #    `aapt2 dump badging` does NOT surface intent-filter data /
+            #    deep-link schemes, so decode the manifest xmltree for this.
+            DEEPLINK_OK=0
+            if command -v aapt2 >/dev/null 2>&1; then
+                XMLTREE_OUT="$(aapt2 dump xmltree --file AndroidManifest.xml "$APK" 2>/dev/null || true)"
+                if printf '%s' "$XMLTREE_OUT" | grep -qiE 'scheme.*sceneview|"sceneview"'; then
+                    DEEPLINK_OK=1
+                fi
+            fi
+            if [ "$DEEPLINK_OK" -eq 1 ]; then
+                echo -e "    ${GREEN}sceneview:// deep-link scheme present${NC}"
+            else
+                echo -e "    ${YELLOW}sceneview:// deep-link scheme not detected in manifest${NC}"
+                APK_ISSUES=$((APK_ISSUES + 1))
+            fi
         else
-            echo -e "  ${YELLOW}android describe failed or CLI missing — manifest cross-check skipped${NC}"
+            echo -e "  ${YELLOW}aapt2 unavailable or APK unreadable — manifest cross-check skipped${NC}"
         fi
         rm -f "$DESCRIBE_OUT" 2>/dev/null || true
     fi

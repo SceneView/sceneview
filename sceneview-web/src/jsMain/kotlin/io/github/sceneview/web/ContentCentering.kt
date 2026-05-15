@@ -74,6 +74,9 @@ internal object ContentCentering {
     fun centeringOffset(box: Aabb?): DoubleArray? {
         if (box == null || !isStable(box)) return null
         val c = center(box)
-        return doubleArrayOf(-c[0], -c[1], -c[2])
+        // `+ 0.0` normalises a negated zero (`-0.0`) back to `0.0`: an
+        // already-centred axis must report a plain `0.0` translation, not the
+        // signed-zero that `-(0.0)` produces.
+        return doubleArrayOf(-c[0] + 0.0, -c[1] + 0.0, -c[2] + 0.0)
     }
 }

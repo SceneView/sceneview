@@ -419,6 +419,13 @@ class MaterialLoader(
         }
     }
 
+    /**
+     * Destroys this loader and cancels its coroutine scope.
+     *
+     * Cancelling the scope stops any in-flight [loadMaterialAsync] job so it cannot touch a
+     * destroyed [Engine] after disposal (#933). Wired to `rememberMaterialLoader`'s
+     * `DisposableEffect.onDispose`, so launched jobs never outlive the owning composition.
+     */
     fun destroy() {
         coroutineScope.cancel()
 

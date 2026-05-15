@@ -26,6 +26,7 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -121,10 +122,13 @@ fun SceneGalleryDemo(onBack: () -> Unit) {
         else -> AssetSourceState.Streamed
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_scene_gallery_title),
         onBack = onBack,
         assetSource = assetSource,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Category chips along the top of the controls sheet. We expose
             // them as a horizontally scrolling row so the four labels never
@@ -169,6 +173,7 @@ fun SceneGalleryDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

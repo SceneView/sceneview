@@ -89,13 +89,15 @@ jobs:
         uses: actions/cache@v5
         with:
           path: samples/ios-demo/SourcePackages
-          # NOTE: the `hashFiles(...)` path mirrors the convention used in
-          # app-store.yml. The checked-in `Package.resolved` actually lives
-          # at `samples/ios-demo/Package.resolved`; the nested swiftpm path
-          # is where Xcode writes the workspace-scoped resolved file on
-          # `-resolvePackageDependencies`. First-run cache misses fall
-          # through to `restore-keys` so the build still completes.
-          key: spm-${{ runner.os }}-demo-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          # `hashFiles()` must point at a file that exists at checkout time
+          # (#1360). The previous key targeted the workspace-scoped
+          # `xcshareddata/swiftpm/Package.resolved`, which Xcode only writes
+          # *during* `-resolvePackageDependencies` — so on a clean runner
+          # the file is absent, `hashFiles()` returns an empty string, and
+          # the key is the constant `spm-<os>-demo-` for every run (no cache
+          # invalidation when dependencies change). The checked-in resolved
+          # file lives at `samples/ios-demo/Package.resolved`; hash that.
+          key: spm-${{ runner.os }}-demo-${{ hashFiles('samples/ios-demo/Package.resolved') }}
           restore-keys: |
             spm-${{ runner.os }}-demo-
 

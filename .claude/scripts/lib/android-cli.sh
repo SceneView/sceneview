@@ -194,29 +194,49 @@ sys.exit(1)
 PY
 }
 
-# android_cli_describe <apk> [output.txt]
-# Runs `android describe` on a built APK to dump its manifest metadata —
-# package, exposed activities, intent filters, permissions, features.
-# Echoes the raw `android describe` output on stdout (also written to
-# <output.txt> when a path is given). Returns 1 if the CLI is missing or
-# the APK does not exist; the caller decides whether that is fatal.
-# `android describe` reads the APK file directly — no device needed.
+# android_cli_describe <apk-or-aab>
+# Echoes the artifact's manifest metadata (package / versionName / versionCode …)
+# on stdout so callers can grep it. Returns non-zero if the artifact can't be read.
+#
+# NOTE on tooling: the `android` CLI's `describe` subcommand (v0.7) analyzes a
+# *project directory*, not a built artifact — it has no artifact-introspection
+# mode. The correct tool for reading a built `.apk` / `.aab` manifest is
+# `aapt2`, which ships with the Android SDK build-tools the runner already has.
+# This helper therefore uses `aapt2`:
+#   - `.apk` → `aapt2 dump badging` reads it directly.
+#   - `.aab` → the protobuf `base/manifest/AndroidManifest.xml` is unzipped and
+#              decoded with `aapt2 dump xmltree`.
 android_cli_describe() {
-  local apk="$1"
-  local out="${2:-}"
-  if [[ ! -f "$apk" ]]; then
-    echo "[android-cli] describe: APK not found: $apk" >&2
+  local artifact="$1"
+  if [[ ! -f "$artifact" ]]; then
+    echo "[android-cli] describe: artifact not found: $artifact" >&2
     return 1
   fi
-  if ! android_cli_locate; then
-    echo "[android-cli] describe requires the android CLI; install via android_cli_ensure" >&2
+  if ! command -v aapt2 >/dev/null 2>&1; then
+    echo "[android-cli] describe: aapt2 not on PATH (expected in Android SDK build-tools)" >&2
     return 1
   fi
-  if [[ -n "$out" ]]; then
-    "$ANDROID_CLI_BIN" "${ANDROID_CLI_GLOBAL_FLAGS[@]}" describe "$apk" | tee "$out"
-  else
-    "$ANDROID_CLI_BIN" "${ANDROID_CLI_GLOBAL_FLAGS[@]}" describe "$apk"
-  fi
+  case "$artifact" in
+    *.aab)
+      # An .aab is a zip; its manifest is protobuf-encoded — `aapt2 dump badging`
+      # cannot read a bundle, so extract + xmltree the base module manifest.
+      local tmp; tmp="$(mktemp -d)"
+      if command -v unzip >/dev/null 2>&1 \
+         && unzip -o -q "$artifact" "base/manifest/AndroidManifest.xml" -d "$tmp" 2>/dev/null \
+         && [[ -f "$tmp/base/manifest/AndroidManifest.xml" ]]; then
+        aapt2 dump xmltree --file "base/manifest/AndroidManifest.xml" "$tmp/base"
+        local rc=$?
+        rm -rf "$tmp"
+        return $rc
+      fi
+      rm -rf "$tmp"
+      echo "[android-cli] describe: could not extract base manifest from $artifact" >&2
+      return 1
+      ;;
+    *)
+      aapt2 dump badging "$artifact"
+      ;;
+  esac
 }
 
 # android_cli_install_and_launch <apk> <package/activity> [serial]
