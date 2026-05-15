@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed — Samples
+
+- **Migrated the remaining `samples/android-demo` demos to the `rememberMaterialInstance` / `rememberUnlitMaterialInstance` helpers ([#971](https://github.com/sceneview/sceneview/issues/971)).** `CollisionDemo`, `LightingDemo`, `VideoDemo`, `ARStreetscapeDemo`, `GeometryDemo`, `DebugOverlayDemo`, `PhysicsDemo` and the shared `Axes3DNode` no longer allocate `MaterialInstance` handles via raw `materialLoader.create*` without disposal — the helpers own the lifecycle. Behaviour-preserving.
+
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
 
 ### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
