@@ -192,50 +192,29 @@ struct SamplesTab: View {
     // MARK: - Scene catalog
 
     private static func allScenes() -> [DemoItem] {
+        // Category + per-demo category assignment mirror Android's
+        // `DemoRegistry.ALL_DEMOS` (`samples/android-demo/.../DemoRegistry.kt`)
+        // verbatim — see #1377.
         var items: [DemoItem] = [
-            // MARK: Geometry
+            // MARK: 3D Basics
 
-            DemoItem(title: "Geometry", icon: "cube.fill", subtitle: "Cube, sphere, cylinder, cone, plane", category: .geometry) {
-                GeometryDemo()
-            },
-            DemoItem(title: "Materials", icon: "paintpalette.fill", subtitle: "PBR metallic & roughness spectrum", category: .geometry) {
-                MaterialsDemo()
-            },
-            DemoItem(title: "Custom Mesh", icon: "diamond.fill", subtitle: "Vertices, normals & triangle indices", category: .geometry) {
-                CustomMeshDemo()
-            },
-            DemoItem(title: "Animation", icon: "figure.run", subtitle: "Skinning, rig-driven animation playback", category: .geometry) {
-                AnimationDemo()
-            },
-            DemoItem(title: "Model Viewer", icon: "cube.transparent.fill", subtitle: "Full-screen hero with a Surprise streamer", category: .geometry) {
+            DemoItem(title: "Model Viewer", icon: "cube.transparent.fill", subtitle: "Full-screen hero with a Surprise streamer", category: .basics3D) {
                 ModelViewerDemo()
             },
-            DemoItem(title: "Multi-Model Park", icon: "tree.fill", subtitle: "Themed scene composed of 4 streamed models", category: .geometry) {
+            DemoItem(title: "Geometry", icon: "cube.fill", subtitle: "Cube, sphere, cylinder, cone, plane", category: .basics3D) {
+                GeometryDemo()
+            },
+            DemoItem(title: "Animation", icon: "figure.run", subtitle: "Skinning, rig-driven animation playback", category: .basics3D) {
+                AnimationDemo()
+            },
+            DemoItem(title: "Multi-Model Park", icon: "tree.fill", subtitle: "Themed scene composed of 4 streamed models", category: .basics3D) {
                 MultiModelDemo()
             },
+            DemoItem(title: "Scene Gallery", icon: "square.grid.3x3.fill", subtitle: "Themed Sketchfab bundles streamed on demand", category: .basics3D) {
+                SceneGalleryDemo()
+            },
 
-            // MARK: Content
-
-            DemoItem(title: "3D Text", icon: "textformat", subtitle: "Extruded text with styles & sizes", category: .content) {
-                TextDemo()
-            },
-            DemoItem(title: "Billboard", icon: "person.fill.viewfinder", subtitle: "Labels that face the camera", category: .content) {
-                BillboardDemo()
-            },
-            DemoItem(title: "Lines & Paths", icon: "point.topleft.down.to.point.bottomright.curvepath", subtitle: "Polylines, helix, grids, circles", category: .content) {
-                LinesPathsDemo()
-            },
-            DemoItem(title: "Image Planes", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
-                ImageDemo()
-            },
-            DemoItem(
-                comingSoonTitle: "Video Texture",
-                icon: "video.fill",
-                subtitle: "Play video on a 3D surface",
-                category: .content
-            ),
-
-            // MARK: Lighting
+            // MARK: Lighting & Environment
 
             DemoItem(title: "Light Types", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
                 LightingDemo()
@@ -246,24 +225,39 @@ struct SamplesTab: View {
             DemoItem(title: "Dynamic Sky", icon: "sun.horizon.fill", subtitle: "Time-of-day sun simulation", category: .lighting) {
                 DynamicSkyDemo()
             },
-
-            // MARK: Effects
-
-            DemoItem(title: "Fog", icon: "cloud.fog.fill", subtitle: "Linear, exponential & height fog", category: .effects) {
+            DemoItem(title: "Fog", icon: "cloud.fog.fill", subtitle: "Linear, exponential & height fog", category: .lighting) {
                 FogDemo()
             },
-            DemoItem(title: "Physics", icon: "figure.walk", subtitle: "Dynamic, static & kinematic bodies", category: .effects) {
-                PhysicsDemo()
+
+            // MARK: Content
+
+            DemoItem(title: "3D Text", icon: "textformat", subtitle: "Extruded text with styles & sizes", category: .content) {
+                TextDemo()
             },
-            DemoItem(title: "Double Pendulum", icon: "waveform.path", subtitle: "Chaotic two-link physics, shared KMP simulation", category: .effects) {
-                DoublePendulumDemo()
+            DemoItem(title: "Lines & Paths", icon: "point.topleft.down.to.point.bottomright.curvepath", subtitle: "Polylines, helix, grids, circles", category: .content) {
+                LinesPathsDemo()
             },
+            DemoItem(title: "Image Planes", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
+                ImageDemo()
+            },
+            DemoItem(title: "Billboard", icon: "person.fill.viewfinder", subtitle: "Labels that face the camera", category: .content) {
+                BillboardDemo()
+            },
+            DemoItem(
+                comingSoonTitle: "Video Texture",
+                icon: "video.fill",
+                subtitle: "Play video on a 3D surface",
+                category: .content
+            ),
 
             // MARK: Interaction
-            // CameraControlsDemo ships in the .advanced section with the full
-            // 3-way mode picker (orbit / pan / firstPerson) since v4.3.0 (#1034).
-            // Gesture-editing demos below are still pending iOS port.
+            // CameraControlsDemo ships here with the full 3-way mode picker
+            // (orbit / pan / firstPerson) since v4.3.0 (#1034). Gesture-editing
+            // demos below are still pending iOS port.
 
+            DemoItem(title: "Camera Controls", icon: "camera.fill", subtitle: "Interactive orbit with grid reference", category: .interaction) {
+                CameraControlsDemo()
+            },
             DemoItem(
                 comingSoonTitle: "Gesture Editing",
                 icon: "hand.pinch.fill",
@@ -285,14 +279,17 @@ struct SamplesTab: View {
 
             // MARK: Advanced
 
-            DemoItem(title: "Camera Controls", icon: "camera.fill", subtitle: "Interactive orbit with grid reference", category: .advanced) {
-                CameraControlsDemo()
+            DemoItem(title: "Materials", icon: "paintpalette.fill", subtitle: "PBR metallic & roughness spectrum", category: .advanced) {
+                MaterialsDemo()
             },
-            DemoItem(title: "Auto Rotate", icon: "rotate.3d.fill", subtitle: "Continuous rotation animation", category: .advanced) {
-                AutoRotateDemo()
+            DemoItem(title: "Physics", icon: "figure.walk", subtitle: "Dynamic, static & kinematic bodies", category: .advanced) {
+                PhysicsDemo()
             },
-            DemoItem(title: "Scene Gallery", icon: "square.grid.3x3.fill", subtitle: "Multiple shapes in one scene", category: .advanced) {
-                SceneGalleryDemo()
+            DemoItem(title: "Double Pendulum", icon: "waveform.path", subtitle: "Chaotic two-link physics, shared KMP simulation", category: .advanced) {
+                DoublePendulumDemo()
+            },
+            DemoItem(title: "Custom Mesh", icon: "diamond.fill", subtitle: "Vertices, normals & triangle indices", category: .advanced) {
+                CustomMeshDemo()
             },
             DemoItem(
                 comingSoonTitle: "Post Processing",
@@ -369,12 +366,10 @@ struct SamplesTab: View {
                 subtitle: "Real-time body skeleton tracking",
                 category: .ar
             ),
-            DemoItem(
-                comingSoonTitle: "AR Record & Playback",
-                icon: "record.circle.fill",
-                subtitle: "Capture & replay AR sessions",
-                category: .ar
-            ),
+            // "AR Record & Playback" coming-soon entry dropped in #1378 — it
+            // duplicated the shipped "AR Recording" demo above. ARKit does not
+            // expose ARCore-style session replay, so the iOS demo ships
+            // record-only and does not promise a playback feature.
             DemoItem(
                 comingSoonTitle: "AR Depth Occlusion",
                 icon: "square.3.layers.3d.down.right",

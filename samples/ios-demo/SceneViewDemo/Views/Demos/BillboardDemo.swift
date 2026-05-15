@@ -28,7 +28,7 @@ struct BillboardDemo: View {
                 }
 
                 // A larger billboard title at top
-                let title = BillboardNode.text("BillboardNode Demo", fontSize: 0.06, color: .white)
+                let title = BillboardNode.text("Always Facing You", fontSize: 0.06, color: .white)
                     .position(.init(x: 0, y: 0.55, z: -2))
                 root.addChild(title.entity)
             }

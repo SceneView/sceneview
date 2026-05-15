@@ -66,17 +66,20 @@ struct DemoItem: Identifiable {
 }
 
 /// Scene categories for grouping.
+///
+/// The category set and display names mirror Android's `DemoCategory`
+/// (`samples/android-demo/.../DemoRegistry.kt`) verbatim — the iOS demo must
+/// read as the same product as the Android demo (see #1377).
 enum DemoCategory: String, CaseIterable, Comparable {
-    case geometry = "Geometry"
+    case basics3D = "3D Basics"
+    case lighting = "Lighting & Environment"
     case content = "Content"
-    case lighting = "Lighting"
-    case effects = "Effects"
     case interaction = "Interaction"
     case advanced = "Advanced"
     case ar = "Augmented Reality"
 
     static func < (lhs: DemoCategory, rhs: DemoCategory) -> Bool {
-        let order: [DemoCategory] = [.geometry, .content, .lighting, .effects, .interaction, .advanced, .ar]
+        let order: [DemoCategory] = [.basics3D, .lighting, .content, .interaction, .advanced, .ar]
         let lhsIndex = order.firstIndex(of: lhs) ?? 0
         let rhsIndex = order.firstIndex(of: rhs) ?? 0
         return lhsIndex < rhsIndex
