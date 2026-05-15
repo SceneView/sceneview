@@ -42,15 +42,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.android.filament.LightManager
 import io.github.sceneview.ExperimentalSceneViewApi
 import io.github.sceneview.SceneView
 import io.github.sceneview.createDefaultCameraManipulator
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.utils.rememberDebugStats
 import kotlinx.coroutines.delay
@@ -103,8 +106,18 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
+    val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val stats = rememberDebugStats()
+
+    // Shared material for every stress-test sphere — without an explicit material the
+    // SphereNode falls back to Filament's default, which rendered black on the black
+    // background (no light, no IBL) and made the demo look empty (#1266). A single
+    // shared color instance keeps the per-node cost at zero extra material allocations,
+    // so the stress test still measures pure geometry + draw-call overhead.
+    val sphereMaterial = remember(materialLoader) {
+        materialLoader.createColorInstance(SceneViewColors.Primary)
+    }
 
     // Rolling FPS history — 120 samples (~2 s of real-world data at 60 fps, but the
     // sparkline width matters more than wall-clock time so we just show the most recent
@@ -305,6 +318,20 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                     if (historySize < fpsHistory.size) historySize++
                 }
             ) {
+                // Key light — without an explicit light the scene was unlit and the
+                // spheres rendered black on the black background (invisible, #1266).
+                // A single directional light shades every sphere uniformly. `apply` is
+                // a NAMED parameter on the LightNode composable, not a trailing lambda.
+                LightNode(
+                    type = LightManager.Type.DIRECTIONAL,
+                    apply = {
+                        color(1.0f, 0.95f, 0.9f)
+                        intensity(80_000f)
+                        direction(0.3f, -1f, -0.5f)
+                        castShadows(false)
+                    },
+                )
+
                 // Spawn `currentCount` procedural spheres in a centered 3-axis grid.
                 // SphereNode is a built-in SDK primitive (24×24 tessellation ≈ 1152
                 // tris each), so the perf cost comes purely from draw calls +
@@ -334,9 +361,9 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                 // IndexBuffer because the SDK's SphereNode constructor builds a fresh
                 // Sphere geometry per node. A future optimisation would be to share one
                 // Sphere geometry across all nodes (an SDK addition — out of scope for
-                // this demo). Material instances are unaffected: a null materialInstance
-                // here means Filament uses its built-in default material with zero
-                // per-node allocation, so the perf cost lives in the geometry buffers.
+                // this demo). The `sphereMaterial` instance is shared across every node
+                // (created once via `remember`), so it adds no per-node allocation —
+                // the perf cost still lives purely in the geometry buffers.
                 repeat(currentCount) { i ->
                     key(i) {
                         // currentCount is a key here so re-spawning at a different
@@ -355,7 +382,8 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                         }
                         SphereNode(
                             radius = NODE_RADIUS,
-                            position = pos
+                            position = pos,
+                            materialInstance = sphereMaterial,
                         )
                     }
                 }
