@@ -1,5 +1,20 @@
 name: Deploy website + docs
 
+# This is the SINGLE workflow that publishes the user-facing site at
+# https://sceneview.github.io. It assembles ONE complete `site/` tree —
+# marketing landing page (root) + MkDocs technical docs (/docs/) +
+# Kotlin/JS web-demo (/web-demo/) + Dokka API reference (/api/sceneview/) —
+# and pushes it to the external `sceneview/sceneview.github.io` repo.
+#
+# Why a single workflow: `deploy-website.yml` previously published ONLY
+# `website-static/` to the same external repo with `keep_files: true`,
+# while this workflow deployed the full `site/` to the *project* Pages of
+# `sceneview/sceneview` (a different host). The result was that
+# `sceneview.github.io/docs/` and `/api/` never received the MkDocs /
+# Dokka content — GitHub Pages' 404 fallback served the landing page
+# byte-for-byte for every unknown route (#925). `deploy-website.yml` is
+# now retired; this workflow is authoritative.
+
 on:
   # Path-gated so a pure-code merge to main does NOT redeploy the
   # website + docs (#1311, #1321). The repo runs a continuous
@@ -22,10 +37,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
-# Allow only one concurrent deployment, skip in-progress runs.
-# Shared with no other workflow — this is the single site deploy path.
+# Allow only one concurrent deployment, skip in-progress runs
 concurrency:
-  group: deploy-site
+  group: pages
   cancel-in-progress: true
 
 permissions:
@@ -44,8 +58,15 @@ jobs:
         run: |
           mkdir -p site
 
-          # Static HTML/CSS/JS landing page
+          # Static HTML/CSS/JS landing page.
           cp -r website-static/* site/
+
+          # Defensive: `site/docs/` is owned exclusively by the MkDocs
+          # build (step 2). `website-static/` must not pre-seed it — a
+          # legacy `website-static/docs/index.html` redirect stub used to
+          # do exactly that and shadow the real docs (#925). The stub has
+          # been removed from source; this guards against it returning.
+          rm -rf site/docs
 
           touch site/.nojekyll
 
@@ -116,85 +137,139 @@ jobs:
               cp samples/web-demo/src/jsMain/resources/index.html site/web-demo/index.html
           else
             echo "::error::Neither expected web-demo output dir exists; aborting"
-            ls -R samples/web-demo/build/ | head -50
+            find samples/web-demo/build/ | head -50
             exit 1
           fi
           [ -f site/web-demo/index.html ] || {
             echo "::error::site/web-demo/index.html missing — deploy would 404"; exit 1; }
 
-      # ── 4. Include Dokka API docs if available ──────────────────────────
+      # ── 4. Include Dokka API docs ───────────────────────────────────────
+      # Dokka is built by a separate workflow (release / api docs run) and
+      # handed over as the `dokka-api-docs` artifact. On a docs-only push
+      # the artifact is absent — that is expected and not fatal.
       - name: Download Dokka API docs (if available)
+        id: dokka
         uses: actions/download-artifact@v8
         with:
           name: dokka-api-docs
           path: site/api/sceneview
         continue-on-error: true
 
-      # ── 5. Verify and upload ────────────────────────────────────────────
+      # The deploy step replaces the published tree wholesale
+      # (`keep_files: false`). If this run has no fresh Dokka artifact we
+      # must carry over the API docs already live on sceneview.github.io,
+      # otherwise a docs-only deploy would wipe `/api/` — the exact
+      # 404-class regression #925 is about.
+      - name: Preserve already-published Dokka API docs
+        if: steps.dokka.outcome != 'success'
+        run: |
+          if find site/api/sceneview -mindepth 1 -print -quit 2>/dev/null | grep -q .; then
+            echo "Dokka artifact present — nothing to preserve."
+            exit 0
+          fi
+          echo "No fresh Dokka artifact; pulling /api/ from the live site."
+          tmp="$(mktemp -d)"
+          if git clone --depth 1 --branch main \
+              https://github.com/sceneview/sceneview.github.io.git "$tmp" 2>/dev/null \
+              && [ -d "$tmp/api" ]; then
+            rm -rf site/api
+            cp -r "$tmp/api" site/api
+            echo "Carried over existing /api/ from sceneview.github.io."
+          else
+            echo "::warning::Could not fetch existing /api/; this deploy will not include API docs."
+          fi
+          rm -rf "$tmp"
+
+      # ── 5. Verify the assembled tree ────────────────────────────────────
       - name: Verify build
         run: |
           FILE_COUNT=$(find site -type f | wc -l)
           echo "Site contains $FILE_COUNT files"
           echo "Root files: $(ls site/)"
-          echo "Has index.html: $([ -f site/index.html ] && echo YES || echo NO)"
-          echo "Has docs/: $([ -d site/docs ] && echo YES || echo NO)"
           if [ "$FILE_COUNT" -lt 10 ]; then
-            echo "ERROR: Site build produced fewer than 10 files. Aborting."
+            echo "::error::Site build produced fewer than 10 files. Aborting."
             exit 1
           fi
-          if [ ! -f site/index.html ]; then
-            echo "ERROR: No index.html in root. Static site copy may have failed."
-            exit 1
+          # The landing page must own the root. The MkDocs docs site and
+          # the web-demo must own their own sub-paths with their own
+          # index.html — otherwise GitHub Pages' 404 fallback serves the
+          # landing page byte-for-byte for those routes (#925).
+          fail=0
+          for path in index.html docs/index.html web-demo/index.html; do
+            if [ -f "site/$path" ]; then
+              echo "OK   site/$path"
+            else
+              echo "::error::Missing site/$path — that route would 404 / fall back to the landing page (#925)"
+              fail=1
+            fi
+          done
+          # Dokka API docs are downloaded from a separate artifact and may
+          # legitimately be absent on a docs-only run — warn, don't fail.
+          if [ -f site/api/sceneview/index.html ]; then
+            echo "OK   site/api/sceneview/index.html"
+          else
+            echo "::warning::site/api/sceneview/index.html missing — Dokka artifact was not available for this run; /api/sceneview/ will 404 until a release run publishes it"
           fi
+          [ "$fail" -eq 0 ] || exit 1
 
-      # ── 6. Publish the complete site to the canonical apex domain ───────
-      # CONSOLIDATION (#1360): this workflow is the SINGLE deploy path for
-      # the public site. It used to upload to the in-repo `github-pages`
-      # environment (served at `sceneview.github.io/sceneview/`), while a
-      # separate `deploy-website.yml` pushed only `website-static/` to the
-      # external repo `sceneview/sceneview.github.io` (the apex
-      # `sceneview.github.io/`). That split published the marketing
-      # landing to two different URLs and divided the site.
-      #
-      # `deploy-website.yml` is removed; this job now publishes the FULL
-      # built site (marketing + MkDocs `/docs/` + `/web-demo/` + Dokka
-      # `/api/`) to the apex repo via the same SSH `deploy_key` that
-      # `release.yml` already uses for its Dokka deploy.
-      #
-      # `keep_files: true` is critical: `release.yml` independently writes
-      # versioned API docs under `api/sceneview/<ver>/` on tag pushes —
-      # without it, actions-gh-pages would wipe everything not in
-      # `publish_dir`. The downloaded `dokka-api-docs` artifact (step 4) is
-      # `continue-on-error`, so on a docs-only run with no fresh Dokka
-      # artifact `site/api/` is simply absent and the existing API tree on
-      # the target repo is preserved.
-      - name: Upload site artifact (for inspection)
+      - name: Upload assembled site artifact
         uses: actions/upload-artifact@v7
         with:
-          name: site
+          name: sceneview-site
           path: site
-          if-no-files-found: error
+          retention-days: 1
 
   deploy:
-    name: Deploy to GitHub Pages (apex)
+    name: Deploy to sceneview.github.io
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Download built site
+      - name: Download assembled site artifact
         uses: actions/download-artifact@v8
         with:
-          name: site
+          name: sceneview-site
           path: site
 
-      - name: Deploy to sceneview.github.io (apex)
+      # Publish the COMPLETE assembled tree (landing page + /docs/ +
+      # /web-demo/ + /api/sceneview/) to the user-facing repo. This is the
+      # only deploy that reaches https://sceneview.github.io.
+      #
+      # The `site/` tree is complete: the build job's "Download Dokka API
+      # docs" step already placed the API reference under `site/api/`
+      # before uploading the `sceneview-site` artifact.
+      #
+      # `keep_files: false` — the assembled `site/` IS the full intended
+      # tree, so a clean replace prevents stale files (e.g. the old
+      # redirect stub at `docs/index.html`) from lingering on the
+      # published branch and shadowing the new content.
+      - name: Deploy to sceneview/sceneview.github.io
         uses: peaceiris/actions-gh-pages@v4
         with:
           deploy_key: ${{ secrets.PAGES_DEPLOY_KEY }}
           external_repository: sceneview/sceneview.github.io
           publish_branch: main
           publish_dir: ./site
-          keep_files: true
-          commit_message: "deploy: ${{ github.event.head_commit.message }}"
+          keep_files: false
+          commit_message: "deploy: ${{ github.event.head_commit.message || github.sha }}"
           user_name: github-actions[bot]
           user_email: github-actions[bot]@users.noreply.github.com
+
+      # GitHub Pages' legacy auto-build on `sceneview/sceneview.github.io`
+      # has been intermittently failing to fire on the push above
+      # (verified 2026-05-07). Force a build via the Pages API. Requires a
+      # PAT in `secrets.PAGES_REBUILD_TOKEN` with `repo` scope — falls
+      # through silently if the secret isn't set, in which case run:
+      #   gh api -X POST repos/sceneview/sceneview.github.io/pages/builds
+      - name: Trigger GitHub Pages build (workaround for auto-build skip)
+        if: ${{ env.PAGES_TOKEN != '' }}
+        env:
+          PAGES_TOKEN: ${{ secrets.PAGES_REBUILD_TOKEN }}
+        continue-on-error: true
+        run: |
+          curl -sSf -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $PAGES_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/sceneview/sceneview.github.io/pages/builds \
+            | head -c 200
