@@ -228,7 +228,16 @@ fun createCollisionSystem(view: View) = CollisionSystem(view)
 
 class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     init {
-        transform = io.github.sceneview.math.Transform(position = Position(0.0f, 0.0f, 1.0f))
+        // 3/4 view: slightly elevated and pulled back so a typical 0.3–1 m model placed
+        // at the world origin is fully framed and centered (#1080). The previous
+        // `(0, 0, 1)` placement sat the camera 1 m dead-ahead of origin — too close for
+        // anything but a tiny object and, with no Y elevation, produced a flat,
+        // under-framed front-on view. `(0, DEFAULT_Y, DEFAULT_Z)` + `lookAt(origin)`
+        // mirrors iOS RealityKit's `look(at: .zero, from: [0, 0.3, 2])` default
+        // (`SceneViewSwift/.../SceneView.swift`) so the same scene frames identically
+        // on both platforms. Pinned in `SceneFactoriesTest.defaultCameraNodePositionIsPinned()`.
+        position = Position(0.0f, DEFAULT_Y, DEFAULT_Z)
+        lookAt(Position(0.0f, 0.0f, 0.0f))
         // Neutral, less photographic exposure.
         // The previous setting (`f/16, 1/125 s, ISO 100` ≈ EV 15) is "sunny-16" — a real-world
         // outdoor exposure that makes Filament renders look much darker than the iOS
@@ -241,6 +250,18 @@ class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     }
 
     companion object {
+        /**
+         * Default camera Y elevation. Small positive lift gives a natural 3/4 angle
+         * looking slightly down on origin-placed content. Matches iOS `[0, 0.3, 2]`.
+         */
+        const val DEFAULT_Y = 0.3f
+
+        /**
+         * Default camera Z distance from origin. Pulls the camera back far enough to
+         * frame a typical 0.3–1 m model. Matches iOS `[0, 0.3, 2]`.
+         */
+        const val DEFAULT_Z = 2.0f
+
         /** Aperture (f-stop). AR mirrors via `ARDefaultCameraNode.DEFAULT_APERTURE`. */
         const val DEFAULT_APERTURE = 12.0f
 
