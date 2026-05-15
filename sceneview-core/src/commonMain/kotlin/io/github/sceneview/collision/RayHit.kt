@@ -9,6 +9,7 @@ open class RayHit {
     private var distance = Float.MAX_VALUE
     private val point = Vector3()
 
+    /** Sets the distance along the ray at which the hit occurred. */
     fun setDistance(distance: Float) {
         this.distance = distance
     }
@@ -20,6 +21,7 @@ open class RayHit {
      */
     fun getDistance(): Float = distance
 
+    /** Sets the world-space position where the ray hit the collision shape. The vector is copied. */
     fun setPoint(point: Vector3) {
         Preconditions.checkNotNull(point, "Parameter \"point\" was null.")
         this.point.set(point)
@@ -39,6 +41,7 @@ open class RayHit {
      */
     fun getWorldPosition(): Float3 = getPoint().let { Float3(it.x, it.y, it.z) }
 
+    /** Copies the distance and point from [other] into this hit. */
     fun set(other: RayHit) {
         Preconditions.checkNotNull(other, "Parameter \"other\" was null.")
 
@@ -46,6 +49,7 @@ open class RayHit {
         setPoint(other.point)
     }
 
+    /** Resets this hit to its empty state — distance back to [Float.MAX_VALUE] and point to the origin. */
     open fun reset() {
         distance = Float.MAX_VALUE
         point.set(0f, 0f, 0f)

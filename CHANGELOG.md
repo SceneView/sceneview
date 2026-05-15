@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added — Documentation
+
+- **KDoc for the `sceneview-core` collision API ([#965](https://github.com/sceneview/sceneview/issues/965)).** Documented previously-undocumented public declarations in the collision module (`Box`, `Sphere`, `Plane`, `Ray`, `RayHit`, `Vector3`, `Quaternion`, `Capsule`, `MeshCollider`, `ChangeId`, `TransformProvider`) plus the `Easing` curve set and the cross-platform `logWarning` logger.
+
 ### Added — CI
 
 - **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.

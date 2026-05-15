@@ -14,6 +14,13 @@ import kotlin.math.sqrt
 // ── Easing functions ────────────────────────────────────────────────────────────
 // Each takes a fraction in [0..1] and returns a curved fraction in [0..1].
 
+/**
+ * Standard animation easing curves.
+ *
+ * Every entry is a function mapping a linear progress fraction in `[0, 1]` to a curved
+ * fraction (also nominally in `[0, 1]`, though `Back` and `Elastic` curves overshoot
+ * slightly). Pass one of these to an animation driver to shape its timing.
+ */
 object Easing {
     /** No curve — constant speed. */
     val Linear: (Float) -> Float = { it }
