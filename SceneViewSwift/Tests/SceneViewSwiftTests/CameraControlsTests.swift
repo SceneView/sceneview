@@ -244,5 +244,82 @@ final class CameraControlsTests: XCTestCase {
         )
         XCTAssertEqual(length, 1.0, accuracy: 0.001)
     }
+
+    // MARK: - Fit-to-bounds framing (#1026 / #1041)
+
+    func testFitRadiusFramesBoundingSphere() {
+        // A 1m cube at 60° vertical FOV with a square viewport (aspect 1):
+        // both FOVs equal, halfFov = 30°, sphereRadius = sqrt(3)/2 ≈ 0.866.
+        // distance = 0.866 / sin(30°) = 1.732, × 1.15 margin ≈ 1.99.
+        let controls = CameraControls()
+        let r = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(1, 1, 1),
+            fovYDegrees: 60,
+            aspect: 1.0,
+            margin: 1.15
+        )
+        XCTAssertEqual(r, 1.99, accuracy: 0.05)
+    }
+
+    func testFitRadiusLargerForBiggerContent() {
+        // Scaling the box up scales the fit distance linearly.
+        let controls = CameraControls()
+        let small = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(1, 1, 1), fovYDegrees: 60, aspect: 1.0)
+        let big = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(4, 4, 4), fovYDegrees: 60, aspect: 1.0)
+        XCTAssertEqual(big / small, 4.0, accuracy: 0.1)
+    }
+
+    func testFitRadiusPortraitNeedsMoreDistanceThanSquare() {
+        // A portrait viewport (aspect < 1) has a narrower horizontal FOV,
+        // so the camera must sit farther back to fit the same content
+        // (#1041 — wide rows of primitives clipped on a phone in portrait).
+        let controls = CameraControls(mode: .orbit, maxRadius: 500)
+        let square = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(2, 1, 1), fovYDegrees: 60, aspect: 1.0)
+        let portrait = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(2, 1, 1), fovYDegrees: 60, aspect: 0.46)
+        XCTAssertGreaterThan(portrait, square)
+    }
+
+    func testFitRadiusClampsToRadiusLimits() {
+        var controls = CameraControls()
+        controls.minRadius = 1.0
+        controls.maxRadius = 10.0
+        // Huge content clamps to maxRadius.
+        let huge = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(1000, 1000, 1000), fovYDegrees: 60)
+        XCTAssertEqual(huge, 10.0, accuracy: 0.001)
+        // Tiny content clamps to minRadius.
+        let tiny = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(0.001, 0.001, 0.001), fovYDegrees: 60)
+        XCTAssertEqual(tiny, 1.0, accuracy: 0.001)
+    }
+
+    func testFitRadiusRejectsDegenerateBounds() {
+        // Empty / non-finite bounds fall back to the current orbitRadius
+        // so an async-loading model never snaps the camera to a bad pose.
+        var controls = CameraControls()
+        controls.orbitRadius = 3.0
+        let zero = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(0, 0, 0), fovYDegrees: 60)
+        XCTAssertEqual(zero, 3.0, accuracy: 0.001)
+        let infinite = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(.infinity, .infinity, .infinity),
+            fovYDegrees: 60)
+        XCTAssertEqual(infinite, 3.0, accuracy: 0.001)
+    }
+
+    func testFitRadiusMarginAddsBreathingRoom() {
+        let controls = CameraControls()
+        let tight = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(1, 1, 1), fovYDegrees: 60,
+            aspect: 1.0, margin: 1.0)
+        let padded = controls.fitRadius(
+            boundsExtents: SIMD3<Float>(1, 1, 1), fovYDegrees: 60,
+            aspect: 1.0, margin: 1.3)
+        XCTAssertEqual(padded / tight, 1.3, accuracy: 0.01)
+    }
 }
 #endif
