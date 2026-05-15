@@ -8,6 +8,9 @@ import XCTest
 /// `CameraGestureDetector` (ORBIT / PAN / FREE_FLIGHT). Each test asserts
 /// that swapping `mode` redirects the drag / pinch math to the right
 /// channel without bleeding into the orbit defaults.
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class CameraControlsModeTests: XCTestCase {
 
     // MARK: - drag math is mode-aware

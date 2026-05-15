@@ -2,6 +2,9 @@ import XCTest
 @testable import SceneViewSwift
 
 #if os(iOS) || os(visionOS)
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class CameraControlsEdgeCaseTests: XCTestCase {
 
     // MARK: - Rapid successive drags

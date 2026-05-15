@@ -4,6 +4,9 @@ import XCTest
 #if os(iOS) || os(macOS) || os(visionOS)
 import RealityKit
 
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class NodeModifiersTests: XCTestCase {
 
     // MARK: - Entity modifiers

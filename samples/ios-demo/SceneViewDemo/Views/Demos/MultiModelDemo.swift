@@ -160,27 +160,67 @@ struct MultiModelDemo: View {
 
     // MARK: - Loading + visibility sync
 
+    /// Load every park slot. Two deliberate properties make the deep-link
+    /// entry point (`sceneview://demo/multi-model`) reliable — issue #1056:
+    ///
+    ///  1. **Concurrent, not sequential** — each slot loads in its own child
+    ///     task. The previous sequential loop loaded the ~15 MB Oak Tree
+    ///     first; on the iOS Simulator RealityKit's `Entity(contentsOf:)`
+    ///     parse of that heavy, texture-dense USDZ stalls for a very long
+    ///     time, and a sequential loop left the lighter Bench / Dog / Bird
+    ///     blocked behind it — so the demo showed an eternal "Loading park
+    ///     scene…" scrim. Loading concurrently means a slow slot only
+    ///     delays itself.
+    ///  2. **Progressive reveal** — each entity is stored into
+    ///     `loadedEntities` the instant it finishes (each slot also re-runs
+    ///     `syncVisibility()`), so the loading scrim is dismissed by the
+    ///     *first* model that lands rather than waiting for all four.
+    ///
+    /// A slot that fails outright is dropped; the rest of the park still
+    /// renders.
     @MainActor
     private func loadAllSlots() async {
-        for slot in Self.slots {
-            guard let slug = slot.slug else { continue }
-            do {
-                let url = try await SketchfabAssetResolver.shared.resolve(slug)
-                let node = try await ModelNode.load(contentsOf: url)
-                _ = node.scaleToUnits(slot.scale)
-                _ = node.centerOrigin()
-                node.entity.position = slot.position
-                if slug.hasBakedAnimation && node.animationCount > 0 {
-                    node.playAllAnimations()
-                }
-                loadedEntities[slug.uid] = node.entity
-            } catch {
-                // Per-slot failure — log and move on so the rest of the park
-                // still renders. Matches Android's per-slug fallback path.
-                print("[MultiModelDemo] Failed to load \(slot.displayName): \(error)")
-            }
+        // One child `Task` per slot. All tasks inherit `@MainActor`
+        // isolation, so the heavy `Entity(contentsOf:)` parses still
+        // interleave at their `await` suspension points — a slow slot only
+        // delays itself, not its siblings.
+        let tasks: [Task<Void, Never>] = Self.slots.compactMap { slot in
+            guard slot.slug != nil else { return nil }
+            return Task { @MainActor in await self.loadSlot(slot) }
         }
-        syncVisibility()
+        for task in tasks {
+            await task.value
+        }
+        // If every slot failed (e.g. offline + missing bundle fallback),
+        // replace the spinner with an honest message instead of an eternal
+        // "Loading park scene…" scrim.
+        if loadedEntities.isEmpty && loadError == nil {
+            loadError = "Couldn't load the park scene — check your connection and reopen the demo."
+        }
+    }
+
+    /// Resolve + load a single park slot, then store its `Entity` and re-sync
+    /// visibility so the scene reveals models progressively. A failure is
+    /// logged and skipped so one bad slot never blocks the rest. (#1056)
+    @MainActor
+    private func loadSlot(_ slot: ParkSlot) async {
+        guard let slug = slot.slug else { return }
+        do {
+            let url = try await SketchfabAssetResolver.shared.resolve(slug)
+            let node = try await ModelNode.load(contentsOf: url)
+            _ = node.scaleToUnits(slot.scale)
+            _ = node.centerOrigin()
+            node.entity.position = slot.position
+            if slug.hasBakedAnimation && node.animationCount > 0 {
+                node.playAllAnimations()
+            }
+            loadedEntities[slug.uid] = node.entity
+            syncVisibility()
+        } catch {
+            // Per-slot failure — log and move on so the rest of the park
+            // still renders. Matches Android's per-slug fallback path.
+            print("[MultiModelDemo] Skipped \(slot.displayName): \(error)")
+        }
     }
 
     /// Re-attach / detach entities based on the four visibility toggles.

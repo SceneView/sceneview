@@ -14,6 +14,9 @@ import XCTest
 /// RerunWireFormatTest). A mismatch here means the Python sidecar would
 /// see different events from Android and iOS clients for the same
 /// logical input — an integration-breaking regression.
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class RerunWireFormatTests: XCTestCase {
 
     func testCameraPoseEmitsCanonicalJsonLine() {

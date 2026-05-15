@@ -4,6 +4,9 @@ import ARKit
 @testable import SceneViewSwift
 
 /// Tests for ARSceneView configuration, including camera exposure API parity with Android.
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class ARSceneViewTests: XCTestCase {
 
     // MARK: - Default initialisation
