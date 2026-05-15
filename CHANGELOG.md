@@ -10,6 +10,10 @@
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
 
+### Fixed — Samples
+
+- **`SecondaryCameraDemo` camera-angle controls are now TalkBack-friendly ([#1256](https://github.com/sceneview/sceneview/issues/1256)).** The section label is exposed as a heading and the selected `FilterChip` carries an explicit "Selected camera angle" state description.
+
 ### Changed — CI
 
 - **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
