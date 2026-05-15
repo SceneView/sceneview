@@ -18,6 +18,30 @@ struct ARTab: View {
     @State private var showError = false
     @State private var showModelPicker = false
     @State private var arViewID = UUID()
+    /// Mirrors Android's `sessionStarted` gate on `ArViewTabContent` — the
+    /// AR tab opens to a static launcher screen (icon + tagline + "Start
+    /// AR Camera" CTA) instead of jumping straight to the live ARKit
+    /// session. Flips to `true` on CTA tap and back to `false` from the
+    /// top-trailing Close button. `@State` (not `@SceneStorage`) because
+    /// `@SceneStorage` survives cold launches via UISceneSession state
+    /// restoration — the opposite of the intended UX. Android's
+    /// `rememberSaveable` survives process death only inside the same
+    /// composition; on iOS the ARTab view stays in the TabView's tree as
+    /// long as the scene is alive, so plain `@State` already matches that
+    /// scope.
+    @State private var sessionStarted = false
+
+    /// Whether the current device has the ARKit world-tracking config we
+    /// need (front-facing AR planes + camera passthrough). Computed once
+    /// at view init; iPhones older than the A9 era return `false`. Mirrors
+    /// Android's `ArCoreApk.checkAvailability()` gating on the launcher CTA.
+    private var arSupported: Bool {
+        #if !targetEnvironment(simulator)
+        ARWorldTrackingConfiguration.isSupported
+        #else
+        false
+        #endif
+    }
 
     /// Increment to force-rebuild the ARSceneView, clearing every placed anchor.
     /// We rebuild because there's no public `removeAllAnchors` on the wrapper.
@@ -25,6 +49,20 @@ struct ARTab: View {
         arViewID = UUID()
         placedCount = 0
         HapticManager.mediumTap()
+    }
+
+    /// Used by the top-right Close button AND a future system-back gesture
+    /// (none on iOS today). Tearing down the `liveARView` via the outer
+    /// `if/else` already destroys the ARSceneView, so we don't bump
+    /// `arViewID` here (it would be dead — that's `resetScene()`'s job
+    /// for in-session resets). We DO close any open sheets / alerts so
+    /// the user lands on a clean launcher instead of an orphan modal.
+    private func exitArSession() {
+        placedCount = 0
+        showModelPicker = false
+        showError = false
+        sessionStarted = false
+        HapticManager.lightTap()
     }
 
     // `animated_dragon.usdz` (8.6 MB) was dropped in #1152 Stage 3 (IPA
@@ -46,6 +84,34 @@ struct ARTab: View {
     }
 
     var body: some View {
+        Group {
+            if sessionStarted {
+                liveARView
+            } else {
+                ARLauncherScreen(arSupported: arSupported) {
+                    sessionStarted = true
+                    HapticManager.lightTap()
+                }
+            }
+        }
+        .alert("AR Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        }
+        .sheet(isPresented: $showModelPicker) {
+            modelPickerSheet
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(28)
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    /// Live AR session UI — what the previous body rendered unconditionally.
+    /// Gated behind `sessionStarted` so the user has to explicitly enter the
+    /// camera session (Polycam / Reality Composer launcher pattern).
+    private var liveARView: some View {
         ZStack {
             #if !targetEnvironment(simulator)
             arSceneView
@@ -63,6 +129,24 @@ struct ARTab: View {
                 Spacer()
             }
 
+            // Top-trailing Close button — exit affordance from the live AR
+            // session. Mirrors Android's top-end Close button on
+            // ArViewTab.kt (which flips `sessionStarted = false` to return
+            // to the launcher screen). Required for issue #1211 item 3.
+            // Re-uses `glassIconButton` so the size + style matches the
+            // bottom action bar (44×44, Apple HIG tap-target minimum).
+            // Extra `.padding(.top, 16)` clears the iPhone 15+/16 Pro
+            // Dynamic Island so the glass circle doesn't sit under it.
+            VStack {
+                HStack {
+                    Spacer()
+                    glassIconButton(systemImage: "xmark", label: "Exit AR camera", action: exitArSession)
+                        .padding(.top, 16)
+                        .padding(.trailing, 12)
+                }
+                Spacer()
+            }
+
             // Bottom floating glass action bar.
             VStack {
                 Spacer()
@@ -70,18 +154,6 @@ struct ARTab: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
             }
-        }
-        .alert("AR Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "An unknown error occurred.")
-        }
-        .sheet(isPresented: $showModelPicker) {
-            modelPickerSheet
-                .presentationDetents([.medium, .large])
-                .presentationBackground(.regularMaterial)
-                .presentationCornerRadius(28)
-                .presentationDragIndicator(.visible)
         }
     }
 
@@ -334,5 +406,99 @@ struct ARTab: View {
             presenter.present(activityVC, animated: true)
         }
     }
+}
+
+// MARK: - Launcher screen (entry / exit gate)
+
+/// Static launcher shown when the AR tab is opened, before the user explicitly
+/// starts the camera session. Mirrors Android's `ArLauncherScreen` on
+/// `ArViewTab.kt` (#1211 item 3): hero icon + tagline + "Start AR Camera" CTA.
+///
+/// On Android the launcher also surfaces a row of AR demo cards (Cloud
+/// Anchor, Streetscape, etc.) — iOS skips that for now since the AR demos
+/// live under the Samples tab and the launcher is meant as a soft entry
+/// point, not a discovery surface.
+private struct ARLauncherScreen: View {
+    let arSupported: Bool
+    let onStartArSession: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            // Hero icon — same gradient + corner radius idiom as the Android
+            // launcher's 56dp box.
+            ZStack {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.85),
+                                .blue.opacity(0.55),
+                                .purple.opacity(0.45),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 96, height: 96)
+                Image(systemName: "arkit")
+                    .font(.system(size: 44, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .accessibilityHidden(true)
+            }
+            .padding(.top, 32)
+
+            VStack(spacing: 8) {
+                Text("AR Experiences")
+                    .font(.title.weight(.bold))
+                    // Bump VoiceOver focus order so the title gets read
+                    // first then the CTA — without this the screen reader
+                    // walks the Spacer / hero / etc before reaching the
+                    // action.
+                    .accessibilitySortPriority(2)
+                Text("Place 3D models in your space, scan faces, anchor to terrain.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: onStartArSession) {
+                Label(arSupported ? "Start AR Camera" : "AR not supported on this device",
+                      systemImage: arSupported ? "camera.viewfinder" : "xmark.octagon")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(.tint, in: Capsule())
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .disabled(!arSupported)
+            .opacity(arSupported ? 1.0 : 0.5)
+            .accessibilityLabel(arSupported ? "Start AR camera" : "AR not supported on this device")
+            .accessibilitySortPriority(1)
+
+            Text(arSupported
+                 ? "Camera permission is requested when you start the camera."
+                 : "ARKit world-tracking isn't available on this iPhone model.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Spacer(minLength: 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+#Preview("Launcher — supported") {
+    ARLauncherScreen(arSupported: true, onStartArSession: {})
+}
+
+#Preview("Launcher — unsupported") {
+    ARLauncherScreen(arSupported: false, onStartArSession: {})
 }
 #endif
