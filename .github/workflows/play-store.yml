@@ -338,7 +338,8 @@ jobs:
           python3 -m venv /tmp/promote-venv
           # Pinned exact versions — this job runs with PLAY_STORE_SERVICE_ACCOUNT_JSON
           # in env, so a compromised PyPI release must not be pullable here (#1230).
-          /tmp/promote-venv/bin/pip install --quiet google-auth==2.38.0 requests==2.32.3
+          # Deps live in a requirements file so Dependabot can track/bump them (#1286).
+          /tmp/promote-venv/bin/pip install --quiet -r .github/workflows/requirements/play-store.txt
 
           /tmp/promote-venv/bin/python3 << 'PYEOF'
           import json, os, sys, requests
@@ -453,7 +454,8 @@ jobs:
         run: |
           python3 -m venv /tmp/listing-venv
           # Pinned exact versions — credential-bearing job (#1230).
-          /tmp/listing-venv/bin/pip install --quiet google-auth==2.38.0 requests==2.32.3
+          # Deps live in a requirements file so Dependabot can track/bump them (#1286).
+          /tmp/listing-venv/bin/pip install --quiet -r .github/workflows/requirements/play-store.txt
 
           /tmp/listing-venv/bin/python3 << 'PYEOF'
           import json, os, sys, pathlib, requests
