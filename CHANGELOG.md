@@ -6,6 +6,10 @@
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
 
+### Fixed — ViewNode rendering
+
+- **`ViewNode` no longer renders as a permanent black rectangle after a background → foreground cycle ([#984](https://github.com/sceneview/sceneview/issues/984)).** `ViewNode.WindowManager` now retries the off-screen window attach via an owner-View attach listener when the owner is not yet attached at resume time, instead of silently dropping the attach.
+
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
 
 ### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
