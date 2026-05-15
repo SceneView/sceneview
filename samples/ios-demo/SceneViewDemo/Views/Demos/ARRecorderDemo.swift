@@ -227,9 +227,13 @@ struct ARRecorderDemo: View {
             defer { isSavingToPhotos = false }
             statusMessage = "Saving to Photos…"
             do {
-                try await ARRecorder.saveToPhotoLibrary(url)
+                let localID = try await ARRecorder.saveToPhotoLibrary(url)
                 if Task.isCancelled { return }
-                statusMessage = "Saved to Photos"
+                if let localID {
+                    statusMessage = "Saved to Photos (\(localID))"
+                } else {
+                    statusMessage = "Saved to Photos"
+                }
             } catch {
                 if Task.isCancelled { return }
                 statusMessage = "Save failed: \(error.localizedDescription)"
