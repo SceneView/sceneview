@@ -34,7 +34,7 @@ struct SamplesTab: View {
     /// Demos that need a full camera feed or heavy 3D viewport must take the
     /// whole screen — a sheet detent would clip the AR camera and gestures.
     private static let fullScreenIDs: Set<String> = [
-        "AR Debug (Rerun)",
+        "Rerun Debug",
         "Orbital AR",
     ]
 
@@ -198,16 +198,16 @@ struct SamplesTab: View {
         var items: [DemoItem] = [
             // MARK: 3D Basics
 
-            DemoItem(title: "Model Viewer", icon: "cube.transparent.fill", subtitle: "Full-screen hero with a Surprise streamer", category: .basics3D) {
+            DemoItem(title: "Model Viewer", icon: "cube.transparent.fill", subtitle: "Load and display 3D models", category: .basics3D) {
                 ModelViewerDemo()
             },
-            DemoItem(title: "Geometry", icon: "cube.fill", subtitle: "Cube, sphere, cylinder, cone, plane", category: .basics3D) {
+            DemoItem(title: "Geometry Primitives", icon: "cube.fill", subtitle: "Cube, sphere, cylinder, cone, plane", category: .basics3D) {
                 GeometryDemo()
             },
-            DemoItem(title: "Animation", icon: "figure.run", subtitle: "Skinning, rig-driven animation playback", category: .basics3D) {
+            DemoItem(title: "Animation", icon: "figure.run", subtitle: "Play, pause, and control animations", category: .basics3D) {
                 AnimationDemo()
             },
-            DemoItem(title: "Multi-Model Park", icon: "tree.fill", subtitle: "Themed scene composed of 4 streamed models", category: .basics3D) {
+            DemoItem(title: "Multi-Model Scene", icon: "tree.fill", subtitle: "Multiple models in one scene", category: .basics3D) {
                 MultiModelDemo()
             },
             DemoItem(title: "Scene Gallery", icon: "square.grid.3x3.fill", subtitle: "Themed Sketchfab bundles streamed on demand", category: .basics3D) {
@@ -216,7 +216,7 @@ struct SamplesTab: View {
 
             // MARK: Lighting & Environment
 
-            DemoItem(title: "Light Types", icon: "lightbulb.fill", subtitle: "Directional, point & spot lights", category: .lighting) {
+            DemoItem(title: "Light Types", icon: "lightbulb.fill", subtitle: "Directional, point, and spot lights", category: .lighting) {
                 LightingDemo()
             },
             DemoItem(title: "Movable Light", icon: "sun.dust.fill", subtitle: "Drag to orbit the light around the model", category: .lighting) {
@@ -225,19 +225,19 @@ struct SamplesTab: View {
             DemoItem(title: "Dynamic Sky", icon: "sun.horizon.fill", subtitle: "Time-of-day sun simulation", category: .lighting) {
                 DynamicSkyDemo()
             },
-            DemoItem(title: "Fog", icon: "cloud.fog.fill", subtitle: "Linear, exponential & height fog", category: .lighting) {
+            DemoItem(title: "Fog", icon: "cloud.fog.fill", subtitle: "Linear, exponential, and height fog", category: .lighting) {
                 FogDemo()
             },
 
             // MARK: Content
 
-            DemoItem(title: "3D Text", icon: "textformat", subtitle: "Extruded text with styles & sizes", category: .content) {
+            DemoItem(title: "3D Text", icon: "textformat", subtitle: "Extruded text with styles and sizes", category: .content) {
                 TextDemo()
             },
-            DemoItem(title: "Lines & Paths", icon: "point.topleft.down.to.point.bottomright.curvepath", subtitle: "Polylines, helix, grids, circles", category: .content) {
+            DemoItem(title: "Lines & Paths", icon: "point.topleft.down.to.point.bottomright.curvepath", subtitle: "Polylines, helix, grids, and circles", category: .content) {
                 LinesPathsDemo()
             },
-            DemoItem(title: "Image Planes", icon: "photo.fill", subtitle: "Colored image planes in 3D", category: .content) {
+            DemoItem(title: "Image Planes", icon: "photo.fill", subtitle: "Image planes in 3D space", category: .content) {
                 ImageDemo()
             },
             DemoItem(title: "Billboard", icon: "person.fill.viewfinder", subtitle: "Labels that face the camera", category: .content) {
@@ -246,7 +246,7 @@ struct SamplesTab: View {
             DemoItem(
                 comingSoonTitle: "Video Texture",
                 icon: "video.fill",
-                subtitle: "Play video on a 3D surface",
+                subtitle: "Video playback on a 3D surface",
                 category: .content
             ),
 
@@ -255,64 +255,64 @@ struct SamplesTab: View {
             // (orbit / pan / firstPerson) since v4.3.0 (#1034). Gesture-editing
             // demos below are still pending iOS port.
 
-            DemoItem(title: "Camera Controls", icon: "camera.fill", subtitle: "Interactive orbit with grid reference", category: .interaction) {
+            DemoItem(title: "Camera Controls", icon: "camera.fill", subtitle: "Orbit, pan, and free camera modes", category: .interaction) {
                 CameraControlsDemo()
             },
             DemoItem(
                 comingSoonTitle: "Gesture Editing",
                 icon: "hand.pinch.fill",
-                subtitle: "Move, scale & rotate models with touches",
+                subtitle: "Move, scale, and rotate with gestures",
                 category: .interaction
             ),
             DemoItem(
-                comingSoonTitle: "Collision Detection",
+                comingSoonTitle: "Collision & Hit Test",
                 icon: "capsule.fill",
-                subtitle: "Hit testing & AABB queries",
+                subtitle: "Hit testing and collision detection",
                 category: .interaction
             ),
             DemoItem(
                 comingSoonTitle: "ViewNode",
                 icon: "rectangle.stack.fill",
-                subtitle: "SwiftUI / Compose overlays in 3D",
+                subtitle: "Native UI embedded in 3D space",
                 category: .interaction
             ),
 
             // MARK: Advanced
 
-            DemoItem(title: "Materials", icon: "paintpalette.fill", subtitle: "PBR metallic & roughness spectrum", category: .advanced) {
+            DemoItem(title: "PBR Materials", icon: "paintpalette.fill", subtitle: "PBR metallic and roughness spectrum", category: .advanced) {
                 MaterialsDemo()
             },
-            DemoItem(title: "Physics", icon: "figure.walk", subtitle: "Dynamic, static & kinematic bodies", category: .advanced) {
+            DemoItem(title: "Physics", icon: "figure.walk", subtitle: "Gravity, collisions, and rigid bodies", category: .advanced) {
                 PhysicsDemo()
             },
             DemoItem(title: "Double Pendulum", icon: "waveform.path", subtitle: "Chaotic two-link physics, shared KMP simulation", category: .advanced) {
                 DoublePendulumDemo()
             },
-            DemoItem(title: "Custom Mesh", icon: "diamond.fill", subtitle: "Vertices, normals & triangle indices", category: .advanced) {
+            DemoItem(title: "Custom Mesh", icon: "diamond.fill", subtitle: "Custom vertex and index buffers", category: .advanced) {
                 CustomMeshDemo()
             },
             DemoItem(
                 comingSoonTitle: "Post Processing",
                 icon: "sparkles",
-                subtitle: "SSAO, tone mapping, color grading",
+                subtitle: "SSAO, anti-aliasing, and tone mapping",
                 category: .advanced
             ),
             DemoItem(
-                comingSoonTitle: "2D Shape Extrude",
+                comingSoonTitle: "Shape Extrude",
                 icon: "scribble.variable",
-                subtitle: "Extrude SVG paths into 3D meshes",
+                subtitle: "Extrude 2D polygons into 3D meshes",
                 category: .advanced
             ),
             DemoItem(
                 comingSoonTitle: "Reflection Probes",
                 icon: "circle.lefthalf.filled",
-                subtitle: "Local environment reflections",
+                subtitle: "Local cubemap reflections",
                 category: .advanced
             ),
             DemoItem(
                 comingSoonTitle: "Secondary Camera (PiP)",
                 icon: "pip.fill",
-                subtitle: "Picture-in-picture from a second camera",
+                subtitle: "Picture-in-picture camera view",
                 category: .advanced,
                 version: "4.4"
             ),
@@ -321,10 +321,10 @@ struct SamplesTab: View {
         // MARK: AR -- iOS only platform-wise; most features still ported from Android
         #if os(iOS)
         items.append(contentsOf: [
-            DemoItem(title: "AR Debug (Rerun)", icon: "antenna.radiowaves.left.and.right", subtitle: "Stream camera pose & planes to the Rerun viewer", category: .ar) {
+            DemoItem(title: "Rerun Debug", icon: "antenna.radiowaves.left.and.right", subtitle: "Stream camera pose and planes to the Rerun viewer", category: .ar) {
                 RerunDebugDemo()
             },
-            DemoItem(title: "Orbital AR", icon: "circle.dotted", subtitle: "Models orbit around you in AR", category: .ar) {
+            DemoItem(title: "Orbital AR", icon: "circle.dotted", subtitle: "Models orbit around you in a personal solar system", category: .ar) {
                 OrbitalARDemo()
             },
             DemoItem(title: "AR Recording", icon: "record.circle", subtitle: "Capture the AR session as a screen video (record-only on iOS)", category: .ar) {
@@ -333,37 +333,37 @@ struct SamplesTab: View {
             DemoItem(title: "AR Lighting", icon: "lightbulb.max.fill", subtitle: "Compare .mainLight / .fillLight modifier presets", category: .ar) {
                 ARLightingDemo()
             },
-            DemoItem(title: "AR Plane Placement", icon: "arkit", subtitle: "Tap a detected plane to place a model", category: .ar) {
+            DemoItem(title: "Tap to Place", icon: "arkit", subtitle: "Tap a detected plane to place a model", category: .ar) {
                 ARPlacementDemo()
             },
             DemoItem(
-                comingSoonTitle: "AR Image Tracking",
+                comingSoonTitle: "Image Tracking",
                 icon: "viewfinder.circle.fill",
                 subtitle: "Detect and track reference images",
                 category: .ar
             ),
             DemoItem(
-                comingSoonTitle: "AR Augmented Faces",
+                comingSoonTitle: "Augmented Faces",
                 icon: "face.smiling.inverse",
-                subtitle: "Face mesh tracking & overlays",
+                subtitle: "Face mesh tracking and overlays",
                 category: .ar
             ),
             DemoItem(
-                comingSoonTitle: "AR Cloud Anchors",
+                comingSoonTitle: "Cloud Anchors",
                 icon: "icloud.fill",
                 subtitle: "Persistent multi-user anchors",
                 category: .ar
             ),
             DemoItem(
-                comingSoonTitle: "AR Streetscape",
+                comingSoonTitle: "Streetscape Geometry",
                 icon: "map.fill",
-                subtitle: "Geospatial building & terrain meshes",
+                subtitle: "Geospatial building and terrain meshes",
                 category: .ar
             ),
             DemoItem(
-                comingSoonTitle: "AR Body Pose",
-                icon: "figure.stand",
-                subtitle: "Real-time body skeleton tracking",
+                comingSoonTitle: "Pose Placement",
+                icon: "move.3d",
+                subtitle: "Free pose positioning",
                 category: .ar
             ),
             // "AR Record & Playback" coming-soon entry dropped in #1378 — it
@@ -371,28 +371,28 @@ struct SamplesTab: View {
             // expose ARCore-style session replay, so the iOS demo ships
             // record-only and does not promise a playback feature.
             DemoItem(
-                comingSoonTitle: "AR Depth Occlusion",
+                comingSoonTitle: "Depth Occlusion",
                 icon: "square.3.layers.3d.down.right",
                 subtitle: "Real-world depth masks virtual objects",
                 category: .ar
             ),
-            DemoItem(title: "AR Instant Placement", icon: "bolt.fill", subtitle: "Place models without plane detection", category: .ar) {
+            DemoItem(title: "Instant Placement", icon: "bolt.fill", subtitle: "Place models before plane detection converges", category: .ar) {
                 ARInstantPlacementDemo()
             },
             DemoItem(
-                comingSoonTitle: "AR Terrain Anchors",
+                comingSoonTitle: "Terrain Anchors",
                 icon: "mountain.2.fill",
                 subtitle: "Anchor models on geospatial terrain",
                 category: .ar
             ),
             DemoItem(
-                comingSoonTitle: "AR Rooftop Anchors",
+                comingSoonTitle: "Rooftop Anchors",
                 icon: "house.fill",
                 subtitle: "Anchor models on geospatial rooftops",
                 category: .ar
             ),
             DemoItem(
-                comingSoonTitle: "AR Image Stabilization",
+                comingSoonTitle: "Image Stabilization (EIS)",
                 icon: "camera.metering.matrix",
                 subtitle: "EIS for smoother AR camera feed",
                 category: .ar
