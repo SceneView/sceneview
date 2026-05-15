@@ -15,6 +15,12 @@ on:
   issues:
     types: [opened]
 
+# One notification run per triggering event; a duplicate webhook delivery
+# (e.g. an issue edited-then-reopened storm) cancels the stale in-flight run.
+concurrency:
+  group: discord-notify-${{ github.event.release.id || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

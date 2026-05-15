@@ -21,6 +21,15 @@ on:
       - 'docs/**'
       - 'marketing/**'
       - 'branding/**'
+      # `.claude/**` (scripts/skill/plans) and `tools/**` (build utilities)
+      # are not exercised by any job here — the repo-hygiene gates read
+      # `.claude/scripts/*.sh` but a *change* to those scripts is validated
+      # by quality-gate.yml, not pr-check.yml. Mirrors ci.yml's ignore list
+      # so a scripts-only PR (the PR #1304 profile) no longer spins up the
+      # ~5 min KMP compile. Closes #1311 gap #1.
+      # ⛔ Do NOT add `.github/workflows/**` — a CI change must re-run CI.
+      - '.claude/**'
+      - 'tools/**'
       - '*.md'
       - 'llms*.txt'
       - 'LICENSE'
@@ -127,12 +136,62 @@ jobs:
         shell: bash
         run: bash .claude/scripts/validate-demo-assets.sh
 
-  # ── KMP core (all targets) ──────────────────────────────────────────────
-  # ci.yml's `web-desktop` job compiles `:sceneview-core:jsMainClasses` but
-  # not the full KMP `assemble` (which builds iosArm64/iosSimulatorArm64/
-  # iosX64/jvm too). Keep this job to protect every KMP target on PR.
+  # ── Path-filter gate ────────────────────────────────────────────────────
+  # Computes whether a PR touched any code that affects the Kotlin/Native
+  # compilation of `sceneview-core`. The workflow-level `paths-ignore` above
+  # already drops pure docs/website/scripts PRs; this finer per-job gate
+  # stops, for example, a Flutter-only or iOS-demo-only PR from running the
+  # ~5 min KMP compile below. Reuses the `dorny/paths-filter` pattern from
+  # ci.yml's `changes` job. Closes #1311 gap #2.
+  #
+  # A job that gets `if:`-skipped reports the "skipped" conclusion, which
+  # GitHub treats as success — `main` has no required-check list, so this is
+  # safe and no check hangs pending.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      kmp: ${{ steps.filter.outputs.kmp }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # `kmp` covers everything that affects Kotlin/Native compilation of
+          # sceneview-core: the KMP module itself, the Android consumers that
+          # share its source set, sceneview-web, and the Gradle build files.
+          # The workflow + its composite action are listed so a CI change
+          # always re-runs this job. `push` events have no PR diff base —
+          # the action falls back to the previous commit; pr-check.yml only
+          # triggers on pull_request anyway.
+          filters: |
+            kmp:
+              - '.github/workflows/pr-check.yml'
+              - '.github/actions/setup-gradle/**'
+              - 'sceneview-core/**'
+              - 'arsceneview/**'
+              - 'sceneview/**'
+              - 'sceneview-web/**'
+              - 'gradle/**'
+              - 'build.gradle*'
+              - 'settings.gradle*'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'gradlew.bat'
+
+  # ── KMP core (iOS-only native targets) ──────────────────────────────────
+  # ci.yml already builds the JVM/JS KMP targets: `web-desktop` compiles
+  # `:sceneview-core:jsMainClasses` and runs `:sceneview-core:jsTest`, and
+  # `build` consumes the JVM/Android target via `assembleDebug`. The ONLY
+  # KMP targets nothing else exercises on PR are the iOS Kotlin/Native ones
+  # (`ios.yml` builds the Swift package, not the KMP native targets), so
+  # this job is narrowed to them — the unique PR-time guard on Kotlin/Native
+  # compilation. Closes #1311 gaps #3 + #4.
   compile-kmp:
     name: Compile KMP core
+    needs: changes
+    if: needs.changes.outputs.kmp == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -141,9 +200,10 @@ jobs:
 
       - uses: ./.github/actions/setup-gradle
 
-      - name: Compile KMP core (all targets)
-        run: ./gradlew :sceneview-core:assemble --stacktrace
-
-      - name: KMP unit tests (JS)
-        continue-on-error: true
-        run: ./gradlew :sceneview-core:jsTest --stacktrace
+      - name: Compile KMP core (iOS Kotlin/Native targets)
+        run: |
+          ./gradlew \
+            :sceneview-core:compileKotlinIosArm64 \
+            :sceneview-core:compileKotlinIosSimulatorArm64 \
+            :sceneview-core:compileKotlinIosX64 \
+            --stacktrace
