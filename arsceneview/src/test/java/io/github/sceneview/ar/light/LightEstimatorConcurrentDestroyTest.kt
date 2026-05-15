@@ -147,8 +147,11 @@ class LightEstimatorConcurrentDestroyTest {
                             // Without this, the updater can hold the CPU for
                             // its entire 1000-call loop and finish BEFORE
                             // destroy() ever fires, leaving the lower-bound
-                            // race-coverage check at 0. See #1258.
-                            if (i and 0x3F == 0) Thread.yield()
+                            // race-coverage check at 0. See #1258. Skip i=0 —
+                            // the destroyer hasn't even reached its spin-wait
+                            // yet on the very first iteration, no point
+                            // yielding to a thread that's still being started.
+                            if (i > 0 && i and 0x3F == 0) Thread.yield()
                         }
                     } catch (t: Throwable) {
                         worstError.compareAndSet(null, t)
@@ -252,7 +255,11 @@ class LightEstimatorConcurrentDestroyTest {
             // so the maintainer running locally sees coverage gaps, but we
             // don't fail CI for them. See #1258.
             if (updatesAfterDestroy.get() == 0) {
-                println(
+                // System.err so Gradle's default test output picks it up
+                // (stdout is hidden behind `testLogging.showStandardStreams`,
+                // stderr is always surfaced). Routes to `<system-err>` in the
+                // JUnit XML report regardless.
+                System.err.println(
                     "⚠️  LightEstimatorConcurrentDestroyTest: race window was " +
                         "never exercised across $iterations iterations " +
                         "(the destroyer thread fired AFTER the updater finished " +
