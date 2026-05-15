@@ -4,10 +4,11 @@ import SwiftUI
 ///
 /// Lives at the top of the app hierarchy so it overlays every tab. Mirrors the
 /// Android `UpdateBanner` UX: a rounded card with a primary CTA ("Update") and
-/// a soft secondary CTA ("Later" → 7-day snooze).
+/// a soft secondary CTA ("Later" → version-keyed snooze).
 ///
 /// The banner is hidden when the updater reports `idle` / `checking` /
-/// `upToDate`, or when the user has snoozed the prompt. Tapping "Update"
+/// `upToDate`, or when the user has snoozed *this* version. A newer App Store
+/// release invalidates the snooze and re-surfaces the banner. Tapping "Update"
 /// jumps straight to the App Store product page via `itms-apps://`.
 struct UpdateBanner: View {
     @EnvironmentObject private var updater: AppStoreUpdater

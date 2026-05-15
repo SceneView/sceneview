@@ -27,8 +27,10 @@ import AppKit
 ///
 /// **Throttle.** Two `UserDefaults` keys keep the network footprint reasonable:
 /// - `sceneview.update.lastCheckAt` — skip lookup if <12h since the last one.
-/// - `sceneview.update.snoozedUntil` — if the user tapped "Later", skip even
-///   showing the banner for the next 7 days.
+/// - `sceneview.update.snoozedVersion` — if the user tapped "Later", the
+///   dismissed version string is stored here so the banner stays hidden for
+///   *that* version only. A newer version on the App Store invalidates the
+///   snooze automatically (version-keyed, matching Web/Flutter/RN).
 @MainActor
 final class AppStoreUpdater: ObservableObject {
 
@@ -55,9 +57,11 @@ final class AppStoreUpdater: ObservableObject {
     private let currentVersionProvider: @MainActor () -> String?
 
     private static let lastCheckKey = "sceneview.update.lastCheckAt"
-    private static let snoozedUntilKey = "sceneview.update.snoozedUntil"
+    private static let snoozedVersionKey = "sceneview.update.snoozedVersion"
+    /// Legacy time-based snooze key (≤4.3.5). Removed on read so a stale
+    /// 7-day TTL from an older build can't keep a banner hidden.
+    private static let legacySnoozedUntilKey = "sceneview.update.snoozedUntil"
     private static let throttle: TimeInterval = 12 * 60 * 60   // 12 hours
-    private static let snoozeWindow: TimeInterval = 7 * 24 * 60 * 60 // 7 days
 
     /// - Parameter currentVersion: Closure returning the running app's
     ///   `CFBundleShortVersionString`. Defaults to `Bundle.main` — XCTest
@@ -114,27 +118,36 @@ final class AppStoreUpdater: ObservableObject {
         #endif
     }
 
-    /// Hide the banner for [`snoozeWindow`] (7 days). The next `checkForUpdate`
-    /// will still hit the network if the throttle window has elapsed, but the
-    /// view layer can use [`isSnoozed`] to keep the banner hidden.
+    /// Hide the banner for the version the user just dismissed. The next
+    /// `checkForUpdate` will still hit the network if the throttle window has
+    /// elapsed; [`isSnoozed`] keeps the banner hidden only while the App Store's
+    /// latest version still equals the dismissed one. A newer version
+    /// invalidates the snooze automatically — matching the version-keyed
+    /// semantics of the Web/Flutter/RN samples.
     func snooze() {
-        defaults.set(now().addingTimeInterval(Self.snoozeWindow).timeIntervalSince1970,
-                     forKey: Self.snoozedUntilKey)
+        if case let .updateAvailable(version, _) = state {
+            defaults.set(version, forKey: Self.snoozedVersionKey)
+        }
+        defaults.removeObject(forKey: Self.legacySnoozedUntilKey)
         state = .upToDate
     }
 
-    /// `true` while the user-initiated snooze window is still active.
+    /// `true` when the version the App Store currently advertises is the same
+    /// one the user already dismissed. A new release surfaces the banner again.
     /// Views should branch on this *and* the published `state` to decide
     /// whether to surface the banner.
     var isSnoozed: Bool {
-        let until = defaults.double(forKey: Self.snoozedUntilKey)
-        return until > now().timeIntervalSince1970
+        guard case let .updateAvailable(version, _) = state else { return false }
+        return defaults.string(forKey: Self.snoozedVersionKey) == version
     }
 
     // MARK: - Private
 
     private func shouldCheck() -> Bool {
-        if isSnoozed { return false }
+        // Note: the snooze is intentionally NOT consulted here. A version-keyed
+        // snooze must still let the lookup run so a *newer* App Store release
+        // can be detected and re-surface the banner. The 12h throttle below is
+        // the only network gate; [`isSnoozed`] only governs banner visibility.
         let nowEpoch = now().timeIntervalSince1970
         // Clamp `last` against the current time: if the system clock rolled
         // backward (or `lastCheckAt` was somehow stamped in the future),

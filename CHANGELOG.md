@@ -13,6 +13,10 @@
 
 - **New `night_sky` HDR environment** bundled across iOS and Android demos — a dramatic Milky Way starfield over a dark landscape (Poly Haven [`dikhololo_night`](https://polyhaven.com/a/dikhololo_night) by Greg Zaal, **CC0 1.0** public domain). iOS exposes it as `SceneEnvironment.nightSky` (added to `allPresets`, so it auto-surfaces in the demo's environment picker); Android adds a "Night Sky" chip to `EnvironmentDemo`. Pairs well with metallic PBR materials for chrome-mirror reflections. Web demo does not bundle HDRs and is unaffected.
 
+### Fixed — iOS demo
+
+- **`AppStoreUpdater` snooze is now version-keyed instead of a 7-day TTL ([#1231](https://github.com/sceneview/sceneview/issues/1231))** — dismissing one release's update banner no longer hides a *newer* release's banner; a new App Store version invalidates the snooze automatically, matching the Web/Flutter/RN samples. The `SceneViewDemoTests` unit-test target is now wired into `SceneViewDemo.xcodeproj` so the `AppStoreUpdater` tests run in CI ([#1227](https://github.com/sceneview/sceneview/issues/1227)).
+
 ### Fixed — iOS rendering
 
 - **`SceneEnvironment.showSkybox = true` now actually paints the HDR as the scene background ([PR #1215](https://github.com/sceneview/sceneview/pull/1215), ported from [@radcli14](https://github.com/radcli14)'s [sceneview-swift#1](https://github.com/sceneview/sceneview-swift/pull/1))** — `SceneView` previously loaded the HDR and applied it as IBL via `ImageBasedLightComponent`, but never assigned it to `RealityViewContent.environment`, so the scene rendered against the default neutral void regardless of which environment preset was selected. The new path caches the loaded `EnvironmentResource` in a `@State` and applies it via `content.environment = .skybox(resource)` in the `RealityView.update:` closure with a diff guard against the last applied resource (no per-frame ARC churn). The `.task(id:)` keys on `(name, showSkybox)` so toggling the flag on the same env re-runs the loader, and clears the cached resource at the start of every task tick so cross-env transitions don't show stale skyboxes under a new IBL.

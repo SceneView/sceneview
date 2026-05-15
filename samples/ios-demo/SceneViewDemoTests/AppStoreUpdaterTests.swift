@@ -2,14 +2,10 @@
 //
 // Unit tests for `samples/ios-demo/SceneViewDemo/Services/AppStoreUpdater.swift`.
 //
-// **Wiring status (2026-05-15).** This file ships in the repo as a ready-to-use
-// test fixture but the `samples/ios-demo/SceneViewDemo.xcodeproj` does NOT yet
-// declare a unit-test target — adding one safely takes a dedicated PR that
-// also wires the `SceneViewDemoTests` PBXNativeTarget, XCTest framework
-// linkage, build configurations and a Test scheme. Until that lands, drop
-// this file into Xcode → "Add files" → "Add to target: SceneViewDemoTests"
-// to run locally, OR open the target via Xcode 16's project editor and let
-// it generate the target boilerplate.
+// **Wiring status (2026-05-15).** This file is compiled by the
+// `SceneViewDemoTests` unit-test target declared in
+// `samples/ios-demo/SceneViewDemo.xcodeproj` and is run by CI via the shared
+// `SceneViewDemo` scheme (`xcodebuild test`).
 //
 // The tests use a custom `URLProtocol` subclass so the iTunes lookup call
 // returns canned JSON without hitting the network. No XCTestExpectation
@@ -31,7 +27,12 @@ final class AppStoreUpdaterTests: XCTestCase {
     /// hit `itunes.apple.com`. Each test pushes a `(status, body)` tuple
     /// onto the static queue and pops it on `startLoading()`.
     final class StubURLProtocol: URLProtocol {
-        static var responses: [(Int, Data)] = []
+        // `nonisolated(unsafe)`: under Swift 6 strict concurrency a mutable
+        // static is flagged. Access is serialized in practice — every test
+        // assigns `responses` synchronously *before* awaiting the lookup, and
+        // `startLoading()` pops exactly one entry per request. Each test also
+        // uses a fresh ephemeral `URLSession`, so there is no cross-test race.
+        nonisolated(unsafe) static var responses: [(Int, Data)] = []
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -193,35 +194,43 @@ final class AppStoreUpdaterTests: XCTestCase {
     }
 
     func testCheck_clockRollbackDoesNotHardLockChecks() async throws {
-        // Regression for #1249: if the system clock rolls backward, a
-        // `lastCheckAt` stamped in the (now-)future makes `now - last`
-        // negative — which is always below the throttle, so `shouldCheck()`
-        // would short-circuit every future check forever. The `min(last, now)`
-        // clamp on read repairs this.
+        // Regression for #1249: a `lastCheckAt` stamped in the future (e.g. the
+        // system clock was set ahead, then corrected) makes `now - last`
+        // negative. A negative value is always below the throttle, so without
+        // the `min(last, now)` clamp `shouldCheck()` would short-circuit every
+        // future check *forever*. The clamp bounds the gap at 0, so the check
+        // simply resumes once a normal throttle window has elapsed.
         let body = #"{"results":[{"version":"9.9.9","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
+        // One queued response — consumed only if the post-repair check runs.
         StubURLProtocol.responses = [(200, Data(body.utf8))]
 
         let defaults = Self.makeDefaults()
-        // First check happens "today".
-        let today = Date()
-        let firstPass = makeUpdater(now: today, defaults: defaults)
-        await firstPass.checkForUpdate()
-        // `lastCheckAt` is now stamped at `today`.
+        let now = Date()
+        // Simulate a `lastCheckAt` stamped 24h in the *future* (the bug input).
+        defaults.set(now.addingTimeInterval(24 * 60 * 60).timeIntervalSince1970,
+                     forKey: "sceneview.update.lastCheckAt")
 
-        // The clock rolls back one full day — `lastCheckAt` is now in the
-        // future relative to the new "now".
-        let yesterday = today.addingTimeInterval(-24 * 60 * 60)
-        let rolledBack = makeUpdater(now: yesterday, defaults: defaults)
-        await rolledBack.checkForUpdate()
+        // A check "now" sees a future timestamp: clamped to `now`, gap is 0,
+        // so it is (correctly) throttled — but NOT permanently negative-locked.
+        let throttled = makeUpdater(now: now, defaults: defaults)
+        await throttled.checkForUpdate()
+        XCTAssertEqual(StubURLProtocol.responses.count, 1,
+                       "Check within the throttle window must not hit the network")
 
-        // The check must have run despite the future `lastCheckAt`: the queued
-        // response was consumed.
+        // Once wall-clock time surpasses the future timestamp by a throttle
+        // window (24h ahead + 12h throttle → check 37h later), the check runs
+        // again. Without the clamp `now - futureLast` would still be negative
+        // — hence below the throttle — and the check would stay locked forever.
+        let recovered = makeUpdater(now: now.addingTimeInterval(37 * 60 * 60),
+                                    defaults: defaults)
+        await recovered.checkForUpdate()
+
         XCTAssertEqual(StubURLProtocol.responses.count, 0,
                        "Clock rollback must not hard-lock update checks")
-        XCTAssertTrue(rolledBack.state.isUpdateAvailable)
+        XCTAssertTrue(recovered.state.isUpdateAvailable)
     }
 
-    func testSnooze_hidesBannerForOneWeek() async throws {
+    func testSnooze_clearsBannerStateForDismissedVersion() async throws {
         let body = #"{"results":[{"version":"9.9.9","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
         StubURLProtocol.responses = [(200, Data(body.utf8))]
 
@@ -230,8 +239,56 @@ final class AppStoreUpdaterTests: XCTestCase {
         XCTAssertTrue(updater.state.isUpdateAvailable)
 
         updater.snooze()
-        XCTAssertTrue(updater.isSnoozed)
         XCTAssertEqual(updater.state, .upToDate, "snooze must clear the banner state")
+    }
+
+    /// Acceptance for #1231: a version-keyed snooze must NOT hide a *newer*
+    /// release. Dismiss 4.3.1's banner → next check returns 4.4.0 → the banner
+    /// re-surfaces (`isSnoozed == false`), because the snooze is keyed on the
+    /// dismissed version string, not a time window.
+    func testSnooze_newVersionInvalidatesSnoozeAndReSurfacesBanner() async throws {
+        let defaults = Self.makeDefaults()
+
+        // User is on 4.3.0; App Store advertises 4.3.1.
+        let v431 = #"{"results":[{"version":"4.3.1","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
+        StubURLProtocol.responses = [(200, Data(v431.utf8))]
+        let firstCheck = makeUpdater(defaults: defaults, currentVersion: "4.3.0")
+        await firstCheck.checkForUpdate(force: true)
+        XCTAssertTrue(firstCheck.state.isUpdateAvailable, "4.3.1 banner expected")
+
+        // User taps "Later" — 4.3.1 is now snoozed.
+        firstCheck.snooze()
+
+        // App Store now advertises 4.4.0. A fresh updater (same defaults
+        // suite, simulating a later app resume) re-checks.
+        let v440 = #"{"results":[{"version":"4.4.0","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
+        StubURLProtocol.responses = [(200, Data(v440.utf8))]
+        let secondCheck = makeUpdater(defaults: defaults, currentVersion: "4.3.0")
+        await secondCheck.checkForUpdate(force: true)
+
+        guard case let .updateAvailable(version, _) = secondCheck.state else {
+            return XCTFail("Expected .updateAvailable for 4.4.0, got \(secondCheck.state)")
+        }
+        XCTAssertEqual(version, "4.4.0")
+        XCTAssertFalse(secondCheck.isSnoozed,
+                       "A newer version must invalidate the 4.3.1 snooze and re-surface the banner")
+    }
+
+    /// The snoozed version stays hidden if the App Store still advertises it.
+    func testSnooze_sameVersionStaysSnoozedAcrossChecks() async throws {
+        let defaults = Self.makeDefaults()
+        let body = #"{"results":[{"version":"4.3.1","bundleId":"io.github.sceneview.demo","releaseNotes":null}]}"#
+
+        StubURLProtocol.responses = [(200, Data(body.utf8))]
+        let firstCheck = makeUpdater(defaults: defaults, currentVersion: "4.3.0")
+        await firstCheck.checkForUpdate(force: true)
+        firstCheck.snooze()
+
+        StubURLProtocol.responses = [(200, Data(body.utf8))]
+        let secondCheck = makeUpdater(defaults: defaults, currentVersion: "4.3.0")
+        await secondCheck.checkForUpdate(force: true)
+        XCTAssertTrue(secondCheck.isSnoozed,
+                      "Re-checking the same version must keep it snoozed")
     }
 }
 
