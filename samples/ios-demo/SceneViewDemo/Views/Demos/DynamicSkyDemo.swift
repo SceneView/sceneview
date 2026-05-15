@@ -25,10 +25,12 @@ struct DynamicSkyDemo: View {
     /// Pick an HDR environment that visually matches the current time of day so the
     /// background isn't a flat black box when the sun is up. Mirrors the Android fix
     /// in commit `15bcaf8c`. Three buckets is coarse — the tint jumps rather than
-    /// fading smoothly — but it covers the obvious user expectations.
+    /// fading smoothly — but it covers the obvious user expectations. The deep-night
+    /// bucket uses the dramatic `night_sky` Milky Way HDR (v4.4.0, #1219) so the
+    /// midnight sky actually wraps the scene instead of fading to neutral dark.
     private var skyEnvironment: SceneEnvironment {
         switch timeOfDay {
-        case ..<6, 19...: return .night
+        case ..<6, 19...: return .nightSky
         case ..<9, 17...: return .sunset
         default: return .outdoor
         }
