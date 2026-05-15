@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **iOS demo cleanup + Android parity ([#1373](https://github.com/sceneview/sceneview/issues/1373)).** Renamed the `Scenes` tab to `Samples`, aligned the Samples category taxonomy to Android, removed the `Auto Rotate` / `AR Record & Playback` duplicate entries and the dead Explore buttons, fixed the `Settings` pill overlapping the controls FAB, and corrected several inaccurate demo subtitles and captions.

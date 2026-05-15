@@ -1,2 +1,0 @@
-<!-- category: Docs -->
-- **`/issue-batch` skill rewritten as a launch-and-go continuous cycle ([#1297](https://github.com/sceneview/sceneview/issues/1297)).** The skill now encodes the validated operating mode: a replace-on-completion pipeline of 6-8 lean-clone background agents (shallow sparse clones, ~0.3-0.6 GB vs ~2.3 GB full), fire-and-forget `gh pr merge --auto`, disk-gated spawn (refuse < 15 GB), disjoint-module parallelism, autonomous dispatch, and a release checkpoint per iteration. `Closes #1297`.

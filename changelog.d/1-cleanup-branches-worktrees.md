@@ -1,2 +1,0 @@
-<!-- category: Added -->
-- **Reusable branch + worktree cleanup task.** New `.claude/scripts/cleanup-branches-worktrees.sh` deletes merged local and remote `claude/*` branches (single `git push --delete`, no bot-burst) and prunes stale `.claude/worktrees/*` directories, with current-branch / unmerged / open-PR safety guards and a `--dry-run` default. A daily `branch-cleanup` job in `maintenance.yml` prunes merged remote branches automatically.
