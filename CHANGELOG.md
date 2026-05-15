@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added — Docs
+
+- **New recipe: iOS visual-polish pipeline ([#1218](https://github.com/sceneview/sceneview/issues/1218)).** `docs/recipes/ios-visual-polish.md` documents how to combine the v4.4.0 HDR-skybox background render, PBR default material, and Apple AR Quick Look hand-off — decoded from [@radcli14](https://github.com/radcli14)'s `twolinks`. The iOS demo's `DynamicSkyDemo` deep-night bucket now uses the dramatic `SceneEnvironment.nightSky` HDR.
+
 ### Fixed — CI security
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
