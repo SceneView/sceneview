@@ -227,8 +227,15 @@ public final class ARRecorder: ObservableObject {
     /// - Throws: ``ARRecorderError/photoLibraryDenied(_:)`` if the user
     ///   denied access, ``ARRecorderError/photoLibrarySaveFailed(_:)``
     ///   if the underlying `performChanges` call returned an error.
+    /// - Returns: The saved asset's `PHAsset.localIdentifier`, or `nil`
+    ///   if `PHPhotoLibrary` did not vend a placeholder for the created
+    ///   asset. Callers can later resolve the asset via
+    ///   `PHAsset.fetchAssets(withLocalIdentifiers:options:)` or deep-link
+    ///   to it. Mirrors Android `ARRecorder.exportToDownloads()` which
+    ///   returns the saved `Uri?`.
     @MainActor
-    public static func saveToPhotoLibrary(_ url: URL) async throws {
+    @discardableResult
+    public static func saveToPhotoLibrary(_ url: URL) async throws -> String? {
         // Ensure the file is on disk before we even ask for permission —
         // a missing-file error is more actionable than a generic
         // "save failed" after the consent sheet.
@@ -249,7 +256,12 @@ public final class ARRecorder: ObservableObject {
             throw ARRecorderError.photoLibraryDenied("Photos add-only permission denied (status=\(granted.rawValue))")
         }
         // Bridge PHPhotoLibrary's completion-handler API into async/await.
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String?, Error>) in
+            // Captured inside the change block, read in the completion
+            // handler. `placeholderForCreatedAsset` is only valid to read
+            // synchronously within `performChanges`; its `localIdentifier`
+            // remains stable and resolvable after the asset is committed.
+            var localIdentifier: String?
             PHPhotoLibrary.shared().performChanges {
                 let request = PHAssetCreationRequest.forAsset()
                 // `shouldMoveFile = true`: Photos moves the source out of our
@@ -263,9 +275,10 @@ public final class ARRecorder: ObservableObject {
                 let options = PHAssetResourceCreationOptions()
                 options.shouldMoveFile = true
                 request.addResource(with: .video, fileURL: url, options: options)
+                localIdentifier = request.placeholderForCreatedAsset?.localIdentifier
             } completionHandler: { success, error in
                 if success {
-                    continuation.resume()
+                    continuation.resume(returning: localIdentifier)
                 } else if let error {
                     continuation.resume(throwing: ARRecorderError.photoLibrarySaveFailed(error.localizedDescription))
                 } else {

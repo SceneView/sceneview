@@ -30,6 +30,18 @@ on:
       - 'llms*.txt'
       - 'LICENSE'
   workflow_dispatch:
+  # Allows nightly-ci.yml to invoke this workflow as a reusable workflow so
+  # the scheduled full-validation run reuses these job definitions instead
+  # of copy-pasting them. See #1324.
+  workflow_call:
+    inputs:
+      force-all:
+        description: >-
+          Run every build job regardless of the path filter. The nightly
+          full-CI safety-net sets this so a path-gated-out regression still
+          gets compiled/tested/built within 24h.
+        type: boolean
+        default: false
 
 # Cancel in-progress runs for the same branch/PR to save resources
 concurrency:
@@ -107,7 +119,7 @@ jobs:
   build:
     name: Build & lint
     needs: changes
-    if: needs.changes.outputs.android == 'true'
+    if: inputs.force-all || needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -206,7 +218,7 @@ jobs:
   web-desktop:
     name: Build web & desktop
     needs: changes
-    if: needs.changes.outputs.web == 'true'
+    if: inputs.force-all || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -252,7 +264,7 @@ jobs:
   flutter-demo:
     name: Build flutter-demo APK
     needs: changes
-    if: needs.changes.outputs.flutter == 'true'
+    if: inputs.force-all || needs.changes.outputs.flutter == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
