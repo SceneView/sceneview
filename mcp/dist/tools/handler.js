@@ -34,6 +34,7 @@ import { ANIMATION_GUIDE, GESTURE_GUIDE, PERFORMANCE_TIPS, } from "../advanced-g
 import { MATERIAL_GUIDE, COLLISION_GUIDE, MODEL_OPTIMIZATION_GUIDE, WEB_RENDERING_GUIDE, } from "../extra-guides.js";
 import { searchModels, formatSearchResults } from "../search-models.js";
 import { analyzeProject, formatAnalysisReport } from "../analyze-project.js";
+import { searchAndroidDocs, fetchAndroidDoc, formatAndroidDocsSearch, formatAndroidDocsFetch, } from "../android-docs.js";
 import { LLMS_TXT } from "../generated/llms-txt.js";
 import { LATEST_SCENEVIEW_RELEASE } from "../generated/version.js";
 // ─── Legal disclaimer (identical to index.ts 4.0.0) ─────────────────────
@@ -788,6 +789,38 @@ export async function dispatchTool(toolName, args, _ctx = {}) {
                     isError: true,
                 };
             }
+        }
+        // ── search_android_docs ──────────────────────────────────────────────────
+        case "search_android_docs": {
+            const query = args?.query;
+            if (!query || typeof query !== "string" || query.trim().length === 0) {
+                return {
+                    content: [{ type: "text", text: "Missing required parameter: `query` must be a non-empty string." }],
+                    isError: true,
+                };
+            }
+            const docsResult = await searchAndroidDocs(query);
+            const text = formatAndroidDocsSearch(query, docsResult);
+            return {
+                content: withDisclaimer([{ type: "text", text }]),
+                isError: docsResult.ok ? undefined : true,
+            };
+        }
+        // ── fetch_android_doc ────────────────────────────────────────────────────
+        case "fetch_android_doc": {
+            const uri = args?.uri;
+            if (!uri || typeof uri !== "string" || uri.trim().length === 0) {
+                return {
+                    content: [{ type: "text", text: "Missing required parameter: `uri` must be a non-empty `kb://...` string." }],
+                    isError: true,
+                };
+            }
+            const docResult = await fetchAndroidDoc(uri);
+            const text = formatAndroidDocsFetch(uri, docResult);
+            return {
+                content: withDisclaimer([{ type: "text", text }]),
+                isError: docResult.ok ? undefined : true,
+            };
         }
         default:
             return {
