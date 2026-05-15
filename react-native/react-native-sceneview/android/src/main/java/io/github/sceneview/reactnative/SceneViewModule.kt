@@ -20,7 +20,9 @@ class SceneViewPackage : ReactPackage {
 
     override fun createNativeModules(
         reactContext: ReactApplicationContext
-    ): List<NativeModule> = emptyList()
+    ): List<NativeModule> = listOf(
+        ARRecorderModule(reactContext),
+    )
 
     override fun createViewManagers(
         reactContext: ReactApplicationContext

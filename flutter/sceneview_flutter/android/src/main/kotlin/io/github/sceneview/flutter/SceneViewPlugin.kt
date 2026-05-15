@@ -216,6 +216,30 @@ class SceneViewPlatformView(
                 environmentPath = call.argument<String>("hdrPath")
                 result.success(null)
             }
+            "setCameraControlMode" -> {
+                // v4.3.0 camera modes (#1053). Android's SceneView composable
+                // already uses an orbit manipulator by default; `pan` and
+                // `firstPerson` are iOS-first additions. Acknowledged here so
+                // cross-platform Dart code does not throw — the per-mode
+                // switch for Android is tracked in #1051.
+                result.success(null)
+            }
+            "setAutoCenterContent" -> {
+                // v4.3.0 content auto-centring (#1053) is iOS-first; the
+                // Android library-level implementation is tracked in #1051.
+                // Acknowledged so cross-platform Dart code does not throw.
+                result.success(null)
+            }
+            "startRecording", "stopRecording", "saveRecordingToPhotoLibrary" -> {
+                // ARRecorder is iOS-only via ReplayKit. The Dart `ARRecorder`
+                // already guards against non-iOS platforms, so reaching here
+                // would only happen on a direct channel call.
+                result.error(
+                    "UNSUPPORTED",
+                    "ARRecorder is not supported on Android via the Flutter bridge (issue #1051).",
+                    null,
+                )
+            }
             else -> result.notImplemented()
         }
     }
@@ -359,6 +383,19 @@ class ARSceneViewPlatformView(
                 // AR scenes use camera feed as background; environment HDR
                 // affects lighting but not the skybox.
                 result.success(null)
+            }
+            "startRecording", "stopRecording", "saveRecordingToPhotoLibrary" -> {
+                // ARRecorder is iOS-only via ReplayKit (#1053). Android's
+                // `io.github.sceneview.ar.recording.ARRecorder` records an
+                // ARCore dataset (a replayable session capture, not a video)
+                // and needs Session/Frame access the platform-view bridge
+                // does not expose. Tracked in #1051. The Dart `ARRecorder`
+                // already guards non-iOS platforms.
+                result.error(
+                    "UNSUPPORTED",
+                    "ARRecorder is not supported on Android via the Flutter bridge (issue #1051).",
+                    null,
+                )
             }
             else -> result.notImplemented()
         }

@@ -62,11 +62,23 @@ class SceneViewFactory: NSObject, FlutterPlatformViewFactory {
     }
 }
 
+/// Maps the wire name sent from Dart to a `CameraControlMode`.
+/// Unknown values fall back to `.orbit`.
+func flutterCameraControlMode(_ raw: String?) -> CameraControlMode {
+    switch raw {
+    case "pan": return .pan
+    case "firstPerson": return .firstPerson
+    default: return .orbit
+    }
+}
+
 /// Observable model holding scene state, updated via method channel.
 @MainActor
 class SceneState: ObservableObject {
     @Published var models: [FlutterModelData] = []
     @Published var environmentPath: String?
+    @Published var cameraControlMode: CameraControlMode = .orbit
+    @Published var autoCenterContent: Bool = true
 }
 
 class SceneViewPlatformView: NSObject, FlutterPlatformView {
@@ -86,6 +98,14 @@ class SceneViewPlatformView: NSObject, FlutterPlatformView {
             binaryMessenger: messenger
         )
         super.init()
+
+        // Apply v4.3.0 creation params (camera mode + auto-centre).
+        let mode = flutterCameraControlMode(args["cameraControlMode"] as? String)
+        let autoCenter = (args["autoCenterContent"] as? NSNumber)?.boolValue ?? true
+        Task { @MainActor in
+            sceneState.cameraControlMode = mode
+            sceneState.autoCenterContent = autoCenter
+        }
 
         channel.setMethodCallHandler(handleMethodCall)
     }
@@ -131,6 +151,21 @@ class SceneViewPlatformView: NSObject, FlutterPlatformView {
             }
             result(nil)
 
+        case "setCameraControlMode":
+            let raw = (call.arguments as? [String: Any])?["mode"] as? String
+            let mode = flutterCameraControlMode(raw)
+            Task { @MainActor in
+                sceneState.cameraControlMode = mode
+            }
+            result(nil)
+
+        case "setAutoCenterContent":
+            let enabled = ((call.arguments as? [String: Any])?["enabled"] as? NSNumber)?.boolValue ?? true
+            Task { @MainActor in
+                sceneState.autoCenterContent = enabled
+            }
+            result(nil)
+
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -148,6 +183,8 @@ struct SceneViewSwiftUIWrapper: View {
                     .scale(model.scale)
             }
         }
+        .cameraControls(state.cameraControlMode)
+        .autoCenterContent(state.autoCenterContent)
     }
 }
 
@@ -183,6 +220,17 @@ class ARSceneViewPlatformView: NSObject, FlutterPlatformView {
     private let hostingController: UIHostingController<ARSceneViewSwiftUIWrapper>
     private let channel: FlutterMethodChannel
     private let sceneState = SceneState()
+
+    /// ReplayKit-backed AR session recorder (v4.3.0, issue #1053).
+    /// Lazily created on the main actor on first use.
+    private var recorder: ARRecorder?
+
+    @MainActor private func ensureRecorder() -> ARRecorder {
+        if let recorder { return recorder }
+        let created = ARRecorder()
+        recorder = created
+        return created
+    }
 
     init(frame: CGRect, viewId: Int64, args: [String: Any], messenger: FlutterBinaryMessenger) {
         self.hostingController = UIHostingController(
@@ -233,6 +281,54 @@ class ARSceneViewPlatformView: NSObject, FlutterPlatformView {
         case "setEnvironment":
             // AR scenes use camera feed; environment HDR affects lighting only.
             result(nil)
+
+        case "startRecording":
+            Task { @MainActor in
+                do {
+                    try await ensureRecorder().startRecording()
+                    result(nil)
+                } catch {
+                    result(FlutterError(
+                        code: "AR_RECORDER_START_FAILED",
+                        message: error.localizedDescription,
+                        details: nil
+                    ))
+                }
+            }
+
+        case "stopRecording":
+            let outputPath = (call.arguments as? [String: Any])?["outputPath"] as? String
+            Task { @MainActor in
+                do {
+                    let outputURL = outputPath.map { URL(fileURLWithPath: $0) }
+                    let url = try await ensureRecorder().stopRecording(outputURL: outputURL)
+                    result(url.path)
+                } catch {
+                    result(FlutterError(
+                        code: "AR_RECORDER_STOP_FAILED",
+                        message: error.localizedDescription,
+                        details: nil
+                    ))
+                }
+            }
+
+        case "saveRecordingToPhotoLibrary":
+            guard let movPath = (call.arguments as? [String: Any])?["movPath"] as? String else {
+                result(FlutterError(code: "INVALID_ARGS", message: "movPath required", details: nil))
+                return
+            }
+            Task { @MainActor in
+                do {
+                    try await ARRecorder.saveToPhotoLibrary(URL(fileURLWithPath: movPath))
+                    result(nil)
+                } catch {
+                    result(FlutterError(
+                        code: "AR_RECORDER_SAVE_FAILED",
+                        message: error.localizedDescription,
+                        details: nil
+                    ))
+                }
+            }
 
         default:
             result(FlutterMethodNotImplemented)

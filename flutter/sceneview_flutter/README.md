@@ -103,14 +103,50 @@ ARSceneView(
 
 ### Controller API
 
-| Method                        | Description                                              |
-|-------------------------------|----------------------------------------------------------|
-| `loadModel(ModelNode)`        | Load a glTF/GLB model into the scene                     |
-| `clearScene()`                | Remove all models from the scene                         |
-| `setEnvironment(String path)` | Set HDR environment for image-based lighting             |
-| `addGeometry(GeometryNode)`   | Add a geometry node (placeholder — not yet rendered)     |
-| `addLight(LightNode)`         | Add a light node (placeholder — scene uses defaults)     |
-| `isAttached`                  | Whether the controller is attached to a live view        |
+| Method                                | Description                                              |
+|----------------------------------------|----------------------------------------------------------|
+| `loadModel(ModelNode)`                 | Load a glTF/GLB model into the scene                     |
+| `clearScene()`                         | Remove all models from the scene                         |
+| `setEnvironment(String path)`          | Set HDR environment for image-based lighting             |
+| `addGeometry(GeometryNode)`            | Add a geometry node (placeholder — not yet rendered)     |
+| `addLight(LightNode)`                  | Add a light node (placeholder — scene uses defaults)     |
+| `setCameraControlMode(CameraControlMode)` | Change the camera mode at runtime (v4.3.0)            |
+| `setAutoCenterContent(bool)`           | Toggle content auto-centring at runtime (v4.3.0)         |
+| `isAttached`                           | Whether the controller is attached to a live view        |
+
+### Camera controls & content centring (v4.3.0)
+
+`SceneView` accepts a `cameraControlMode` and `autoCenterContent`:
+
+```dart
+SceneView(
+  controller: controller,
+  cameraControlMode: CameraControlMode.pan, // .orbit | .pan | .firstPerson
+  autoCenterContent: false,                 // default true
+)
+```
+
+`CameraControlMode.pan` and `.firstPerson` are iOS-only in v4.3.0; on Android
+they fall back to orbit. `autoCenterContent` is iOS-first — the Android side
+is tracked in issue #1051.
+
+### AR recording (v4.3.0 — iOS)
+
+`ARRecorder` records an AR session to a `.mov` video (iOS via ReplayKit):
+
+```dart
+final recorder = ARRecorder(arController);
+
+await recorder.startRecording();
+// ... later ...
+final path = await recorder.stopRecording();
+await recorder.saveToPhotoLibrary(path);
+```
+
+`ARRecorder` is iOS-only; on Android every method throws an `UnsupportedError`
+(ARCore session recording is tracked in issue #1051). The host iOS app must
+declare `NSPhotoLibraryAddUsageDescription` in `Info.plist` to use
+`saveToPhotoLibrary`.
 
 ### ModelNode properties
 

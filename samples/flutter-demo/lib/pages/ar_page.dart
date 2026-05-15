@@ -27,6 +27,17 @@ class _ARPageState extends State<ARPage> {
   String? _lastTappedNode;
   int _modelsPlaced = 0;
 
+  // AR session recording (v4.3.0, iOS via ReplayKit).
+  late final ARRecorder _recorder = ARRecorder(_arController);
+  ARRecorderState _recorderState = ARRecorderState.idle;
+  String? _lastRecordingPath;
+
+  @override
+  void dispose() {
+    _recorder.dispose();
+    super.dispose();
+  }
+
   // Model to place in AR
   static const _arModels = [
     _ARModel('Avocado', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Avocado/glTF-Binary/Avocado.glb', 1.0),
@@ -223,9 +234,84 @@ class _ARPageState extends State<ARPage> {
               dense: true,
               onChanged: (v) => setState(() => _planeDetection = v),
             ),
+            const SizedBox(height: 8),
+            // AR session recording (v4.3.0) — iOS only via ReplayKit.
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _sceneReady ? _toggleRecording : null,
+                    icon: Icon(
+                      _recorderState == ARRecorderState.recording
+                          ? Icons.stop_circle
+                          : Icons.fiber_manual_record,
+                      color: _recorderState == ARRecorderState.recording
+                          ? theme.colorScheme.error
+                          : null,
+                    ),
+                    label: Text(
+                      _recorderState == ARRecorderState.recording
+                          ? 'Stop Recording'
+                          : 'Record (iOS)',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _lastRecordingPath != null
+                        ? _saveRecordingToPhotos
+                        : null,
+                    icon: const Icon(Icons.save_alt),
+                    label: const Text('Save to Photos'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
       ),
+    );
+  }
+
+  Future<void> _toggleRecording() async {
+    try {
+      if (_recorderState == ARRecorderState.recording) {
+        final path = await _recorder.stopRecording();
+        setState(() {
+          _recorderState = ARRecorderState.idle;
+          _lastRecordingPath = path;
+        });
+        _showSnack('Recording saved to: $path');
+      } else {
+        await _recorder.startRecording();
+        setState(() => _recorderState = ARRecorderState.recording);
+      }
+    } on UnsupportedError catch (e) {
+      _showSnack(e.message ?? 'ARRecorder is iOS-only');
+    } catch (e) {
+      setState(() => _recorderState = ARRecorderState.error);
+      _showSnack('Recording failed: $e');
+    }
+  }
+
+  Future<void> _saveRecordingToPhotos() async {
+    final path = _lastRecordingPath;
+    if (path == null) return;
+    try {
+      await _recorder.saveToPhotoLibrary(path);
+      _showSnack('Saved to Photos');
+    } on UnsupportedError catch (e) {
+      _showSnack(e.message ?? 'Save to Photos is iOS-only');
+    } catch (e) {
+      _showSnack('Save failed: $e');
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

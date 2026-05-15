@@ -3706,8 +3706,26 @@ ARSceneView(
 
 `ModelNode` fields: `modelPath` (required), `x/y/z` (world position), `scale`, `rotationX/Y/Z` (degrees).
 Controller methods: `loadModel(ModelNode)`, `addGeometry(GeometryNode)`, `addLight(LightNode)`,
-`clearScene()`, `setEnvironment(hdrPath)`.
+`clearScene()`, `setEnvironment(hdrPath)`, `setCameraControlMode(CameraControlMode)`,
+`setAutoCenterContent(bool)`.
 Note: `GeometryNode` and `LightNode` are acknowledged by the bridge but not yet rendered natively.
+
+v4.3.0 camera + recording APIs:
+```dart
+// Camera control mode + content auto-centring (iOS-first; Android pan/firstPerson
+// fall back to orbit, autoCenterContent tracked in #1051).
+SceneView(
+  cameraControlMode: CameraControlMode.pan, // .orbit | .pan | .firstPerson
+  autoCenterContent: false,                  // default true
+)
+
+// AR session recording — iOS via ReplayKit; Android throws UnsupportedError.
+final recorder = ARRecorder(arController);
+await recorder.startRecording();
+final path = await recorder.stopRecording();   // returns .mov path
+await recorder.saveToPhotoLibrary(path);
+// recorder.state / recorder.stateChanges — ARRecorderState.idle/recording/error
+```
 
 ### React Native Bridge API
 Package: `@sceneview-sdk/react-native` (npm) — Alpha, Android + iOS only.
@@ -3749,5 +3767,25 @@ import { SceneView, ARSceneView, ModelNode } from '@sceneview-sdk/react-native';
 `scale?: number | [x,y,z]`, `animation?: string` (auto-play animation name).
 Geometry types: `'box' | 'cube' | 'sphere' | 'cylinder' | 'plane'`.
 Light types: `'directional' | 'point' | 'spot'`.
+
+v4.3.0 camera + recording APIs:
+```tsx
+import { SceneView, ARRecorder } from '@sceneview-sdk/react-native';
+
+// Camera control mode + content auto-centring (iOS-first; Android pan/firstPerson
+// fall back to orbit, autoCenterContent tracked in #1051).
+<SceneView
+  cameraControlMode="pan"        // 'orbit' | 'pan' | 'firstPerson'
+  autoCenterContent={false}      // default true
+/>
+
+// AR session recording — iOS via ReplayKit; Android rejects with UNSUPPORTED.
+const recorder = new ARRecorder();
+if (ARRecorder.isSupported) {
+  await recorder.start();
+  const path = await recorder.stop();   // resolves with .mov path
+  await recorder.saveToPhotoLibrary(path);
+}
+```
 
 See "## SceneView Web (Kotlin/JS + Filament.js)" for the full Web Geometry DSL reference.

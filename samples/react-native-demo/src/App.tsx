@@ -17,9 +17,11 @@ import {
 import {
   SceneView,
   ARSceneView,
+  ARRecorder,
   type ModelNode,
   type GeometryNode,
   type LightNode,
+  type CameraControlMode,
 } from '@sceneview-sdk/react-native';
 import { UpdateChecker } from './UpdateChecker';
 
@@ -60,6 +62,12 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 ];
 
 const SHAPE_TYPES: GeometryNode['type'][] = ['cube', 'sphere', 'cylinder', 'plane'];
+
+const CAMERA_MODES: { id: CameraControlMode; label: string }[] = [
+  { id: 'orbit', label: 'Orbit' },
+  { id: 'pan', label: 'Pan' },
+  { id: 'firstPerson', label: 'FPV' },
+];
 
 const PRESET_COLORS = [
   '#E53935', '#D81B60', '#8E24AA', '#5E35B1',
@@ -272,6 +280,8 @@ function GeometryTab() {
   const [selectedColor, setSelectedColor] = useState('#1E88E5');
   const [selectedType, setSelectedType] = useState<GeometryNode['type']>('cube');
   const [tapInfo, setTapInfo] = useState<string | null>(null);
+  // Camera control mode (v4.3.0). pan/firstPerson are iOS-only.
+  const [cameraMode, setCameraMode] = useState<CameraControlMode>('orbit');
 
   const addShape = useCallback(() => {
     const xOffset = (Math.random() - 0.5) * 4;
@@ -310,6 +320,7 @@ function GeometryTab() {
           environment={ENVIRONMENT}
           geometryNodes={geometryNodes}
           cameraOrbit
+          cameraControlMode={cameraMode}
           onTap={(e) => {
             const { x, y, z, nodeName } = e.nativeEvent;
             setTapInfo(
@@ -329,6 +340,23 @@ function GeometryTab() {
 
       {/* Controls */}
       <ScrollView style={styles.controls} contentContainerStyle={styles.controlsContent}>
+        {/* Camera control mode (v4.3.0) */}
+        <Text style={styles.controlLabel}>Camera Mode</Text>
+        <View style={styles.chipRow}>
+          {CAMERA_MODES.map((mode) => (
+            <TouchableOpacity
+              key={mode.id}
+              style={[styles.typeChip, cameraMode === mode.id && styles.typeChipSelected]}
+              onPress={() => setCameraMode(mode.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.typeChipText, cameraMode === mode.id && styles.typeChipTextSelected]}>
+                {mode.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Shape type selector */}
         <Text style={styles.controlLabel}>Shape Type</Text>
         <View style={styles.chipRow}>
@@ -496,6 +524,37 @@ function ARTab() {
   const [instantPlacement, setInstantPlacement] = useState(false);
   const [detectedPlanes, setDetectedPlanes] = useState(0);
   const [tapInfo, setTapInfo] = useState<string | null>(null);
+  // AR session recording (v4.3.0, iOS via ReplayKit).
+  const [recorder] = useState(() => new ARRecorder());
+  const [isRecording, setIsRecording] = useState(false);
+  const [lastRecordingPath, setLastRecordingPath] = useState<string | null>(null);
+
+  const toggleRecording = useCallback(async () => {
+    try {
+      if (isRecording) {
+        const path = await recorder.stop();
+        setIsRecording(false);
+        setLastRecordingPath(path);
+        Alert.alert('Recording stopped', `Saved to:\n${path}`);
+      } else {
+        await recorder.start();
+        setIsRecording(true);
+      }
+    } catch (e: any) {
+      setIsRecording(false);
+      Alert.alert('AR Recorder', e?.message ?? 'Recording failed');
+    }
+  }, [isRecording, recorder]);
+
+  const saveRecording = useCallback(async () => {
+    if (!lastRecordingPath) return;
+    try {
+      await recorder.saveToPhotoLibrary(lastRecordingPath);
+      Alert.alert('Saved', 'Recording added to Photos');
+    } catch (e: any) {
+      Alert.alert('AR Recorder', e?.message ?? 'Save failed');
+    }
+  }, [lastRecordingPath, recorder]);
 
   const arGeometry: GeometryNode[] = [
     { type: 'cube', color: '#1E88E5', position: [0, 0, -1], size: [0.2, 0.2, 0.2] },
@@ -571,6 +630,32 @@ function ARTab() {
             trackColor={{ false: '#3A3F4B', true: '#1E88E5' }}
             thumbColor="#fff"
           />
+        </View>
+
+        {/* AR session recording (v4.3.0) — iOS only via ReplayKit */}
+        <Text style={[styles.controlLabel, { marginTop: 16 }]}>AR Recording</Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, isRecording && styles.actionButtonDanger]}
+            onPress={toggleRecording}
+            activeOpacity={0.7}
+          >
+            <Text style={isRecording ? styles.actionButtonDangerText : styles.actionButtonText}>
+              {isRecording ? 'Stop' : 'Record (iOS)'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.actionButtonSecondary,
+              !lastRecordingPath && styles.searchButtonDisabled,
+            ]}
+            onPress={saveRecording}
+            disabled={!lastRecordingPath}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.actionButtonSecondaryText}>Save to Photos</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.arInfoCard}>

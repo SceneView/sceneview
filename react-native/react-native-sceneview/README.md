@@ -91,15 +91,21 @@ import { ARSceneView } from '@sceneview-sdk/react-native';
 
 ### Props — SceneView
 
-| Prop             | Type            | Default | Description                              |
-|------------------|-----------------|---------|------------------------------------------|
-| `style`          | `ViewStyle`     | —       | Standard React Native style              |
-| `environment`    | `string`        | —       | HDR environment asset path               |
-| `modelNodes`     | `ModelNode[]`   | `[]`    | Models to render                         |
-| `geometryNodes`  | `GeometryNode[]`| `[]`    | Geometry nodes (forward-compatible)      |
-| `lightNodes`     | `LightNode[]`   | `[]`    | Light nodes (forward-compatible)         |
-| `cameraOrbit`    | `boolean`       | `true`  | Enable orbit camera controls             |
-| `onTap`          | `function`      | —       | Tap callback (event pending)             |
+| Prop                | Type                 | Default   | Description                              |
+|---------------------|----------------------|-----------|------------------------------------------|
+| `style`             | `ViewStyle`          | —         | Standard React Native style              |
+| `environment`       | `string`             | —         | HDR environment asset path               |
+| `modelNodes`        | `ModelNode[]`        | `[]`      | Models to render                         |
+| `geometryNodes`     | `GeometryNode[]`     | `[]`      | Geometry nodes (forward-compatible)      |
+| `lightNodes`        | `LightNode[]`        | `[]`      | Light nodes (forward-compatible)         |
+| `cameraOrbit`       | `boolean`            | `true`    | Enable orbit camera controls             |
+| `cameraControlMode` | `CameraControlMode`  | `'orbit'` | Camera mode (v4.3.0). `'pan'`/`'firstPerson'` are iOS-only |
+| `autoCenterContent` | `boolean`            | `true`    | Auto-centre content on first frame (v4.3.0, iOS-first) |
+| `onTap`             | `function`           | —         | Tap callback (event pending)             |
+
+`cameraControlMode` `'pan'` and `'firstPerson'` are iOS-only in v4.3.0; on
+Android they fall back to orbit. `autoCenterContent` is iOS-first — the
+Android side is tracked in issue #1051.
 
 ### Props — ARSceneView (extends SceneView)
 
@@ -121,6 +127,26 @@ interface ModelNode {
   animation?: string;                      // Animation name to auto-play
 }
 ```
+
+### AR recording (v4.3.0 — iOS)
+
+`ARRecorder` records an AR session to a `.mov` video (iOS via ReplayKit):
+
+```ts
+import { ARRecorder } from '@sceneview-sdk/react-native';
+
+const recorder = new ARRecorder();
+
+await recorder.start();
+// ... later ...
+const path = await recorder.stop();
+await recorder.saveToPhotoLibrary(path);
+```
+
+`ARRecorder` is iOS-only; on Android every method rejects with an
+`UNSUPPORTED` error (ARCore session recording is tracked in issue #1051).
+Check `ARRecorder.isSupported` before use. The host iOS app must declare
+`NSPhotoLibraryAddUsageDescription` in `Info.plist` for `saveToPhotoLibrary`.
 
 ## Architecture
 
