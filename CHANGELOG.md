@@ -18,6 +18,10 @@
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
 
+### Fixed — Samples
+
+- **`SecondaryCameraDemo` camera-angle controls are now TalkBack-friendly ([#1256](https://github.com/sceneview/sceneview/issues/1256)).** The section label is exposed as a heading and the selected `FilterChip` carries an explicit "Selected camera angle" state description.
+
 ### Changed — CI
 
 - **CI/publish workflows' inline `pip install` deps moved into per-workflow `.github/workflows/requirements/*.txt` files so Dependabot's `pip` ecosystem tracks and bumps them ([#1286](https://github.com/sceneview/sceneview/issues/1286)).** Same packages, same pinned versions installed — Dependabot just cannot see inline `pip install x==y` lines in workflow YAML, so the pins would have gone stale silently.
