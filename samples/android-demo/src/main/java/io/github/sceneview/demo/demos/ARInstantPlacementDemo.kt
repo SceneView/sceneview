@@ -481,50 +481,63 @@ private fun InstantPlacementScene(
             }
         }
 
-        // Scanning indicator overlay. Anchored top-center just below the stats
-        // pill (issue #1199) so it never competes with the bottom-anchored Clear
-        // All button. The top-center placement also matches Material's standard
+        // Scanning indicator pill. Anchored top-center just below the stats pill
+        // (issue #1199) so it never competes with the bottom-anchored Clear All
+        // button. The top-center placement also matches Material's standard
         // "transient status" snackbar pattern and is the first thing the user
         // sees while ARCore is still initialising.
-        AnimatedVisibility(
-            visible = !isTracking,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
-        ) {
-            Surface(
+        //
+        // #1265: a `BoxScope.align(TopCenter)` set directly on `AnimatedVisibility`
+        // did not reliably position the animated content — the pill rendered
+        // bottom-left, overlapping Clear All. `AnimatedVisibility` introduces its
+        // own layout node for the enter/exit transition, and the `BoxScope.align`
+        // modifier on that wrapper is not always honoured by the animated child.
+        // The alignment is now carried by a static `Box` that is a direct child of
+        // the outer `Box`; `AnimatedVisibility` lives inside it and handles only
+        // the fade. This mirrors how the working stats pill above is structured.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
                 // Top padding accounts for: the stats pill (8 dp + ~28 dp text
                 // height) + the per-model badge column when present
                 // (placedModels.take(4) * ~26 dp). 56 dp keeps the pill visible
                 // even with up to one badge below the stats; with the v4.3.5
                 // hide-when-empty rule the Clear All button is also gone at
                 // session start so there's no longer any visual collision.
-                modifier = Modifier.padding(top = 56.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large
+                .padding(top = 56.dp)
+        ) {
+            AnimatedVisibility(
+                visible = !isTracking,
+                enter = fadeIn(),
+                exit = fadeOut(),
             ) {
-                Text(
-                    text = trackingFailureReason?.let { reason ->
-                        when (reason) {
-                            TrackingFailureReason.NONE ->
-                                if (instantEnabled) "Tap to place — even before scanning"
-                                else "Point your camera at a surface"
-                            TrackingFailureReason.BAD_STATE -> "AR session error"
-                            TrackingFailureReason.INSUFFICIENT_LIGHT -> "Not enough light"
-                            TrackingFailureReason.EXCESSIVE_MOTION -> "Moving too fast"
-                            TrackingFailureReason.INSUFFICIENT_FEATURES ->
-                                "Not enough detail — try a textured surface"
-                            TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
-                        }
-                    } ?: if (instantEnabled) {
-                        "Initializing camera — you can already tap to place"
-                    } else {
-                        stringResource(R.string.ar_status_scanning)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                )
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Text(
+                        text = trackingFailureReason?.let { reason ->
+                            when (reason) {
+                                TrackingFailureReason.NONE ->
+                                    if (instantEnabled) "Tap to place — even before scanning"
+                                    else "Point your camera at a surface"
+                                TrackingFailureReason.BAD_STATE -> "AR session error"
+                                TrackingFailureReason.INSUFFICIENT_LIGHT -> "Not enough light"
+                                TrackingFailureReason.EXCESSIVE_MOTION -> "Moving too fast"
+                                TrackingFailureReason.INSUFFICIENT_FEATURES ->
+                                    "Not enough detail — try a textured surface"
+                                TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera unavailable"
+                            }
+                        } ?: if (instantEnabled) {
+                            "Initializing camera — you can already tap to place"
+                        } else {
+                            stringResource(R.string.ar_status_scanning)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                    )
+                }
             }
         }
     }
