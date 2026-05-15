@@ -188,7 +188,11 @@ final class AppStoreUpdater: ObservableObject {
 
     /// Component-wise version comparison (`1.2.10` > `1.2.9`). Trailing zeros
     /// don't matter (`1.2` == `1.2.0`). Non-numeric components compare as `0`.
-    static func isNewer(latest: String, current: String) -> Bool {
+    /// `nonisolated` for the same reason as `bundleVersion()` — a pure
+    /// string-parsing function with zero MainActor dependencies; marking it
+    /// explicitly keeps the two static helpers consistent and pre-empts the
+    /// Swift 6 isolation error if it's ever used as an init default.
+    nonisolated static func isNewer(latest: String, current: String) -> Bool {
         let lhs = latest.split(separator: ".").map { Int($0) ?? 0 }
         let rhs = current.split(separator: ".").map { Int($0) ?? 0 }
         let count = max(lhs.count, rhs.count)

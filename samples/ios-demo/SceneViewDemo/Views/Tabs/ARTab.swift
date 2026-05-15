@@ -2,6 +2,7 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import AVFoundation
 import SceneViewSwift
 
 /// AR tab — place 3D models in your real-world space.
@@ -244,7 +245,10 @@ struct ARTab: View {
         if placedCount == 0 {
             return "Tap a surface to place \(selectedModel.name)"
         } else {
-            return "\(placedCount) placed \u{00B7} tap to add"
+            // Keep the selected model name after the first placement —
+            // previously the pill dropped to "N placed · tap to add" and
+            // the user lost track of what the next tap would drop.
+            return "\(placedCount) placed \u{00B7} tap to add \(selectedModel.name)"
         }
     }
 
@@ -410,6 +414,20 @@ struct ARTab: View {
 
 // MARK: - Launcher screen (entry / exit gate)
 
+/// What the launcher CTA should do, derived from device capability +
+/// the camera authorization status. Mirrors Android's `ArLauncherScreen`
+/// CTA states (checking / grant-camera / start / unsupported).
+private enum ARLauncherState {
+    /// ARKit available + camera not-yet-denied — CTA starts the session.
+    case ready
+    /// ARKit world-tracking unavailable on this device — CTA disabled.
+    case unsupported
+    /// Camera permission was denied/restricted in a previous run — CTA
+    /// deep-links to Settings so the user can re-enable it (Android's
+    /// launcher offers the equivalent "Grant Camera Access" path).
+    case cameraDenied
+}
+
 /// Static launcher shown when the AR tab is opened, before the user explicitly
 /// starts the camera session. Mirrors Android's `ArLauncherScreen` on
 /// `ArViewTab.kt` (#1211 item 3): hero icon + tagline + "Start AR Camera" CTA.
@@ -417,10 +435,61 @@ struct ARTab: View {
 /// On Android the launcher also surfaces a row of AR demo cards (Cloud
 /// Anchor, Streetscape, etc.) — iOS skips that for now since the AR demos
 /// live under the Samples tab and the launcher is meant as a soft entry
-/// point, not a discovery surface.
+/// point, not a discovery surface (tracked in #1253).
 private struct ARLauncherScreen: View {
     let arSupported: Bool
     let onStartArSession: () -> Void
+
+    /// Re-read on every `.onAppear` so a user who tapped "Open Settings",
+    /// flipped the camera switch and swiped back sees the CTA recover to
+    /// "Start AR Camera" without an app relaunch.
+    @State private var cameraStatus: AVAuthorizationStatus =
+        AVCaptureDevice.authorizationStatus(for: .video)
+
+    private var state: ARLauncherState {
+        if !arSupported { return .unsupported }
+        switch cameraStatus {
+        case .denied, .restricted: return .cameraDenied
+        default: return .ready   // .notDetermined / .authorized
+        }
+    }
+
+    private var ctaTitle: String {
+        switch state {
+        case .ready:       return "Start AR Camera"
+        case .unsupported: return "AR not supported on this device"
+        case .cameraDenied: return "Open Settings to enable Camera"
+        }
+    }
+
+    private var ctaIcon: String {
+        switch state {
+        case .ready:       return "camera.viewfinder"
+        case .unsupported: return "xmark.octagon"
+        case .cameraDenied: return "gearshape.fill"
+        }
+    }
+
+    private var caption: String {
+        switch state {
+        case .ready:       return "Camera permission is requested when you start the camera."
+        case .unsupported: return "ARKit world-tracking isn't available on this iPhone model."
+        case .cameraDenied: return "Camera access was turned off for this app. Re-enable it in Settings to place models in AR."
+        }
+    }
+
+    private func onCtaTap() {
+        switch state {
+        case .ready:
+            onStartArSession()
+        case .cameraDenied:
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+        case .unsupported:
+            break  // button is disabled
+        }
+    }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -464,9 +533,8 @@ private struct ARLauncherScreen: View {
 
             Spacer(minLength: 8)
 
-            Button(action: onStartArSession) {
-                Label(arSupported ? "Start AR Camera" : "AR not supported on this device",
-                      systemImage: arSupported ? "camera.viewfinder" : "xmark.octagon")
+            Button(action: onCtaTap) {
+                Label(ctaTitle, systemImage: ctaIcon)
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -475,14 +543,12 @@ private struct ARLauncherScreen: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
-            .disabled(!arSupported)
-            .opacity(arSupported ? 1.0 : 0.5)
-            .accessibilityLabel(arSupported ? "Start AR camera" : "AR not supported on this device")
+            .disabled(state == .unsupported)
+            .opacity(state == .unsupported ? 0.5 : 1.0)
+            .accessibilityLabel(ctaTitle)
             .accessibilitySortPriority(1)
 
-            Text(arSupported
-                 ? "Camera permission is requested when you start the camera."
-                 : "ARKit world-tracking isn't available on this iPhone model.")
+            Text(caption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -491,6 +557,11 @@ private struct ARLauncherScreen: View {
             Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            // Re-sync after returning from Settings (or a first-run prompt
+            // resolved while the launcher was off-screen).
+            cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        }
     }
 }
 
