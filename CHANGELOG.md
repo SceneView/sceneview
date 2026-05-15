@@ -2,6 +2,10 @@
 
 ## Unreleased — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Cloud Anchor docs hotfix + `sceneview-swift` mirror retired
 
+### Added — `night_sky` environment preset ([#1219](https://github.com/sceneview/sceneview/issues/1219))
+
+- **New `night_sky` HDR environment** bundled across iOS and Android demos — a dramatic Milky Way starfield over a dark landscape (Poly Haven [`dikhololo_night`](https://polyhaven.com/a/dikhololo_night) by Greg Zaal, **CC0 1.0** public domain). iOS exposes it as `SceneEnvironment.nightSky` (added to `allPresets`, so it auto-surfaces in the demo's environment picker); Android adds a "Night Sky" chip to `EnvironmentDemo`. Pairs well with metallic PBR materials for chrome-mirror reflections. Web demo does not bundle HDRs and is unaffected.
+
 ### Fixed — iOS rendering
 
 - **`SceneEnvironment.showSkybox = true` now actually paints the HDR as the scene background ([PR #1215](https://github.com/sceneview/sceneview/pull/1215), ported from [@radcli14](https://github.com/radcli14)'s [sceneview-swift#1](https://github.com/sceneview/sceneview-swift/pull/1))** — `SceneView` previously loaded the HDR and applied it as IBL via `ImageBasedLightComponent`, but never assigned it to `RealityViewContent.environment`, so the scene rendered against the default neutral void regardless of which environment preset was selected. The new path caches the loaded `EnvironmentResource` in a `@State` and applies it via `content.environment = .skybox(resource)` in the `RealityView.update:` closure with a diff guard against the last applied resource (no per-frame ARC churn). The `.task(id:)` keys on `(name, showSkybox)` so toggling the flag on the same env re-runs the loader, and clears the cached resource at the start of every task tick so cross-env transitions don't show stale skyboxes under a new IBL.
@@ -25,6 +29,10 @@ Two regressions from `cd4034ff` (PR #1224) that the #1241 emulator QA sweep prov
 
 - **AR Instant Placement — "Initializing camera" pill alignment** ([#1265](https://github.com/sceneview/sceneview/issues/1265)): the scanning-indicator pill rendered bottom-left, overlapping the Clear All button, despite a `BoxScope.align(TopCenter)` set directly on its `AnimatedVisibility` wrapper. `AnimatedVisibility` introduces its own layout node for the enter/exit transition and the `align` modifier on that wrapper is not reliably honoured by the animated child. The alignment is now carried by a static `Box` that is a direct child of the outer `Box`, with `AnimatedVisibility` inside it handling only the fade — matching the structure of the working stats pill above. Pill stays pinned top-center, clear of the bottom Clear All button.
 - **Debug Overlay — invisible stress-test spheres** ([#1266](https://github.com/sceneview/sceneview/issues/1266)): the `SceneView` content block had no `LightNode` and the spheres were spawned with no `materialInstance`, so the default Filament material rendered black on the black background. Added a directional key light and a shared on-brand color material (created once via `remember`, so the stress test still measures pure geometry overhead). The earlier #1212 grid-centering fix already places the count == 1 sphere at origin; this completes the visibility fix.
+
+### Docs
+
+- **New recipe: Blender → SceneView asset pipeline ([#1222](https://github.com/sceneview/sceneview/issues/1222))** — `samples/recipes/blender-to-sceneview.md` and `docs/docs/recipes/blender-pipeline.md` walk contributors through authoring a custom 3D model in Blender and shipping it in a SceneView app: `.glb` is native on Android, while Apple platforms go `.glb` → Reality Converter → `.usdz` → Reality Composer Pro (Blender's own USDZ exporter produces broken materials). Adapted from [@radcli14](https://github.com/radcli14)'s [`blender-to-realitykit`](https://github.com/radcli14/blender-to-realitykit) tutorial (MIT, 17⭐), with a SceneView-specific call-out on the Android Filament JNI main-thread rule. Cross-linked from both quickstarts and the API cheatsheet. Closes [#1222](https://github.com/sceneview/sceneview/issues/1222).
 
 ### Follow-ups (filed against the master polish-pipeline reference [#1218](https://github.com/sceneview/sceneview/issues/1218))
 
