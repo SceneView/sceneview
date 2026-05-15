@@ -1,3 +1,7 @@
+## 4.6.1
+
+- Version alignment with SceneView v4.6.1. CI hotfix release — `play-store.yml` AAB manifest validation no longer blocks the Play Store deploy ([#1413](https://github.com/sceneview/sceneview/issues/1413)). No public Flutter API change.
+
 ## 4.6.0
 
 - Version alignment with SceneView v4.6.0. New Double Pendulum physics demo in `samples/flutter-demo` ([#1332](https://github.com/sceneview/sceneview/issues/1332)); iOS/Android demo title & taxonomy unification ([#1376](https://github.com/sceneview/sceneview/issues/1376)); AR demo screenshot regression pipeline ([#1050](https://github.com/sceneview/sceneview/issues/1050)); `MaterialLoader`/`EnvironmentLoader` coroutine-scope leak fix ([#933](https://github.com/sceneview/sceneview/issues/933)); CI hygiene cluster ([#1360](https://github.com/sceneview/sceneview/issues/1360)). No public Flutter API change.

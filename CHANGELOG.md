@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v4.6.1 — CI hotfix: unblock the Play Store deploy for the demo app (2026-05-16)
+
+### Fixed
+
+- **Play Store deploy no longer blocked by AAB manifest validation ([#1413](https://github.com/sceneview/sceneview/issues/1413)).** `validate-release-artifact.sh` now resolves `aapt2` from `$ANDROID_SDK_ROOT/build-tools/<newest>/` instead of relying on `PATH` (where it never is), and the pre-upload guard now warns and skips instead of hard-failing when the validation tooling itself is unavailable — only a genuine manifest mismatch blocks a release.
+
 ## v4.6.0 — Demo polish & cross-platform parity: iOS/Android demo unification + Samples tab fixes + AR screenshot regression pipeline + CI hygiene (2026-05-16)
 
 ### Added
