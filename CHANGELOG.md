@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added — Docs
+
+- **New recipe: iOS visual-polish pipeline ([#1218](https://github.com/sceneview/sceneview/issues/1218)).** `docs/recipes/ios-visual-polish.md` documents how to combine the v4.4.0 HDR-skybox background render, PBR default material, and Apple AR Quick Look hand-off — decoded from [@radcli14](https://github.com/radcli14)'s `twolinks`. The iOS demo's `DynamicSkyDemo` deep-night bucket now uses the dramatic `SceneEnvironment.nightSky` HDR.
+
 ### Added — Samples
 
 - **Web demo: Double Pendulum physics demo** ([#1221](https://github.com/sceneview/sceneview/issues/1221)) — a new "Physics" tab in `samples/web-demo` runs the chaotic two-link pendulum with link-length / gravity sliders + reset; the integrator mirrors the shared `sceneview-core` `DoublePendulum` simulation that drives the Android and iOS demos. Reachable via the `#double-pendulum` deep link.
