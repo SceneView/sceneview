@@ -2,7 +2,7 @@ name: Render Tests
 
 on:
   # Render tests no longer run on PRs — they are non-blocking
-  # (`continue-on-error: true`), spin up 3 KVM-accelerated emulator shards
+  # (`continue-on-error: true`), spin up a KVM-accelerated emulator
   # + an iOS Simulator + Playwright web, and the screenshots they produce
   # were rarely consulted by PR reviewers. The signal is still captured
   # on every push to main, so post-merge regressions surface in the
@@ -24,6 +24,9 @@ on:
       - 'SceneViewSwift/**'
       - 'gradle/**'
   workflow_dispatch:
+  # Invoked by nightly-ci.yml so the scheduled full-validation run reuses
+  # this render-test definition rather than duplicating it. See #1324.
+  workflow_call:
 
 concurrency:
   group: render-tests-${{ github.ref }}
@@ -44,21 +47,13 @@ jobs:
     # status check.  Individual job status still visible in the Actions tab.
     continue-on-error: true
 
-    # Shard render tests across 3 parallel emulator jobs (#1119). The
-    # `class=` testInstrumentationRunnerArguments accepts a comma-separated
-    # list, so a "group" can bundle 2+ classes that exercise similar code
-    # paths. Wall-clock drops from ~20 min sequential to ~8 min parallel.
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [30]
-        test-group:
-          - name: demo-parameters
-            classes: io.github.sceneview.render.DemoParametersRenderTest
-          - name: visual-geometry
-            classes: io.github.sceneview.render.VisualVerificationTest,io.github.sceneview.render.GeometryRenderTest
-          - name: smoke-lighting
-            classes: io.github.sceneview.render.RenderSmokeTest,io.github.sceneview.render.LightingRenderTest
+    # The 3-shard emulator matrix (#1119, PR #1145) was REVERTED to a single
+    # job: all 5 render-test classes are class-level `@Ignore`'d on
+    # SwiftShader CI (Filament `readPixels` crash, tracked in #803), so
+    # sharding boots 3 emulators to run 0 tests — strictly more CI cost for
+    # the same 0 coverage. Re-apply the matrix scaffold (DemoParameters
+    # alone; Visual+Geometry paired; Smoke+Lighting paired) once #803 lifts
+    # the `@Ignore`s and real per-class wall-clocks justify the parallelism.
 
     steps:
       - uses: actions/checkout@v6
@@ -78,15 +73,15 @@ jobs:
       - name: Run render tests on emulator
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: ${{ matrix.api-level }}
+          api-level: 30
           target: google_apis
           arch: x86_64
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            # Run this shard's class list only. The `class=` arg accepts a
-            # comma-separated list, so a "group" can bundle related classes.
-            ./gradlew :sceneview:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=${{ matrix.test-group.classes }} --stacktrace
+            # Run the whole render-test suite in one emulator. Every target
+            # class is currently `@Ignore`'d (#803), so this completes fast.
+            ./gradlew :sceneview:connectedDebugAndroidTest --stacktrace
 
             # Pull rendered screenshots from device for visual inspection
             mkdir -p render-output
@@ -96,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-library-render-results-${{ matrix.test-group.name }}
+          name: android-library-render-results
           path: sceneview/build/reports/androidTests/
           if-no-files-found: ignore
 
@@ -104,7 +99,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-library-render-screenshots-${{ matrix.test-group.name }}
+          name: android-library-render-screenshots
           path: render-output/
           if-no-files-found: ignore
 

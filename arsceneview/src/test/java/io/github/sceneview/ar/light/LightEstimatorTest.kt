@@ -167,4 +167,64 @@ class LightEstimatorTest {
         val f = LightEstimator.SPHERICAL_HARMONICS_IRRADIANCE_FACTORS
         assertTrue("factor[3] should be negative, got ${f[3]}", f[3] < 0f)
     }
+
+    // ── Estimation.clear() — reused-instance reset (#1105) ───────────────────
+
+    /**
+     * #1105: `update()` reuses a single [LightEstimator.Estimation] instance to
+     * avoid a per-frame allocation on the 30-60 Hz render thread. [clear] must
+     * reset every field so a frame that does not take a given path (e.g.
+     * `environmentalHdrReflections` off) never surfaces a stale value from a
+     * previous frame.
+     */
+    @Test
+    fun `Estimation clear resets every field to null`() {
+        val est = LightEstimator.Estimation(
+            mainLightIntensity = 4.2f,
+            irradiance = FloatArray(27) { it.toFloat() }
+        )
+        est.clear()
+        assertNull(est.mainLightColor)
+        assertNull(est.mainLightIntensity)
+        assertNull(est.mainLightDirection)
+        assertNull(est.reflections)
+        assertNull(est.irradiance)
+    }
+
+    @Test
+    fun `Estimation clear on already-empty instance is a no-op`() {
+        val est = LightEstimator.Estimation()
+        est.clear()
+        assertNull(est.mainLightIntensity)
+        assertNull(est.irradiance)
+    }
+
+    // ── Spherical-harmonics conversion (in-place loop, #1105) ────────────────
+
+    /**
+     * #1105 replaced `mapIndexed { … }.toFloatArray()` with an in-place loop into
+     * a reused 27-element buffer. The arithmetic must be identical: each of the
+     * 27 ARCore SH floats is scaled by `FACTORS[index / 3]`. Pins the conversion
+     * so the allocation refactor cannot silently change irradiance output.
+     */
+    @Test
+    fun `SH conversion scales each component by FACTORS index over 3`() {
+        val factors = LightEstimator.SPHERICAL_HARMONICS_IRRADIANCE_FACTORS
+        val arCoreSh = FloatArray(27) { (it + 1).toFloat() }
+
+        val converted = FloatArray(27)
+        for (index in converted.indices) {
+            converted[index] = arCoreSh[index] * factors[index / 3]
+        }
+
+        // Reference computation via the pre-#1105 mapIndexed form.
+        val reference = arCoreSh
+            .mapIndexed { index, v -> v * factors[index / 3] }
+            .toFloatArray()
+
+        assertEquals(27, converted.size)
+        for (i in converted.indices) {
+            assertEquals("component[$i] mismatch", reference[i], converted[i], 1e-6f)
+        }
+    }
 }

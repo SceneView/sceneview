@@ -40,6 +40,9 @@ on:
       - 'llms*.txt'
       - 'LICENSE'
   workflow_dispatch:
+  # Invoked by nightly-ci.yml so the scheduled full-validation run reuses
+  # this quality-gate definition rather than duplicating it. See #1324.
+  workflow_call:
 
 # One run per ref; cancel older in-progress runs to save resources.
 concurrency:
