@@ -86,6 +86,7 @@
 		E10000000000000000000004 /* rooftop_night.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* rooftop_night.hdr */; };
 		E10000000000000000000005 /* studio_warm.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* studio_warm.hdr */; };
 		E10000000000000000000006 /* autumn_field.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* autumn_field.hdr */; };
+		E10000000000000000000007 /* night_sky.hdr in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000007 /* night_sky.hdr */; };
 		ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */; };
 /* End PBXBuildFile section */
 
@@ -171,6 +172,7 @@
 		E20000000000000000000004 /* rooftop_night.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = rooftop_night.hdr; sourceTree = "<group>"; };
 		E20000000000000000000005 /* studio_warm.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = studio_warm.hdr; sourceTree = "<group>"; };
 		E20000000000000000000006 /* autumn_field.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = autumn_field.hdr; sourceTree = "<group>"; };
+		E20000000000000000000007 /* night_sky.hdr */ = {isa = PBXFileReference; lastKnownFileType = file; path = night_sky.hdr; sourceTree = "<group>"; };
 		E6E3457CB732DF2AE71757CC /* MovableLightDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MovableLightDemo.swift; path = SceneViewDemo/Views/Demos/MovableLightDemo.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -341,6 +343,7 @@
 				E20000000000000000000004 /* rooftop_night.hdr */,
 				E20000000000000000000005 /* studio_warm.hdr */,
 				E20000000000000000000006 /* autumn_field.hdr */,
+				E20000000000000000000007 /* night_sky.hdr */,
 			);
 			path = Environments;
 			sourceTree = "<group>";
@@ -443,6 +446,7 @@
 				E10000000000000000000004 /* rooftop_night.hdr in Resources */,
 				E10000000000000000000005 /* studio_warm.hdr in Resources */,
 				E10000000000000000000006 /* autumn_field.hdr in Resources */,
+				E10000000000000000000007 /* night_sky.hdr in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

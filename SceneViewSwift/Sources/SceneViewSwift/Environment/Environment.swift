@@ -142,9 +142,18 @@ extension SceneEnvironment {
         intensity: 0.9
     )
 
+    /// Deep night sky with the Milky Way — a dramatic CC0 starfield HDRI.
+    /// Pairs with metallic PBR materials for chrome-mirror reflections.
+    public static let nightSky = SceneEnvironment(
+        name: "Night Sky",
+        hdrResource: "night_sky.hdr",
+        intensity: 0.5,          // dim ambient — stars shouldn't blow out skin tones
+        showSkybox: true
+    )
+
     /// All available presets for UI pickers.
     public static let allPresets: [SceneEnvironment] = [
-        .studio, .outdoor, .sunset, .night, .warm, .autumn
+        .studio, .outdoor, .sunset, .night, .warm, .autumn, .nightSky
     ]
 }
 
