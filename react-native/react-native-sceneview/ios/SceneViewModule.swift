@@ -33,12 +33,24 @@ class RNSceneViewManager: RCTViewManager {
     }
 }
 
+/// Maps the wire string sent from JS to a `CameraControlMode` (v4.3.0).
+/// Unknown values fall back to `.orbit`.
+func rnCameraControlMode(_ raw: String?) -> CameraControlMode {
+    switch raw {
+    case "pan": return .pan
+    case "firstPerson": return .firstPerson
+    default: return .orbit
+    }
+}
+
 /// Observable state model shared between React props and SwiftUI view.
 @MainActor
 class RNSceneState: ObservableObject {
     @Published var models: [RNModelData] = []
     @Published var environmentPath: String?
     @Published var cameraOrbit: Bool = true
+    @Published var cameraControlMode: CameraControlMode = .orbit
+    @Published var autoCenterContent: Bool = true
 }
 
 /// UIView wrapper that hosts a SwiftUI `SceneView` via UIHostingController.
@@ -112,6 +124,25 @@ class RNSceneViewWrapper: UIView {
             }
         }
     }
+
+    /// Camera interaction mode (v4.3.0, issue #1053).
+    @objc var cameraControlMode: String? {
+        didSet {
+            let mode = rnCameraControlMode(cameraControlMode)
+            Task { @MainActor in
+                sceneState.cameraControlMode = mode
+            }
+        }
+    }
+
+    /// Whether to auto-centre scene content (v4.3.0, issue #1053).
+    @objc var autoCenterContent: Bool = true {
+        didSet {
+            Task { @MainActor in
+                sceneState.autoCenterContent = autoCenterContent
+            }
+        }
+    }
 }
 
 /// SwiftUI content view rendering SceneViewSwift.SceneView.
@@ -126,6 +157,8 @@ struct RNSceneViewContent: View {
                     .scale(model.scale)
             }
         }
+        .cameraControls(state.cameraControlMode)
+        .autoCenterContent(state.autoCenterContent)
     }
 }
 
@@ -253,6 +286,71 @@ struct RNARSceneViewContent: View {
             ForEach(state.models) { model in
                 ModelNode(model.path)
                     .scale(model.scale)
+            }
+        }
+    }
+}
+
+// MARK: - AR Recorder native module (v4.3.0, issue #1053)
+
+/// React Native bridge for SceneViewSwift's `ARRecorder` — record-only
+/// AR session capture via ReplayKit. Exposed to JS as `NativeModules.RNARRecorder`.
+///
+/// iOS-only; the JS `ARRecorder` class guards non-iOS platforms before
+/// calling into this module.
+@objc(RNARRecorder)
+class RNARRecorder: NSObject {
+
+    /// A single recorder instance shared by the JS `ARRecorder` API —
+    /// ReplayKit's `RPScreenRecorder` is itself a process-wide singleton,
+    /// so multiple JS instances still drive one underlying recorder.
+    @MainActor private lazy var recorder = ARRecorder()
+
+    override static func requiresMainQueueSetup() -> Bool {
+        return true
+    }
+
+    @objc func start(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        Task { @MainActor in
+            do {
+                try await recorder.startRecording()
+                resolve(nil)
+            } catch {
+                reject("AR_RECORDER_START_FAILED", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc func stop(
+        _ outputPath: String?,
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        Task { @MainActor in
+            do {
+                let outputURL = outputPath.map { URL(fileURLWithPath: $0) }
+                let url = try await recorder.stopRecording(outputURL: outputURL)
+                resolve(url.path)
+            } catch {
+                reject("AR_RECORDER_STOP_FAILED", error.localizedDescription, error)
+            }
+        }
+    }
+
+    @objc func saveToPhotoLibrary(
+        _ movPath: String,
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        Task { @MainActor in
+            do {
+                try await ARRecorder.saveToPhotoLibrary(URL(fileURLWithPath: movPath))
+                resolve(nil)
+            } catch {
+                reject("AR_RECORDER_SAVE_FAILED", error.localizedDescription, error)
             }
         }
     }

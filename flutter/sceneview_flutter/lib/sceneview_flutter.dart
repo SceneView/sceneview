@@ -13,6 +13,179 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 // ---------------------------------------------------------------------------
+// Camera controls (v4.3.0 — iOS-first, see issue #1053)
+// ---------------------------------------------------------------------------
+
+/// Camera interaction mode for a [SceneView].
+///
+/// Mirrors SceneViewSwift's `CameraControlMode` and Android's camera
+/// manipulator modes.
+///
+/// Platform support:
+/// - **iOS**: all three modes are wired through `.cameraControls(_:)`.
+/// - **Android**: [orbit] is the default Compose behaviour; [pan] and
+///   [firstPerson] currently fall back to orbit (the per-mode switch is
+///   an iOS-first v4.3.0 addition — tracked for the Android side in #1051).
+enum CameraControlMode {
+  /// Orbit around a target point. Drag rotates; pinch dollies in/out.
+  orbit,
+
+  /// Pan the camera in the view plane. Drag translates the target.
+  pan,
+
+  /// First-person look-around. Drag rotates; pinch adjusts field of view.
+  firstPerson,
+}
+
+/// Wire name sent across the method/platform channel for a [CameraControlMode].
+String _cameraControlModeName(CameraControlMode mode) {
+  switch (mode) {
+    case CameraControlMode.orbit:
+      return 'orbit';
+    case CameraControlMode.pan:
+      return 'pan';
+    case CameraControlMode.firstPerson:
+      return 'firstPerson';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AR recording (v4.3.0 — iOS via ReplayKit, see issue #1053)
+// ---------------------------------------------------------------------------
+
+/// Lifecycle state of an [ARRecorder].
+enum ARRecorderState {
+  /// No recording in progress.
+  idle,
+
+  /// A recording is actively capturing.
+  recording,
+
+  /// The last start/stop call failed. See [ARRecorder.lastError].
+  error,
+}
+
+/// Records an AR session to a video file.
+///
+/// iOS port of SceneViewSwift's `ARRecorder` (record-only via ReplayKit —
+/// produces a QuickTime `.mov`). Attach it to a [SceneViewController] bound
+/// to an [ARSceneView]:
+///
+/// ```dart
+/// final controller = SceneViewController();
+/// final recorder = ARRecorder(controller);
+///
+/// await recorder.startRecording();
+/// // ... later ...
+/// final path = await recorder.stopRecording();
+/// await recorder.saveToPhotoLibrary(path);
+/// ```
+///
+/// Platform support:
+/// - **iOS**: full support — screen capture via `RPScreenRecorder`.
+/// - **Android**: not yet bridged. ARCore session recording is a different
+///   artifact (a replayable dataset, not a video) and needs deeper access
+///   to the AR `Session`/`Frame` than the platform-view bridge exposes.
+///   Calls throw an [UnsupportedError] on Android until #1051 lands the
+///   Android side.
+class ARRecorder {
+  /// The controller of the [ARSceneView] this recorder drives.
+  final SceneViewController controller;
+
+  ARRecorderState _state = ARRecorderState.idle;
+  String? _lastError;
+
+  final StreamController<ARRecorderState> _stateController =
+      StreamController<ARRecorderState>.broadcast();
+
+  ARRecorder(this.controller);
+
+  /// Current recorder state.
+  ARRecorderState get state => _state;
+
+  /// Human-readable message for the last failure, or `null` if none.
+  String? get lastError => _lastError;
+
+  /// `true` between a successful [startRecording] and [stopRecording].
+  bool get isRecording => _state == ARRecorderState.recording;
+
+  /// Emits a new value every time the recorder state changes.
+  Stream<ARRecorderState> get stateChanges => _stateController.stream;
+
+  void _setState(ARRecorderState next, {String? error}) {
+    _state = next;
+    _lastError = error;
+    if (!_stateController.isClosed) _stateController.add(next);
+  }
+
+  /// Starts an AR session recording.
+  ///
+  /// Throws [UnsupportedError] on Android, [StateError] if the controller
+  /// is not attached, and a [PlatformException] if the native recorder
+  /// rejects the request (e.g. screen-record permission denied).
+  Future<void> startRecording() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      throw UnsupportedError(
+        'ARRecorder is currently only supported on iOS. '
+        'Android AR session recording is tracked in issue #1051.',
+      );
+    }
+    controller._ensureAttached();
+    try {
+      await controller._channel!.invokeMethod('startRecording');
+      _setState(ARRecorderState.recording);
+    } on PlatformException catch (e) {
+      _setState(ARRecorderState.error, error: e.message);
+      rethrow;
+    }
+  }
+
+  /// Stops the in-progress recording and returns the path to the `.mov` file.
+  ///
+  /// [outputPath] optionally specifies where the file is written; when
+  /// omitted the native side picks a temp location.
+  Future<String> stopRecording({String? outputPath}) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      throw UnsupportedError(
+        'ARRecorder is currently only supported on iOS. '
+        'Android AR session recording is tracked in issue #1051.',
+      );
+    }
+    controller._ensureAttached();
+    try {
+      final path = await controller._channel!.invokeMethod<String>(
+        'stopRecording',
+        {if (outputPath != null) 'outputPath': outputPath},
+      );
+      _setState(ARRecorderState.idle);
+      return path ?? '';
+    } on PlatformException catch (e) {
+      _setState(ARRecorderState.error, error: e.message);
+      rethrow;
+    }
+  }
+
+  /// Saves a recorded `.mov` file to the device's photo library (iOS).
+  Future<void> saveToPhotoLibrary(String movPath) async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      throw UnsupportedError(
+        'ARRecorder.saveToPhotoLibrary is currently only supported on iOS.',
+      );
+    }
+    controller._ensureAttached();
+    await controller._channel!.invokeMethod('saveRecordingToPhotoLibrary', {
+      'movPath': movPath,
+    });
+  }
+
+  /// Releases the state-change stream. Call when the recorder is no longer
+  /// needed (e.g. in the host widget's `dispose`).
+  void dispose() {
+    _stateController.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Data classes
 // ---------------------------------------------------------------------------
 
@@ -238,6 +411,26 @@ class SceneViewController {
     await _channel!.invokeMethod('setEnvironment', {'hdrPath': hdrPath});
   }
 
+  /// Change the camera interaction mode at runtime (v4.3.0).
+  ///
+  /// On iOS this re-applies `.cameraControls(_:)`. On Android only
+  /// [CameraControlMode.orbit] is honoured; other modes are acknowledged
+  /// but fall back to orbit (see [CameraControlMode]).
+  Future<void> setCameraControlMode(CameraControlMode mode) async {
+    _ensureAttached();
+    await _channel!.invokeMethod('setCameraControlMode', {
+      'mode': _cameraControlModeName(mode),
+    });
+  }
+
+  /// Toggle content auto-centring at runtime (v4.3.0).
+  ///
+  /// iOS-first; the Android side is tracked in #1051.
+  Future<void> setAutoCenterContent(bool enabled) async {
+    _ensureAttached();
+    await _channel!.invokeMethod('setAutoCenterContent', {'enabled': enabled});
+  }
+
   void _ensureAttached() {
     if (!isAttached) {
       throw StateError(
@@ -275,12 +468,26 @@ class SceneView extends StatefulWidget {
   /// Called when a model node is tapped. Receives the node name/id.
   final void Function(String nodeName)? onTap;
 
+  /// Camera interaction mode. Defaults to [CameraControlMode.orbit].
+  ///
+  /// [CameraControlMode.pan] and [CameraControlMode.firstPerson] are iOS-only
+  /// in v4.3.0; on Android they fall back to orbit (see [CameraControlMode]).
+  final CameraControlMode cameraControlMode;
+
+  /// Whether the scene auto-centres its content on the first stable frame.
+  ///
+  /// Defaults to `true`. Set to `false` to keep models at their authored
+  /// positions. iOS-first in v4.3.0; the Android side is tracked in #1051.
+  final bool autoCenterContent;
+
   const SceneView({
     super.key,
     this.controller,
     this.onViewCreated,
     this.initialModels = const [],
     this.onTap,
+    this.cameraControlMode = CameraControlMode.orbit,
+    this.autoCenterContent = true,
   });
 
   @override
@@ -327,6 +534,8 @@ class _SceneViewState extends State<SceneView> {
   Widget build(BuildContext context) {
     final creationParams = <String, dynamic>{
       'models': widget.initialModels.map((m) => m.toMap()).toList(),
+      'cameraControlMode': _cameraControlModeName(widget.cameraControlMode),
+      'autoCenterContent': widget.autoCenterContent,
     };
 
     switch (defaultTargetPlatform) {

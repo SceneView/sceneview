@@ -39,6 +39,19 @@ class SceneViewState {
     val lightNodes = mutableStateListOf<LightNodeData>()
     val environmentPath = mutableStateOf<String?>(null)
     val orbitEnabled = mutableStateOf(true)
+
+    /**
+     * v4.3.0 camera control mode (#1053). Stored for parity with the iOS
+     * bridge; Android's `SceneView` composable already orbits by default,
+     * so `pan` / `firstPerson` currently fall back to orbit (tracked in #1051).
+     */
+    val cameraControlMode = mutableStateOf("orbit")
+
+    /**
+     * v4.3.0 content auto-centring (#1053). iOS-first; the Android
+     * library-level implementation is tracked in #1051.
+     */
+    val autoCenterContent = mutableStateOf(true)
 }
 
 /**
@@ -302,6 +315,24 @@ class SceneViewManager : SimpleViewManager<FrameLayout>() {
     @ReactProp(name = "cameraOrbit", defaultBoolean = true)
     fun setCameraOrbit(view: FrameLayout, enabled: Boolean) {
         getState(view).orbitEnabled.value = enabled
+    }
+
+    @ReactProp(name = "cameraControlMode")
+    fun setCameraControlMode(view: FrameLayout, mode: String?) {
+        // v4.3.0 camera modes (#1053). The Android `SceneView` composable
+        // already uses an orbit manipulator by default; `pan` and
+        // `firstPerson` are iOS-first additions. Acknowledged here so
+        // cross-platform JS code does not crash the prop setter — the
+        // per-mode switch for Android is tracked in issue #1051.
+        getState(view).cameraControlMode.value = mode ?: "orbit"
+    }
+
+    @ReactProp(name = "autoCenterContent", defaultBoolean = true)
+    fun setAutoCenterContent(view: FrameLayout, enabled: Boolean) {
+        // v4.3.0 content auto-centring (#1053) is iOS-first; the Android
+        // library-level implementation is tracked in issue #1051.
+        // Acknowledged so cross-platform JS code does not crash.
+        getState(view).autoCenterContent.value = enabled
     }
 }
 

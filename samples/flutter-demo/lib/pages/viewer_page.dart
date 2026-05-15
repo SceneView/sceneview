@@ -35,6 +35,9 @@ class _ViewerPageState extends State<ViewerPage> {
   double _rotationZ = 0;
   double _scale = 1.0;
 
+  // Camera control mode (v4.3.0) — orbit / pan / firstPerson.
+  CameraControlMode _cameraMode = CameraControlMode.orbit;
+
   // Built-in sample model URLs (public GLB files)
   static const _sampleModels = [
     _SampleModel('Damaged Helmet', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb', Icons.sports_motorsports),
@@ -93,6 +96,7 @@ class _ViewerPageState extends State<ViewerPage> {
               children: [
                 SceneView(
                   controller: _controller,
+                  cameraControlMode: _cameraMode,
                   onViewCreated: _onSceneCreated,
                   onTap: _onNodeTapped,
                 ),
@@ -101,6 +105,11 @@ class _ViewerPageState extends State<ViewerPage> {
               ],
             ),
           ),
+
+          // Camera control mode picker (v4.3.0)
+          _buildCameraModePicker(theme),
+
+          const Divider(height: 1),
 
           // Rotation controls
           _buildRotationControls(theme),
@@ -137,6 +146,46 @@ class _ViewerPageState extends State<ViewerPage> {
             child: _searchResults.isNotEmpty
                 ? _buildSearchResults()
                 : _buildSampleModels(theme),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraModePicker(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Text('Camera:', style: theme.textTheme.titleSmall),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SegmentedButton<CameraControlMode>(
+              segments: const [
+                ButtonSegment(
+                  value: CameraControlMode.orbit,
+                  icon: Icon(Icons.threesixty),
+                  label: Text('Orbit'),
+                ),
+                ButtonSegment(
+                  value: CameraControlMode.pan,
+                  icon: Icon(Icons.pan_tool_alt),
+                  label: Text('Pan'),
+                ),
+                ButtonSegment(
+                  value: CameraControlMode.firstPerson,
+                  icon: Icon(Icons.visibility),
+                  label: Text('FPV'),
+                ),
+              ],
+              selected: {_cameraMode},
+              onSelectionChanged: (set) {
+                setState(() => _cameraMode = set.first);
+                if (_sceneReady) {
+                  _controller.setCameraControlMode(_cameraMode);
+                }
+              },
+            ),
           ),
         ],
       ),

@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.SceneView = exports.ARSceneView = void 0;
+exports.SceneView = exports.ARSceneView = exports.ARRecorder = void 0;
 var _react = _interopRequireDefault(require("react"));
 var _reactNative = require("react-native");
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
@@ -24,6 +24,16 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
+
+/**
+ * Camera interaction mode for a {@link SceneView} (v4.3.0).
+ *
+ * Platform support:
+ * - **iOS**: all three modes are wired through `.cameraControls(_:)`.
+ * - **Android**: `'orbit'` is the default; `'pan'` / `'firstPerson'` fall
+ *   back to orbit (the per-mode switch is an iOS-first v4.3.0 addition —
+ *   the Android side is tracked in issue #1051).
+ */
 
 // ---------------------------------------------------------------------------
 // Native components (only available on Android and iOS)
@@ -99,5 +109,74 @@ const ARSceneView = props => {
   }
   return /*#__PURE__*/_react.default.createElement(NativeARSceneView, props);
 };
+
+// ---------------------------------------------------------------------------
+// AR recording (v4.3.0 — iOS via ReplayKit, see issue #1053)
+// ---------------------------------------------------------------------------
+
+/** Native module backing {@link ARRecorder}. Present only on iOS. */
 exports.ARSceneView = ARSceneView;
+const NativeARRecorder = _reactNative.NativeModules.RNARRecorder;
+
+/**
+ * Records an AR session to a video file (v4.3.0).
+ *
+ * iOS port of SceneViewSwift's `ARRecorder` — record-only via ReplayKit,
+ * producing a QuickTime `.mov`.
+ *
+ * ```ts
+ * const recorder = new ARRecorder();
+ * await recorder.start();
+ * // ... later ...
+ * const path = await recorder.stop();
+ * await recorder.saveToPhotoLibrary(path);
+ * ```
+ *
+ * Platform support:
+ * - **iOS**: full support via `RPScreenRecorder`.
+ * - **Android**: not yet bridged. ARCore session recording produces a
+ *   replayable dataset (not a video) and needs deeper `Session`/`Frame`
+ *   access than the Fabric bridge exposes. Every method rejects with an
+ *   error on Android until issue #1051 lands the Android side.
+ */
+class ARRecorder {
+  /** `true` when {@link ARRecorder} is supported on the current platform. */
+  static get isSupported() {
+    return _reactNative.Platform.OS === 'ios' && NativeARRecorder != null;
+  }
+  rejectUnsupported() {
+    return Promise.reject(new Error('ARRecorder is currently only supported on iOS. Android AR session ' + 'recording is tracked in issue #1051.'));
+  }
+
+  /** Starts an AR session recording. */
+  start() {
+    if (!ARRecorder.isSupported || !NativeARRecorder) {
+      return this.rejectUnsupported();
+    }
+    return NativeARRecorder.start();
+  }
+
+  /**
+   * Stops the in-progress recording and resolves with the path of the
+   * written `.mov` file.
+   *
+   * @param outputPath optional destination path; when omitted the native
+   *   side picks a temp location.
+   */
+  stop(outputPath) {
+    if (!ARRecorder.isSupported || !NativeARRecorder) {
+      return this.rejectUnsupported();
+    }
+    return NativeARRecorder.stop(outputPath ?? null);
+  }
+
+  /** Saves a recorded `.mov` file to the device's photo library (iOS). */
+  saveToPhotoLibrary(movPath) {
+    if (!ARRecorder.isSupported || !NativeARRecorder) {
+      return this.rejectUnsupported();
+    }
+    return NativeARRecorder.saveToPhotoLibrary(movPath);
+  }
+}
+exports.ARRecorder = ARRecorder;
 //# sourceMappingURL=index.js.map
