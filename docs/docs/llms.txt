@@ -2,14 +2,19 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.3.1):**
-- 3D only: `io.github.sceneview:sceneview:4.3.5`
-- AR + 3D: `io.github.sceneview:arsceneview:4.3.5`
+**Android — Maven artifacts (version 4.4.0):**
+- 3D only: `io.github.sceneview:sceneview:4.4.0`
+- AR + 3D: `io.github.sceneview:arsceneview:4.4.0`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
-- `https://github.com/sceneview/sceneview.git` (from: "4.3.5")
+- `https://github.com/sceneview/sceneview.git` (from: "4.4.0")
 
 **Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.20 | **Compose BOM compatible**
+
+**API reference (Dokka):** browse the full generated API docs at
+`https://sceneview.github.io/api/sceneview/latest/sceneview/` (3D) and
+`https://sceneview.github.io/api/sceneview/latest/arsceneview/` (AR). Each release
+is also archived under `/api/sceneview/<version>/`.
 
 ---
 
@@ -18,8 +23,8 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.3.5")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.3.5") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.4.0")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.4.0") // AR (includes sceneview)
 }
 ```
 
@@ -64,12 +69,15 @@ fun SceneView(
     permissionHandler: ARPermissionHandler? = /* auto from ComponentActivity */,
     lifecycle: Lifecycle = LocalLifecycleOwner.current.lifecycle,
     renderQuality: RenderQuality = RenderQuality.Default,   // Cinematic / Default / Performance — see "Render Quality"
+    autoCenterContent: Boolean = true,   // library-level auto-center — see note below
     onFrame: ((frameTimeNanos: Long) -> Unit)? = null,
     content: (@Composable SceneScope.() -> Unit)? = null
 )
 ```
 
 **Defaults changed in v4.0.10+:** shadows ON (mainLight + fillLight), SSAO + bloom enabled, neutral exposure (~1.0), dual-light setup out-of-the-box. No more "flat-lit chrome look" — drop a model in and it renders cinematic by default.
+
+**`autoCenterContent` (default `true`):** all DSL `content` nodes are parented to an intermediate content-root node which the library translates once — on the first frame their union bounding box is non-empty — so the content centroid lands at the orbit pivot and renders centred without per-node `ModelNode(centerOrigin = …)`. Lights / camera are `SceneView` parameters (never DSL children) so they stay put. Pass `autoCenterContent = false` for scenes with intentional off-centre placement. Mirrors the iOS `autoCenterContent` modifier.
 
 Minimal usage:
 ```kotlin
@@ -2330,7 +2338,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.3.5")
+    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.4.0")
 ]
 ```
 
@@ -2865,6 +2873,9 @@ SceneView.create(canvas, configure = {
     noEnvironment()                // skip IBL loading entirely
     cameraControls(true)           // orbit controls (default: true)
     autoRotate(true)               // auto-spin camera
+    autoCenterContent(true)        // center loaded content on the camera target
+                                   //  (default: true) — port of iOS autoCenterContent.
+                                   //  Pass false for intentional off-center scenes.
 }) { sceneView -> /* onReady */ }
 ```
 
@@ -2926,6 +2937,7 @@ sv.setAutoRotate(enabled)   // Boolean
 sv.setAutoRotateSpeed(radiansPerFrame)
 sv.setZoomLimits(min, max)
 sv.setBackgroundColor(r, g, b, a)  // 0-1 range
+sv.setAutoCenterContent(enabled)   // Boolean — center loaded content (default true)
 sv.fitToModels()
 sv.startRendering()
 sv.stopRendering()
@@ -3069,7 +3081,7 @@ Renderer: **RealityKit**. Requires iOS 17+ / macOS 14+ / visionOS 1+.
 
 SPM dependency (Package.swift or Xcode):
 ```swift
-.package(url: "https://github.com/sceneview/sceneview.git", from: "4.3.5")
+.package(url: "https://github.com/sceneview/sceneview.git", from: "4.4.0")
 ```
 
 Import: `import SceneViewSwift`
@@ -3660,7 +3672,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.3.5
+  sceneview_flutter: ^4.4.0
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).
@@ -3697,8 +3709,26 @@ ARSceneView(
 
 `ModelNode` fields: `modelPath` (required), `x/y/z` (world position), `scale`, `rotationX/Y/Z` (degrees).
 Controller methods: `loadModel(ModelNode)`, `addGeometry(GeometryNode)`, `addLight(LightNode)`,
-`clearScene()`, `setEnvironment(hdrPath)`.
+`clearScene()`, `setEnvironment(hdrPath)`, `setCameraControlMode(CameraControlMode)`,
+`setAutoCenterContent(bool)`.
 Note: `GeometryNode` and `LightNode` are acknowledged by the bridge but not yet rendered natively.
+
+v4.3.0 camera + recording APIs:
+```dart
+// Camera control mode + content auto-centring (iOS-first; Android pan/firstPerson
+// fall back to orbit, autoCenterContent tracked in #1051).
+SceneView(
+  cameraControlMode: CameraControlMode.pan, // .orbit | .pan | .firstPerson
+  autoCenterContent: false,                  // default true
+)
+
+// AR session recording — iOS via ReplayKit; Android throws UnsupportedError.
+final recorder = ARRecorder(arController);
+await recorder.startRecording();
+final path = await recorder.stopRecording();   // returns .mov path
+await recorder.saveToPhotoLibrary(path);
+// recorder.state / recorder.stateChanges — ARRecorderState.idle/recording/error
+```
 
 ### React Native Bridge API
 Package: `@sceneview-sdk/react-native` (npm) — Alpha, Android + iOS only.
@@ -3740,5 +3770,25 @@ import { SceneView, ARSceneView, ModelNode } from '@sceneview-sdk/react-native';
 `scale?: number | [x,y,z]`, `animation?: string` (auto-play animation name).
 Geometry types: `'box' | 'cube' | 'sphere' | 'cylinder' | 'plane'`.
 Light types: `'directional' | 'point' | 'spot'`.
+
+v4.3.0 camera + recording APIs:
+```tsx
+import { SceneView, ARRecorder } from '@sceneview-sdk/react-native';
+
+// Camera control mode + content auto-centring (iOS-first; Android pan/firstPerson
+// fall back to orbit, autoCenterContent tracked in #1051).
+<SceneView
+  cameraControlMode="pan"        // 'orbit' | 'pan' | 'firstPerson'
+  autoCenterContent={false}      // default true
+/>
+
+// AR session recording — iOS via ReplayKit; Android rejects with UNSUPPORTED.
+const recorder = new ARRecorder();
+if (ARRecorder.isSupported) {
+  await recorder.start();
+  const path = await recorder.stop();   // resolves with .mov path
+  await recorder.saveToPhotoLibrary(path);
+}
+```
 
 See "## SceneView Web (Kotlin/JS + Filament.js)" for the full Web Geometry DSL reference.
