@@ -281,7 +281,9 @@ jobs:
         run: ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
 
       - name: Build desktop targets
-        # continue-on-error: desktop is a Compose Canvas placeholder, not a real Filament target
+        # continue-on-error: desktop is a Compose Canvas placeholder, not a
+        # real Filament target. This non-blocking compile check is tracked
+        # for a drop-or-make-blocking decision in #1396.
         continue-on-error: true
         run: ./gradlew :samples:desktop-demo:compileKotlinDesktop --stacktrace
 
