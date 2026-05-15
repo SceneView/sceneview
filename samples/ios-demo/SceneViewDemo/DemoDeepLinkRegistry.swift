@@ -33,7 +33,7 @@ enum DemoDeepLinkRegistry {
         // Interaction
         "camera-controls", "gesture-editing",
         // Advanced
-        "physics", "custom-mesh", "shape",
+        "physics", "double-pendulum", "custom-mesh", "shape",
         // AR
         "ar-placement", "ar-image", "ar-face", "ar-rerun",
     ]
@@ -79,6 +79,7 @@ enum DemoDeepLinkRegistry {
         case "dynamic-sky":   DynamicSkyDemo()
         case "fog":           FogDemo()
         case "physics":       PhysicsDemo()
+        case "double-pendulum": DoublePendulumDemo()
 
         // Interaction.
         case "camera-controls": CameraControlsDemo()

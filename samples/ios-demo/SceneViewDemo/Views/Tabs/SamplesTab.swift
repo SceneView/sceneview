@@ -255,6 +255,9 @@ struct SamplesTab: View {
             DemoItem(title: "Physics", icon: "figure.walk", subtitle: "Dynamic, static & kinematic bodies", category: .effects) {
                 PhysicsDemo()
             },
+            DemoItem(title: "Double Pendulum", icon: "waveform.path", subtitle: "Chaotic two-link physics, shared KMP simulation", category: .effects) {
+                DoublePendulumDemo()
+            },
 
             // MARK: Interaction
             // CameraControlsDemo ships in the .advanced section with the full

@@ -48,6 +48,7 @@ import io.github.sceneview.demo.demos.ShapeDemo
 import io.github.sceneview.demo.demos.ReflectionProbesDemo
 import io.github.sceneview.demo.demos.SecondaryCameraDemo
 import io.github.sceneview.demo.demos.DebugOverlayDemo
+import io.github.sceneview.demo.demos.DoublePendulumDemo
 import io.github.sceneview.demo.demos.ARImageDemo
 import io.github.sceneview.demo.demos.ARFaceDemo
 import io.github.sceneview.demo.demos.ARCloudAnchorDemo
@@ -272,6 +273,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "multi-model" -> MultiModelDemo(onBack)
         "materials" -> MaterialsDemo(onBack)
         "physics" -> PhysicsDemo(onBack)
+        "double-pendulum" -> DoublePendulumDemo(onBack)
         "post-processing" -> PostProcessingDemo(onBack)
         "custom-mesh" -> CustomMeshDemo(onBack)
         "shape" -> ShapeDemo(onBack)
