@@ -134,19 +134,16 @@ describe("npm tarball includes every runtime module imported by src/index.ts", (
   let tarballFiles: string[];
   let tarballSet: Set<string>;
 
+  // `npm pack` itself runs the package's `prepare` script (generate-llms-txt
+  // + generate-version + `tsc`) before walking the tree, so a single
+  // `getTarballFiles()` call already builds deterministically — no separate
+  // `npm run build` step is needed. That `tsc` compile makes the call take
+  // ~10–15 s on CI, so the hook gets an explicit 120 s timeout (vitest's
+  // 10 s default would otherwise abort it).
   beforeAll(() => {
-    // Build deterministically and to completion BEFORE invoking `npm pack`.
-    // `npm pack` re-runs `prepare` regardless, but with the generated files
-    // and `dist/` already fully written the run is stable — there is no
-    // half-written state for the pack file-walk to observe.
-    execFileSync("npm", ["run", "build"], {
-      cwd: MCP_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "ignore", "inherit"],
-    });
     tarballFiles = getTarballFiles();
     tarballSet = new Set(tarballFiles);
-  });
+  }, 120_000);
 
   it("all transitively-imported modules are present in the tarball", () => {
     const missing = requiredDistPaths.filter((p) => !tarballSet.has(p));
