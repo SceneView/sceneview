@@ -6,11 +6,33 @@
 
 - **iOS `.firstPerson` now rotates the perspective camera in place instead of orbiting the scene root, so switching orbit ↔ firstPerson no longer teleports the camera; new `recentersTargetOnOrbit(_:)` modifier + `CameraControls.recenterTarget()` fix pan→orbit pivot drift.** `Closes #1236`.
 
+### Tests
+
+- **Regression pins for three untested AR rendering fixes from the 2026-05-14 batch ([#1120](https://github.com/sceneview/sceneview/issues/1120)).** New JVM tests pin the `environmentalHdrSpecularFilter = true` default (#1086), the no-double-close hoisted cubemap upload callback (#1091), and the 7 `@Volatile` `LightEstimator` toggles (#1095).
+
+### Added — CI
+
+- **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
+
+### Changed — Samples
+
+- **Migrated the remaining `samples/android-demo` demos to the `rememberMaterialInstance` / `rememberUnlitMaterialInstance` helpers ([#971](https://github.com/sceneview/sceneview/issues/971)).** `CollisionDemo`, `LightingDemo`, `VideoDemo`, `ARStreetscapeDemo`, `GeometryDemo`, `DebugOverlayDemo`, `PhysicsDemo` and the shared `Axes3DNode` no longer allocate `MaterialInstance` handles via raw `materialLoader.create*` without disposal — the helpers own the lifecycle. Behaviour-preserving.
+
 ### Fixed — CI security
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
 
+### Changed — CI
+
+- **CI/publish workflows' inline `pip install` deps moved into per-workflow `.github/workflows/requirements/*.txt` files so Dependabot's `pip` ecosystem tracks and bumps them ([#1286](https://github.com/sceneview/sceneview/issues/1286)).** Same packages, same pinned versions installed — Dependabot just cannot see inline `pip install x==y` lines in workflow YAML, so the pins would have gone stale silently.
+
+- **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
+
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
+
+### Changed — AR `LightEstimator` allocation & robustness refactor ([#1105](https://github.com/sceneview/sceneview/issues/1105))
+
+- **`LightEstimator.update()` no longer allocates on the AR render thread.** Per-frame `Estimation`, color-correction, cubemap face-offset, RGB-triplet, and 27-element irradiance buffers are now hoisted, reused fields; an `ENVIRONMENTAL_HDR` capability probe (`Session.isSupported`, cached per mode) early-returns instead of feeding silently-degraded HDR estimates to Filament; the legacy Sceneform `1.8` pixel-intensity gain is now a named constant. Public behaviour is unchanged. `Closes #1105`.
 
 ### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
 
@@ -27,6 +49,10 @@
 ### Fixed — iOS demo bug cluster ([#1054](https://github.com/sceneview/sceneview/issues/1054)–[#1059](https://github.com/sceneview/sceneview/issues/1059))
 
 - **iOS demo bug cluster — `swift test` build, `CameraControls` rename, deep-link, Plane, first-paint audit.** Local `cd SceneViewSwift && swift test` runs the full 603-test suite again ([#1054](https://github.com/sceneview/sceneview/issues/1054)): the 36 `SceneViewSwiftTests` classes are now `@MainActor`-annotated so their RealityKit `@MainActor` node factories no longer raise ~500 `#ActorIsolatedCall` compile errors under the Xcode 26 toolchain. `OrbitCameraDemo.swift` renamed to `CameraControlsDemo.swift` ([#1055](https://github.com/sceneview/sceneview/issues/1055)) so the file matches its `struct CameraControlsDemo` (`project.pbxproj` synced). The `sceneview://demo/multi-model` deep-link no longer hangs on an eternal black "Loading park scene…" scrim ([#1056](https://github.com/sceneview/sceneview/issues/1056)) — `MultiModelDemo` loads its four park models concurrently and reveals each progressively, so one slow heavy USDZ no longer blocks the rest. `GeometryDemo`'s `Plane` is no longer invisible/edge-on ([#1058](https://github.com/sceneview/sceneview/issues/1058)) — the demo now stands the XZ plane upright to face the orbit camera. First-paint audit ([#1059](https://github.com/sceneview/sceneview/issues/1059)): RealityKit does **not** exhibit Android #1022's Filament shader-compile black first frame on non-AR demos, so no library-level scrim was needed on iOS.
+### Added — iOS
+
+- **`ARRecorder.saveToPhotoLibrary(_:)` now returns the saved asset's `PHAsset.localIdentifier` (`String?`) ([#1057](https://github.com/sceneview/sceneview/issues/1057)).** Callers get a handle to the saved recording — resolve it later via `PHAsset.fetchAssets(withLocalIdentifiers:options:)` or deep-link to it — closing the cross-platform parity gap with Android's `ARRecorder.exportToDownloads()` `Uri?` return. The result is `@discardableResult`, so existing v4.3.0 call sites are unaffected.
+
 ### Added — Bridges
 
 - **Flutter + React Native bridges now expose the v4.3.0 iOS additions — `CameraControlMode` (orbit/pan/firstPerson), `autoCenterContent`, and `ARRecorder` (record-only via ReplayKit) ([#1053](https://github.com/sceneview/sceneview/issues/1053)).** Cross-platform consumers can drive iOS camera modes, opt out of auto-centring, and record AR sessions; Android gracefully falls back where the feature is iOS-first (tracked in #1051).

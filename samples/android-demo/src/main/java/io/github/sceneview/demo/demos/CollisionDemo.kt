@@ -30,6 +30,7 @@ import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.rememberView
+import io.github.sceneview.sample.rememberUnlitMaterialInstance
 
 /**
  * Demonstrates collision-based hit testing.
@@ -52,12 +53,8 @@ fun CollisionDemo(onBack: () -> Unit) {
     // On-brand: Primary blue by default, Accent purple when a shape is hit — same hero
     // gradient as the product identity. Unlit so the hit/no-hit colour flip stays
     // legible regardless of scene lighting (the colour itself IS the signal here).
-    val defaultMaterial = remember(materialLoader) {
-        materialLoader.createUnlitColorInstance(color = SceneViewColors.Primary)
-    }
-    val highlightedMaterial = remember(materialLoader) {
-        materialLoader.createUnlitColorInstance(color = SceneViewColors.Accent)
-    }
+    val defaultMaterial = rememberUnlitMaterialInstance(materialLoader, SceneViewColors.Primary)
+    val highlightedMaterial = rememberUnlitMaterialInstance(materialLoader, SceneViewColors.Accent)
 
     // Node layout: 3 cubes and 2 spheres in a row.
     data class ShapeSpec(

@@ -1,12 +1,12 @@
 package io.github.sceneview.demo.common
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import io.github.sceneview.SceneScope
 import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
+import io.github.sceneview.sample.rememberUnlitMaterialInstance
 
 /**
  * Blender-style 3D axes gizmo at the origin (0, 0, 0).
@@ -51,19 +51,14 @@ fun SceneScope.Axes3DNode(
     colorY: Color = Color.Green,
     colorZ: Color = Color.Blue,
 ) {
-    // Materials are minted once per (loader, colour) pair — `remember` ensures we don't
-    // leak a fresh MaterialInstance on every recomposition. Unlit so the gizmo keeps the
-    // requested colour regardless of scene lighting (it's a debug reference, not part of
-    // the rendered world).
-    val materialX = remember(materialLoader, colorX) {
-        materialLoader.createUnlitColorInstance(color = colorX)
-    }
-    val materialY = remember(materialLoader, colorY) {
-        materialLoader.createUnlitColorInstance(color = colorY)
-    }
-    val materialZ = remember(materialLoader, colorZ) {
-        materialLoader.createUnlitColorInstance(color = colorZ)
-    }
+    // Materials are minted once per (loader, colour) pair and disposed when the
+    // composition leaves — `rememberUnlitMaterialInstance` owns the MaterialInstance
+    // lifecycle so the gizmo never leaks a JNI handle. Unlit so it keeps the requested
+    // colour regardless of scene lighting (it's a debug reference, not part of the
+    // rendered world).
+    val materialX = rememberUnlitMaterialInstance(materialLoader, colorX)
+    val materialY = rememberUnlitMaterialInstance(materialLoader, colorY)
+    val materialZ = rememberUnlitMaterialInstance(materialLoader, colorZ)
 
     // X axis — cylinder lies along native +Y, rotate -90° around Z to point along +X.
     CylinderNode(

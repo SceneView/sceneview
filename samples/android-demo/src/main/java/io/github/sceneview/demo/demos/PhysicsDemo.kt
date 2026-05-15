@@ -213,9 +213,14 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 val groundMaterial = rememberMaterialInstance(
                     materialLoader, SceneViewColors.SurfaceDim
                 )
-                val sphereMaterials = remember(materialLoader) {
-                    SceneViewColors.Ramp4.map { materialLoader.createColorInstance(it) }
-                }
+                // Ramp4 is a fixed 4-colour list — call the helper once per slot so
+                // each MaterialInstance gets the same disposal hygiene as the rest.
+                val sphereMaterials = listOf(
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[0]),
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[1]),
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[2]),
+                    rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[3]),
+                )
 
                 // Ground plane — must use Size(x, y=0, z) for a HORIZONTAL floor
                 PlaneNode(
