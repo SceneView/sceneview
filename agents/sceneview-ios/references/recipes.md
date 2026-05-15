@@ -14,7 +14,7 @@ code — the demo is the authoritative recipe.
 — `GeometryNode.cube / .sphere / .cylinder / .plane / .cone / .torus / .capsule`.
 
 ## 3. Camera controls (orbit / pan)
-[`OrbitCameraDemo.swift`](https://github.com/sceneview/sceneview/blob/main/samples/ios-demo/SceneViewDemo/Views/Demos/OrbitCameraDemo.swift)
+[`CameraControlsDemo.swift`](https://github.com/sceneview/sceneview/blob/main/samples/ios-demo/SceneViewDemo/Views/Demos/CameraControlsDemo.swift)
 — `.cameraControls(.orbit)` modifier.
 
 ## 4. Auto-rotate turntable
