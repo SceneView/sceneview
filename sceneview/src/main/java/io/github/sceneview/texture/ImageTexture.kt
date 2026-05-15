@@ -12,7 +12,22 @@ import com.google.android.filament.android.TextureHelper
 import com.google.android.filament.utils.TextureType
 import io.github.sceneview.utils.readBuffer
 
+/**
+ * Helper for creating Filament [Texture]s from Android [Bitmap]s, asset files, or drawable
+ * resources, with automatic mipmap generation.
+ *
+ * Use the nested [Builder] to construct a texture, or the [Texture.setBitmap] extensions to
+ * upload image data into an existing texture. All operations touch the Filament engine and
+ * must run on the main thread.
+ */
 class ImageTexture {
+    /**
+     * Builder for an [ImageTexture]-backed Filament [Texture]. Supply image data via one of
+     * the [bitmap] overloads, then call [build].
+     *
+     * The texture is configured with `SAMPLER_2D`, automatic mip-level count, and the
+     * `GEN_MIPMAPPABLE` usage flag so [build] can generate mipmaps.
+     */
     class Builder : Texture.Builder() {
         private lateinit var bitmap: Bitmap
 
@@ -26,6 +41,11 @@ class ImageTexture {
             usage(Texture.Usage.DEFAULT or Texture.Usage.GEN_MIPMAPPABLE)
         }
 
+        /**
+         * Sets the texture internal format from a semantic [type]: `COLOR` maps to sRGB
+         * (gamma-corrected), `NORMAL` and `DATA` map to linear RGBA8. Returns this builder
+         * for chaining.
+         */
         fun type(type: TextureType) = apply {
             format(
                 when (type) {
@@ -36,6 +56,12 @@ class ImageTexture {
             )
         }
 
+        /**
+         * Sets the texture dimensions, format and source data from an in-memory [bitmap].
+         * Returns this builder for chaining.
+         *
+         * @param type semantic format of the image; defaults to [DEFAULT_TYPE] ([TextureType.COLOR]).
+         */
         fun bitmap(bitmap: Bitmap, type: TextureType = DEFAULT_TYPE) = apply {
             width(bitmap.width)
             height(bitmap.height)
@@ -43,18 +69,35 @@ class ImageTexture {
             this.bitmap = bitmap
         }
 
+        /**
+         * Decodes an image from the app assets at [fileLocation] and uses it as the source.
+         * Returns this builder for chaining.
+         *
+         * @param type semantic format of the image; defaults to [DEFAULT_TYPE].
+         */
         fun bitmap(
             assets: AssetManager,
             fileLocation: String,
             type: TextureType = DEFAULT_TYPE
         ) = bitmap(getBitmap(assets, fileLocation, type), type)
 
+        /**
+         * Decodes a drawable resource [drawableResId] and uses it as the source.
+         * Returns this builder for chaining.
+         *
+         * @param type semantic format of the image; defaults to [DEFAULT_TYPE].
+         */
         fun bitmap(
             context: Context,
             @DrawableRes drawableResId: Int,
             type: TextureType = DEFAULT_TYPE
         ) = bitmap(getBitmap(context, drawableResId, type), type)
 
+        /**
+         * Builds the Filament [Texture] on [engine], uploads the configured bitmap, and
+         * generates its mipmap chain. A source bitmap must have been set first via one of the
+         * [bitmap] overloads. Must be called on the main thread.
+         */
         override fun build(engine: Engine): Texture = super.build(engine).apply {
             // TextureHelper offers a method that skips the copy of the bitmap into a ByteBuffer
             setBitmap(engine, bitmap)
@@ -63,8 +106,13 @@ class ImageTexture {
     }
 
     companion object {
+        /** Default semantic texture type used when none is specified: [TextureType.COLOR]. */
         val DEFAULT_TYPE = TextureType.COLOR
 
+        /**
+         * Decodes a [Bitmap] from the app assets at [fileLocation]. Alpha is pre-multiplied
+         * only for [TextureType.COLOR] textures, matching Filament's expectation.
+         */
         fun getBitmap(
             assets: AssetManager,
             fileLocation: String,
@@ -83,6 +131,10 @@ class ImageTexture {
                 })
         }
 
+        /**
+         * Decodes a [Bitmap] from the drawable resource [drawableResId]. Alpha is
+         * pre-multiplied only for [TextureType.COLOR] textures.
+         */
         fun getBitmap(
             context: Context,
             @DrawableRes drawableResId: Int,
@@ -99,6 +151,12 @@ class ImageTexture {
     }
 }
 
+/**
+ * Uploads an image decoded from the app assets at [fileLocation] into this [Texture] at the
+ * given mip [level]. Must be called on the main thread.
+ *
+ * @param level destination mip level, `0` for the base level.
+ */
 fun Texture.setBitmap(
     engine: Engine,
     assets: AssetManager,
@@ -107,6 +165,12 @@ fun Texture.setBitmap(
     @IntRange(from = 0) level: Int = 0
 ) = setBitmap(engine, ImageTexture.getBitmap(assets, fileLocation, type), level)
 
+/**
+ * Uploads an image decoded from the drawable resource [drawableResId] into this [Texture] at
+ * the given mip [level]. Must be called on the main thread.
+ *
+ * @param level destination mip level, `0` for the base level.
+ */
 fun Texture.setBitmap(
     engine: Engine,
     context: Context,
@@ -115,6 +179,13 @@ fun Texture.setBitmap(
     @IntRange(from = 0) level: Int = 0
 ) = setBitmap(engine, ImageTexture.getBitmap(context, drawableResId, type), level)
 
+/**
+ * Uploads [bitmap] into this [Texture] at the given mip [level], without an intermediate
+ * `ByteBuffer` copy. The bitmap dimensions must match the texture level. Must be called on
+ * the main thread.
+ *
+ * @param level destination mip level, `0` for the base level.
+ */
 fun Texture.setBitmap(engine: Engine, bitmap: Bitmap, @IntRange(from = 0) level: Int = 0) =
     TextureHelper.setBitmap(
         engine,

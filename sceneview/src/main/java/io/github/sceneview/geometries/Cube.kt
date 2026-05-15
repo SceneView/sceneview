@@ -9,6 +9,14 @@ import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
 
+/**
+ * An axis-aligned box [Geometry] with per-face normals and UV coordinates, suitable for
+ * use as a renderable mesh (e.g. attached to a `CubeNode`).
+ *
+ * Instances are immutable once built; create one with the [Builder] and mutate it
+ * afterwards through [update]. All Filament buffer operations run synchronously and must
+ * therefore be called on the main thread.
+ */
 class Cube private constructor(
     primitiveType: PrimitiveType,
     vertices: List<Vertex>,
@@ -28,15 +36,28 @@ class Cube private constructor(
     primitivesOffsets,
     boundingBox
 ) {
+    /**
+     * Builder for [Cube]. Configure [size] and [center], then call [build].
+     */
     class Builder : Geometry.Builder(PrimitiveType.TRIANGLES) {
+        /** Full extents of the box along each axis, in scene units. Defaults to [DEFAULT_SIZE]. */
         var size: Size = DEFAULT_SIZE
             private set
+
+        /** Local-space position of the box center. Defaults to [DEFAULT_CENTER] (the origin). */
         var center: Position = DEFAULT_CENTER
             private set
 
+        /** Sets the full extents of the box along each axis. Returns this builder for chaining. */
         fun size(size: Size) = apply { this.size = size }
+
+        /** Sets the local-space center of the box. Returns this builder for chaining. */
         fun center(center: Position) = apply { this.center = center }
 
+        /**
+         * Builds the [Cube], allocating its Filament vertex and index buffers on [engine].
+         * Must be called on the main thread.
+         */
         override fun build(engine: Engine): Cube {
             vertices(getVertices(size, center))
             primitivesIndices(INDICES)
@@ -49,11 +70,19 @@ class Cube private constructor(
         }
     }
 
+    /** Current local-space center of the box. */
     var center: Position = center
         private set
+
+    /** Current full extents of the box along each axis, in scene units. */
     var size: Size = size
         private set
 
+    /**
+     * Regenerates the box vertices in place for the given [center] and [size] and re-uploads
+     * them to the existing Filament vertex buffer. Index buffer is unchanged. Must be called
+     * on the main thread. Returns this geometry for chaining.
+     */
     fun update(
         engine: Engine,
         center: Position = this.center,
