@@ -22,7 +22,8 @@ import SwiftUI
 ///
 /// Behaviour:
 /// - Floating "gear" button anchored bottom-trailing.
-/// - Peek chip ("Settings") sits above the button while the sheet is closed.
+/// - Peek chip ("Settings") sits to the left of the button (8pt gap, never
+///   overlapping) while the sheet is closed.
 /// - Tap the chip OR the button to open the sheet at the medium detent. The
 ///   sheet supports `.fraction(0.25)`, `.medium`, and `.large` detents and a
 ///   visible drag-indicator handle. Scene keeps tracking 6DOF (AR) while the
@@ -43,7 +44,11 @@ public struct DemoSettingsSheetModifier<SheetContent: View>: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottomTrailing) {
-                VStack(alignment: .trailing, spacing: 8) {
+                // Lay the peek chip fully to the LEFT of the circular FAB with
+                // an 8pt gap so the two never overlap — see #1374. (The previous
+                // right-aligned VStack let the chip's rounded corners tuck
+                // behind the FAB.)
+                HStack(alignment: .center, spacing: 8) {
                     if !isPresented {
                         Button {
                             #if os(iOS)

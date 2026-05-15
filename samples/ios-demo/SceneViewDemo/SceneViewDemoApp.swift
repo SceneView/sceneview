@@ -86,10 +86,10 @@ struct ContentView: View {
 
             SamplesTab()
                 .tabItem {
-                    Label("Scenes", systemImage: "square.grid.2x2.fill")
+                    Label("Samples", systemImage: "square.grid.2x2.fill")
                 }
                 .tag(2)
-                .accessibilityLabel("Scene Presets")
+                .accessibilityLabel("Sample Presets")
 
             AboutTab()
                 .tabItem {
@@ -101,7 +101,7 @@ struct ContentView: View {
         .tint(SceneViewTheme.primary)
         .onChange(of: pendingDeepLinkDemo) { newId in
             guard let id = newId else { return }
-            // Switch to the Scenes tab so the deep-link surface feels
+            // Switch to the Samples tab so the deep-link surface feels
             // contextual; then present the demo above it as a modal so we
             // don't have to thread navigation through SamplesTab.
             selectedTab = 2

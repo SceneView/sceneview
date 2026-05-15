@@ -365,16 +365,8 @@ struct ExploreTab: View {
     /// own screen, which renders through SceneView (same path as the Scenes tab).
     private var trySampleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Try a sample")
-                    .font(.title2.weight(.bold))
-                Spacer()
-                Button("All samples") {
-                    // V1.1: deep-link to the Samples tab
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.tint)
-            }
+            Text("Try a sample")
+                .font(.title2.weight(.bold))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     SamplePromoCard(title: "PBR Materials", subtitle: "Metallic + roughness spectrum", icon: "paintpalette.fill", gradient: [.purple.opacity(0.35), .pink.opacity(0.18)]) {
@@ -392,7 +384,7 @@ struct ExploreTab: View {
                     SamplePromoCard(title: "3D Text", subtitle: "Extruded fonts with style", icon: "textformat", gradient: [.indigo.opacity(0.30), .purple.opacity(0.18)]) {
                         AnyView(TextDemo())
                     }
-                    SamplePromoCard(title: "Scene Gallery", subtitle: "Multiple shapes in one scene", icon: "square.grid.3x3.fill", gradient: [.red.opacity(0.28), .orange.opacity(0.15)]) {
+                    SamplePromoCard(title: "Scene Gallery", subtitle: "Themed Sketchfab bundles streamed on demand", icon: "square.grid.3x3.fill", gradient: [.red.opacity(0.28), .orange.opacity(0.15)]) {
                         AnyView(SceneGalleryDemo())
                     }
                 }
@@ -424,16 +416,8 @@ struct ExploreTab: View {
     /// One horizontal carousel of Sketchfab models, used three times in the body.
     private func feedSection(title: String, feedID: String, models: [SketchfabModel]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title)
-                    .font(.title2.weight(.bold))
-                Spacer()
-                Button("See all") {
-                    // V1.1: navigate to a paged listing for this feed
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.tint)
-            }
+            Text(title)
+                .font(.title2.weight(.bold))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(models) { model in

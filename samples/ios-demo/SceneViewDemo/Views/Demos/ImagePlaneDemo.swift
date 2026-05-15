@@ -50,7 +50,7 @@ struct ImageDemo: View {
 
             VStack {
                 Spacer()
-                Text("ImageNode.color -- textured planes in an arc")
+                Text("ImageNode.color -- solid-color planes in an arc")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.6))
                     .padding(.bottom, 12)

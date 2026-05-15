@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed — iOS
+
+- ios demo cleanup + android parity: tab renamed scenes→samples, category taxonomy aligned to android, animation/auto-rotate + ar recording duplicates removed, dead explore buttons removed, settings pill no longer overlaps the controls fab, copy fixes ([#1373](https://github.com/sceneview/sceneview/issues/1373)).
+
 ### Added — iOS
 
 - **visionOS immersive-space skybox ([#1235](https://github.com/sceneview/sceneview/issues/1235)).** A `SceneView` pulled into a fully immersive `ImmersiveSpace` now renders its `showSkybox` HDR environment as a background. The new `.immersiveSpace()` modifier opts in; the HDR is mapped onto an inverted sphere parented under a `WorldComponent` root, since `RealityViewContent.environment` (the windowed iOS / macOS `.skybox(_:)` path from #1215) is unavailable on visionOS. Windowed / volumetric visionOS scenes are unchanged.

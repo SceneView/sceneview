@@ -591,7 +591,14 @@ private struct ARLauncherScreen: View {
     private var caption: String {
         switch state {
         case .ready:       return "Camera permission is requested when you start the camera."
-        case .unsupported: return "ARKit world-tracking isn't available on this iPhone model."
+        case .unsupported:
+            #if targetEnvironment(simulator)
+            // ARKit world-tracking needs a real device camera — it is never
+            // available in the iOS Simulator regardless of the iPhone model.
+            return "AR is not available in the iOS Simulator. Run on a physical device to use the camera."
+            #else
+            return "ARKit world-tracking isn't available on this device."
+            #endif
         case .cameraDenied: return "Camera access was turned off for this app. Re-enable it in Settings to place models in AR."
         }
     }
