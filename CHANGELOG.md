@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added — Samples
+
+- **Web demo: Double Pendulum physics demo** ([#1221](https://github.com/sceneview/sceneview/issues/1221)) — a new "Physics" tab in `samples/web-demo` runs the chaotic two-link pendulum with link-length / gravity sliders + reset; the integrator mirrors the shared `sceneview-core` `DoublePendulum` simulation that drives the Android and iOS demos. Reachable via the `#double-pendulum` deep link.
+
 ### Fixed — iOS true look-around camera ([#1236](https://github.com/sceneview/sceneview/issues/1236))
 
 - **iOS `.firstPerson` now rotates the perspective camera in place instead of orbiting the scene root, so switching orbit ↔ firstPerson no longer teleports the camera; new `recentersTargetOnOrbit(_:)` modifier + `CameraControls.recenterTarget()` fix pan→orbit pivot drift.** `Closes #1236`.
