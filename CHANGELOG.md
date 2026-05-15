@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added — iOS
+
+- **visionOS immersive-space skybox ([#1235](https://github.com/sceneview/sceneview/issues/1235)).** A `SceneView` pulled into a fully immersive `ImmersiveSpace` now renders its `showSkybox` HDR environment as a background. The new `.immersiveSpace()` modifier opts in; the HDR is mapped onto an inverted sphere parented under a `WorldComponent` root, since `RealityViewContent.environment` (the windowed iOS / macOS `.skybox(_:)` path from #1215) is unavailable on visionOS. Windowed / volumetric visionOS scenes are unchanged.
+
 ### Added — CI
 
 - **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
