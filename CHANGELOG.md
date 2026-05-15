@@ -14,6 +14,10 @@
 
 - **Removed the French localization from the sample apps — sample apps are English-only by design ([#1294](https://github.com/sceneview/sceneview/issues/1294)).** Deleted `samples/android-demo/.../res/values-fr/strings.xml`; the default English resources remain the single source of truth.
 
+### Fixed — 3D rendering quality umbrella ([#1074](https://github.com/sceneview/sceneview/issues/1074))
+
+- **`DefaultCameraNode` now starts at a framed 3/4 view** — the default 3D camera placement moved from `(0, 0, 1)` (1 m dead-ahead of the world origin, flat front-on, under-framing anything but a tiny object) to `(0, 0.3, 2)` looking at the origin. This frames a typical 0.3–1 m model placed at origin correctly out of the box and mirrors iOS RealityKit's `look(at: .zero, from: [0, 0.3, 2])` default, so the same scene frames identically on Android and iOS. The position is exposed as `DefaultCameraNode.DEFAULT_Y` / `DEFAULT_Z` and pinned in `SceneFactoriesTest`. This is a visual behavior change — demos that supply their own `cameraNode` are unaffected. The remaining umbrella items (IBL intensity 30k→10k, PostProcessingDemo SSAO toggle, light/material leaks, render-quality clobber, `indirectLightApply` threading, PhysicsDemo light retune) already shipped in [#1079](https://github.com/sceneview/sceneview/pull/1079), [#1088](https://github.com/sceneview/sceneview/pull/1088), [#1089](https://github.com/sceneview/sceneview/pull/1089), [#1092](https://github.com/sceneview/sceneview/pull/1092) and [#1147](https://github.com/sceneview/sceneview/pull/1147).
+
 ### Changed — CI
 
 - **`release.yml` now deploys the generated Dokka API docs to `sceneview.github.io/api/sceneview/<version>/` + `/latest/` and wraps Dokka generation in a 3× retry to tolerate transient Maven Central 503s ([#1252](https://github.com/sceneview/sceneview/issues/1252), [#1127](https://github.com/sceneview/sceneview/issues/1127)).**
