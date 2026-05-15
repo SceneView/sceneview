@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed — iOS true look-around camera ([#1236](https://github.com/sceneview/sceneview/issues/1236))
+
+- **iOS `.firstPerson` now rotates the perspective camera in place instead of orbiting the scene root, so switching orbit ↔ firstPerson no longer teleports the camera; new `recentersTargetOnOrbit(_:)` modifier + `CameraControls.recenterTarget()` fix pan→orbit pivot drift.** `Closes #1236`.
+
+### Tests
+
+- **Regression pins for three untested AR rendering fixes from the 2026-05-14 batch ([#1120](https://github.com/sceneview/sceneview/issues/1120)).** New JVM tests pin the `environmentalHdrSpecularFilter = true` default (#1086), the no-double-close hoisted cubemap upload callback (#1091), and the 7 `@Volatile` `LightEstimator` toggles (#1095).
+
 ### Added — CI
 
 - **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
@@ -10,11 +18,21 @@
 
 - **`SceneView` main/fill light mutations are now reactive ([#1306](https://github.com/sceneview/sceneview/issues/1306)).** `rememberMainLightNode` / `rememberFillLightNode` re-run their `apply` block on every recomposition (via `SideEffect`), so Compose-state-driven light properties (intensity, direction, color) propagate to the Filament scene without re-keying the `remember` — matching the iOS `RealityView.update:` reactive light contract.
 
+### Changed — Samples
+
+- **Migrated the remaining `samples/android-demo` demos to the `rememberMaterialInstance` / `rememberUnlitMaterialInstance` helpers ([#971](https://github.com/sceneview/sceneview/issues/971)).** `CollisionDemo`, `LightingDemo`, `VideoDemo`, `ARStreetscapeDemo`, `GeometryDemo`, `DebugOverlayDemo`, `PhysicsDemo` and the shared `Axes3DNode` no longer allocate `MaterialInstance` handles via raw `materialLoader.create*` without disposal — the helpers own the lifecycle. Behaviour-preserving.
+
 ### Fixed — CI security
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
 
+### Fixed — Samples
+
+- **`SecondaryCameraDemo` camera-angle controls are now TalkBack-friendly ([#1256](https://github.com/sceneview/sceneview/issues/1256)).** The section label is exposed as a heading and the selected `FilterChip` carries an explicit "Selected camera angle" state description.
+
 ### Changed — CI
+
+- **CI/publish workflows' inline `pip install` deps moved into per-workflow `.github/workflows/requirements/*.txt` files so Dependabot's `pip` ecosystem tracks and bumps them ([#1286](https://github.com/sceneview/sceneview/issues/1286)).** Same packages, same pinned versions installed — Dependabot just cannot see inline `pip install x==y` lines in workflow YAML, so the pins would have gone stale silently.
 
 - **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
 
