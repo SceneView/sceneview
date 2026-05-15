@@ -103,8 +103,13 @@ jobs:
             -project SceneViewDemo.xcodeproj \
             -clonedSourcePackagesDirPath SourcePackages
 
-      - name: Build iOS sample demo (catches missing pbxproj entries)
+      - name: Build & test iOS sample demo (catches missing pbxproj entries)
         if: always()
+        # `xcodebuild test` builds the demo AND runs the `SceneViewDemoTests`
+        # unit-test target (wired in #1227) — so a missing pbxproj registration
+        # on a new demo file still fails the PR, and the AppStoreUpdater tests
+        # now run on every PR.
+        #
         # Inject `SKETCHFAB_API_KEY` so the `Info.plist` placeholder
         # substitution path (introduced for #1157) is exercised on every CI
         # build, not just on `xcodebuild archive` in `app-store.yml`. Forks
@@ -115,7 +120,7 @@ jobs:
           SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         working-directory: samples/ios-demo
         run: |
-          xcodebuild build \
+          xcodebuild test \
             -project SceneViewDemo.xcodeproj \
             -scheme SceneViewDemo \
             -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
