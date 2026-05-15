@@ -12,6 +12,10 @@
 
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
 
+### Changed — AR `LightEstimator` allocation & robustness refactor ([#1105](https://github.com/sceneview/sceneview/issues/1105))
+
+- **`LightEstimator.update()` no longer allocates on the AR render thread.** Per-frame `Estimation`, color-correction, cubemap face-offset, RGB-triplet, and 27-element irradiance buffers are now hoisted, reused fields; an `ENVIRONMENTAL_HDR` capability probe (`Session.isSupported`, cached per mode) early-returns instead of feeding silently-degraded HDR estimates to Filament; the legacy Sceneform `1.8` pixel-intensity gain is now a named constant. Public behaviour is unchanged. `Closes #1105`.
+
 ### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
 
 - **`ARRecorder` no longer records at ARCore's low-res 640×480 default.** ARCore writes the CPU image stream into the MP4, whose stock default is the device's *lowest*-resolution camera config. `ARSceneView`'s `sessionCameraConfig` now defaults to the new `highestResolutionCameraConfig` selector (highest-resolution BACK-facing, 30 FPS config), so every AR scene — and every recording — runs at full camera resolution without opt-in. `ARRecorder.start(...)` also gains an optional `recordingResolution: Size?` parameter to request a specific resolution explicitly. `Closes #1065`.
