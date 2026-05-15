@@ -6,15 +6,20 @@
 # on 2026-05-14 dropped local disk below the 15 GB alert threshold.
 #
 # Safety contract:
-#   - NEVER removes the caller's own worktree (use --keep <path>).
-#   - NEVER removes a worktree whose branch is NOT fully merged on
-#     origin/main (ahead-count > 0 means unpushed/unmerged work).
+#   - NEVER removes the caller's own worktree (use --keep <path>, repeatable).
+#   - NEVER removes a worktree with uncommitted changes — a non-empty
+#     `git status --porcelain` skips the worktree unconditionally.
+#   - NEVER removes a worktree whose branch is NOT merged. "Merged" means
+#     either ahead-count == 0 vs origin/main, OR the branch's associated
+#     PR is MERGED on GitHub (squash-merge case — ahead-count stays > 0).
+#   - Uses plain `git worktree remove` (fails safe on dirty/locked trees),
+#     never `--force`.
 #   - Defaults to interactive prompt; --yes for non-interactive; --dry-run
 #     for preview without deletion.
 #
 # Usage:
 #   bash .claude/scripts/worktree-auto-prune.sh --dry-run --keep "$(git rev-parse --show-toplevel)"
-#   bash .claude/scripts/worktree-auto-prune.sh --yes  --keep "$(git rev-parse --show-toplevel)"
+#   bash .claude/scripts/worktree-auto-prune.sh --yes  --keep "$PATH_A" --keep "$PATH_B"
 #
 # Tracking: https://github.com/sceneview/sceneview/issues/1242
 #
@@ -26,16 +31,16 @@ set -euo pipefail
 
 DRY_RUN=false
 ASSUME_YES=false
-KEEP_PATH=""
+KEEP_PATHS=()
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --dry-run) DRY_RUN=true; shift ;;
         --yes)     ASSUME_YES=true; shift ;;
-        --keep)    KEEP_PATH="${2:-}"; shift 2 ;;
-        --keep=*)  KEEP_PATH="${1#--keep=}"; shift ;;
+        --keep)    KEEP_PATHS+=("${2:-}"); shift 2 ;;
+        --keep=*)  KEEP_PATHS+=("${1#--keep=}"); shift ;;
         -h|--help)
-            sed -n '2,25p' "$0"
+            sed -n '2,28p' "$0"
             exit 0
             ;;
         *)
@@ -64,10 +69,37 @@ fi
 GIT_COMMON_DIR="$(cd "$GIT_COMMON_DIR" && pwd)"
 REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
 
-# Normalise KEEP_PATH to an absolute path if provided.
-if [ -n "$KEEP_PATH" ]; then
-    KEEP_PATH="$(cd "$KEEP_PATH" 2>/dev/null && pwd || echo "$KEEP_PATH")"
+# Normalise each --keep path to an absolute path.
+KEEP_ABS=()
+for kp in "${KEEP_PATHS[@]:-}"; do
+    [ -z "$kp" ] && continue
+    KEEP_ABS+=("$(cd "$kp" 2>/dev/null && pwd || echo "$kp")")
+done
+
+# is_kept <path> — true if the path matches any --keep argument.
+is_kept() {
+    local p="$1" k
+    for k in "${KEEP_ABS[@]:-}"; do
+        [ -n "$k" ] && [ "$p" = "$k" ] && return 0
+    done
+    return 1
+}
+
+# gh availability — only used for the merged-PR signal. The script must
+# still work fully offline / without `gh`, falling back to ahead=0 only.
+GH_AVAILABLE=false
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    GH_AVAILABLE=true
 fi
+
+# pr_is_merged <branch> — true if the branch has an associated MERGED PR.
+# Degrades safely: any failure (offline, no gh, no PR) returns false.
+pr_is_merged() {
+    local branch="$1" state
+    [ "$GH_AVAILABLE" = "true" ] || return 1
+    state="$(gh pr view "$branch" --json state --jq .state 2>/dev/null || echo "")"
+    [ "$state" = "MERGED" ]
+}
 
 WORKTREES_DIR="$REPO_ROOT/.claude/worktrees"
 
@@ -79,8 +111,10 @@ fi
 echo -e "${CYAN}=== Worktree auto-prune ===${NC}"
 echo "Repo root:     $REPO_ROOT"
 echo "Worktrees dir: $WORKTREES_DIR"
-if [ -n "$KEEP_PATH" ]; then
-    echo "Keeping:       $KEEP_PATH"
+if [ "${#KEEP_ABS[@]:-0}" -gt 0 ]; then
+    for k in "${KEEP_ABS[@]}"; do
+        echo "Keeping:       $k"
+    done
 fi
 echo ""
 
@@ -91,6 +125,7 @@ git fetch --quiet origin main 2>/dev/null || \
 CANDIDATES=()
 SKIPPED_UNMERGED=()
 SKIPPED_KEEP=()
+SKIPPED_DIRTY=()
 
 # Iterate worktrees registered with git (avoids stale dirs that aren't
 # real worktrees, and respects locked-state).
@@ -109,14 +144,22 @@ while IFS= read -r line; do
                 # Only consider worktrees under .claude/worktrees/
                 case "$current_path" in
                     "$WORKTREES_DIR"/*)
-                        # Skip --keep path
-                        if [ -n "$KEEP_PATH" ] && [ "$current_path" = "$KEEP_PATH" ]; then
+                        # Skip --keep paths
+                        if is_kept "$current_path"; then
                             SKIPPED_KEEP+=("$current_path")
+                        # Dirty-tree check — uncommitted edits mean a session
+                        # is mid-work. NEVER prune; data-loss risk (#1278).
+                        elif [ -n "$(git -C "$current_path" status --porcelain 2>/dev/null)" ]; then
+                            SKIPPED_DIRTY+=("$current_path (${current_branch:-detached} — uncommitted changes)")
                         elif [ -n "${current_branch:-}" ]; then
                             # ahead-count: commits in branch not yet on origin/main
                             ahead=$(git rev-list --count "origin/main..$current_branch" 2>/dev/null || echo "unknown")
                             if [ "$ahead" = "0" ]; then
-                                CANDIDATES+=("$current_path|$current_branch")
+                                CANDIDATES+=("$current_path|$current_branch|ahead=0")
+                            elif pr_is_merged "$current_branch"; then
+                                # Squash-merge case: commits stay distinct
+                                # (ahead>0) but the PR is merged → reclaimable.
+                                CANDIDATES+=("$current_path|$current_branch|PR merged")
                             else
                                 SKIPPED_UNMERGED+=("$current_path ($current_branch, ahead=$ahead)")
                             fi
@@ -139,9 +182,19 @@ if [ "${#CANDIDATES[@]}" -eq 0 ]; then
 else
     for entry in "${CANDIDATES[@]}"; do
         path="${entry%%|*}"
-        branch="${entry#*|}"
+        rest="${entry#*|}"
+        branch="${rest%%|*}"
+        reason="${rest#*|}"
         size=$(du -sh "$path" 2>/dev/null | awk '{print $1}')
-        echo "  $path  [$branch]  $size"
+        echo "  $path  [$branch]  $size  ($reason)"
+    done
+fi
+
+if [ "${#SKIPPED_DIRTY[@]}" -gt 0 ]; then
+    echo ""
+    echo -e "${YELLOW}--- Skipped (uncommitted changes — DO NOT delete) ---${NC}"
+    for entry in "${SKIPPED_DIRTY[@]}"; do
+        echo "  $entry"
     done
 fi
 
@@ -187,12 +240,16 @@ REMOVED=0
 FAILED=0
 for entry in "${CANDIDATES[@]}"; do
     path="${entry%%|*}"
-    if git worktree remove --force "$path" 2>/dev/null; then
+    # Plain `git worktree remove` (no --force): it fails safe on a dirty
+    # or locked tree. A locked-but-clean worktree is unlocked first, then
+    # removed plainly — the dirty check above already gated data safety.
+    git worktree unlock "$path" 2>/dev/null || true
+    if git worktree remove "$path" 2>/dev/null; then
         REMOVED=$((REMOVED + 1))
         echo -e "  ${GREEN}removed${NC} $path"
     else
         FAILED=$((FAILED + 1))
-        echo -e "  ${RED}failed ${NC} $path"
+        echo -e "  ${RED}failed ${NC} $path (dirty/locked — left intact)"
     fi
 done
 
