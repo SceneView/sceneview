@@ -8,6 +8,10 @@ on:
       - 'docs/**'
       - 'marketing/**'
       - 'mcp*/**'
+      - 'telemetry-worker/**'
+      - 'branding/**'
+      - '.claude/**'
+      - 'tools/**'
       - '*.md'
       - 'llms*.txt'
       - 'LICENSE'
@@ -18,6 +22,10 @@ on:
       - 'docs/**'
       - 'marketing/**'
       - 'mcp*/**'
+      - 'telemetry-worker/**'
+      - 'branding/**'
+      - '.claude/**'
+      - 'tools/**'
       - '*.md'
       - 'llms*.txt'
       - 'LICENSE'
@@ -32,8 +40,74 @@ permissions:
   contents: read
 
 jobs:
+  # ── Path-filter gate ─────────────────────────────────────────────────────
+  # Computes which areas of the repo a PR touched so the three build jobs
+  # below can each skip when nothing in their scope changed. The
+  # workflow-level `paths-ignore` above already drops pure docs/website/mcp
+  # PRs; this finer per-job gate stops, for example, a Flutter-only change
+  # from rebuilding the Android libraries or a web-only change from
+  # rebuilding the Flutter demo. See #1295.
+  #
+  # A job that gets `if:`-skipped reports the "skipped" conclusion, which
+  # GitHub treats as success for branch-protection required checks — the
+  # same guarantee the repo already relies on for the workflow-level
+  # `paths` filters in ios.yml / build-apks.yml / telemetry-ci.yml. No
+  # check is renamed, so branch protection is unaffected.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      web: ${{ steps.filter.outputs.web }}
+      flutter: ${{ steps.filter.outputs.flutter }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Conservative bias (#1295): when unsure whether a path is in
+          # scope, INCLUDE it — a needless rebuild is cheaper than a
+          # skipped-but-needed test. `sceneview-core/**` is shared KMP
+          # logic, so it intentionally appears in BOTH `android` and
+          # `web`. The workflow file + its composite actions are listed
+          # under every filter so a CI change always re-runs every job.
+          # `push` events (branch `main`) have no PR diff base — the
+          # action falls back to comparing against the previous commit;
+          # the workflow-level `paths-ignore` is the real gate there.
+          filters: |
+            shared: &shared
+              - '.github/workflows/ci.yml'
+              - '.github/actions/setup-gradle/**'
+              - 'gradle/**'
+              - 'build.gradle*'
+              - 'settings.gradle*'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'gradlew.bat'
+            android:
+              - *shared
+              - 'sceneview/**'
+              - 'arsceneview/**'
+              - 'sceneview-core/**'
+              - 'samples/android-demo/**'
+              - 'samples/android-tv-demo/**'
+              - 'samples/common/**'
+            web:
+              - *shared
+              - 'sceneview-core/**'
+              - 'sceneview-web/**'
+              - 'samples/web-demo/**'
+              - 'samples/desktop-demo/**'
+            flutter:
+              - *shared
+              - 'flutter/**'
+              - 'samples/flutter-demo/**'
+
   build:
     name: Build & lint
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -131,6 +205,8 @@ jobs:
   # ── Web & Desktop modules (Kotlin/JS + Compose Desktop) ──────────────────
   web-desktop:
     name: Build web & desktop
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -175,6 +251,8 @@ jobs:
   # only shows up the next time someone runs `flutter build apk`.
   flutter-demo:
     name: Build flutter-demo APK
+    needs: changes
+    if: needs.changes.outputs.flutter == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
