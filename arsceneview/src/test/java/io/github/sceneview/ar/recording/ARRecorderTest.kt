@@ -545,6 +545,129 @@ class ARRecorderTest {
         assertEquals(ARRecorder.State.RECORDING, recorder.state)
     }
 
+    // ── recordingResolution camera-config restore after stop() (#1358) ───────
+
+    @Test
+    fun `stop restores the camera config that start swapped out for recordingResolution`() {
+        // #1358: start(recordingResolution=…) swaps the session's cameraConfig to a higher-res
+        // one. After stop(), the original config MUST be restored so the higher-res CPU image
+        // stream does not outlive the recording.
+        val originalConfig = fakeCameraConfig(640, 480)
+        val highResConfig = fakeCameraConfig(1920, 1080)
+        val recorder = ARRecorder()
+        val session = FakeSession(
+            supportedCameraConfigs = listOf(originalConfig, highResConfig),
+            initialCameraConfig = originalConfig,
+        )
+        recorder.attach(session)
+
+        assertTrue(recorder.start(outFile, recordingResolution = Size(1920, 1080)))
+        // The swap happened.
+        assertSame(highResConfig, session.cameraConfig)
+
+        recorder.stop()
+
+        // The prior config is back.
+        assertSame("stop() must restore the pre-recording camera config", originalConfig, session.cameraConfig)
+        assertEquals(ARRecorder.State.IDLE, recorder.state)
+    }
+
+    @Test
+    fun `stop does not touch the camera config when start requested no recordingResolution`() {
+        // No swap → nothing to restore. stop() must not call setCameraConfig at all.
+        val originalConfig = fakeCameraConfig(640, 480)
+        val recorder = ARRecorder()
+        val session = FakeSession(
+            supportedCameraConfigs = listOf(originalConfig),
+            initialCameraConfig = originalConfig,
+        )
+        recorder.attach(session)
+
+        assertTrue(recorder.start(outFile, recordingResolution = null))
+        recorder.stop()
+
+        assertNull("no swap happened — setCameraConfig must never be called", session.lastSetCameraConfig)
+    }
+
+    @Test
+    fun `stop does not touch the camera config when the device exposed no matching config`() {
+        // recordingResolution requested but getSupportedCameraConfigs returned empty — no swap
+        // occurred, so stop() must not attempt a restore.
+        val recorder = ARRecorder()
+        val session = FakeSession(supportedCameraConfigs = emptyList())
+        recorder.attach(session)
+
+        assertTrue(recorder.start(outFile, recordingResolution = Size(1920, 1080)))
+        recorder.stop()
+
+        assertNull("no swap happened — setCameraConfig must never be called", session.lastSetCameraConfig)
+    }
+
+    @Test
+    fun `a second recordingResolution recording restores the config from its own start`() {
+        // The captured config must be cleared on each stop() so a later recording restores
+        // the config in effect at ITS start, not a stale one.
+        val originalConfig = fakeCameraConfig(640, 480)
+        val highResConfig = fakeCameraConfig(1920, 1080)
+        val recorder = ARRecorder()
+        val session = FakeSession(
+            supportedCameraConfigs = listOf(originalConfig, highResConfig),
+            initialCameraConfig = originalConfig,
+        )
+        recorder.attach(session)
+
+        assertTrue(recorder.start(outFile, recordingResolution = Size(1920, 1080)))
+        recorder.stop()
+        assertSame(originalConfig, session.cameraConfig)
+
+        // Second recording with no resolution swap — stop() must NOT re-apply a stale config.
+        assertTrue(recorder.start(outFile, recordingResolution = null))
+        recorder.stop()
+        assertSame("stale config must not be restored on a no-swap recording", originalConfig, session.cameraConfig)
+    }
+
+    @Test
+    fun `stop restores the camera config even when stopRecording throws`() {
+        // A failed stopRecording() must not leak the higher-res config — the restore runs
+        // in a finally block.
+        val originalConfig = fakeCameraConfig(640, 480)
+        val highResConfig = fakeCameraConfig(1920, 1080)
+        val recorder = ARRecorder()
+        val session = FakeSession(
+            supportedCameraConfigs = listOf(originalConfig, highResConfig),
+            initialCameraConfig = originalConfig,
+            stopRecordingException = lazy { RecordingFailedException("io issue") },
+        )
+        recorder.attach(session)
+
+        assertTrue(recorder.start(outFile, recordingResolution = Size(1920, 1080)))
+        recorder.stop()
+
+        assertSame("config must be restored despite the stopRecording failure", originalConfig, session.cameraConfig)
+        assertEquals(ARRecorder.State.ERROR, recorder.state)
+    }
+
+    @Test
+    fun `a failed start restores the camera config it swapped before startRecording threw`() {
+        // The swap happens before startRecording(). If start fails, the prior config must be
+        // restored — a failed recording must not leak the high-res stream.
+        val originalConfig = fakeCameraConfig(640, 480)
+        val highResConfig = fakeCameraConfig(1920, 1080)
+        val recorder = ARRecorder()
+        val session = FakeSession(
+            supportedCameraConfigs = listOf(originalConfig, highResConfig),
+            initialCameraConfig = originalConfig,
+            startRecordingException = lazy { RecordingFailedException("disk full") },
+            failOnStartRecordingFromCall = 1,
+        )
+        recorder.attach(session)
+
+        assertFalse(recorder.start(outFile, recordingResolution = Size(1920, 1080)))
+
+        assertSame("a failed start must restore the pre-swap config", originalConfig, session.cameraConfig)
+        assertEquals(ARRecorder.State.ERROR, recorder.state)
+    }
+
     // ── Test doubles ─────────────────────────────────────────────────────────
 
     /** [CameraConfig] test double — stubs only the image size the selector reads. */
@@ -575,6 +698,8 @@ class ARRecorderTest {
         private val supportedCameraConfigs: List<CameraConfig> = emptyList(),
         /** When true, [getSupportedCameraConfigs] throws — simulates a JNI failure. */
         private val getSupportedCameraConfigsThrows: Boolean = false,
+        /** The config in effect before recording — what a `recordingResolution` swap must restore. */
+        initialCameraConfig: CameraConfig? = null,
     ) : Session() {
 
         var startRecordingCount: Int = 0
@@ -586,6 +711,8 @@ class ARRecorderTest {
         /** The last config passed to [setCameraConfig], or `null` if it was never called. */
         var lastSetCameraConfig: CameraConfig? = null
             private set
+        /** The session's current camera config — readable by [getCameraConfig], mutated by [setCameraConfig]. */
+        private var currentCameraConfig: CameraConfig? = initialCameraConfig
 
         override fun getPlaybackStatus(): PlaybackStatus = playbackStatus
 
@@ -613,7 +740,11 @@ class ARRecorderTest {
 
         override fun setCameraConfig(cameraConfig: CameraConfig?) {
             lastSetCameraConfig = cameraConfig
+            currentCameraConfig = cameraConfig
         }
+
+        override fun getCameraConfig(): CameraConfig =
+            currentCameraConfig ?: throw IllegalStateException("no camera config set")
     }
 
     /**
