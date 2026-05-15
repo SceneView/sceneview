@@ -307,6 +307,20 @@ Custom environment:
 .environment(.custom(name: "My HDR", hdrFile: "custom.hdr", intensity: 1.5))
 ```
 
+visionOS — immersive-space skybox: a windowed / volumetric scene composites
+over passthrough and ignores the HDR skybox. For a fully immersive
+`ImmersiveSpace`, opt in with `.immersiveSpace()` to render the HDR as a
+`WorldComponent`-rooted background sphere:
+
+```swift
+ImmersiveSpace(id: "scene") {
+    SceneView { root in /* ... */ }
+        .environment(.nightSky)   // showSkybox == true
+        .immersiveSpace()         // render the HDR skybox on visionOS
+}
+.immersionStyle(selection: .constant(.full), in: .full)
+```
+
 ---
 
 ## Materials

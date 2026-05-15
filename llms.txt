@@ -3531,6 +3531,21 @@ public struct SceneEnvironment: Sendable {
 }
 ```
 
+`showSkybox: true` renders the HDR as a background. On iOS / macOS it uses
+`RealityViewContent.environment = .skybox(...)`. On visionOS a windowed /
+volumetric scene composites over passthrough and ignores the skybox; for a
+fully immersive `ImmersiveSpace` consumer, opt in with `.immersiveSpace()`
+and the HDR is rendered via a `WorldComponent`-rooted inverted sphere:
+
+```swift
+ImmersiveSpace(id: "scene") {
+    SceneView { root in /* ... */ }
+        .environment(.nightSky)   // showSkybox == true
+        .immersiveSpace()         // render the HDR skybox on visionOS
+}
+.immersionStyle(selection: .constant(.full), in: .full)
+```
+
 ---
 
 ### NodeBuilder — declarative scene composition

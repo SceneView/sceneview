@@ -73,6 +73,10 @@ is_whitelisted() {
     # SwiftUI.Scene is a protocol unrelated to SceneView
     samples/ios-demo/SceneViewDemo/SceneViewDemoApp.swift) return 0 ;;
     SceneViewSwift/Examples/SceneViewDemo/SceneViewDemo/SceneViewDemoApp.swift) return 0 ;;
+    # environment-lighting.md's visionOS snippet declares `var body: some Scene`
+    # — that is SwiftUI's own `App.body` Scene protocol (WindowGroup /
+    # ImmersiveSpace), not the deprecated SceneView `Scene{}` composable (#1235).
+    samples/recipes/environment-lighting.md) return 0 ;;
 
     # CLAUDE.md describes the rename rule itself in prose
     # (e.g. "validator catches the `Scene { } → SceneView { }` rename") —

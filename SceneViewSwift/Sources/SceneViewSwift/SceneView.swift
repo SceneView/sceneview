@@ -100,6 +100,16 @@ public struct SceneView: View {
     // `.autoCenterContent(false)`. Closes #1026.
     var autoCenterContentEnabled: Bool = true
 
+    // visionOS only: set by `.immersiveSpace(true)` when the caller embeds
+    // this `SceneView` inside an `ImmersiveSpace` with the `.full` style. In
+    // that surface the HDR `showSkybox` environment is rendered via an
+    // inverted-sphere skybox under a `WorldComponent` root, since
+    // `RealityViewContent.environment` is `@available(visionOS, unavailable)`.
+    // Default `false` — windowed / volumetric visionOS scenes keep
+    // passthrough. No-op on iOS / macOS (those use the `.skybox(_:)` path).
+    // Closes #1235.
+    var immersiveSpace: Bool = false
+
     // When true, switching back to `.orbit` resets the orbit pivot to the
     // content centroid (world origin under auto-centering) so repeated
     // pan-then-orbit cycles don't drift the centroid out of frame.
@@ -147,6 +157,7 @@ public struct SceneView: View {
             fillLightSlot: fillLightSlot,
             renderQualityPreset: renderQualityPreset,
             autoCenterContentEnabled: autoCenterContentEnabled,
+            immersiveSpace: immersiveSpace,
             recentersTargetOnOrbit: recentersTargetOnOrbit
         )
     }
@@ -312,6 +323,36 @@ public struct SceneView: View {
         copy.autoCenterContentEnabled = enabled
         return copy
     }
+
+    /// Declares that this `SceneView` is hosted inside a fully immersive
+    /// visionOS `ImmersiveSpace` (the `.full` style).
+    ///
+    /// A windowed or volumetric `RealityView` on visionOS composites over
+    /// passthrough and ignores the RealityKit environment setter, so the
+    /// `.environment(_:)` HDR only lights the scene — its `showSkybox` flag
+    /// is silently a no-op on visionOS (see #1215). A fully immersive scene
+    /// *can* host an HDR background: opt in with this modifier and the
+    /// `showSkybox` environment is rendered as an inverted-sphere skybox
+    /// (parented under a `WorldComponent` root, since
+    /// `RealityViewContent.environment` is unavailable on visionOS).
+    ///
+    /// No effect on iOS / macOS — those always use the windowed
+    /// `.skybox(_:)` path. visionOS does not expose a runtime "am I in an
+    /// `ImmersiveSpace`?" query, so this opt-in is required. Closes #1235.
+    ///
+    /// ```swift
+    /// ImmersiveSpace(id: "scene") {
+    ///     SceneView { root in /* ... */ }
+    ///         .environment(.nightSky)   // showSkybox == true
+    ///         .immersiveSpace()         // render the HDR as a skybox
+    /// }
+    /// .immersionStyle(selection: .constant(.full), in: .full)
+    /// ```
+    public func immersiveSpace(_ enabled: Bool = true) -> SceneView {
+        var copy = self
+        copy.immersiveSpace = enabled
+        return copy
+    }
 }
 
 // MARK: - Scene entities holder
@@ -360,6 +401,10 @@ private struct SceneViewRepresentation: View {
     /// `entities.contentRoot` so the scene's centroid lands at the orbit
     /// pivot. Closes #1026.
     let autoCenterContentEnabled: Bool
+    /// visionOS only: when true, the `showSkybox` HDR environment is
+    /// rendered as an inverted-sphere skybox under a `WorldComponent` root
+    /// for fully immersive (`ImmersiveSpace`) consumers. Closes #1235.
+    let immersiveSpace: Bool
 
     /// When true, re-entering `.orbit` resets the orbit pivot to the
     /// content centroid so repeated pan→orbit cycles don't drift. Closes #1236.
@@ -412,6 +457,24 @@ private struct SceneViewRepresentation: View {
     /// NEW IBL for the load duration.
     @State private var appliedSkyboxResource: EnvironmentResource? = nil
 
+    #if os(visionOS)
+    /// visionOS-only: the equirectangular HDR texture loaded for the
+    /// immersive-space skybox. `RealityViewContent.environment` is
+    /// `@available(visionOS, unavailable)`, so the windowed `.skybox(_:)`
+    /// path above cannot be used — instead this texture is mapped onto an
+    /// inverted sphere by ``VisionOSSkybox``. Loaded in the same `.task(id:)`
+    /// closure as the IBL; `nil` while loading, on failure, or when the
+    /// environment has `showSkybox == false`. Closes #1235.
+    @State private var loadedImmersiveSkyboxTexture: TextureResource? = nil
+
+    /// HDR resource name of the immersive skybox host currently attached to
+    /// the scene — compared against the loaded environment in `update:` so
+    /// the inverted-sphere host is rebuilt only when the resource changes.
+    /// Same diff-write discipline as `appliedSkyboxResource` / the light
+    /// slots. Closes #1235.
+    @State private var appliedImmersiveSkyboxResource: String? = nil
+    #endif
+
     var body: some View {
         realityViewContent
             .gesture(dragGesture)
@@ -460,6 +523,9 @@ private struct SceneViewRepresentation: View {
                 // next frame after `loadEnvironment` completes will
                 // diff the new resource in.
                 loadedSkyboxResource = nil
+                #if os(visionOS)
+                loadedImmersiveSkyboxTexture = nil
+                #endif
                 guard let env = sceneEnvironment else { return }
                 await loadEnvironment(env)
             }
@@ -507,6 +573,16 @@ private struct SceneViewRepresentation: View {
                 }
                 appliedSkyboxResource = loadedSkyboxResource
             }
+            #endif
+
+            // visionOS immersive-space skybox. `RealityViewContent.environment`
+            // is unavailable on visionOS, so a fully immersive consumer that
+            // opted in via `.immersiveSpace()` gets the HDR rendered as an
+            // inverted-sphere skybox under a `WorldComponent` root instead.
+            // Diff-write keyed on the HDR resource name — same discipline as
+            // the iOS / macOS branch above. Closes #1235.
+            #if os(visionOS)
+            refreshImmersiveSkybox()
             #endif
         }
         #else
@@ -655,6 +731,43 @@ private struct SceneViewRepresentation: View {
         }
     }
 
+    // MARK: - visionOS immersive skybox (#1235)
+
+    #if os(visionOS)
+    /// Diffs the loaded immersive-skybox HDR against the host currently
+    /// attached to the scene and rebuilds the inverted-sphere skybox
+    /// in-place when they differ. Called from the `RealityView.update:`
+    /// closure on every render.
+    ///
+    /// `RealityViewContent.environment` is `@available(visionOS, unavailable)`,
+    /// so the iOS / macOS `.skybox(_:)` write cannot be used here. The skybox
+    /// is instead a `WorldComponent`-tagged entity (placed in absolute
+    /// immersive-space world coordinates) carrying an inverted HDR sphere.
+    /// Same diff-write discipline as ``refreshLightSlot(_:slot:)``, keyed on
+    /// the HDR resource name. Closes #1235.
+    @MainActor
+    private func refreshImmersiveSkybox() {
+        // Identity of the skybox that should be on screen this frame: the
+        // HDR resource name when a texture is loaded and the caller opted
+        // into immersive mode, otherwise `nil` (no skybox).
+        let desired: String? = (immersiveSpace && loadedImmersiveSkyboxTexture != nil)
+            ? sceneEnvironment?.hdrResource
+            : nil
+        guard desired != appliedImmersiveSkyboxResource else { return }
+        // Remove any existing skybox host.
+        let existing = entities.root.children.first { entity in
+            entity.components[VisionOSSkybox.Marker.self] != nil
+        }
+        existing?.removeFromParent()
+        // Build + attach the new host, if a texture is available.
+        if let desired, let texture = loadedImmersiveSkyboxTexture {
+            let host = VisionOSSkybox.makeHost(texture: texture, hdrResource: desired)
+            entities.root.addChild(host)
+        }
+        appliedImmersiveSkyboxResource = desired
+    }
+    #endif
+
     // MARK: - Auto-center content (#1026)
 
     /// Translates ``SceneEntities/contentRoot`` so the centroid of its
@@ -724,10 +837,28 @@ private struct SceneViewRepresentation: View {
             // Ported from Eliott Radcliffe's sceneview-swift PR #1.
             loadedSkyboxResource = env.showSkybox ? resource : nil
             #endif
+
+            // visionOS immersive-space skybox: also load the equirectangular
+            // HDR as a `TextureResource` for the inverted-sphere skybox.
+            // `EnvironmentResource.skybox` is a cubemap and cannot UV-map
+            // onto a sphere, so the HDR file itself is loaded. Only when the
+            // caller opted into `.immersiveSpace()` and `showSkybox` is set —
+            // skipped entirely for windowed visionOS scenes. Closes #1235.
+            #if os(visionOS)
+            if immersiveSpace, env.showSkybox, let hdr = env.hdrResource {
+                loadedImmersiveSkyboxTexture =
+                    await VisionOSSkybox.loadEquirectangularTexture(named: hdr)
+            } else {
+                loadedImmersiveSkyboxTexture = nil
+            }
+            #endif
         } catch {
             // Environment loading failed — scene continues with default lighting
             print("[SceneViewSwift] Failed to load environment '\(env.name)': \(error)")
             loadedSkyboxResource = nil
+            #if os(visionOS)
+            loadedImmersiveSkyboxTexture = nil
+            #endif
         }
     }
 
