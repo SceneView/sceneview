@@ -350,6 +350,11 @@ SPM_FILES=(
     website-static/playground.html
     .github/copilot-instructions.md
     gpt/system-prompt.md
+    # AI-assistant prompt surfaces in .gitignore'd dirs — tracked files
+    # that the release sweep kept missing (drift fixed by hand in #1217
+    # and again in #1262). Listed explicitly so `--fix` keeps them in sync.
+    pro/gpt-store/gpt-instructions.md
+    marketing/stackoverflow/qa-drafts.md
 )
 for spm_file in "${SPM_FILES[@]}"; do
     F="$REPO_ROOT/$spm_file"

@@ -2894,6 +2894,26 @@
       "usedIn": [
         "android-demo"
       ]
+    },
+    {
+      "id": "night_sky",
+      "name": "Night Sky (Dikhololo Night)",
+      "source": "polyhaven",
+      "sourceId": "dikhololo_night",
+      "sourceUrl": "https://polyhaven.com/a/dikhololo_night",
+      "author": "Greg Zaal",
+      "license": "CC0-1.0",
+      "file": "environments/hdr/night_sky_2k.hdr",
+      "tags": [
+        "night",
+        "stars",
+        "milky-way",
+        "outdoor"
+      ],
+      "usedIn": [
+        "android-demo",
+        "ios-demo"
+      ]
     }
   ],
   "pendingReview": [
