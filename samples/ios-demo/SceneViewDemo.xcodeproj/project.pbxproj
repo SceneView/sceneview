@@ -43,6 +43,11 @@
 		C10000000000000000000025 /* OrbitalARDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000025 /* OrbitalARDemo.swift */; };
 		C10000000000000000000031 /* ARRecorderDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000031 /* ARRecorderDemo.swift */; };
 		C10000000000000000000032 /* ARLightingDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000032 /* ARLightingDemo.swift */; };
+		C10000000000000000000033 /* AnimationDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000033 /* AnimationDemo.swift */; };
+		C10000000000000000000034 /* ModelViewerDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000034 /* ModelViewerDemo.swift */; };
+		C10000000000000000000035 /* MultiModelDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000035 /* MultiModelDemo.swift */; };
+		C10000000000000000000036 /* ARPlacementDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000036 /* ARPlacementDemo.swift */; };
+		C10000000000000000000037 /* ARInstantPlacementDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000037 /* ARInstantPlacementDemo.swift */; };
 		C10000000000000000000030 /* FavoritesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000030 /* FavoritesManager.swift */; };
 		C10000000000000000000050 /* DemoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000050 /* DemoSheet.swift */; };
 		C10000000000000000000051 /* CreditsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000051 /* CreditsSheet.swift */; };
@@ -122,6 +127,11 @@
 		C20000000000000000000025 /* OrbitalARDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalARDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000031 /* ARRecorderDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARRecorderDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000032 /* ARLightingDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARLightingDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000033 /* AnimationDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000034 /* ModelViewerDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelViewerDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000035 /* MultiModelDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiModelDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000036 /* ARPlacementDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARPlacementDemo.swift; sourceTree = "<group>"; };
+		C20000000000000000000037 /* ARInstantPlacementDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARInstantPlacementDemo.swift; sourceTree = "<group>"; };
 		C20000000000000000000030 /* FavoritesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesManager.swift; sourceTree = "<group>"; };
 		C20000000000000000000050 /* DemoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DemoSheet.swift; path = SceneViewDemo/Views/Components/DemoSheet.swift; sourceTree = SOURCE_ROOT; };
 		C20000000000000000000051 /* CreditsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CreditsSheet.swift; path = SceneViewDemo/Views/CreditsSheet.swift; sourceTree = SOURCE_ROOT; };
@@ -269,6 +279,11 @@
 				C20000000000000000000025 /* OrbitalARDemo.swift */,
 				C20000000000000000000031 /* ARRecorderDemo.swift */,
 				C20000000000000000000032 /* ARLightingDemo.swift */,
+				C20000000000000000000033 /* AnimationDemo.swift */,
+				C20000000000000000000034 /* ModelViewerDemo.swift */,
+				C20000000000000000000035 /* MultiModelDemo.swift */,
+				C20000000000000000000036 /* ARPlacementDemo.swift */,
+				C20000000000000000000037 /* ARInstantPlacementDemo.swift */,
 			);
 			path = Demos;
 			sourceTree = "<group>";
@@ -474,6 +489,11 @@
 				C10000000000000000000025 /* OrbitalARDemo.swift in Sources */,
 				C10000000000000000000031 /* ARRecorderDemo.swift in Sources */,
 				C10000000000000000000032 /* ARLightingDemo.swift in Sources */,
+				C10000000000000000000033 /* AnimationDemo.swift in Sources */,
+				C10000000000000000000034 /* ModelViewerDemo.swift in Sources */,
+				C10000000000000000000035 /* MultiModelDemo.swift in Sources */,
+				C10000000000000000000036 /* ARPlacementDemo.swift in Sources */,
+				C10000000000000000000037 /* ARInstantPlacementDemo.swift in Sources */,
 				ED794E60A009AF57DE2B2861 /* MovableLightDemo.swift in Sources */,
 				C10000000000000000000050 /* DemoSheet.swift in Sources */,
 				C10000000000000000000051 /* CreditsSheet.swift in Sources */,

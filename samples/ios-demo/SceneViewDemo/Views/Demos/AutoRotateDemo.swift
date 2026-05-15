@@ -2,10 +2,15 @@ import SwiftUI
 import RealityKit
 import SceneViewSwift
 
-/// Animation showcase -- metallic torus-like arrangement that auto-rotates continuously.
-/// Named `AnimationDemo` to mirror the Android demo of the same name (auto-rotation
-/// is the V1 form of "animation" on iOS until skinning/rig playback lands).
-struct AnimationDemo: View {
+/// Auto-rotate showcase — metallic torus-like arrangement that auto-rotates continuously.
+///
+/// Originally shipped as the iOS V1 `AnimationDemo` stub while skinning/rig playback
+/// was unported. The real ``AnimationDemo`` (carousel of streamed animated models with
+/// play / pause / speed / loop controls) now lives in `AnimationDemo.swift`, so the
+/// struct is renamed to `AutoRotateDemo` to free up the name. The "Auto Rotate"
+/// entry in ``SamplesTab`` continues to map to this struct so the on-disk catalog
+/// stays stable.
+struct AutoRotateDemo: View {
     var body: some View {
         ZStack {
             SceneView { root in
