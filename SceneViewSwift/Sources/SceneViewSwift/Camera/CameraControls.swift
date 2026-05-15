@@ -56,8 +56,14 @@ public struct CameraControls: Sendable {
     /// Target point the camera orbits around (orbit mode).
     public var target: SIMD3<Float> = .zero
 
-    /// Distance from camera to target (orbit mode).
-    public var orbitRadius: Float = 5.0
+    /// Distance from camera to target (orbit mode). Default `2.0`
+    /// matches the camera-to-target distance of the pre-v4.4.0 fake-orbit
+    /// (camera at `[0, 0.3, 2]` looking at origin) so the on-screen
+    /// framing of existing demos is preserved when orbit became true
+    /// camera motion. Bump when constructing a `CameraControls` directly
+    /// for larger scenes — values >= `5.0` are typical for room-scale
+    /// content.
+    public var orbitRadius: Float = 2.0
 
     /// Horizontal orbit angle in radians.
     public var azimuth: Float = 0.0
@@ -65,8 +71,15 @@ public struct CameraControls: Sendable {
     /// Vertical orbit angle in radians, clamped to avoid gimbal lock.
     public var elevation: Float = Float.pi / 6  // 30 degrees
 
-    /// Minimum orbit radius (zoom-in limit).
-    public var minRadius: Float = 0.5
+    /// Minimum orbit radius (zoom-in limit). Default `1.0` matches the
+    /// approximate bounding-sphere of the bundled demo content — pinching
+    /// closer would put the perspective camera inside the model (since
+    /// orbit is now true-camera motion via `cameraPosition()`, not a
+    /// scene-scale hack). Bump explicitly if your content is smaller than
+    /// ~1m extent. Pre-v4.4.0 this was `0.5`, which worked under the old
+    /// fake-orbit `scale = 5.0 / radius` path but clips into geometry on
+    /// the true-camera path.
+    public var minRadius: Float = 1.0
 
     /// Maximum orbit radius (zoom-out limit).
     public var maxRadius: Float = 50.0

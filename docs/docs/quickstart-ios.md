@@ -40,7 +40,7 @@ SceneViewSwift is distributed as a **Swift Package**.
 2. Enter the repository URL:
 
 ```
-https://github.com/sceneview/sceneview-swift.git
+https://github.com/sceneview/sceneview.git
 ```
 
 3. Set the version rule to **Up to Next Major** from `4.0.0`.
@@ -49,7 +49,7 @@ https://github.com/sceneview/sceneview-swift.git
 !!! tip
     You can also add the dependency manually in your `Package.swift`:
     ```swift
-    .package(url: "https://github.com/sceneview/sceneview-swift.git", from: "4.3.5")
+    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.3.5")
     ```
 
 ---

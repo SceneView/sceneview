@@ -9,7 +9,8 @@
 // were a manual copy of the `SceneViewSwift/` subtree of this monorepo.
 // That mirror got stuck on `v4.0.0` while the monorepo shipped through
 // `v4.0.9`, so every iOS consumer following the README was silently 9
-// versions behind.
+// versions behind. The mirror is now archived (read-only) in favour of
+// SPM consumers pointing at this monorepo directly.
 //
 // This file makes the monorepo itself a valid SPM root. The single
 // product `SceneViewSwift` points at `SceneViewSwift/Sources/SceneViewSwift`
@@ -18,9 +19,9 @@
 //     .package(url: "https://github.com/sceneview/sceneview", from: "4.3.5")
 //
 // and pin to any tag the monorepo has cut, no manual mirroring required.
-// The `SceneViewSwift/Package.swift` sub-manifest is left in place so the
-// legacy `sceneview-swift` mirror repo (still kept as a redirect / for
-// existing consumers) continues to build.
+// The `SceneViewSwift/Package.swift` sub-manifest is left in place for
+// internal use by `swift test --package-path SceneViewSwift` and for any
+// pre-archive consumer still resolving against the mirror's frozen v4.0.0.
 
 import PackageDescription
 

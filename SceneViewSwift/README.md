@@ -13,7 +13,7 @@ Add SceneViewSwift via Swift Package Manager:
 1. In Xcode, go to **File > Add Package Dependencies...**
 2. Enter the repository URL:
    ```
-   https://github.com/sceneview/sceneview-swift
+   https://github.com/sceneview/sceneview
    ```
 3. Select the version rule and add the package to your target.
 
@@ -21,7 +21,7 @@ Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview-swift", from: "4.3.5")
+    .package(url: "https://github.com/sceneview/sceneview", from: "4.3.5")
 ]
 ```
 

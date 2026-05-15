@@ -28,7 +28,7 @@ By the end of this codelab, you will have a working AR app that:
 If you have not already added SceneViewSwift, follow the same SPM steps from the [3D codelab](codelab-3d-swiftui.md):
 
 1. **File > Add Package Dependencies**
-2. URL: `https://github.com/sceneview/sceneview-swift.git`
+2. URL: `https://github.com/sceneview/sceneview.git`
 3. Version: from `4.0.0`
 
 ### Camera permission
