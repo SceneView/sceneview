@@ -236,6 +236,7 @@
     <string name="demo_secondary_camera_chip_front">Front</string>
     <string name="demo_secondary_camera_chip_corner">Corner</string>
     <string name="demo_secondary_camera_pip_cd">Picture-in-picture camera view: %1$s</string>
+    <string name="demo_secondary_camera_chip_selected">Selected camera angle</string>
     <string name="demo_debug_overlay_title">Debug Overlay</string>
     <string name="demo_debug_overlay_subtitle">Performance stats overlay</string>
     <string name="demo_ar_placement_title">Tap to Place</string>

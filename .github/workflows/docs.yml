@@ -57,9 +57,10 @@ jobs:
 
       - name: Install MkDocs
         run: |
-          pip install mkdocs-material
+          # Deps live in requirements files so Dependabot can track/bump them (#1286).
+          pip install -r .github/workflows/requirements/docs.txt
           # mkdocs-material[imaging] enables social card previews (optional, needs Cairo)
-          pip install "mkdocs-material[imaging]" 2>/dev/null || true
+          pip install -r .github/workflows/requirements/docs-imaging.txt 2>/dev/null || true
 
       - name: Sync content into docs
         run: |

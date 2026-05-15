@@ -49,6 +49,7 @@ import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 
 private const val TAG = "ARStreetscapeDemo"
 
@@ -230,14 +231,13 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     // Semi-transparent material for streetscape geometry overlays — SceneView TintLight at
     // low alpha so the real camera feed of buildings/sidewalks stays readable through the
     // overlay mesh.
-    val buildingMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(
-            color = SceneViewColors.LandscapeOverlay,
-            metallic = 0.1f,
-            roughness = 0.9f,
-            reflectance = 0.1f
-        )
-    }
+    val buildingMaterial = rememberMaterialInstance(
+        materialLoader,
+        color = SceneViewColors.LandscapeOverlay,
+        metallic = 0.1f,
+        roughness = 0.9f,
+        reflectance = 0.1f,
+    )
 
     DemoScaffold(
         title = stringResource(R.string.demo_ar_streetscape_title),

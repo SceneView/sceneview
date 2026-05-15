@@ -263,6 +263,29 @@ class ViewNode(
 
         private var destroyed = false
 
+        // The owner View we are currently waiting on to become attached to a window so we can
+        // retry the off-screen attach. Non-null only between a failed `resume()` and the moment
+        // the owner View finally attaches (or `pause()`/`destroy()` cancels the wait).
+        private var pendingAttachOwner: View? = null
+
+        // Re-runs the off-screen attach the instant the owner View becomes attached to a window.
+        // This is the fix for sceneview/sceneview#984: on a background → foreground cycle the
+        // owner SurfaceView/TextureView re-attaches *after* `onResume` fires, so the `post`ed
+        // attach in `resume()` runs while the owner is still detached and would otherwise be
+        // silently dropped — leaving the ViewNode as a black rectangle until the next process
+        // restart.
+        private val onOwnerAttachListener = object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) {
+                if (!destroyed) tryAttachingView()
+            }
+
+            override fun onViewDetachedFromWindow(v: View) {
+                // Owner window is gone — drop the off-screen window so it is not leaked, and keep
+                // waiting on this owner for the next attach.
+                tryDetachingView()
+            }
+        }
+
         val layout by lazy {
             FrameLayout(context).also {
                 context.findActivity()?.let { activity ->
@@ -282,8 +305,12 @@ class ViewNode(
 
         /**
          * An owner View can only be added to the WindowManager after the activity has finished
-         * resuming.
-         * Therefore, we must use post to ensure that the window is only added after resume is finished.
+         * resuming **and** the owner View itself is attached to a window.
+         *
+         * If the owner View is not yet attached when we try (common on a background → foreground
+         * cycle, where the SurfaceView re-attaches after `onResume`), we register an
+         * [View.OnAttachStateChangeListener] so the attach is retried automatically the moment the
+         * owner View becomes attached, instead of being silently dropped (sceneview/sceneview#984).
          */
         fun resume(ownerView: View) {
             if (destroyed) return
@@ -293,8 +320,13 @@ class ViewNode(
                 // Recheck after the post: destroy() may have run while we were queued — without this
                 // guard the layout would be re-attached to the system WindowManager *after* it was
                 // explicitly torn down, leaking the window for the lifetime of the process.
-                if (!destroyed && ownerView.isAttachedToWindow) {
+                if (destroyed) return@post
+                if (ownerView.isAttachedToWindow) {
+                    clearPendingAttach()
                     tryAttachingView()
+                } else {
+                    // Owner not attached yet — wait for it instead of dropping the attach.
+                    awaitOwnerAttach(ownerView)
                 }
             }
         }
@@ -304,34 +336,55 @@ class ViewNode(
          * the window will be leaked. Therefore we add/remove the ownerView in resume/pause.
          */
         fun pause() {
+            clearPendingAttach()
             tryDetachingView()
         }
 
         fun destroy() {
             destroyed = true
+            clearPendingAttach()
             tryDetachingView()
         }
 
+        /** Registers [onOwnerAttachListener] on [ownerView] so the attach retries once it attaches. */
+        private fun awaitOwnerAttach(ownerView: View) {
+            if (pendingAttachOwner === ownerView) return
+            clearPendingAttach()
+            pendingAttachOwner = ownerView
+            ownerView.addOnAttachStateChangeListener(onOwnerAttachListener)
+        }
+
+        /** Stops waiting on the pending owner View, if any. */
+        private fun clearPendingAttach() {
+            pendingAttachOwner?.removeOnAttachStateChangeListener(onOwnerAttachListener)
+            pendingAttachOwner = null
+        }
+
         private fun tryAttachingView() {
+            if (destroyed || layout.parent != null) return
             try {
-                if (layout.parent == null) {
-                    windowManager.addView(layout, LayoutParams(
-                        LayoutParams.WRAP_CONTENT,
-                        LayoutParams.WRAP_CONTENT,
-                        LayoutParams.TYPE_APPLICATION_PANEL,
-                        LayoutParams.FLAG_NOT_FOCUSABLE
-                                or LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                                or LayoutParams.FLAG_NOT_TOUCHABLE
-                                or LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                        PixelFormat.TRANSLUCENT
-                    ).apply {
-                        title = "ViewNodeWindowManager"
-                    })
-                }
+                windowManager.addView(layout, LayoutParams(
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.TYPE_APPLICATION_PANEL,
+                    LayoutParams.FLAG_NOT_FOCUSABLE
+                            or LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                            or LayoutParams.FLAG_NOT_TOUCHABLE
+                            or LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    title = "ViewNodeWindowManager"
+                })
+                // Attached successfully — stop waiting on any pending owner View.
+                clearPendingAttach()
             } catch (t: Throwable) {
-                Log.e(
+                // Attach failed despite the owner View being attached (e.g. a transient bad
+                // window token). This is the rare retry path, hence Log.w rather than Log.e:
+                // the attach is retried on the next resume()/owner-attach callback rather than
+                // leaving the ViewNode permanently black.
+                Log.w(
                     "ViewNode",
-                    "Failed to attach ViewNode layout to system WindowManager — view will render as black rectangle",
+                    "ViewNode layout attach to system WindowManager failed — will retry on next resume",
                     t
                 )
             }
