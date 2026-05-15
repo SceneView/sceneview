@@ -34,11 +34,14 @@ public struct LineNode: Sendable {
     ///   - to: End point in world space.
     ///   - thickness: Line thickness in meters. Default 0.005.
     ///   - color: Line color. Default white.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     public init(
         from: SIMD3<Float>,
         to: SIMD3<Float>,
         thickness: Float = 0.005,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) {
         let direction = to - from
         let length = simd_length(direction)
@@ -57,7 +60,7 @@ public struct LineNode: Sendable {
             depth: thickness
         )
         #endif
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = GeometryNode.defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
 
         // Position at midpoint

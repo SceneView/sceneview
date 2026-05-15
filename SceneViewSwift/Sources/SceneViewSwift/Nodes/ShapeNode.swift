@@ -83,15 +83,27 @@ public struct ShapeNode: Sendable {
     ///     flat shape. Default 0.
     ///   - color: Material color. Default white.
     ///   - isMetallic: Whether the material is metallic. Default false.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     public init(
         points: [SIMD2<Float>],
         extrusionDepth: Float = 0,
         color: SimpleMaterial.Color = .white,
-        isMetallic: Bool = false
+        isMetallic: Bool = false,
+        unlit: Bool = false
     ) {
         self.points = points
 
-        let material = SimpleMaterial(color: color, isMetallic: isMetallic)
+        let material: any RealityKit.Material
+        if unlit {
+            material = SimpleMaterial(color: color, isMetallic: isMetallic)
+        } else {
+            var pbr = PhysicallyBasedMaterial()
+            pbr.baseColor = .init(tint: color)
+            pbr.metallic = .init(floatLiteral: isMetallic ? 1.0 : 0.0)
+            pbr.roughness = .init(floatLiteral: 0.5)
+            material = pbr
+        }
 
         if points.count < 3 {
             // Degenerate polygon -- return an empty entity

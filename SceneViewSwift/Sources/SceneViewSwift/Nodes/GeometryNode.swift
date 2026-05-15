@@ -47,25 +47,54 @@ public struct GeometryNode: Sendable {
         nonmutating set { entity.scale = newValue }
     }
 
+    // MARK: - Default material
+
+    /// Builds the library-default material for a procedurally-created shape.
+    ///
+    /// The default is a physically-based, matte-neutral material (`metallic: 0`,
+    /// `roughness: 0.5`) so that shapes react correctly to image-based lighting
+    /// (the HDR environment that `SceneView` wires by default). This is the single
+    /// biggest visual-quality jump over RealityKit's unlit-flat `SimpleMaterial`.
+    ///
+    /// Pass `unlit: true` to opt back into the legacy flat-fill `SimpleMaterial`
+    /// look — useful for debug visualizations and overlays that should not react
+    /// to scene lighting.
+    static func defaultMaterial(
+        color: SimpleMaterial.Color,
+        unlit: Bool = false
+    ) -> any RealityKit.Material {
+        if unlit {
+            return SimpleMaterial(color: color, isMetallic: false)
+        }
+        var pbr = PhysicallyBasedMaterial()
+        pbr.baseColor = .init(tint: color)
+        pbr.metallic = .init(floatLiteral: 0.0)
+        pbr.roughness = .init(floatLiteral: 0.5) // matte-neutral default, not glossy
+        return pbr
+    }
+
     // MARK: - Cube
 
     /// Creates a cube (box) geometry.
     ///
     /// - Parameters:
     ///   - size: Edge length in meters.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
     ///   - cornerRadius: Corner rounding radius. Default 0.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a box mesh.
     public static func cube(
         size: Float = 1.0,
         color: SimpleMaterial.Color = .white,
-        cornerRadius: Float = 0
+        cornerRadius: Float = 0,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = MeshResource.generateBox(
             size: size,
             cornerRadius: cornerRadius
         )
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -92,14 +121,17 @@ public struct GeometryNode: Sendable {
     ///
     /// - Parameters:
     ///   - radius: Sphere radius in meters.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a sphere mesh.
     public static func sphere(
         radius: Float = 0.5,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = MeshResource.generateSphere(radius: radius)
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -123,18 +155,21 @@ public struct GeometryNode: Sendable {
     /// - Parameters:
     ///   - radius: Cylinder radius in meters.
     ///   - height: Cylinder height in meters.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a cylinder mesh.
     public static func cylinder(
         radius: Float = 0.5,
         height: Float = 1.0,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = MeshResource.generateCylinder(
             height: height,
             radius: radius
         )
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -147,15 +182,18 @@ public struct GeometryNode: Sendable {
     /// - Parameters:
     ///   - width: Plane width in meters.
     ///   - depth: Plane depth in meters.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a plane mesh.
     public static func plane(
         width: Float = 1.0,
         depth: Float = 1.0,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = MeshResource.generatePlane(width: width, depth: depth)
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -168,15 +206,18 @@ public struct GeometryNode: Sendable {
     /// - Parameters:
     ///   - height: Cone height in meters.
     ///   - radius: Base radius in meters.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a cone mesh.
     public static func cone(
         height: Float = 1.0,
         radius: Float = 0.5,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = MeshResource.generateCone(height: height, radius: radius)
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -191,14 +232,17 @@ public struct GeometryNode: Sendable {
     ///   - minorRadius: Radius of the tube itself.
     ///   - majorSegments: Number of segments around the main ring. Default 48.
     ///   - minorSegments: Number of segments around the tube cross-section. Default 24.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a torus mesh.
     public static func torus(
         majorRadius: Float = 0.4,
         minorRadius: Float = 0.15,
         majorSegments: Int = 48,
         minorSegments: Int = 24,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = generateTorusMesh(
             majorRadius: majorRadius,
@@ -206,7 +250,7 @@ public struct GeometryNode: Sendable {
             majorSegments: majorSegments,
             minorSegments: minorSegments
         )
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -240,14 +284,17 @@ public struct GeometryNode: Sendable {
     ///   - height: Total height including the two hemisphere caps.
     ///   - capSegments: Number of vertical segments per hemisphere cap. Default 12.
     ///   - radialSegments: Number of segments around the circumference. Default 24.
-    ///   - color: Simple material color.
+    ///   - color: Material color tint.
+    ///   - unlit: When `true`, uses a flat unlit material instead of the default
+    ///     physically-based material. Default `false`.
     /// - Returns: A `GeometryNode` containing a capsule mesh.
     public static func capsule(
         radius: Float = 0.25,
         height: Float = 1.0,
         capSegments: Int = 12,
         radialSegments: Int = 24,
-        color: SimpleMaterial.Color = .white
+        color: SimpleMaterial.Color = .white,
+        unlit: Bool = false
     ) -> GeometryNode {
         let mesh = generateCapsuleMesh(
             radius: radius,
@@ -255,7 +302,7 @@ public struct GeometryNode: Sendable {
             capSegments: capSegments,
             radialSegments: radialSegments
         )
-        let material = SimpleMaterial(color: color, isMetallic: false)
+        let material = defaultMaterial(color: color, unlit: unlit)
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.generateCollisionShapes(recursive: false)
         return GeometryNode(entity: entity)
@@ -584,8 +631,8 @@ public enum GeometryMaterial: @unchecked Sendable {
             return SimpleMaterial(color: color, isMetallic: false)
 
         case .pbr(let color, let metallic, let roughness):
-            var mat = SimpleMaterial()
-            mat.color = .init(tint: color)
+            var mat = PhysicallyBasedMaterial()
+            mat.baseColor = .init(tint: color)
             mat.metallic = .init(floatLiteral: metallic)
             mat.roughness = .init(floatLiteral: roughness)
             return mat
