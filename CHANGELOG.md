@@ -6,6 +6,10 @@
 
 - **visionOS immersive-space skybox ([#1235](https://github.com/sceneview/sceneview/issues/1235)).** A `SceneView` pulled into a fully immersive `ImmersiveSpace` now renders its `showSkybox` HDR environment as a background. The new `.immersiveSpace()` modifier opts in; the HDR is mapped onto an inverted sphere parented under a `WorldComponent` root, since `RealityViewContent.environment` (the windowed iOS / macOS `.skybox(_:)` path from #1215) is unavailable on visionOS. Windowed / volumetric visionOS scenes are unchanged.
 
+### Fixed — iOS
+
+- **camera auto-framing now scales-to-fit the scene bounds ([#1026](https://github.com/sceneview/sceneview/issues/1026), [#1041](https://github.com/sceneview/sceneview/issues/1041)).** the `SceneView` default camera now dollies to a distance that fits the content bounding box in the viewport — accounting for the vertical fov and live aspect ratio — instead of sitting at a fixed pose, so models are no longer rendered too small, too low, clipped, or overflowing across the ios demos.
+
 ### Added — Documentation
 
 - **KDoc for the `sceneview-core` collision API ([#965](https://github.com/sceneview/sceneview/issues/965)).** Documented previously-undocumented public declarations in the collision module (`Box`, `Sphere`, `Plane`, `Ray`, `RayHit`, `Vector3`, `Quaternion`, `Capsule`, `MeshCollider`, `ChangeId`, `TransformProvider`) plus the `Easing` curve set and the cross-platform `logWarning` logger.
