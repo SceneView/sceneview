@@ -2,6 +2,10 @@
 
 ## Unreleased — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Cloud Anchor docs hotfix + `sceneview-swift` mirror retired
 
+### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
+
+- **`ARRecorder` no longer records at ARCore's low-res 640×480 default.** ARCore writes the CPU image stream into the MP4, whose stock default is the device's *lowest*-resolution camera config. `ARSceneView`'s `sessionCameraConfig` now defaults to the new `highestResolutionCameraConfig` selector (highest-resolution BACK-facing, 30 FPS config), so every AR scene — and every recording — runs at full camera resolution without opt-in. `ARRecorder.start(...)` also gains an optional `recordingResolution: Size?` parameter to request a specific resolution explicitly. `Closes #1065`.
+
 ### Added — Agent skills
 
 - **Published `sceneview-ios` and `sceneview-web` agent skills, and documented the Android `sceneview` skill's `android-cli` registry submission ([#1080](https://github.com/sceneview/sceneview/issues/1080), [#1081](https://github.com/sceneview/sceneview/issues/1081), [#1082](https://github.com/sceneview/sceneview/issues/1082)).** New `agents/sceneview-ios/` (SwiftUI + RealityKit) and `agents/sceneview-web/` (Filament.js + WebXR) skills with install scripts; `check-sceneview-skill.sh` now validates all three; submission packet and steps tracked in `agents/REGISTRY.md`.
