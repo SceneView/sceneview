@@ -13,6 +13,10 @@
 
 - **New `night_sky` HDR environment** bundled across iOS and Android demos — a dramatic Milky Way starfield over a dark landscape (Poly Haven [`dikhololo_night`](https://polyhaven.com/a/dikhololo_night) by Greg Zaal, **CC0 1.0** public domain). iOS exposes it as `SceneEnvironment.nightSky` (added to `allPresets`, so it auto-surfaces in the demo's environment picker); Android adds a "Night Sky" chip to `EnvironmentDemo`. Pairs well with metallic PBR materials for chrome-mirror reflections. Web demo does not bundle HDRs and is unaffected.
 
+### Changed — iOS demo
+
+- **The AR tab launcher now doubles as a discovery surface ([#1253](https://github.com/sceneview/sceneview/issues/1253))** — a 2×3 grid of headline AR demo cards under the "Start AR Camera" CTA (Plane Placement, Instant Placement, AR Lighting, AR Recording, Orbital AR, AR Debug), each opening the demo full-screen — closing the launcher-parity gap with Android's `ArLauncherScreen`. The AR tab's placed-model count is also derived from the live anchor collection so it can no longer drift.
+
 ### Fixed — iOS demo
 
 - **`AppStoreUpdater` snooze is now version-keyed instead of a 7-day TTL ([#1231](https://github.com/sceneview/sceneview/issues/1231))** — dismissing one release's update banner no longer hides a *newer* release's banner; a new App Store version invalidates the snooze automatically, matching the Web/Flutter/RN samples. The `SceneViewDemoTests` unit-test target is now wired into `SceneViewDemo.xcodeproj` so the `AppStoreUpdater` tests run in CI ([#1227](https://github.com/sceneview/sceneview/issues/1227)).
