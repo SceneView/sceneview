@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Texture
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Visibility
@@ -157,6 +158,7 @@ val ALL_DEMOS = listOf(
     // Advanced
     DemoEntry("materials", R.string.demo_materials_title, R.string.demo_materials_subtitle, DemoCategory.ADVANCED, Icons.Filled.Palette),
     DemoEntry("physics", R.string.demo_physics_title, R.string.demo_physics_subtitle, DemoCategory.ADVANCED, Icons.Filled.ScatterPlot),
+    DemoEntry("double-pendulum", R.string.demo_double_pendulum_title, R.string.demo_double_pendulum_subtitle, DemoCategory.ADVANCED, Icons.Filled.Vibration),
     DemoEntry("post-processing", R.string.demo_post_processing_title, R.string.demo_post_processing_subtitle, DemoCategory.ADVANCED, Icons.Filled.Tune),
     DemoEntry("custom-mesh", R.string.demo_custom_mesh_title, R.string.demo_custom_mesh_subtitle, DemoCategory.ADVANCED, Icons.Filled.Hexagon),
     DemoEntry("shape", R.string.demo_shape_title, R.string.demo_shape_subtitle, DemoCategory.ADVANCED, Icons.Filled.Pentagon),
