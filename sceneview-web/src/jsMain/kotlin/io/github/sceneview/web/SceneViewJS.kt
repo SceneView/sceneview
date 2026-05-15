@@ -157,6 +157,19 @@ class SceneViewJS {
     }
 
     /**
+     * Toggle library-level auto-centring of loaded content.
+     *
+     * When enabled (the default), content is translated so its bounding box
+     * is centred on the orbit-camera target the first frame it finishes
+     * loading. Pass `false` for narrative scenes with intentional off-centre
+     * placement. Port of iOS `autoCenterContent` (#1026).
+     */
+    @JsName("setAutoCenterContent")
+    fun setAutoCenterContent(enabled: Boolean) {
+        _sceneView?.autoCenterContent = enabled
+    }
+
+    /**
      * Clean up all GPU resources. Call when removing the viewer.
      */
     @JsName("dispose")
