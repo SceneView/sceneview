@@ -124,8 +124,10 @@ public struct ImageNode: Sendable {
 
         let material: any Material
         if isLit {
-            var pbr = SimpleMaterial()
-            pbr.color = .init(texture: .init(texture))
+            var pbr = PhysicallyBasedMaterial()
+            pbr.baseColor = .init(texture: .init(texture))
+            pbr.metallic = .init(floatLiteral: 0.0)
+            pbr.roughness = .init(floatLiteral: 0.5)
             material = pbr
         } else {
             var unlit = UnlitMaterial()
