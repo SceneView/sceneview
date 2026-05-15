@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.sample.rememberMaterialInstance
 import io.github.sceneview.math.Position
@@ -90,9 +91,12 @@ fun ShapeDemo(onBack: () -> Unit) {
         "Hexagon" to hexagonPath,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_shape_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Shape", style = MaterialTheme.typography.labelLarge)
             Row(
@@ -111,6 +115,7 @@ fun ShapeDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             // Dolly closer — shape sits at z = -1 with radius ≤ 0.5 m, default camera

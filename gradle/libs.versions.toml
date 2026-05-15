@@ -11,7 +11,7 @@ fragmentKtx = "1.8.9"
 
 # Compose
 composeBom = "2026.05.00"
-composeMaterial3Expressive = "1.5.0-alpha17"
+composeMaterial3Expressive = "1.5.0-alpha18"
 activityCompose = "1.13.0"
 navigationCompose = "2.9.8"
 lifecycleRuntimeCompose = "2.10.0"
@@ -40,15 +40,15 @@ arCore = "1.53.0"
 # Networking
 fuel = "2.3.1"
 okhttp = "5.3.2"
-kotlinxSerialization = "1.8.0"
+kotlinxSerialization = "1.11.0"
 
 # UI
 googleMaterial = "1.13.0"
-media3 = "1.10.0"
+media3 = "1.10.1"
 
 # TV
 tvFoundation = "1.0.0"
-tvMaterial = "1.0.1"
+tvMaterial = "1.1.0"
 
 # Play Services
 playAppUpdate = "2.1.0"

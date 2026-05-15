@@ -83,8 +83,9 @@ public struct ShapeNode: Sendable {
     ///     flat shape. Default 0.
     ///   - color: Material color. Default white.
     ///   - isMetallic: Whether the material is metallic. Default false.
-    ///   - unlit: When `true`, uses a flat unlit material instead of the default
-    ///     physically-based material. Default `false`.
+    ///     Ignored when `unlit` is `true`.
+    ///   - unlit: When `true`, uses a flat unlit material (no lighting response)
+    ///     instead of the default physically-based material. Default `false`.
     public init(
         points: [SIMD2<Float>],
         extrusionDepth: Float = 0,
@@ -96,7 +97,10 @@ public struct ShapeNode: Sendable {
 
         let material: any RealityKit.Material
         if unlit {
-            material = SimpleMaterial(color: color, isMetallic: isMetallic)
+            // UnlitMaterial renders a flat fill that ignores scene lighting,
+            // honouring the `unlit` contract. `isMetallic` has no meaning for
+            // an unlit material and is intentionally ignored on this path.
+            material = UnlitMaterial(color: color)
         } else {
             var pbr = PhysicallyBasedMaterial()
             pbr.baseColor = .init(tint: color)

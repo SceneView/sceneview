@@ -116,8 +116,17 @@ jobs:
               - 'flutter/**'
               - 'samples/flutter-demo/**'
 
+  # ── Android build / test / lint ──────────────────────────────────────────
+  # Gap #6 (#1311): the former single "Build & lint" job ran assembleDebug +
+  # 2 demo APKs + JaCoCo unit tests + lint sequentially (~8.5 min long pole).
+  # It is now split into three jobs that run in parallel on separate runners
+  # and share the same Gradle build cache (the `setup-gradle` composite action
+  # is `cache-read-only` on non-push, so the cache is consistent across them).
+  # Trades a few extra runner-minutes for ~3 min wall-clock. All three are
+  # picked up automatically by the `CI Gate` aggregator (#1314), which polls
+  # every check run for the head SHA rather than using a static `needs:` list.
   build:
-    name: Build & lint
+    name: Build libraries & samples
     needs: changes
     if: inputs.force-all || needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
@@ -138,6 +147,43 @@ jobs:
             :samples:android-demo:assembleDebug \
             :samples:android-tv-demo:assembleDebug \
             --stacktrace
+
+  lint:
+    name: Lint
+    needs: changes
+    if: inputs.force-all || needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gradle
+
+      - name: Lint
+        run: ./gradlew :sceneview:lintDebug :arsceneview:lintDebug --stacktrace
+
+      - name: Upload lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-reports
+          path: |
+            sceneview/build/reports/lint-results-debug.html
+            arsceneview/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  unit-test:
+    name: Unit tests + coverage
+    needs: changes
+    if: inputs.force-all || needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gradle
 
       - name: Unit tests + JaCoCo coverage
         # Single invocation: jacocoTestReport depends on testDebugUnitTest so
@@ -200,19 +246,6 @@ jobs:
             sceneview/build/reports/jacoco/jacocoTestReport/
             arsceneview/build/reports/jacoco/jacocoTestReport/
           if-no-files-found: warn
-
-      - name: Lint
-        run: ./gradlew :sceneview:lintDebug :arsceneview:lintDebug --stacktrace
-
-      - name: Upload lint reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: lint-reports
-          path: |
-            sceneview/build/reports/lint-results-debug.html
-            arsceneview/build/reports/lint-results-debug.html
-          if-no-files-found: ignore
 
   # ── Web & Desktop modules (Kotlin/JS + Compose Desktop) ──────────────────
   web-desktop:

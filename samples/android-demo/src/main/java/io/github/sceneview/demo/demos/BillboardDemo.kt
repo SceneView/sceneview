@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Scale
 import io.github.sceneview.rememberCameraManipulator
@@ -49,9 +50,12 @@ fun BillboardDemo(onBack: () -> Unit) {
         createLabelBitmap("Fixed", 0xFF6446CD.toInt())  // SceneView Accent
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_billboard_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Visible Nodes", style = MaterialTheme.typography.labelLarge)
             Row(
@@ -75,6 +79,7 @@ fun BillboardDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             // Dolly closer so both 0.55 m-wide panels read comfortably — at default

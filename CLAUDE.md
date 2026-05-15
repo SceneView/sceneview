@@ -179,6 +179,17 @@ One unified showcase app per platform — all features integrated into tabs.
 | `buildSrc/` | Gradle build logic + detekt config |
 | `.github/` | CI workflows + community docs (CoC, Security, Support, Governance, Sponsors, Privacy) |
 
+## Changelog entries
+
+**Changelog entries go in `changelog.d/`, not `CHANGELOG.md`.** Each PR adds one
+fragment file `changelog.d/<issue-or-pr>-<slug>.md` with its release-note
+bullet(s) and a `<!-- category: Fixed -->` tag (Added/Changed/Fixed/Removed/
+Tests/Docs). Distinct filenames mean parallel PRs never conflict on the
+changelog. At release time `bash .claude/scripts/collate-changelog.sh X.Y.Z`
+collates every fragment into a new `## vX.Y.Z` section and deletes them. Never
+hand-edit the `## Unreleased` anchor — it is kept empty for backward-compat.
+See [`changelog.d/README.md`](changelog.d/README.md).
+
 ## Version Location Map
 
 **Source of truth:** `gradle.properties` -> `VERSION_NAME=X.Y.Z`
@@ -231,7 +242,11 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Current state (last updated: 2026-05-14 night, session upbeat-kare-a31ed4 — v4.2.0 SHIPPED end-to-end + handoff for new session)
+### Latest release: v4.4.0
+
+**Current source-of-truth version is `4.4.0`** (`gradle.properties:VERSION_NAME`). Any AI bootstrapping from this file should treat `4.4.0` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `v4.4.0`, web CDN). The dated session logs below are historical context only — do not infer the latest version from them.
+
+### Historical state (last updated: 2026-05-14 night, session upbeat-kare-a31ed4 — v4.2.0 SHIPPED end-to-end + handoff for new session)
 
 - 🚀🚀 **v4.2.0 fully published** — Maven Central `<latest>4.2.0</latest>` (.pom HTTP/2 200), npm `sceneview-web@4.2.0` + `@sceneview-sdk/react-native@4.2.0`, Dokka API docs, [GitHub Release v4.2.0](https://github.com/sceneview/sceneview/releases/tag/v4.2.0) auto-populated, Play Store production track delivered. **First fully-green `release.yml` run** (all 7 jobs ✅) since the v4.1.0 saga — release.yml hardening #1002 worked end-to-end.
 - ✅ **iOS parity sprint major scope COMPLETE** ([umbrella #1004](https://github.com/sceneview/sceneview/issues/1004) ~75% done). v4.2.0 ships LightSlot + LightNode.fill + .mainLight/.fillLight (#1016), RenderQuality preset (#1018), onEntityTapped real entity hit-test + CameraNode.exposure docs (#1019, #928), NodeGesture wire (#1024, #928), AnchorNode.image/.face/.body (#1025, #894 partial), iOS deep-link routing model-viewer + multi-model (#1020, closes #1015), reactive light update (#1031, closes #1017), AR sessionInterruption + LightNode.spot innerAngle clamp (#1013, #928).

@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.common.Axes3DNode
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
@@ -157,9 +158,12 @@ fun GestureEditingDemo(onBack: () -> Unit) {
         derivedStateOf { editable && (positionEditable || rotationEditable || scaleEditable) }
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_gesture_editing_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Row(
                 modifier = Modifier
@@ -245,6 +249,7 @@ fun GestureEditingDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             modelLoader = modelLoader,
             materialLoader = materialLoader,

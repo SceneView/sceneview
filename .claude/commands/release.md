@@ -56,23 +56,29 @@ If not using /version-bump, manually update:
 ### MCP source
 24. `mcp/src/index.ts` — version string in server info
 
-## Step 2: Update CHANGELOG.md
+## Step 2: Collate the CHANGELOG
 
-Add a new section at the top:
-```markdown
-## X.Y.Z — YYYY-MM-DD
+Changelog entries no longer live under a manually-edited `## Unreleased` anchor —
+each PR drops a fragment in `changelog.d/` (see `changelog.d/README.md`). Collate
+them into a new release section in one command:
 
-### New
-- ...
-
-### Improved
-- ...
-
-### Fixed
-- ...
+```bash
+bash .claude/scripts/collate-changelog.sh X.Y.Z
 ```
 
-Pull from recent git log: `git log <last-tag>..HEAD --oneline`
+This reads every `changelog.d/*.md` fragment, groups the bullets by category
+(`### Added` / `### Changed` / `### Fixed` / `### Removed` / `### Tests` /
+`### Docs`), prepends a `## vX.Y.Z — <date>` section to `CHANGELOG.md`, folds in
+any legacy `## Unreleased` entries, deletes the consumed fragments, and leaves an
+empty `## Unreleased` placeholder. Pass `--dry-run` first to preview, or
+`--date YYYY-MM-DD` to override the date.
+
+After collation, review `git diff CHANGELOG.md` and hand-edit the
+`## vX.Y.Z — <date>` title to add the thematic summary (the format
+`release.yml` extracts and publishes as the GitHub Release body), then
+reorder/merge bullets if needed.
+
+Cross-check against recent git log: `git log <last-tag>..HEAD --oneline`
 
 ## Step 3: Rebuild MCP
 
