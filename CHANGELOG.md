@@ -54,6 +54,9 @@ Two regressions from `cd4034ff` (PR #1224) that the #1241 emulator QA sweep prov
 
 ### Fixed — tooling
 
+- **Web demo — deferred update snackbar stranded on engine-init failure** ([#1279](https://github.com/sceneview/sceneview/issues/1279)) — `flushPendingUpdateSnackbar()` (added in PR #1271 to defer the update snackbar past engine init) was only called in the `SceneView.modelViewer(...)` success path; an engine-init rejection left a deferred version stuck in `pendingUpdateVersion` forever. The `.catch()` path now flushes too — the snackbar is pure DOM and `flushPendingUpdateSnackbar()` nulls `pendingUpdateVersion`, so it can never double-show. `Closes #1279`.
+- **`DemoInteractionTest` — FR-locale gap in control helpers** ([#1282](https://github.com/sceneview/sceneview/issues/1282)) — `secondaryCamera_pipAngles` now resolves the PiP-angle chip labels from `R.string.demo_secondary_camera_chip_*` instead of hard-coded English literals, so the interaction test passes on a French-locale device. Demos that still inline English control labels in the composable need a per-demo resource-extraction sweep first (tracked separately). `Closes #1282`.
+
 - **`worktree-auto-prune.sh` no longer risks destroying a parallel session's uncommitted work** ([#1278](https://github.com/sceneview/sceneview/issues/1278)) — the script now skips any worktree with a non-empty `git status --porcelain`, uses plain `git worktree remove` (fail-safe) instead of `--force`, accepts repeatable `--keep` paths, and reclaims squash-merged worktrees via a `gh`-backed merged-PR check that degrades gracefully offline. `Closes #1278`.
 
 ### Docs

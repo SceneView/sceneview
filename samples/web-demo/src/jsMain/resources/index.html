@@ -919,6 +919,11 @@
           .catch(function(err) {
             console.error('SceneView init failed:', err);
             loadingOverlay.querySelector('.loading-text').textContent = 'Failed to initialize: ' + err.message;
+            // Engine init failed, but the update snackbar is pure DOM and not
+            // engine-dependent — flush any deferred version so it isn't stranded
+            // in pendingUpdateVersion forever. flushPendingUpdateSnackbar() nulls
+            // pendingUpdateVersion, so the success path can never double-show it.
+            flushPendingUpdateSnackbar();
           });
       }
 
