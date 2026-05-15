@@ -1,35 +1,31 @@
 name: Deploy Demo to Play Store
 
-# Canary pattern with snapshot/release split.
+# Release-checkpoint deploy — tag-only.
 #
 # Trigger             → tracks
 # ─────────────────────────────────────────────────────────────────────
-# push to main        → internal only (snapshots like 4.0.2-abcdef0)
 # push of v* tag      → internal + production (clean release like 4.0.2)
 # manual dispatch     → user chooses
 #
-# Why this shape:
+# Why tag-only (#1321):
 #
-# - Internal is always the freshest — every push to main lands there
-#   within ~1 hour, no Google review. Thomas + the team eat the
-#   snapshot before real users do.
-# - Production is reserved for **stable releases** (semver tags). No
-#   more "4.0.2-133df8ff" snapshots leaking onto the public store —
-#   only "4.0.2", "4.0.3", … hit production.
+# - The repo runs a continuous high-merge-rate issue cycle (dozens of
+#   merges/day). Building + uploading an AAB on every push to main
+#   spent ~12 min of runner time per merge and churned the internal
+#   track with snapshots nobody installed.
+# - Production is reserved for **stable releases** (semver tags) and a
+#   tag push targets BOTH internal AND production, so internal testers
+#   still get the clean release the moment the tag lands — they no
+#   longer lag, they just no longer get a snapshot per merge.
+# - Mirrors `app-store.yml` (tag-only after #1318) and `release.yml`.
 # - A tag push runs through Google review (1-3 days) and replaces the
-#   previous public build. Internal still gets the same AAB so testers
-#   never lag behind production.
+#   previous public build.
+#
+# To deploy an interim build between releases, use `workflow_dispatch`
+# below and pick the desired track.
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'sceneview/**'
-      - 'arsceneview/**'
-      - 'sceneview-core/**'
-      - 'samples/android-demo/**'
-      - 'samples/android-demo-assets/**'
-      - 'samples/common/**'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:

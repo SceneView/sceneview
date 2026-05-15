@@ -8,11 +8,18 @@ on:
   # on every push to main, so post-merge regressions surface in the
   # Actions tab without burning ~30 min × multiple PRs per day. Trigger
   # manually via workflow_dispatch when you want to vet a feature branch.
+  #
+  # Strictly path-gated (#1311, #1321): runs only when render-affecting
+  # source actually changes. SKIPPED on doc-only, CI-only (`.github/**`),
+  # and `mcp/`-only merges — none of those can change a rendered frame.
+  # squash-merge means `main` HEAD differs from every PR commit, so this
+  # main-push run still catches integration regressions a PR build can't.
   push:
     branches: [main]
     paths:
       - 'sceneview/src/**'
       - 'arsceneview/src/**'
+      - 'sceneview-core/src/**'
       - 'samples/**'
       - 'SceneViewSwift/**'
       - 'gradle/**'

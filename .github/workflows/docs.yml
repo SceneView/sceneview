@@ -1,18 +1,22 @@
 name: Deploy website + docs
 
 on:
+  # Path-gated so a pure-code merge to main does NOT redeploy the
+  # website + docs (#1311, #1321). The repo runs a continuous
+  # high-merge-rate cycle — a Pages rebuild only adds value when
+  # documentation or website content actually changes.
+  #   - `**/*.md` covers CHANGELOG.md / MIGRATION.md / CONTRIBUTING.md
+  #     (synced into the MkDocs site) plus marketing/codelabs/*.md.
+  #   - the workflow file itself is listed so changes to the deploy
+  #     logic re-run it.
   push:
     branches: [main]
     paths:
-      - 'website-static/**'
       - 'docs/**'
-      - 'marketing/**'
-      - 'samples/web-demo/**'
-      - 'sceneview-web/**'
+      - 'website-static/**'
       - 'llms.txt'
-      - 'CHANGELOG.md'
-      - 'MIGRATION.md'
-      - 'CONTRIBUTING.md'
+      - '**/*.md'
+      - '.github/workflows/docs.yml'
   release:
     types: [published]
   workflow_call:

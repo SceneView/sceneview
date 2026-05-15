@@ -6,6 +6,11 @@ on:
   # every PR before this slimming pass). This workflow now only produces
   # the artifact-uploaded + release-attached APKs on main and tag pushes,
   # which is the only unique value vs ci.yml's build.
+  #
+  # Strictly path-gated (#1311, #1321): SKIPPED on doc-only, CI-only
+  # (`.github/**`), and `mcp/`-only merges — none of those change the
+  # built APKs. Still runs on every real code/build-script change to
+  # `main` so squash-merged integration regressions are caught.
   push:
     branches: [main]
     paths:
