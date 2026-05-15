@@ -30,6 +30,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
 import io.github.sceneview.demo.sketchfab.SketchfabSlug
@@ -120,9 +121,12 @@ fun PhysicsDemo(onBack: () -> Unit) {
         lookAt(Position(0f, 0f, 0f))
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_physics_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Bodies: $bodyCount", style = MaterialTheme.typography.labelLarge)
             Row(
@@ -198,6 +202,7 @@ fun PhysicsDemo(onBack: () -> Unit) {
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
                 cameraNode = cameraNode,
+                onFrame = firstFrame.onFrame,
                 cameraManipulator = rememberCameraManipulator(
                     orbitHomePosition = cameraNode.worldPosition
                 )

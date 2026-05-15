@@ -20,6 +20,7 @@ import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
 import io.github.sceneview.node.Node
@@ -95,9 +96,12 @@ fun CollisionDemo(onBack: () -> Unit) {
         }
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_collision_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text(
                 "Tap a shape to highlight it",
@@ -114,6 +118,7 @@ fun CollisionDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,

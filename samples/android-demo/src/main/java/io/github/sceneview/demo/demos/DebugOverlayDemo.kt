@@ -49,6 +49,7 @@ import io.github.sceneview.createDefaultCameraManipulator
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
@@ -192,9 +193,12 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
         }
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_debug_overlay_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -310,6 +314,7 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
                 cameraNode = cameraNode,
                 cameraManipulator = cameraManipulator,
                 onFrame = { frameTimeNanos ->
+                    firstFrame.onFrame(frameTimeNanos)
                     stats.onFrame(frameTimeNanos, nodeCount = currentCount)
                     // Push the just-computed FPS into the ring buffer. We read
                     // stats.fps after onFrame() so we get the freshest value.
