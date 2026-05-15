@@ -2,6 +2,10 @@
 
 ## Unreleased — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Cloud Anchor docs hotfix + `sceneview-swift` mirror retired
 
+### Removed — Samples
+
+- **Removed the French localization from the sample apps — sample apps are English-only by design ([#1294](https://github.com/sceneview/sceneview/issues/1294)).** Deleted `samples/android-demo/.../res/values-fr/strings.xml`; the default English resources remain the single source of truth.
+
 ### Changed — CI
 
 - **`release.yml` now deploys the generated Dokka API docs to `sceneview.github.io/api/sceneview/<version>/` + `/latest/` and wraps Dokka generation in a 3× retry to tolerate transient Maven Central 503s ([#1252](https://github.com/sceneview/sceneview/issues/1252), [#1127](https://github.com/sceneview/sceneview/issues/1127)).**

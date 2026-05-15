@@ -134,10 +134,8 @@ class DemoInteractionTest {
      * bypassing the home list scroll entirely. Waits until the demo's title bar appears.
      *
      * The expected title is resolved from [ALL_DEMOS] via `context.getString(titleRes)`
-     * rather than passed as a literal — so the `By.text(...)` match works on ANY device
-     * locale. A hard-coded English literal silently broke the whole suite on a French
-     * device (see #1257): every key in `values-fr/strings.xml` resolves to a French
-     * title the matcher would never find.
+     * rather than passed as a literal — so the `By.text(...)` match stays in sync with
+     * the string resources and never drifts when a demo title is renamed.
      */
     private fun openDemo(demoId: String) {
         val titleRes = ALL_DEMOS.firstOrNull { it.id == demoId }?.titleRes
@@ -669,7 +667,7 @@ class DemoInteractionTest {
         screenshot("53_secondaryCam_top_default")
 
         // Chip labels resolved from string resources (R.string.demo_secondary_camera_chip_*,
-        // added in PR #1270) so the tap matcher works on any device locale — see #1282.
+        // added in PR #1270) so the tap matcher stays in sync with the string resources.
         tap(context.getString(R.string.demo_secondary_camera_chip_side))
         screenshot("54_secondaryCam_side")
 

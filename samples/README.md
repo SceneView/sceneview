@@ -2,6 +2,8 @@
 
 This directory contains sample apps demonstrating SceneView capabilities across Android, iOS, Web, Desktop, Flutter, and React Native.
 
+> **Sample apps are English-only — do not add localized resources.** They are technical demonstrations for developers; localization adds maintenance and test-matrix cost for zero practical value (see [#1294](https://github.com/sceneview/sceneview/issues/1294)).
+
 ## Quick reference — "I want to..."
 
 | I want to... | Sample | Key code |
