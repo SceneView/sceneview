@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed — CI security
+
+- **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
+
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
 
 ### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
