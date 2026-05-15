@@ -166,6 +166,31 @@ class InAppUpdateManagerTest {
     }
 
     @Test
+    fun `DOWNLOADING state surfaces with non-zero downloadProgress`() {
+        fake.setUpdateAvailable(42)
+        manager.checkForUpdate()
+        shadowOf(activity.mainLooper).idle()
+        fake.userAcceptsUpdate()
+        // `downloadStarts()` flips the fake into the DOWNLOADING phase and
+        // emits an InstallState with 0 bytes — that already drives the manager
+        // to `UpdateState.DOWNLOADING`.
+        fake.downloadStarts()
+        shadowOf(activity.mainLooper).idle()
+        assertEquals(InAppUpdateManager.UpdateState.DOWNLOADING, manager.updateState)
+
+        // `setBytesDownloaded` only re-fires the InstallStateUpdatedListener
+        // once the fake is in the DOWNLOADING phase AND the byte count fits
+        // inside `totalBytesToDownload`, so the total must be set first. The
+        // re-emitted DOWNLOADING event carries 500 / 2000 -> 0.25 progress.
+        fake.setTotalBytesToDownload(2000)
+        fake.setBytesDownloaded(500)
+        shadowOf(activity.mainLooper).idle()
+
+        assertEquals(InAppUpdateManager.UpdateState.DOWNLOADING, manager.updateState)
+        assertEquals(0.25f, manager.downloadProgress, 0.001f)
+    }
+
+    @Test
     fun `zero totalBytes does not crash progress computation`() {
         fake.setUpdateAvailable(42)
         manager.checkForUpdate()
