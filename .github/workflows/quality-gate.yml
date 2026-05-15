@@ -61,11 +61,13 @@ jobs:
 
     steps:
       - name: Checkout
+        # Gap #10 (#1311): the default shallow checkout (fetch-depth: 1) is
+        # sufficient. quality-gate.sh only runs `git diff HEAD`,
+        # `git diff --cached`, `git ls-files` and `git branch --show-current`
+        # — all of which resolve against the working tree / HEAD, never an
+        # older commit. sync-versions.sh compares files with plain `diff`, no
+        # git history. Dropping `fetch-depth: 0` skips cloning full history.
         uses: actions/checkout@v6
-        with:
-          # Full history so quality-gate.sh can run git diff/ls-files against
-          # main and so version checks can resolve historical refs.
-          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -100,9 +102,9 @@ jobs:
         env:
           # Optional. Demo runtime disables Geospatial when unset.
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
-          # ci.yml's `build` job already runs `assembleDebug` + the same
-          # unit-test set + JaCoCo coverage in parallel with this gate.
-          # Skipping the duplicate Android build/test work here keeps the
+          # ci.yml's `build` / `unit-test` jobs already run `assembleDebug`
+          # + the same unit-test set + JaCoCo coverage in parallel with this
+          # gate. Skipping the duplicate Android build/test work here keeps the
           # gate focused on what it owns uniquely: version sync, security
           # scans, asset CDN integrity, website rules, MCP tests, agent
           # skill drift. Trims ~5 min from every PR and push. The full

@@ -7,11 +7,18 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * A Vector with 3 floats.
+ * A mutable 3-component vector (x, y, z).
+ *
+ * Used throughout the collision system for positions, directions, scales and extents.
+ * Instances are mutable: methods like [set] modify the receiver in place, while operations
+ * such as [scaled] or the [Companion] arithmetic helpers return new instances.
  */
 class Vector3 {
+    /** The X component. */
     var x: Float
+    /** The Y component. */
     var y: Float
+    /** The Z component. */
     var z: Float
 
     /** Construct a Vector3 and assign zero to all values */
@@ -81,8 +88,10 @@ class Vector3 {
         set(-1f, 0f, 0f)
     }
 
+    /** Returns the squared length (magnitude) of this vector. Cheaper than [length] — avoids the square root. */
     fun lengthSquared(): Float = x * x + y * y + z * z
 
+    /** Returns the Euclidean length (magnitude) of this vector. */
     fun length(): Float = sqrt(lengthSquared())
 
     override fun toString(): String = "[x=$x, y=$y, z=$z]"
@@ -127,18 +136,23 @@ class Vector3 {
     }
 
     companion object {
+        /** Returns the component-wise sum `lhs + rhs` as a new vector. */
         fun add(lhs: Vector3, rhs: Vector3): Vector3 =
             Vector3(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z)
 
+        /** Returns the component-wise difference `lhs - rhs` as a new vector. */
         fun subtract(lhs: Vector3, rhs: Vector3): Vector3 =
             Vector3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z)
 
+        /** Returns the component-wise (Hadamard) product `lhs * rhs` as a new vector. */
         fun multiply(lhs: Vector3, rhs: Vector3): Vector3 =
             Vector3(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z)
 
+        /** Returns the dot product of [lhs] and [rhs]. */
         fun dot(lhs: Vector3, rhs: Vector3): Float =
             lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z
 
+        /** Returns the cross product `lhs × rhs` — a vector perpendicular to both inputs. */
         fun cross(lhs: Vector3, rhs: Vector3): Vector3 {
             val lhsX = lhs.x
             val lhsY = lhs.y
@@ -151,9 +165,11 @@ class Vector3 {
             )
         }
 
+        /** Returns the component-wise minimum of [lhs] and [rhs]. */
         fun min(lhs: Vector3, rhs: Vector3): Vector3 =
             Vector3(min(lhs.x, rhs.x), min(lhs.y, rhs.y), min(lhs.z, rhs.z))
 
+        /** Returns the component-wise maximum of [lhs] and [rhs]. */
         fun max(lhs: Vector3, rhs: Vector3): Vector3 =
             Vector3(max(lhs.x, rhs.x), max(lhs.y, rhs.y), max(lhs.z, rhs.z))
 
@@ -161,6 +177,12 @@ class Vector3 {
 
         internal fun componentMin(a: Vector3): Float = min(min(a.x, a.y), a.z)
 
+        /**
+         * Linearly interpolates between [a] and [b].
+         *
+         * @param t Interpolation factor; 0 returns [a], 1 returns [b]. Values outside
+         *   `[0, 1]` extrapolate.
+         */
         fun lerp(a: Vector3, b: Vector3, t: Float): Vector3 = Vector3(
             MathHelper.lerp(a.x, b.x, t), MathHelper.lerp(a.y, b.y, t), MathHelper.lerp(a.z, b.z, t)
         )
@@ -184,6 +206,7 @@ class Vector3 {
             return (angleRadians * (180.0 / PI)).toFloat()
         }
 
+        /** Returns `true` if [lhs] and [rhs] are equal component-wise within floating-point tolerance. */
         fun equals(lhs: Vector3, rhs: Vector3): Boolean {
             var result = true
             result = result and MathHelper.almostEqualRelativeAndAbs(lhs.x, rhs.x)
@@ -192,13 +215,28 @@ class Vector3 {
             return result
         }
 
+        /** Returns a new zero vector `(0, 0, 0)`. */
         fun zero(): Vector3 = Vector3()
+
+        /** Returns a new vector with all components set to 1 — the unit scale. */
         fun one(): Vector3 = Vector3(1f, 1f, 1f)
+
+        /** Returns the forward direction `(0, 0, -1)` (SceneView faces down -Z). */
         fun forward(): Vector3 = Vector3(0f, 0f, -1f)
+
+        /** Returns the backward direction `(0, 0, 1)`. */
         fun back(): Vector3 = Vector3(0f, 0f, 1f)
+
+        /** Returns the up direction `(0, 1, 0)`. */
         fun up(): Vector3 = Vector3(0f, 1f, 0f)
+
+        /** Returns the down direction `(0, -1, 0)`. */
         fun down(): Vector3 = Vector3(0f, -1f, 0f)
+
+        /** Returns the right direction `(1, 0, 0)`. */
         fun right(): Vector3 = Vector3(1f, 0f, 0f)
+
+        /** Returns the left direction `(-1, 0, 0)`. */
         fun left(): Vector3 = Vector3(-1f, 0f, 0f)
     }
 }

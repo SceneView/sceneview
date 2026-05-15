@@ -43,7 +43,8 @@ SceneView { root in
     root.addChild(model.entity)
 }
 .environment(.studio)              // IBL lighting preset
-.cameraControls(.orbit)            // .orbit (default) | .pan | .firstPerson (v4.3.0+)
+.cameraControls(.orbit)            // .orbit (default) | .pan | .firstPerson (v4.3.0+; firstPerson is true in-place look-around v4.4.0+)
+.recentersTargetOnOrbit(true)      // v4.4.0+ — re-pivot on content centroid when returning to orbit (default false)
 .onEntityTapped { entity in }      // tap handler
 .autoRotate(speed: 0.3)            // turntable auto-rotation
 .autoCenterContent(true)           // v4.3.0+ — library translates content centroid to orbit pivot (default true; pass false to keep explicit placements)
@@ -304,6 +305,20 @@ Custom environment:
 
 ```swift
 .environment(.custom(name: "My HDR", hdrFile: "custom.hdr", intensity: 1.5))
+```
+
+visionOS — immersive-space skybox: a windowed / volumetric scene composites
+over passthrough and ignores the HDR skybox. For a fully immersive
+`ImmersiveSpace`, opt in with `.immersiveSpace()` to render the HDR as a
+`WorldComponent`-rooted background sphere:
+
+```swift
+ImmersiveSpace(id: "scene") {
+    SceneView { root in /* ... */ }
+        .environment(.nightSky)   // showSkybox == true
+        .immersiveSpace()         // render the HDR skybox on visionOS
+}
+.immersionStyle(selection: .constant(.full), in: .full)
 ```
 
 ---

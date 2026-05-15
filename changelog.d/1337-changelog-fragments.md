@@ -1,0 +1,2 @@
+<!-- category: Changed -->
+- **Adopted a towncrier-style fragment changelog ([#1337](https://github.com/sceneview/sceneview/issues/1337)).** PRs now drop a small file in `changelog.d/` instead of editing `CHANGELOG.md`'s `## Unreleased` anchor, so parallel PRs no longer conflict on the changelog. `.claude/scripts/collate-changelog.sh X.Y.Z` collates the fragments into a new `## vX.Y.Z` section at release time. `Closes #1337`.

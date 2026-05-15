@@ -32,6 +32,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoPreviewPlaceholder
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.SceneViewColors
 import io.github.sceneview.demo.demos.internal.DemoMath
@@ -121,9 +122,13 @@ fun GeometryDemo(onBack: () -> Unit) {
         }
     }
 
+    val firstFrame = rememberFirstFrameState()
+
+
     DemoScaffold(
         title = stringResource(R.string.demo_geometry_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Controls extracted into a separate composable so a Roborazzi snapshot
             // test can capture the panel layout in pure JVM (no Filament, no SceneView).
@@ -140,6 +145,7 @@ fun GeometryDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,

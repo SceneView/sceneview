@@ -1,4 +1,6 @@
 import XCTest
+import RealityKit
+import CoreGraphics
 @testable import SceneViewSwift
 
 #if os(iOS) || os(visionOS)
@@ -93,5 +95,76 @@ final class SceneEnvironmentTests: XCTestCase {
         env.showSkybox = false
         XCTAssertFalse(env.showSkybox)
     }
+
+    // MARK: - visionOS immersive skybox (#1235)
+
+    func testImmersiveSpaceModifierDefaultsOff() {
+        // Without the modifier, a SceneView keeps passthrough on visionOS.
+        let view = SceneView { _ in }
+        XCTAssertFalse(view.immersiveSpace)
+    }
+
+    func testImmersiveSpaceModifierOptIn() {
+        let view = SceneView { _ in }.immersiveSpace()
+        XCTAssertTrue(view.immersiveSpace)
+    }
+
+    func testImmersiveSpaceModifierExplicitFalse() {
+        let view = SceneView { _ in }.immersiveSpace(false)
+        XCTAssertFalse(view.immersiveSpace)
+    }
+
+    func testImmersiveSpaceModifierIsCopyOnWrite() {
+        // The modifier must not mutate the receiver — it returns a copy.
+        let base = SceneView { _ in }
+        _ = base.immersiveSpace()
+        XCTAssertFalse(base.immersiveSpace)
+    }
 }
+
+#if os(visionOS)
+@MainActor
+final class VisionOSSkyboxTests: XCTestCase {
+
+    func testMakeHostCarriesWorldComponentAndMarker() async throws {
+        // A 1×1 white texture stands in for the equirectangular HDR — the
+        // host-construction path is texture-agnostic.
+        let texture = try await TextureResource(
+            image: makeWhitePixel(),
+            withName: "skybox-test-pixel",
+            options: .init(semantic: .hdrColor)
+        )
+        let host = VisionOSSkybox.makeHost(texture: texture, hdrResource: "studio.hdr")
+        // Marker stamps the HDR resource for the update: diff.
+        let marker = host.components[VisionOSSkybox.Marker.self]
+        XCTAssertEqual(marker?.hdrResource, "studio.hdr")
+        // WorldComponent places the subtree in absolute world space.
+        XCTAssertNotNil(host.components[WorldComponent.self])
+        // Exactly one inverted-sphere child.
+        XCTAssertEqual(host.children.count, 1)
+        XCTAssertEqual(host.children.first?.scale, [-1, 1, 1])
+    }
+
+    func testLoadEquirectangularTextureMissingFileReturnsNil() async {
+        // Graceful degradation: an unresolvable HDR returns nil instead of
+        // throwing, so the immersive background just stays neutral.
+        let texture = await VisionOSSkybox.loadEquirectangularTexture(
+            named: "does-not-exist-\(UUID().uuidString).hdr"
+        )
+        XCTAssertNil(texture)
+    }
+
+    private func makeWhitePixel() -> CGImage {
+        let space = CGColorSpaceCreateDeviceRGB()
+        let ctx = CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: space,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+        return ctx.makeImage()!
+    }
+}
+#endif
 #endif

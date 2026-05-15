@@ -30,6 +30,7 @@ import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberPausableHeroYaw
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
@@ -88,9 +89,12 @@ fun ViewNodeDemo(onBack: () -> Unit) {
         onScroll = { _, _, _, _ -> onHeroGesture() },
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_view_node_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Wrap the whole row in Modifier.toggleable so the row itself is the
             // click target — tapping anywhere on "Visible" (label or switch) flips
@@ -113,6 +117,7 @@ fun ViewNodeDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,

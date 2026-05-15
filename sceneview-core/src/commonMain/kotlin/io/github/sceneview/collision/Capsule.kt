@@ -41,27 +41,34 @@ class Capsule : CollisionShape {
         this.center.set(center)
     }
 
+    /** Sets the capsule center and notifies listeners that the shape changed. The vector is copied. */
     fun setCenter(center: Vector3) {
         this.center.set(center)
         onChanged()
     }
 
+    /** Returns a copy of the capsule center. */
     fun getCenter(): Vector3 = Vector3(center)
 
+    /** Sets the capsule radius and notifies listeners that the shape changed. */
     fun setRadius(radius: Float) {
         this.radius = radius
         onChanged()
     }
 
+    /** Returns the capsule radius. */
     fun getRadius(): Float = radius
 
+    /** Sets the full capsule height (including the hemispherical caps) and notifies listeners. */
     fun setHeight(height: Float) {
         this.height = height
         onChanged()
     }
 
+    /** Returns the full capsule height, including the hemispherical caps. */
     fun getHeight(): Float = height
 
+    /** Sets the capsule orientation and notifies listeners that the shape changed. */
     fun setRotation(rotation: Quaternion) {
         rotationMatrix.makeRotation(rotation)
         onChanged()
@@ -83,12 +90,23 @@ class Capsule : CollisionShape {
         return Pair(bottom, top)
     }
 
+    /** Returns an independent copy of this capsule with the same dimensions and orientation. */
     override fun makeCopy(): Capsule {
         val copy = Capsule(radius, height, getCenter())
         copy.rotationMatrix.set(rotationMatrix)
         return copy
     }
 
+    /**
+     * Tests whether [ray] intersects this capsule and, if so, fills [result] with the nearest hit.
+     *
+     * The capsule is tested as an infinite cylinder body plus two hemispherical caps;
+     * the closest non-negative intersection across all parts is reported.
+     *
+     * @param ray Ray in the same space as the capsule.
+     * @param result Mutated in place with the hit distance and point when an intersection occurs.
+     * @return `true` if the ray intersects the capsule.
+     */
     override fun rayIntersection(ray: Ray, result: RayHit): Boolean {
         // Ray-capsule intersection: test ray against the infinite cylinder,
         // then against the two hemispherical caps
@@ -160,6 +178,11 @@ class Capsule : CollisionShape {
         return false
     }
 
+    /**
+     * Returns `true` if this capsule overlaps [shape].
+     *
+     * Supports [Sphere], [Box] and [Capsule]; any other shape type returns `false`.
+     */
     override fun shapeIntersection(shape: CollisionShape): Boolean {
         return when (shape) {
             is Sphere -> capsuleSphereIntersection(this, shape)
@@ -169,22 +192,35 @@ class Capsule : CollisionShape {
         }
     }
 
+    /** Returns `true` if this capsule overlaps [sphere]. */
     override fun sphereIntersection(sphere: Sphere): Boolean =
         capsuleSphereIntersection(this, sphere)
 
+    /** Returns `true` if this capsule overlaps [box]. */
     override fun boxIntersection(box: Box): Boolean =
         capsuleBoxIntersection(this, box)
 
-    /** Test whether this capsule intersects another [Capsule]. */
+    /** Returns `true` if this capsule overlaps another [Capsule]. */
     fun capsuleIntersection(other: Capsule): Boolean =
         capsuleCapsuleIntersection(this, other)
 
+    /**
+     * Returns a new capsule obtained by applying [transformProvider]'s transform to this one.
+     *
+     * Position, orientation, radius (scaled by the larger radial scale) and height are carried through.
+     */
     override fun transform(transformProvider: TransformProvider): CollisionShape {
         val result = Capsule()
         transform(transformProvider, result)
         return result
     }
 
+    /**
+     * Applies [transformProvider]'s transform to this capsule, writing into [result].
+     *
+     * @param result Must be a [Capsule] and must not be this same instance.
+     * @throws IllegalArgumentException if [result] is this same capsule instance.
+     */
     override fun transform(transformProvider: TransformProvider, result: CollisionShape) {
         if (result !is Capsule) {
             logWarning(TAG, "Cannot pass CollisionShape of a type other than Capsule into Capsule.transform.")

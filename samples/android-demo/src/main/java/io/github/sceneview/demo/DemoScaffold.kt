@@ -49,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,6 +111,13 @@ enum class AssetSourceState { Streamed, Streaming, Bundled }
  * The sheet content is rendered inside a vertically-scrolling Column so the same
  * `controls = { ... }` blocks that worked with the v1 side-panel work unchanged
  * — 35 demo call-sites stay byte-identical.
+ *
+ * - `firstFrameRendered != null` → a surface-tinted scrim covers the 3D viewport
+ *   until the first Filament frame is presented, hiding the 5–12 s cold-start
+ *   black viewport that reads as a crash to users (#1022). Wire it with
+ *   [rememberFirstFrameState] + `SceneView(onFrame = …)`. A defensive 12 s
+ *   timeout dismisses the scrim even if `onFrame` never fires. Demos that load
+ *   models can still layer their own [LoadingScrim] spinner on top.
  */
 @Composable
 fun DemoScaffold(
@@ -117,6 +125,7 @@ fun DemoScaffold(
     onBack: () -> Unit,
     controls: (@Composable ColumnScope.() -> Unit)? = null,
     assetSource: AssetSourceState? = null,
+    firstFrameRendered: androidx.compose.runtime.State<Boolean>? = null,
     scene: @Composable BoxScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -178,6 +187,10 @@ fun DemoScaffold(
         ) {
             Box(modifier = Modifier.fillMaxSize(), content = scene)
 
+            if (firstFrameRendered != null) {
+                FirstFrameScrim(firstFrameRendered = firstFrameRendered)
+            }
+
             if (assetSource != null) {
                 AssetSourceChip(state = assetSource)
             }
@@ -234,6 +247,65 @@ private fun BoxScope.AssetSourceChip(state: AssetSourceState) {
 }
 
 /**
+ * Surface-tinted scrim that covers the 3D viewport until the SceneView presents
+ * its first Filament frame (#1022). Without it, 13 of the demos render a black
+ * viewport for 5–12 s on a cold start while shaders compile — which reads as a
+ * crash to a first-time user.
+ *
+ * The scrim is an opaque [MaterialTheme.colorScheme.surface] fill (light + dark
+ * both covered by the theme token) carrying a small centred progress indicator.
+ * Once [firstFrameRendered] flips true it cross-fades out over 350 ms (the
+ * `DESIGN.md` `duration-medium` token), revealing the rendered scene underneath.
+ *
+ * Defensive timeout: if `onFrame` never fires (a broken demo, a viewport that
+ * never composes a SceneView) the scrim still dismisses after 12 s so the
+ * controls are never permanently blocked.
+ */
+@Composable
+private fun BoxScope.FirstFrameScrim(
+    firstFrameRendered: androidx.compose.runtime.State<Boolean>,
+) {
+    // Defensive fallback: dismiss even if the first frame is never reported.
+    var timedOut by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(FIRST_FRAME_SCRIM_TIMEOUT_MS)
+        timedOut = true
+    }
+    val dismissed = firstFrameRendered.value || timedOut
+    // Cross-fade out on the M3 `duration-medium` (350 ms) — the surface fades to
+    // reveal the rendered scene, never the reverse, so it can't imply readiness
+    // and then flash black again (see #1022 rejected-timeout note).
+    val alpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (dismissed) 0f else 1f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 350),
+        label = "first-frame-scrim",
+    )
+    if (alpha <= 0f) return
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .alpha(alpha)
+            .background(MaterialTheme.colorScheme.surface)
+            // Swallow touches while the scrim is opaque so a stray tap can't
+            // reach the (not-yet-rendered) scene; lets them through once fading.
+            .then(
+                if (dismissed) Modifier
+                else Modifier.pointerInput(Unit) { detectTapGestures { } }
+            )
+            .testTag(DemoScaffoldTestTags.FIRST_FRAME_SCRIM),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.CircularProgressIndicator(
+            modifier = Modifier.size(40.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 4.dp,
+        )
+    }
+}
+
+private const val FIRST_FRAME_SCRIM_TIMEOUT_MS = 12_000L
+
+/**
  * Stable test tags consumed by `DemoInteractionTest` and any future visual smoke
  * tooling so the controls sheet can be opened deterministically without relying
  * on accessibility-tree heuristics. Kept in the public surface of this file so
@@ -245,6 +317,7 @@ object DemoScaffoldTestTags {
     const val SETTINGS_SHEET = "demo-settings-sheet"
     const val QA_PILL = "demo-qa-pill"
     const val ASSET_SOURCE_CHIP = "demo-asset-source-chip"
+    const val FIRST_FRAME_SCRIM = "demo-first-frame-scrim"
 }
 
 /**

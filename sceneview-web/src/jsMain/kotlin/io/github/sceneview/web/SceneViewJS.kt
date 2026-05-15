@@ -184,5 +184,9 @@ class SceneViewJS {
 
 /**
  * Library version.
+ *
+ * Kept in lockstep with the repo-wide `VERSION_NAME` (`gradle.properties`) — `sceneview-web` has no
+ * Gradle `buildConfig` plugin, so this literal is the single source of truth for the JS surface.
+ * Bump it together with every other version location (see CLAUDE.md "Version Location Map").
  */
-const val SCENEVIEW_VERSION = "3.6.0"
+const val SCENEVIEW_VERSION = "4.4.0"

@@ -11,14 +11,20 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * A Sceneform quaternion class for floats.
+ * A mutable float quaternion representing a 3D rotation.
  *
  * Quaternion operations are Hamiltonian using the right-hand-rule convention.
+ * Components are stored normalized — most setters re-normalize automatically.
+ * The identity quaternion `(0, 0, 0, 1)` represents no rotation.
  */
 class Quaternion {
+    /** The X component of the rotation axis (imaginary part). */
     var x: Float
+    /** The Y component of the rotation axis (imaginary part). */
     var y: Float
+    /** The Z component of the rotation axis (imaginary part). */
     var z: Float
+    /** The scalar (real) component. */
     var w: Float
 
     /** Construct Quaternion and set to Identity */
@@ -130,14 +136,26 @@ class Quaternion {
         return true
     }
 
+    /** Returns a normalized (unit-length) copy of this quaternion, leaving this one unchanged. */
     fun normalized(): Quaternion {
         val result = Quaternion(this)
         result.normalize()
         return result
     }
 
+    /**
+     * Returns the inverse rotation as a new quaternion (the conjugate, valid for unit quaternions).
+     *
+     * Applying this rotation after the original cancels it out.
+     */
     fun inverted(): Quaternion = Quaternion(-this.x, -this.y, -this.z, this.w)
 
+    /**
+     * Returns a new quaternion with all components negated.
+     *
+     * This represents the *same* rotation as the original (q and -q are equivalent),
+     * but is useful for taking the shortest interpolation path.
+     */
     fun negated(): Quaternion = Quaternion(-this.x, -this.y, -this.z, -this.w)
 
     override fun toString(): String = "[x=$x, y=$y, z=$z, w=$w]"
@@ -171,6 +189,11 @@ class Quaternion {
         return result
     }
 
+    /**
+     * Returns this rotation as Euler angles in degrees (pitch, yaw, roll) on the X, Y, Z axes.
+     *
+     * @return A [Vector3] where x/y/z hold the rotation about each axis in degrees.
+     */
     fun getEulerAngles(): Vector3 {
         val xRadians = atan2((2.0f * (y * z + w * x)).toDouble(), (w * w - x * x - y * y + z * z).toDouble())
         val yRadians = asin((-2.0f * (x * z - w * y)).toDouble())
@@ -185,6 +208,7 @@ class Quaternion {
     companion object {
         private const val SLERP_THRESHOLD = 0.9995f
 
+        /** Rotates [src] by quaternion [q] and returns the rotated vector. */
         fun rotateVector(q: Quaternion, src: Vector3): Vector3 {
             val result = Vector3()
             val w2 = q.w * q.w
@@ -215,6 +239,7 @@ class Quaternion {
             return result
         }
 
+        /** Rotates [src] by the inverse of quaternion [q] and returns the rotated vector. */
         fun inverseRotateVector(q: Quaternion, src: Vector3): Vector3 {
             val result = Vector3()
             val w2 = q.w * q.w
@@ -245,6 +270,10 @@ class Quaternion {
             return result
         }
 
+        /**
+         * Returns the Hamilton product `lhs * rhs` — the rotation that applies [rhs] first,
+         * then [lhs]. Quaternion multiplication is not commutative.
+         */
         fun multiply(lhs: Quaternion, rhs: Quaternion): Quaternion {
             val lx = lhs.x
             val ly = lhs.y
@@ -263,6 +292,12 @@ class Quaternion {
             )
         }
 
+        /**
+         * Returns the component-wise sum of [lhs] and [rhs].
+         *
+         * Note: the result is *not* a normalized rotation — addition is only meaningful
+         * as an intermediate step in interpolation (see [slerp]).
+         */
         fun add(lhs: Quaternion, rhs: Quaternion): Quaternion {
             val result = Quaternion()
             result.x = lhs.x + rhs.x
@@ -282,6 +317,14 @@ class Quaternion {
             MathHelper.lerp(a.w, b.w, ratio)
         )
 
+        /**
+         * Spherical linear interpolation between rotations [start] and [end].
+         *
+         * Always takes the shortest path and falls back to linear interpolation for
+         * nearly-parallel rotations to avoid numerical instability.
+         *
+         * @param t Interpolation factor; 0 returns [start], 1 returns [end].
+         */
         fun slerp(start: Quaternion, end: Quaternion, t: Float): Quaternion {
             val orientation0 = start.normalized()
             var orientation1 = end.normalized()
@@ -308,6 +351,12 @@ class Quaternion {
             return result.normalized()
         }
 
+        /**
+         * Builds a rotation of [degrees] around the given [axis].
+         *
+         * @param axis Rotation axis. Need not be normalized — the result is normalized internally.
+         * @param degrees Rotation angle in degrees (right-hand rule).
+         */
         fun axisAngle(axis: Vector3, degrees: Float): Quaternion {
             val dest = Quaternion()
             val angle = degrees.toDouble() * (PI / 180.0)
@@ -321,6 +370,12 @@ class Quaternion {
             return dest
         }
 
+        /**
+         * Builds a rotation from Euler angles in degrees.
+         *
+         * @param eulerAngles Rotation about the X, Y and Z axes in degrees. Composed as
+         *   intrinsic ZYX (extrinsic XYZ), matching [getEulerAngles].
+         */
         fun eulerAngles(eulerAngles: Vector3): Quaternion {
             val qX = Quaternion(Vector3.right(), eulerAngles.x)
             val qY = Quaternion(Vector3.up(), eulerAngles.y)
@@ -329,6 +384,11 @@ class Quaternion {
             return multiply(multiply(qZ, qY), qX)
         }
 
+        /**
+         * Returns the shortest-arc rotation that turns direction [start] into direction [end].
+         *
+         * Both inputs are normalized internally. Handles the antiparallel case (180° rotation).
+         */
         fun rotationBetweenVectors(start: Vector3, end: Vector3): Quaternion {
             val startN = start.normalized()
             val endN = end.normalized()
@@ -359,6 +419,13 @@ class Quaternion {
             )
         }
 
+        /**
+         * Builds a rotation that orients the local forward axis along [forwardInWorld]
+         * while keeping the local up axis as close as possible to [desiredUpInWorld].
+         *
+         * @param forwardInWorld Desired forward (look) direction in world space.
+         * @param desiredUpInWorld Desired up direction in world space (used to resolve roll).
+         */
         fun lookRotation(forwardInWorld: Vector3, desiredUpInWorld: Vector3): Quaternion {
             val rotateForwardToDesiredForward = rotationBetweenVectors(Vector3.forward(), forwardInWorld)
 
@@ -371,6 +438,10 @@ class Quaternion {
             return multiply(rotateNewUpToUpwards, rotateForwardToDesiredForward)
         }
 
+        /**
+         * Returns `true` if [lhs] and [rhs] represent the same rotation within floating-point
+         * tolerance. `q` and `-q` are treated as equal since they encode the same orientation.
+         */
         fun equals(lhs: Quaternion, rhs: Quaternion): Boolean {
             // Use abs(dot) to handle both q and -q representing the same rotation.
             // Compare abs(1.0 - abs(dot)) <= epsilon to tolerate float precision
@@ -379,6 +450,7 @@ class Quaternion {
             return kotlin.math.abs(1.0f - dotVal) <= MathHelper.FLT_EPSILON * 10f
         }
 
+        /** Returns the identity quaternion `(0, 0, 0, 1)` — no rotation. */
         fun identity(): Quaternion = Quaternion()
     }
 }

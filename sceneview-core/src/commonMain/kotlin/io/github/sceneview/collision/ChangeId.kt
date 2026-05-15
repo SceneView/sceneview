@@ -10,17 +10,27 @@ package io.github.sceneview.collision
  */
 class ChangeId {
     companion object {
+        /** The id value that represents "never changed yet". */
         const val EMPTY_ID = 0
     }
 
     private var id = EMPTY_ID
 
+    /** Returns the current change id. Store it and later pass it to [checkChanged] to detect mutations. */
     fun get(): Int = id
 
+    /** Returns `true` if no change has been recorded yet (the id is still [EMPTY_ID]). */
     fun isEmpty(): Boolean = id == EMPTY_ID
 
+    /**
+     * Returns `true` if the object has changed since the snapshot [id] was taken.
+     *
+     * @param id A previously captured value from [get].
+     * @return `false` if no change has ever occurred, otherwise whether the id differs.
+     */
     fun checkChanged(id: Int): Boolean = this.id != id && !isEmpty()
 
+    /** Records a change by advancing the id. Skips [EMPTY_ID] on wrap-around. */
     fun update() {
         id++
 

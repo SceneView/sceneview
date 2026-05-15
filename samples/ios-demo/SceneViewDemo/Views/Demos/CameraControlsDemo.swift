@@ -7,8 +7,16 @@ import SceneViewSwift
 /// Users can switch between ``CameraControlMode/orbit``, ``CameraControlMode/pan``,
 /// and ``CameraControlMode/firstPerson`` to feel the difference in gesture
 /// handling. Closes #1034 (last #928 silent-stub item).
+///
+/// The mode switcher also exercises the v4.4.0 follow-up #1236: switching
+/// orbit ↔ firstPerson keeps the camera in place (true look-around, no
+/// teleport), and the "Recenter on orbit" toggle re-pivots a panned scene
+/// when you return to orbit mode.
 struct CameraControlsDemo: View {
     @State private var mode: CameraControlMode = .orbit
+    /// When on, returning to `.orbit` snaps the orbit pivot back to the
+    /// scene centroid so repeated pan→orbit cycles don't drift (#1236).
+    @State private var recenterOnOrbit = false
 
     var body: some View {
         sceneContent
@@ -60,6 +68,7 @@ struct CameraControlsDemo: View {
                 root.addChild(zLabel.entity)
             }
             .cameraControls(mode)
+            .recentersTargetOnOrbit(recenterOnOrbit)
             .ignoresSafeArea()
         }
         .background(Color.black)
@@ -79,6 +88,13 @@ struct CameraControlsDemo: View {
             VStack(spacing: 8) {
                 instructionRow(icon: gestureIconForMode, text: dragHintForMode)
                 instructionRow(icon: "hand.pinch.fill", text: pinchHintForMode)
+            }
+
+            // #1236: opt-in pivot recentre so pan-then-orbit doesn't drift
+            // the model out of frame on repeated cycles.
+            Toggle(isOn: $recenterOnOrbit) {
+                Label("Recenter pivot on orbit", systemImage: "scope")
+                    .font(.caption)
             }
         }
     }

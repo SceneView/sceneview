@@ -46,6 +46,35 @@ SceneView(environment: .studio) {
 .cameraControls(.orbit)
 ```
 
+## visionOS — immersive-space skybox
+
+A windowed or volumetric `RealityView` on visionOS composites over
+passthrough, so the HDR `showSkybox` only lights the scene — the background
+stays passthrough. A fully immersive `ImmersiveSpace` *can* host an HDR
+background: opt in with `.immersiveSpace()` and the HDR is rendered as a
+`WorldComponent`-rooted inverted sphere.
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup { ContentView() }
+
+        ImmersiveSpace(id: "scene") {
+            SceneView { root in
+                root.addChild(model.entity)
+            }
+            .environment(.nightSky)   // showSkybox == true
+            .immersiveSpace()         // render the HDR skybox on visionOS
+        }
+        .immersionStyle(selection: .constant(.full), in: .full)
+    }
+}
+```
+
+`.immersiveSpace()` is a no-op on iOS / macOS — those use the windowed
+`.skybox(_:)` path automatically.
+
 ## Available Environments
 
 | Environment | Description | Best for |
