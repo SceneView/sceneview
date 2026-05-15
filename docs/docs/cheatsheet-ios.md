@@ -43,7 +43,8 @@ SceneView { root in
     root.addChild(model.entity)
 }
 .environment(.studio)              // IBL lighting preset
-.cameraControls(.orbit)            // .orbit (default) | .pan | .firstPerson (v4.3.0+)
+.cameraControls(.orbit)            // .orbit (default) | .pan | .firstPerson (v4.3.0+; firstPerson is true in-place look-around v4.4.0+)
+.recentersTargetOnOrbit(true)      // v4.4.0+ — re-pivot on content centroid when returning to orbit (default false)
 .onEntityTapped { entity in }      // tap handler
 .autoRotate(speed: 0.3)            // turntable auto-rotation
 .autoCenterContent(true)           // v4.3.0+ — library translates content centroid to orbit pivot (default true; pass false to keep explicit placements)
@@ -120,11 +121,15 @@ photoLibraryDenied, photoLibrarySaveFailed}`. See the parity table below.
 
 ```swift
 // after stopRecording() returns the URL:
-try await ARRecorder.saveToPhotoLibrary(url)
+let localID = try await ARRecorder.saveToPhotoLibrary(url)
+// localID is the saved asset's PHAsset.localIdentifier (or nil) —
+// resolve later via PHAsset.fetchAssets(withLocalIdentifiers:options:).
 ```
 
 Wraps `PHPhotoLibrary.shared().performChanges` to copy the `.mov` into
-the system Photos library — mirrors Android's `ARRecorder.exportToDownloads()`.
+the system Photos library and returns the created asset's
+`PHAsset.localIdentifier` (`String?`) — mirrors Android's
+`ARRecorder.exportToDownloads()` which returns the saved `Uri?`.
 First call surfaces the system permission sheet; subsequent calls go
 straight through. **Requires** the host app's `Info.plist` to declare
 `NSPhotoLibraryAddUsageDescription` — without it, iOS crashes the app

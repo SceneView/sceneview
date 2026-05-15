@@ -100,6 +100,12 @@ public struct SceneView: View {
     // `.autoCenterContent(false)`. Closes #1026.
     var autoCenterContentEnabled: Bool = true
 
+    // When true, switching back to `.orbit` resets the orbit pivot to the
+    // content centroid (world origin under auto-centering) so repeated
+    // pan-then-orbit cycles don't drift the centroid out of frame.
+    // Default `false` — pan-then-orbit keeps the panned pivot. Closes #1236.
+    var recentersTargetOnOrbit: Bool = false
+
     /// Creates a 3D scene with imperative content setup.
     ///
     /// - Parameter content: A closure that populates the scene. Receives a root
@@ -140,7 +146,8 @@ public struct SceneView: View {
             mainLightSlot: mainLightSlot,
             fillLightSlot: fillLightSlot,
             renderQualityPreset: renderQualityPreset,
-            autoCenterContentEnabled: autoCenterContentEnabled
+            autoCenterContentEnabled: autoCenterContentEnabled,
+            recentersTargetOnOrbit: recentersTargetOnOrbit
         )
     }
 
@@ -157,6 +164,28 @@ public struct SceneView: View {
     public func cameraControls(_ mode: CameraControlMode) -> SceneView {
         var copy = self
         copy.cameraControlMode = mode
+        return copy
+    }
+
+    /// Controls whether switching back to ``CameraControlMode/orbit`` resets
+    /// the orbit pivot to the content centroid. Default `false`.
+    ///
+    /// ``CameraControlMode/pan`` translates the orbit target laterally;
+    /// over repeated pan-then-orbit cycles the pivot drifts away from the
+    /// content centroid and the model can creep out of frame (#1236
+    /// limitation 2). Pass `true` to snap the orbit pivot back to the
+    /// centroid — the world origin under ``autoCenterContent(_:)`` — every
+    /// time orbit mode is (re-)entered. The camera keeps its current
+    /// azimuth / elevation / radius, so only the framing recenters.
+    ///
+    /// ```swift
+    /// SceneView { /* ... */ }
+    ///   .cameraControls(mode)
+    ///   .recentersTargetOnOrbit(true)   // pan → orbit re-pivots on centroid
+    /// ```
+    public func recentersTargetOnOrbit(_ enabled: Bool) -> SceneView {
+        var copy = self
+        copy.recentersTargetOnOrbit = enabled
         return copy
     }
 
@@ -331,6 +360,10 @@ private struct SceneViewRepresentation: View {
     /// `entities.contentRoot` so the scene's centroid lands at the orbit
     /// pivot. Closes #1026.
     let autoCenterContentEnabled: Bool
+
+    /// When true, re-entering `.orbit` resets the orbit pivot to the
+    /// content centroid so repeated pan→orbit cycles don't drift. Closes #1236.
+    let recentersTargetOnOrbit: Bool
 
     /// Default `CameraControls(mode: .orbit)` — uses the struct's own
     /// `orbitRadius = 2.0` public default, which matches the camera-
@@ -712,16 +745,33 @@ private struct SceneViewRepresentation: View {
         // camera state is `@State` — without this, calling
         // `.cameraControls(.pan)` would be silently ignored. Closes #1034.
         if camera.mode != cameraControlMode {
+            let previousMode = camera.mode
             camera.mode = cameraControlMode
-            // Reset the pinched FOV back to baseline when LEAVING firstPerson,
-            // so the next firstPerson entry starts at 60° rather than at the
-            // last clamped value. Without this guard, a user who pinches FOV
-            // down to 30° in firstPerson then switches to orbit sees the
-            // 30° stick around (visible as a stuck zoom-in); switching back
-            // to firstPerson would then resume at 30° instead of resetting.
-            // R3 MAJOR finding.
-            if camera.mode != .firstPerson && camera.fov != Self.baselineFov {
-                camera.fov = Self.baselineFov
+            if camera.mode == .firstPerson {
+                // ENTERING firstPerson: pin the camera at exactly its
+                // current orbit/pan world position so the mode switch
+                // does not teleport (#1236 limitation 1). The look-around
+                // then yaws / pitches the camera in place around this eye.
+                camera.enterFirstPerson()
+            } else if previousMode == .firstPerson {
+                // LEAVING firstPerson: re-derive the orbit pivot from the
+                // fixed eye + current look direction so orbit resumes
+                // continuously (the recomputed orbit camera position
+                // equals the firstPerson eye). Then reset the pinched FOV
+                // back to baseline — a user who pinched FOV down to 30°
+                // in firstPerson then switched to orbit must not keep the
+                // 30° zoom (R3 MAJOR — FOV bleed).
+                camera.exitFirstPerson()
+                if camera.fov != Self.baselineFov {
+                    camera.fov = Self.baselineFov
+                }
+            }
+            // Opt-in pivot recentre on (re-)entering orbit so repeated
+            // pan→orbit cycles don't drift the centroid out of frame
+            // (#1236 limitation 2). The content centroid is the world
+            // origin under `.autoCenterContent(true)` (#1026).
+            if camera.mode == .orbit && recentersTargetOnOrbit {
+                camera.recenterTarget()
             }
         }
 
@@ -777,35 +827,45 @@ private struct SceneViewRepresentation: View {
             #endif
 
         case .firstPerson:
-            // First-person inspection: pinch mutates FOV (see pinchGesture)
-            // rather than the orbit radius. Currently rotates the scene
-            // root around world origin while the camera stays at a fixed
-            // eye — visually a tight orbit at radius `2`. NOT a true
-            // "stand still and look around" camera-orientation rotation;
-            // tracked as a v4.4.0 follow-up in ``CameraControlMode/firstPerson``.
+            // True look-around (#1236 / #1034): the perspective camera
+            // stands still at a fixed eye and only its ORIENTATION yaws /
+            // pitches — it does not orbit and does not rotate the scene
+            // root. The eye was captured (`enterFirstPerson()`) from the
+            // exact orbit/pan camera position at the mode switch, so
+            // entering firstPerson never teleports. Pinch mutates FOV
+            // (see pinchGesture) rather than the orbit radius.
             //
-            // KNOWN LIMITATION (R3 MAJOR, deferred to v4.4.0): switching
-            // orbit → firstPerson teleports the perspective camera from
-            // its last orbit position to `[0, 0.3, 2]` without
-            // interpolation. The "true look-around" rewrite tracked under
-            // #1034 will resolve this by rotating the camera entity in
-            // place instead of repositioning it on mode entry.
-            let yaw = simd_quatf(angle: -camera.azimuth, axis: [0, 1, 0])
-            let pitch = simd_quatf(angle: -camera.elevation, axis: [1, 0, 0])
-            entities.root.orientation = yaw * pitch
+            // The scene root stays at identity for ALL three modes — the
+            // skybox therefore wraps correctly and content never moves
+            // under the camera.
+            entities.root.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
             entities.root.scale = SIMD3<Float>(repeating: 1)
             entities.root.position = .zero
             #if os(iOS) || os(macOS)
-            // Pin the camera at a fixed eye and reset to look at origin
-            // so a mode switch from orbit doesn't strand the camera at
-            // the last orbit position. Sync FOV to the controls state —
-            // this is the ONLY mode that mirrors `camera.fov` so pinch
-            // can dolly without affecting orbit's baseline (see orbit/pan
-            // case above for the corresponding non-write).
-            entities.perspCamera.look(at: .zero, from: [0, 0.3, 2], relativeTo: nil)
+            // Eye is normally set by `enterFirstPerson()` on the orbit→
+            // firstPerson switch. When firstPerson is the INITIAL mode no
+            // such switch ever fires, so capture it once here from the
+            // current orbit position — otherwise dragging would re-derive
+            // a moving `cameraPosition()` each frame (the old orbit bug).
+            if camera.firstPersonEye == nil {
+                camera.enterFirstPerson()
+            }
+            let eye = camera.firstPersonEye ?? camera.cameraPosition()
+            entities.perspCamera.position = eye
+            // Rotate the camera in place — `lookOrientation()` reproduces
+            // the same forward vector orbit looks along, so orbit↔first-
+            // person is continuous in both directions.
+            entities.perspCamera.orientation = camera.lookOrientation()
+            // firstPerson is the ONLY mode that mirrors `camera.fov` so
+            // pinch can zoom without affecting orbit's baseline (see the
+            // orbit/pan case above for the corresponding non-write).
             if entities.perspCamera.camera.fieldOfViewInDegrees != camera.fov {
                 entities.perspCamera.camera.fieldOfViewInDegrees = camera.fov
             }
+            #else
+            // visionOS fallback: no manual camera entity (the headset is
+            // the camera). Rotate the scene root to simulate look-around.
+            entities.root.orientation = camera.sceneRotation()
             #endif
         }
     }

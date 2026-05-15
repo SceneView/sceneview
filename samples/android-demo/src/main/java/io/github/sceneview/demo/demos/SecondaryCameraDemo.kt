@@ -27,8 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.SurfaceType
@@ -120,19 +122,31 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
         onBack = onBack,
         firstFrameRendered = firstFrame.rendered,
         controls = {
+            // Mark the section label as a heading so TalkBack users can
+            // navigate to it and understand the chip row that follows.
             Text(
                 stringResource(R.string.demo_secondary_camera_chip_section),
-                style = MaterialTheme.typography.labelLarge
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.semantics { heading() }
             )
+            val selectedStateDescription =
+                stringResource(R.string.demo_secondary_camera_chip_selected)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 CameraPreset.entries.forEach { preset ->
+                    val selected = cameraPreset == preset
                     FilterChip(
-                        selected = cameraPreset == preset,
+                        selected = selected,
                         onClick = { cameraPreset = preset },
-                        label = { Text(stringResource(preset.labelRes)) }
+                        label = { Text(stringResource(preset.labelRes)) },
+                        // FilterChip exposes a selected toggle to TalkBack, but
+                        // the default state announcement ("on"/"off") is vague
+                        // for a camera-angle picker — spell out "selected".
+                        modifier = Modifier.semantics {
+                            if (selected) stateDescription = selectedStateDescription
+                        }
                     )
                 }
             }

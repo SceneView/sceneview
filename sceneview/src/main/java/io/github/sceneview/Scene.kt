@@ -1001,8 +1001,16 @@ fun rememberCameraNode(
  * )
  * ```
  *
+ * The [apply] block is **reactive**: it is re-invoked on every recomposition, so light
+ * properties driven by Compose state (e.g. `intensity = animatedIntensity`) propagate to the
+ * Filament scene without re-keying the [remember]. This mirrors the iOS `RealityView.update:`
+ * reactive light contract (#1031) and closes the cross-platform parity gap of #1306. The
+ * underlying [LightComponent] setters write straight to Filament's `LightManager`, so the
+ * re-apply only touches properties the caller actually mutated.
+ *
  * @param engine The Filament [Engine] that owns the light.
- * @param apply  Configuration block applied after creation (intensity, direction, color, etc.).
+ * @param apply  Configuration block applied after creation and re-applied on every recomposition
+ *               (intensity, direction, color, etc.).
  * @return A [LightNode] destroyed on disposal.
  */
 @Composable
@@ -1010,7 +1018,11 @@ fun rememberMainLightNode(
     engine: Engine,
     apply: LightNode.() -> Unit = {}
 ) = rememberNode {
-    createMainLightNode(engine).apply(apply)
+    createMainLightNode(engine)
+}.also { node ->
+    // Re-apply on every recomposition so Compose-state-driven light properties stay reactive.
+    // SideEffect runs on the composition applier (main) thread — required for Filament JNI.
+    SideEffect { node.apply(apply) }
 }
 
 /**
@@ -1030,8 +1042,13 @@ fun rememberMainLightNode(
  * )
  * ```
  *
+ * The [apply] block is **reactive**: it is re-invoked on every recomposition, so light
+ * properties driven by Compose state propagate to the Filament scene without re-keying the
+ * [remember] — matching [rememberMainLightNode] and the iOS reactive light contract (#1306).
+ *
  * @param engine The Filament [Engine] that owns the light.
- * @param apply  Configuration block applied after creation (intensity, direction, color, etc.).
+ * @param apply  Configuration block applied after creation and re-applied on every recomposition
+ *               (intensity, direction, color, etc.).
  * @return A [LightNode] destroyed on disposal.
  */
 @Composable
@@ -1039,7 +1056,11 @@ fun rememberFillLightNode(
     engine: Engine,
     apply: LightNode.() -> Unit = {}
 ) = rememberNode {
-    createFillLightNode(engine).apply(apply)
+    createFillLightNode(engine)
+}.also { node ->
+    // Re-apply on every recomposition so Compose-state-driven light properties stay reactive.
+    // SideEffect runs on the composition applier (main) thread — required for Filament JNI.
+    SideEffect { node.apply(apply) }
 }
 
 /**

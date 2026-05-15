@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Added — Samples
+
+- **Web demo: Double Pendulum physics demo** ([#1221](https://github.com/sceneview/sceneview/issues/1221)) — a new "Physics" tab in `samples/web-demo` runs the chaotic two-link pendulum with link-length / gravity sliders + reset; the integrator mirrors the shared `sceneview-core` `DoublePendulum` simulation that drives the Android and iOS demos. Reachable via the `#double-pendulum` deep link.
+
+### Fixed — iOS true look-around camera ([#1236](https://github.com/sceneview/sceneview/issues/1236))
+
+- **iOS `.firstPerson` now rotates the perspective camera in place instead of orbiting the scene root, so switching orbit ↔ firstPerson no longer teleports the camera; new `recentersTargetOnOrbit(_:)` modifier + `CameraControls.recenterTarget()` fix pan→orbit pivot drift.** `Closes #1236`.
+
+### Tests
+
+- **Regression pins for three untested AR rendering fixes from the 2026-05-14 batch ([#1120](https://github.com/sceneview/sceneview/issues/1120)).** New JVM tests pin the `environmentalHdrSpecularFilter = true` default (#1086), the no-double-close hoisted cubemap upload callback (#1091), and the 7 `@Volatile` `LightEstimator` toggles (#1095).
+
+### Added — CI
+
+- **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
+
+### Fixed
+
+- **`SceneView` main/fill light mutations are now reactive ([#1306](https://github.com/sceneview/sceneview/issues/1306)).** `rememberMainLightNode` / `rememberFillLightNode` re-run their `apply` block on every recomposition (via `SideEffect`), so Compose-state-driven light properties (intensity, direction, color) propagate to the Filament scene without re-keying the `remember` — matching the iOS `RealityView.update:` reactive light contract.
+
+### Changed — Samples
+
+- **Migrated the remaining `samples/android-demo` demos to the `rememberMaterialInstance` / `rememberUnlitMaterialInstance` helpers ([#971](https://github.com/sceneview/sceneview/issues/971)).** `CollisionDemo`, `LightingDemo`, `VideoDemo`, `ARStreetscapeDemo`, `GeometryDemo`, `DebugOverlayDemo`, `PhysicsDemo` and the shared `Axes3DNode` no longer allocate `MaterialInstance` handles via raw `materialLoader.create*` without disposal — the helpers own the lifecycle. Behaviour-preserving.
+
+### Fixed — Web
+
+- **`sceneview-web` stale `SCENEVIEW_VERSION` + auto-center not resetting on a 2nd model load ([#1357](https://github.com/sceneview/sceneview/issues/1357)).** The `@JsExport`-reachable `SCENEVIEW_VERSION` was two majors stale (`3.6.0`); it now reports `4.4.0` and is pinned by a jsTest. `SceneView.loadModel` now resets `didCenterContent` so a model loaded after the first one was auto-centered gets re-centered, mirroring Android's `SceneAutoCenterState.reset()`.
+
 ### Fixed — CI security
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
@@ -10,7 +38,29 @@
 
 - **Demo viewports no longer flash black for 5–12 s on cold start ([#1022](https://github.com/sceneview/sceneview/issues/1022)).** `DemoScaffold` now shows a surface-tinted loading scrim over the 3D viewport until the SceneView presents its first Filament frame, wired via the new `rememberFirstFrameState()` helper.
 
+### Fixed — ViewNode rendering
+
+- **`ViewNode` no longer renders as a permanent black rectangle after a background → foreground cycle ([#984](https://github.com/sceneview/sceneview/issues/984)).** `ViewNode.WindowManager` now retries the off-screen window attach via an owner-View attach listener when the owner is not yet attached at resume time, instead of silently dropping the attach.
+
+### Fixed — Samples
+
+- **`SecondaryCameraDemo` camera-angle controls are now TalkBack-friendly ([#1256](https://github.com/sceneview/sceneview/issues/1256)).** The section label is exposed as a heading and the selected `FilterChip` carries an explicit "Selected camera angle" state description.
+
+### Changed — CI
+
+- **CI/publish workflows' inline `pip install` deps moved into per-workflow `.github/workflows/requirements/*.txt` files so Dependabot's `pip` ecosystem tracks and bumps them ([#1286](https://github.com/sceneview/sceneview/issues/1286)).** Same packages, same pinned versions installed — Dependabot just cannot see inline `pip install x==y` lines in workflow YAML, so the pins would have gone stale silently.
+
+- **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
+
+### Fixed — Docs
+
+- **Reconciled stale version refs that survived the v4.4.0 release and hardened `sync-versions.sh` to catch them ([#1356](https://github.com/sceneview/sceneview/issues/1356)).** README badges/CDN/SPM snippets, `ai-context.md`, `android-xr-emulator.md`, `website-static/js/package.json`, the Kotlin toolchain version in `llms.txt`, and the root↔docs `llms.txt` `ARRecorder.saveToPhotoLibrary` paragraph now all read 4.4.0 / 2.3.21; `sync-versions.sh` gained checks for every one of those off-map locations.
+
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
+
+### Changed — AR `LightEstimator` allocation & robustness refactor ([#1105](https://github.com/sceneview/sceneview/issues/1105))
+
+- **`LightEstimator.update()` no longer allocates on the AR render thread.** Per-frame `Estimation`, color-correction, cubemap face-offset, RGB-triplet, and 27-element irradiance buffers are now hoisted, reused fields; an `ENVIRONMENTAL_HDR` capability probe (`Session.isSupported`, cached per mode) early-returns instead of feeding silently-degraded HDR estimates to Filament; the legacy Sceneform `1.8` pixel-intensity gain is now a named constant. Public behaviour is unchanged. `Closes #1105`.
 
 ### Fixed — AR recording resolution ([#1065](https://github.com/sceneview/sceneview/issues/1065))
 
@@ -27,6 +77,10 @@
 ### Fixed — iOS demo bug cluster ([#1054](https://github.com/sceneview/sceneview/issues/1054)–[#1059](https://github.com/sceneview/sceneview/issues/1059))
 
 - **iOS demo bug cluster — `swift test` build, `CameraControls` rename, deep-link, Plane, first-paint audit.** Local `cd SceneViewSwift && swift test` runs the full 603-test suite again ([#1054](https://github.com/sceneview/sceneview/issues/1054)): the 36 `SceneViewSwiftTests` classes are now `@MainActor`-annotated so their RealityKit `@MainActor` node factories no longer raise ~500 `#ActorIsolatedCall` compile errors under the Xcode 26 toolchain. `OrbitCameraDemo.swift` renamed to `CameraControlsDemo.swift` ([#1055](https://github.com/sceneview/sceneview/issues/1055)) so the file matches its `struct CameraControlsDemo` (`project.pbxproj` synced). The `sceneview://demo/multi-model` deep-link no longer hangs on an eternal black "Loading park scene…" scrim ([#1056](https://github.com/sceneview/sceneview/issues/1056)) — `MultiModelDemo` loads its four park models concurrently and reveals each progressively, so one slow heavy USDZ no longer blocks the rest. `GeometryDemo`'s `Plane` is no longer invisible/edge-on ([#1058](https://github.com/sceneview/sceneview/issues/1058)) — the demo now stands the XZ plane upright to face the orbit camera. First-paint audit ([#1059](https://github.com/sceneview/sceneview/issues/1059)): RealityKit does **not** exhibit Android #1022's Filament shader-compile black first frame on non-AR demos, so no library-level scrim was needed on iOS.
+### Added — iOS
+
+- **`ARRecorder.saveToPhotoLibrary(_:)` now returns the saved asset's `PHAsset.localIdentifier` (`String?`) ([#1057](https://github.com/sceneview/sceneview/issues/1057)).** Callers get a handle to the saved recording — resolve it later via `PHAsset.fetchAssets(withLocalIdentifiers:options:)` or deep-link to it — closing the cross-platform parity gap with Android's `ARRecorder.exportToDownloads()` `Uri?` return. The result is `@discardableResult`, so existing v4.3.0 call sites are unaffected.
+
 ### Added — Bridges
 
 - **Flutter + React Native bridges now expose the v4.3.0 iOS additions — `CameraControlMode` (orbit/pan/firstPerson), `autoCenterContent`, and `ARRecorder` (record-only via ReplayKit) ([#1053](https://github.com/sceneview/sceneview/issues/1053)).** Cross-platform consumers can drive iOS camera modes, opt out of auto-centring, and record AR sessions; Android gracefully falls back where the feature is iOS-first (tracked in #1051).

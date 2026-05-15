@@ -88,4 +88,33 @@ class ContentCenteringTest {
         val offset = ContentCentering.centeringOffset(box)!!
         assertEquals(0.0, offset[0]); assertEquals(0.0, offset[1]); assertEquals(0.0, offset[2])
     }
+
+    /**
+     * Loading a 2nd model after the 1st was centered (#1357): the union of both models has a
+     * different centroid, so re-running the centering pass must produce a *non-zero* offset.
+     * `SceneView.loadModel` resets `didCenterContent` so this re-run actually happens — this
+     * test pins the math that makes the reset worthwhile.
+     */
+    @Test
+    fun loadingSecondModelShiftsCentroidSoReCenterIsNonZero() {
+        // 1st model: centered around the origin; once it loads, offset is zero.
+        val first = aabb(doubleArrayOf(-1.0, -1.0, -1.0), doubleArrayOf(1.0, 1.0, 1.0))
+        val offsetAfterFirst = ContentCentering.centeringOffset(ContentCentering.union(listOf(first)))!!
+        assertEquals(0.0, offsetAfterFirst[0])
+        assertEquals(0.0, offsetAfterFirst[1])
+        assertEquals(0.0, offsetAfterFirst[2])
+
+        // 2nd model loaded off to +x — the combined content centroid moves, so a re-center
+        // (only possible because `didCenterContent` was reset) yields a real translation.
+        val second = aabb(doubleArrayOf(3.0, -1.0, -1.0), doubleArrayOf(5.0, 1.0, 1.0))
+        val offsetAfterBoth =
+            ContentCentering.centeringOffset(ContentCentering.union(listOf(first, second)))!!
+        assertEquals(-2.0, offsetAfterBoth[0], "Union centroid at x=2 -> offset of -2.")
+        assertEquals(0.0, offsetAfterBoth[1])
+        assertEquals(0.0, offsetAfterBoth[2])
+        assertTrue(
+            offsetAfterBoth[0] != offsetAfterFirst[0],
+            "A 2nd model must change the offset — otherwise re-centering is pointless.",
+        )
+    }
 }

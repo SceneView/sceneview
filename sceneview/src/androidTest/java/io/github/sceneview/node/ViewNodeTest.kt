@@ -280,4 +280,86 @@ class ViewNodeTest {
             wm.destroy() // calling twice must not throw
         }
     }
+
+    // ── Retry-on-attach (sceneview/sceneview#984) ─────────────────────────────
+
+    /**
+     * Regression for #984: when `resume()` is called with an owner View that is not yet
+     * attached to a window, the WindowManager must register an attach listener on it so the
+     * off-screen attach is retried automatically — not silently dropped. A detached owner
+     * View must therefore have an [View.OnAttachStateChangeListener] registered after
+     * `resume()`, and that listener must be removed again on `pause()`.
+     */
+    @Test
+    fun windowManager_resume_withDetachedOwner_registersAttachListener() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        lateinit var wm: ViewNode.WindowManager
+        lateinit var detachedOwner: AttachTrackingView
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            wm = ViewNode.WindowManager(ctx)
+            // A bare View built from a Context is not attached to any window.
+            detachedOwner = AttachTrackingView(ctx)
+            wm.resume(detachedOwner)
+        }
+        // resume() posts its work to the owner View — let the main looper drain it.
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            assertTrue(
+                "resume() with a detached owner must register an attach listener for retry",
+                detachedOwner.listenerCount > 0
+            )
+
+            wm.pause()
+            assertEquals(
+                "pause() must remove the pending attach listener",
+                0, detachedOwner.listenerCount
+            )
+
+            wm.destroy()
+        }
+    }
+
+    /**
+     * Regression for #984: `destroy()` must also clear the pending attach listener so the
+     * WindowManager does not keep a reference to (and re-attach via) a stale owner View.
+     */
+    @Test
+    fun windowManager_destroy_clearsPendingAttachListener() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        lateinit var wm: ViewNode.WindowManager
+        lateinit var detachedOwner: AttachTrackingView
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            wm = ViewNode.WindowManager(ctx)
+            detachedOwner = AttachTrackingView(ctx)
+            wm.resume(detachedOwner)
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            wm.destroy()
+            assertEquals(
+                "destroy() must remove the pending attach listener",
+                0, detachedOwner.listenerCount
+            )
+        }
+    }
+
+    /** A [View] that counts how many [OnAttachStateChangeListener]s are currently registered. */
+    private class AttachTrackingView(ctx: android.content.Context) : View(ctx) {
+        var listenerCount = 0
+            private set
+
+        override fun addOnAttachStateChangeListener(listener: OnAttachStateChangeListener) {
+            super.addOnAttachStateChangeListener(listener)
+            listenerCount++
+        }
+
+        override fun removeOnAttachStateChangeListener(listener: OnAttachStateChangeListener) {
+            super.removeOnAttachStateChangeListener(listener)
+            if (listenerCount > 0) listenerCount--
+        }
+    }
 }

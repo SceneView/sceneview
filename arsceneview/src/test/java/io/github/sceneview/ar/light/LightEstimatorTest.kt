@@ -167,4 +167,140 @@ class LightEstimatorTest {
         val f = LightEstimator.SPHERICAL_HARMONICS_IRRADIANCE_FACTORS
         assertTrue("factor[3] should be negative, got ${f[3]}", f[3] < 0f)
     }
+
+    // ── Estimation.clear() — reused-instance reset (#1105) ───────────────────
+
+    /**
+     * #1105: `update()` reuses a single [LightEstimator.Estimation] instance to
+     * avoid a per-frame allocation on the 30-60 Hz render thread. [clear] must
+     * reset every field so a frame that does not take a given path (e.g.
+     * `environmentalHdrReflections` off) never surfaces a stale value from a
+     * previous frame.
+     */
+    @Test
+    fun `Estimation clear resets every field to null`() {
+        val est = LightEstimator.Estimation(
+            mainLightIntensity = 4.2f,
+            irradiance = FloatArray(27) { it.toFloat() }
+        )
+        est.clear()
+        assertNull(est.mainLightColor)
+        assertNull(est.mainLightIntensity)
+        assertNull(est.mainLightDirection)
+        assertNull(est.reflections)
+        assertNull(est.irradiance)
+    }
+
+    @Test
+    fun `Estimation clear on already-empty instance is a no-op`() {
+        val est = LightEstimator.Estimation()
+        est.clear()
+        assertNull(est.mainLightIntensity)
+        assertNull(est.irradiance)
+    }
+
+    // ── Spherical-harmonics conversion (in-place loop, #1105) ────────────────
+
+    /**
+     * #1105 replaced `mapIndexed { … }.toFloatArray()` with an in-place loop into
+     * a reused 27-element buffer. The arithmetic must be identical: each of the
+     * 27 ARCore SH floats is scaled by `FACTORS[index / 3]`. Pins the conversion
+     * so the allocation refactor cannot silently change irradiance output.
+     */
+    @Test
+    fun `SH conversion scales each component by FACTORS index over 3`() {
+        val factors = LightEstimator.SPHERICAL_HARMONICS_IRRADIANCE_FACTORS
+        val arCoreSh = FloatArray(27) { (it + 1).toFloat() }
+
+        val converted = FloatArray(27)
+        for (index in converted.indices) {
+            converted[index] = arCoreSh[index] * factors[index / 3]
+        }
+
+        // Reference computation via the pre-#1105 mapIndexed form.
+        val reference = arCoreSh
+            .mapIndexed { index, v -> v * factors[index / 3] }
+            .toFloatArray()
+
+        assertEquals(27, converted.size)
+        for (i in converted.indices) {
+            assertEquals("component[$i] mismatch", reference[i], converted[i], 1e-6f)
+        }
+    }
+
+    // ── Source-level regression pins (#1120) ─────────────────────────────────
+    //
+    // `LightEstimator`'s instance fields can only be observed by constructing the
+    // class, which needs a real Filament `Engine` + `IBLPrefilter` (JNI, not
+    // shadowed by Robolectric). The established repo pattern for that situation
+    // — see `ARCompletenessDefaultsTest` — is to pin the source declaration with
+    // a regex so a revert fails the build. These pins fill the test gap left by
+    // PRs #1086 and #1091 (post-merge audit batch on `ce1f4a79`, see #1120).
+
+    private val lightEstimatorSource: String by lazy {
+        val f = java.io.File(
+            "src/main/java/io/github/sceneview/ar/light/LightEstimator.kt"
+        )
+        assertTrue(
+            "Expected ${f.absolutePath} — JVM test must run from arsceneview module root.",
+            f.exists(),
+        )
+        f.readText()
+    }
+
+    @Test
+    fun `environmentalHdrSpecularFilter defaults to true (#1086)`() {
+        // PR #1086 flipped the default false → true (#1064): Filament's
+        // `IndirectLight.reflections()` expects a roughness-prefiltered mip
+        // chain, so a raw cubemap makes every reflection mirror-like at any
+        // roughness. A future "default-off for perf" PR would silently revert
+        // this without a test catching it (#1120).
+        val pattern = Regex(
+            """var\s+environmentalHdrSpecularFilter\s*=\s*true"""
+        )
+        assertTrue(
+            "LightEstimator.environmentalHdrSpecularFilter MUST default to `true` " +
+                "(#1086 / #1064). Source did not match $pattern.",
+            pattern.containsMatchIn(lightEstimatorSource),
+        )
+    }
+
+    @Test
+    fun `cubemap upload callback is the hoisted no-double-close uploadCompletedCallback (#1091)`() {
+        // PR #1091 (#1090) removed the inline callback that double-closed the
+        // already-`use {}`-closed ARCore Images. CORR-B (#1094) then restored a
+        // *synchronisation-only* callback, hoisted by #1102 to the instance-scoped
+        // `uploadCompletedCallback`. Pin BOTH facets of the evolved contract:
+        //   1. the callback handed to `PixelBufferDescriptor` is the hoisted ref;
+        //   2. that hoisted ref's body is a pure flag flip — it must NEVER close
+        //      `arImages` again (the #1091 double-close regression).
+        val src = lightEstimatorSource
+        // Strip Kotlin line comments — the call site carries an inline comment
+        // between `null,` and `uploadCompletedCallback` explaining the #1102 hoist.
+        val codeOnly = src.lineSequence()
+            .map { it.substringBefore("//") }
+            .joinToString("\n")
+        assertTrue(
+            "The `Texture.PixelBufferDescriptor` callback MUST be the hoisted " +
+                "`uploadCompletedCallback` (#1091 double-close fix + #1102 hoist).",
+            Regex("""1,\s*0,\s*0,\s*0,\s*null,\s*uploadCompletedCallback""")
+                .containsMatchIn(codeOnly),
+        )
+        val callbackDecl = Regex(
+            """uploadCompletedCallback\s*=\s*Runnable\s*\{[^}]*}"""
+        ).find(codeOnly)?.value
+        requireNotNull(callbackDecl) {
+            "Could not find the `uploadCompletedCallback` Runnable declaration."
+        }
+        assertTrue(
+            "uploadCompletedCallback body must be the pure flag flip " +
+                "`uploadInFlight = false` (#1094). Saw: $callbackDecl",
+            Regex("""uploadInFlight\s*=\s*false""").containsMatchIn(callbackDecl),
+        )
+        assertFalse(
+            "uploadCompletedCallback MUST NOT close `arImages` — that is the " +
+                "#1090/#1091 double-close regression. Saw: $callbackDecl",
+            callbackDecl.contains("arImages"),
+        )
+    }
 }

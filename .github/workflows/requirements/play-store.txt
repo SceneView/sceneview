@@ -1,0 +1,6 @@
+# Python deps for .github/workflows/play-store.yml (Play Store promote + listing sync).
+# Pinned exact versions — these jobs run with PLAY_STORE_SERVICE_ACCOUNT_JSON in env,
+# so a compromised PyPI release must not be pullable here (#1230).
+# Tracked by Dependabot via the `pip` entry in .github/dependabot.yml.
+google-auth==2.52.0
+requests==2.32.3

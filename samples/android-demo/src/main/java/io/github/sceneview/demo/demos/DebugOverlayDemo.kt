@@ -56,6 +56,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 import io.github.sceneview.utils.rememberDebugStats
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -116,9 +117,7 @@ fun DebugOverlayDemo(onBack: () -> Unit) {
     // background (no light, no IBL) and made the demo look empty (#1266). A single
     // shared color instance keeps the per-node cost at zero extra material allocations,
     // so the stress test still measures pure geometry + draw-call overhead.
-    val sphereMaterial = remember(materialLoader) {
-        materialLoader.createColorInstance(SceneViewColors.Primary)
-    }
+    val sphereMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Primary)
 
     // Rolling FPS history — 120 samples (~2 s of real-world data at 60 fps, but the
     // sparkline width matters more than wall-clock time so we just show the most recent

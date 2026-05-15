@@ -3,6 +3,7 @@ package io.github.sceneview.ar.light
 import com.google.android.filament.Camera
 import com.google.android.filament.Engine
 import com.google.android.filament.Texture
+import com.google.ar.core.Config
 import com.google.ar.core.Config.LightEstimationMode
 import com.google.ar.core.Frame
 import com.google.ar.core.LightEstimate
@@ -75,7 +76,21 @@ class LightEstimator(
         var mainLightDirection: Direction? = null,
         var reflections: Texture? = null,
         var irradiance: FloatArray? = null
-    )
+    ) {
+        /**
+         * Resets every field to `null` so the single reused instance (#1105) starts
+         * each [update] from a clean slate — a path not taken on a given frame
+         * (e.g. `environmentalHdrReflections` off) must not surface a stale value
+         * from a previous frame.
+         */
+        internal fun clear() {
+            mainLightColor = null
+            mainLightIntensity = null
+            mainLightDirection = null
+            reflections = null
+            irradiance = null
+        }
+    }
 
     @Volatile
     var isEnabled = true
@@ -146,6 +161,48 @@ class LightEstimator(
     var environmentalHdrMainLightIntensity = true
 
     private var timestamp: Long? = null
+
+    /**
+     * Single reusable [Estimation] instance returned by every [update] call (#1105).
+     *
+     * [update] runs at 30–60 Hz on the AR render thread; allocating a fresh
+     * `Estimation` per frame churned the young-gen heap for no benefit. The
+     * consumer in `ARScene.onARFrame` reads the fields synchronously inside the
+     * same `?.let { }` block and never retains the instance past the frame, so
+     * one shared, field-cleared instance is safe. Cleared at the top of each
+     * estimating frame via [Estimation.clear].
+     */
+    private val estimation = Estimation()
+
+    /**
+     * Reusable scratch for ARCore's 4-component color-correction output in the
+     * `AMBIENT_INTENSITY` path (#1105) — hoisted out of [update] so the per-frame
+     * `FloatArray(4)` allocation is gone.
+     */
+    private val colorCorrections = FloatArray(4)
+
+    /**
+     * Reusable per-face byte-offset array for the `ENVIRONMENTAL_HDR` cubemap
+     * upload (#1105). ARCore's HDR cubemap is always exactly [CUBEMAP_FACE_COUNT]
+     * faces, so this is a fixed-size field instead of a per-frame `IntArray`.
+     */
+    private val faceOffsets = IntArray(CUBEMAP_FACE_COUNT)
+
+    /**
+     * Reusable RGB-triplet scratch for copying cubemap pixels (#1105) — the inner
+     * copy loop reads 3 RGB bytes per pixel and skips the 2-byte alpha; hoisted
+     * out of [update] to drop a `ByteArray(6)` allocation per cubemap upload.
+     */
+    private val rgbBytes = ByteArray(6)
+
+    /**
+     * Reusable 27-element irradiance buffer for the spherical-harmonics path
+     * (#1105). ARCore returns 9 SH coefficients × 3 RGB channels; the conversion
+     * to Filament factors is now an in-place loop into this field instead of a
+     * `mapIndexed { … }.toFloatArray()` allocation per frame.
+     */
+    private val irradianceBuffer = FloatArray(SPHERICAL_HARMONICS_COMPONENT_COUNT)
+
     private var cubeMapBuffer: ByteBuffer? = null
     private var cubeMapTexture: Texture? = null
         set(value) {
@@ -183,6 +240,42 @@ class LightEstimator(
     @Volatile
     internal var isDestroyed = false
         private set
+
+    /**
+     * Caches the ARCore capability probe per [LightEstimationMode], so the probe
+     * runs once per mode instead of every frame (#1105).
+     *
+     * Why the check matters: `update()` reads `session.config.lightEstimationMode`
+     * and trusts it blindly. If the app configured `ENVIRONMENTAL_HDR` on a device
+     * that only supports `AMBIENT_INTENSITY`, ARCore silently degrades the
+     * `LightEstimate` and the HDR fields (`environmentalHdrMainLightIntensity`,
+     * the cubemap, the SH coefficients) come back as zero/garbage — producing
+     * black or wrongly-lit AR objects with no error. Probing
+     * [Session.isSupported] with a [Config] carrying the target mode lets
+     * [update] early-return cleanly instead of feeding garbage into Filament.
+     */
+    private val supportedModeCache = HashMap<LightEstimationMode, Boolean>()
+
+    /**
+     * Returns whether [session] actually supports [mode], caching the answer.
+     *
+     * [LightEstimationMode.DISABLED] is treated as universally supported (it is a
+     * no-op). The probe builds a [Config] carrying just [mode] and asks
+     * [Session.isSupported]; the [Config] allocation is amortised because the
+     * answer is cached per mode (one probe per mode for the estimator's lifetime).
+     * Any [RuntimeException] from the ARCore probe is treated as "supported" so a
+     * quirky device implementation cannot suppress a mode the app explicitly
+     * requested — failing open keeps behaviour identical to the pre-#1105 path,
+     * which trusted the configured mode unconditionally.
+     */
+    private fun isModeSupported(session: Session, mode: LightEstimationMode): Boolean {
+        if (mode == LightEstimationMode.DISABLED) return true
+        return supportedModeCache.getOrPut(mode) {
+            runCatching {
+                session.isSupported(Config(session).setLightEstimationMode(mode))
+            }.getOrDefault(true)
+        }
+    }
 
     /**
      * Acts as a 1-bit semaphore between the AR thread (which fills
@@ -230,7 +323,13 @@ class LightEstimator(
         if (isDestroyed) return null
 
         val mode = session.config.lightEstimationMode
-        val enabled = isEnabled && mode != LightEstimationMode.DISABLED
+        // #1105: probe ARCore for actual support before trusting the configured
+        // mode. On a device that only supports AMBIENT_INTENSITY, a configured
+        // ENVIRONMENTAL_HDR mode silently degrades to zero/garbage HDR fields —
+        // treat an unsupported mode as disabled so we never feed that to Filament.
+        val enabled = isEnabled &&
+                mode != LightEstimationMode.DISABLED &&
+                isModeSupported(session, mode)
 
         // Fix 2 (CORR-B, #1094 acceptance #2): free reflection resources as soon as
         // their feature flag flips false, so toggles don't leak.
@@ -269,39 +368,44 @@ class LightEstimator(
 
         timestamp = lightEstimate.timestamp
 
-        return when (mode) {
-            LightEstimationMode.AMBIENT_INTENSITY -> Estimation().apply {
-                val colorCorrections = FloatArray(4).apply {
-                    // The float array the 4 component color correction values are written to.
-                    // The four values are:
-                    // - `colorCorrections[0]`: Color correction value for the red channel. This
-                    // value is larger or equal to zero.
-                    // - `colorCorrections[1]`: Color correction value for the green channel. This
-                    // value is always 1.0 as the green channel is the reference baseline.
-                    // - `colorCorrections[2]`: Color correction value for the blue channel. This
-                    // value is larger or equal to zero.
-                    // `colorCorrections[3]`: This value is identical to the average pixel intensity
-                    // from [LightEstimate.getPixelIntensity] in the range `[0.0, 1.0]`.
-                    // A value of a white colorCorrection (r=1.0, g=1.0, b=1.0) and pixelIntensity
-                    // of 1.0 mean that no changes are made to the light settings.
-                    // The color correction method uses the green channel as reference baseline and
-                    // scales the red and blue channels accordingly. In this way the overall
-                    // intensity will not be significantly changed
-                    lightEstimate.getColorCorrection(this, 0)
-                }
+        // #1105: reuse a single Estimation instance per estimator (cleared each
+        // frame) instead of allocating one per call on the 30-60 Hz render thread.
+        estimation.clear()
 
-                val colorIntensitiesFactors = colorCorrections
-                    .slice(0..2).let { (r, g, b) -> Color(r, g, b) }
+        return when (mode) {
+            LightEstimationMode.AMBIENT_INTENSITY -> estimation.apply {
+                // The 4-component color correction values are written into the
+                // reused `colorCorrections` field (#1105). The four values are:
+                // - `colorCorrections[0]`: Color correction value for the red channel. This
+                // value is larger or equal to zero.
+                // - `colorCorrections[1]`: Color correction value for the green channel. This
+                // value is always 1.0 as the green channel is the reference baseline.
+                // - `colorCorrections[2]`: Color correction value for the blue channel. This
+                // value is larger or equal to zero.
+                // `colorCorrections[3]`: This value is identical to the average pixel intensity
+                // from [LightEstimate.getPixelIntensity] in the range `[0.0, 1.0]`.
+                // A value of a white colorCorrection (r=1.0, g=1.0, b=1.0) and pixelIntensity
+                // of 1.0 mean that no changes are made to the light settings.
+                // The color correction method uses the green channel as reference baseline and
+                // scales the red and blue channels accordingly. In this way the overall
+                // intensity will not be significantly changed
+                lightEstimate.getColorCorrection(colorCorrections, 0)
+
+                // Index the RGB channels directly (#1105) — `slice(0..2)` boxed a
+                // `List<Float>` plus 3 boxed `Float`s every frame.
+                val colorIntensitiesFactors = Color(
+                    colorCorrections[0], colorCorrections[1], colorCorrections[2]
+                )
                 val maxIntensity = max(colorIntensitiesFactors)
                 // Normalize color to fit into [0..1]
                 // Rendering in linear space
                 mainLightColor = (colorIntensitiesFactors / maxIntensity).toLinearSpace()
 
-                // Normalize the pixel intensity by multiplying it by 1.8
-                mainLightIntensity = colorCorrections[3] * 1.8f
+                // Normalize the pixel intensity by the legacy Sceneform gain factor
+                mainLightIntensity = colorCorrections[3] * AMBIENT_INTENSITY_GAIN
             }
 
-            LightEstimationMode.ENVIRONMENTAL_HDR -> Estimation().apply {
+            LightEstimationMode.ENVIRONMENTAL_HDR -> estimation.apply {
                 // Returns the intensity of the main directional light based on the inferred
                 // Environmental HDR Lighting Estimation. All return values are larger or equal to
                 // zero.
@@ -318,9 +422,21 @@ class LightEstimator(
                     // More info: [https://github.com/ThomasGorisse/SceneformMaintained/pull/156#issuecomment-911873565]
                     val exposureFactor = camera.exposureFactor
                     // Apply the camera exposure factor
-                    mainLightColor = colorIntensitiesFactors * exposureFactor
-                    // Average intensity
-                    mainLightIntensity = mainLightColor?.toFloatArray()?.average()?.toFloat()
+                    val exposedColor = colorIntensitiesFactors * exposureFactor
+                    mainLightColor = exposedColor
+                    // Average intensity — computed inline (#1105) instead of
+                    // `toFloatArray().average()`, which allocated a FloatArray
+                    // plus boxed the Double result every frame.
+                    //
+                    // NOTE: the divisor is 4, not 3. `Color` is a kotlin-math
+                    // `Float4`; `Color(r, g, b)` leaves `w = 0`, and the legacy
+                    // `toFloatArray().average()` averaged all 4 components
+                    // (`(r + g + b + 0) / 4`). This refactor is allocation-only —
+                    // it deliberately preserves that exact value rather than
+                    // "fixing" it to `/ 3`, which would shift main-light
+                    // intensity in every existing ENVIRONMENTAL_HDR AR scene.
+                    mainLightIntensity =
+                        (exposedColor.r + exposedColor.g + exposedColor.b) / 4f
                 }
 
                 if (environmentalHdrMainLightDirection) {
@@ -357,7 +473,14 @@ class LightEstimator(
                         // suspenders for forward compatibility with future loop edits.
                         try {
                             val (width, height) = arImages[0].width to arImages[0].height
-                            val faceOffsets = IntArray(arImages.size)
+                            // #1105: `faceOffsets` is the reused [CUBEMAP_FACE_COUNT]-sized
+                            // field. ARCore's HDR cubemap is always exactly 6 faces;
+                            // guard against a future ARCore that changes that so we never
+                            // index out of bounds.
+                            check(arImages.size == CUBEMAP_FACE_COUNT) {
+                                "Expected an $CUBEMAP_FACE_COUNT-face ARCore HDR cubemap, " +
+                                        "got ${arImages.size}"
+                            }
                             // RGB Bytes per pixel : 6 * 2
                             val bufferSize =
                                 width * height * arImages.size * 6 * 2
@@ -370,7 +493,8 @@ class LightEstimator(
                                 order(ByteOrder.nativeOrder())
                                 cubeMapBuffer = this
                             }
-                            val rgbBytes = ByteArray(6) // RGB Bytes per pixel
+                            // `rgbBytes` (#1105) is the reused 6-byte RGB-triplet
+                            // scratch field — see its field doc.
                             arImages.forEachIndexed { index, image ->
                                 faceOffsets[index] = buffer.position()
                                 val imageBuffer = image.planes[0].buffer
@@ -492,12 +616,24 @@ class LightEstimator(
                     }
                 }
                 if (environmentalHdrSphericalHarmonics) {
-                    irradiance = lightEstimate.environmentalHdrAmbientSphericalHarmonics
-                        .mapIndexed { index, sphericalHarmonic ->
-                            // Convert Environmental HDR's spherical harmonics to Filament
-                            // irradiance spherical harmonics.
-                            sphericalHarmonic * SPHERICAL_HARMONICS_IRRADIANCE_FACTORS[index / 3]
-                        }.toFloatArray()
+                    // Convert Environmental HDR's spherical harmonics to Filament
+                    // irradiance spherical harmonics, in place into the reused
+                    // `irradianceBuffer` field (#1105) — the previous
+                    // `mapIndexed { … }.toFloatArray()` allocated a 27-element
+                    // `List<Float>` plus a fresh `FloatArray` every frame.
+                    val sh = lightEstimate.environmentalHdrAmbientSphericalHarmonics
+                    // ARCore documents this as always 9 SH coefficients × 3 RGB
+                    // channels. Guard the fixed-size buffer against a future
+                    // ARCore that changes that rather than indexing out of bounds.
+                    check(sh.size == SPHERICAL_HARMONICS_COMPONENT_COUNT) {
+                        "Expected $SPHERICAL_HARMONICS_COMPONENT_COUNT SH components, " +
+                                "got ${sh.size}"
+                    }
+                    for (index in irradianceBuffer.indices) {
+                        irradianceBuffer[index] =
+                            sh[index] * SPHERICAL_HARMONICS_IRRADIANCE_FACTORS[index / 3]
+                    }
+                    irradiance = irradianceBuffer
                 }
             }
 
@@ -554,6 +690,33 @@ class LightEstimator(
     }
 
     companion object {
+
+        /**
+         * Legacy Sceneform pixel-intensity gain applied to the `AMBIENT_INTENSITY`
+         * main-light intensity (#1105).
+         *
+         * ARCore's `LightEstimate.getColorCorrection()` writes the average pixel
+         * intensity into `colorCorrections[3]` in `[0.0, 1.0]`. The Sceneform-era
+         * mapping (ThomasGorisse/SceneformMaintained) multiplied it by `1.8` so a
+         * fully-lit scene drives the Filament directional light past its neutral
+         * `1.0` and produces visible relighting. Kept as a named constant rather
+         * than the bare `1.8f` literal it replaces — the value is a tuning
+         * constant, not arithmetic.
+         */
+        private const val AMBIENT_INTENSITY_GAIN = 1.8f
+
+        /**
+         * Number of cubemap faces in ARCore's `ENVIRONMENTAL_HDR` reflection
+         * cubemap — always 6. Sizes the reused [faceOffsets] field (#1105).
+         */
+        private const val CUBEMAP_FACE_COUNT = 6
+
+        /**
+         * Number of floats in ARCore's environmental-HDR ambient spherical
+         * harmonics: 9 SH coefficients × 3 RGB channels = 27. Sizes the reused
+         * [irradianceBuffer] field (#1105).
+         */
+        private const val SPHERICAL_HARMONICS_COMPONENT_COUNT = 27
 
         /**
          * Filament SH normalization factors for the 9 first-order spherical harmonic
