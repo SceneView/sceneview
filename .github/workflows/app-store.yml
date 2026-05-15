@@ -13,21 +13,7 @@ name: Deploy iOS App to App Store
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-    # The `paths` filter applies to BOTH branch and tag pushes — i.e. a tag
-    # push must also touch one of these paths to trigger. Every release
-    # commit in this repo bumps `gradle.properties:VERSION_NAME` and adds an
-    # entry to `CHANGELOG.md` (per the Version Location Map in CLAUDE.md), so
-    # those two paths act as a "release commit always touches at least one
-    # of these" anchor that guarantees every clean release tag fires the
-    # workflow even if the iOS source itself didn't change in that PR.
-    paths:
-      - 'SceneViewSwift/**'
-      - 'samples/ios-demo/**'
-      - '.github/workflows/app-store.yml'
-      - 'gradle.properties'
-      - 'CHANGELOG.md'
   workflow_dispatch:
     inputs:
       submit_for_review:
