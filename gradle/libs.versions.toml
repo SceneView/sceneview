@@ -48,7 +48,7 @@ media3 = "1.10.1"
 
 # TV
 tvFoundation = "1.0.0"
-tvMaterial = "1.0.1"
+tvMaterial = "1.1.0"
 
 # Play Services
 playAppUpdate = "2.1.0"
