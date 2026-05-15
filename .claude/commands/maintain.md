@@ -89,6 +89,45 @@ If a newer stable version exists, note it for a potential PR.
 - Check for TODO/FIXME: `git log --since="1 day ago" -p | grep "+.*TODO\|+.*FIXME"`
 - Run detekt if configured: `./gradlew detekt`
 
+## 5b. AI-first tooling health (android-CLI / agent skill)
+
+SceneView's QA workflows depend on Google's `android` CLI and the published
+`agents/sceneview/` agent skill. Drift here silently degrades every
+agent-driven QA run, so check it daily.
+
+### Agent skill drift
+```bash
+bash .claude/scripts/check-sceneview-skill.sh
+```
+Catches hallucinated APIs, dead demo refs, and stale `last-updated`
+frontmatter in `agents/sceneview/`. If it fails, update the skill from real
+demos / `llms.txt` (don't just bump the date).
+
+### android CLI version drift
+```bash
+android --version 2>/dev/null || echo "android CLI not installed"
+```
+CLAUDE.md pins the tested baseline (currently **v0.7.15411012**). If the
+installed CLI is materially newer, sanity-check that `android layout`,
+`android screen capture`, and `android run` still behave as the helper
+(`.claude/scripts/lib/android-cli.sh`) expects, and bump the documented
+baseline if the new version is adopted.
+
+### AR emulator (AVD) health
+```bash
+bash .claude/scripts/setup-ar-emulator.sh --check
+```
+Read-only inspection of the reusable `Pixel_7a` ARCore AVD. If it reports a
+missing AVD, missing ARCore APK, or storage degradation (see
+`project_emulator_storage_degradation.md` — viewports go black after ~6 QA
+runs), run `setup-ar-emulator.sh --clean` to wipe and recreate it.
+
+### Dev-env sanity
+```bash
+bash .claude/scripts/android-env-check.sh
+```
+Use `--fix` to auto-install the `android` CLI and re-sync the SceneView skill.
+
 ## 6. Cross-platform API parity
 
 ```bash

@@ -67,6 +67,12 @@ import {
 } from "../extra-guides.js";
 import { searchModels, formatSearchResults } from "../search-models.js";
 import { analyzeProject, formatAnalysisReport } from "../analyze-project.js";
+import {
+  searchAndroidDocs,
+  fetchAndroidDoc,
+  formatAndroidDocsSearch,
+  formatAndroidDocsFetch,
+} from "../android-docs.js";
 import { LLMS_TXT } from "../generated/llms-txt.js";
 
 import type { DispatchContext, ToolResult, ToolTextContent } from "./types.js";
@@ -888,6 +894,40 @@ export async function dispatchTool(
           isError: true,
         };
       }
+    }
+
+    // ── search_android_docs ──────────────────────────────────────────────────
+    case "search_android_docs": {
+      const query = args?.query as string | undefined;
+      if (!query || typeof query !== "string" || query.trim().length === 0) {
+        return {
+          content: [{ type: "text", text: "Missing required parameter: `query` must be a non-empty string." }],
+          isError: true,
+        };
+      }
+      const docsResult = await searchAndroidDocs(query);
+      const text = formatAndroidDocsSearch(query, docsResult);
+      return {
+        content: withDisclaimer([{ type: "text", text }]),
+        isError: docsResult.ok ? undefined : true,
+      };
+    }
+
+    // ── fetch_android_doc ────────────────────────────────────────────────────
+    case "fetch_android_doc": {
+      const uri = args?.uri as string | undefined;
+      if (!uri || typeof uri !== "string" || uri.trim().length === 0) {
+        return {
+          content: [{ type: "text", text: "Missing required parameter: `uri` must be a non-empty `kb://...` string." }],
+          isError: true,
+        };
+      }
+      const docResult = await fetchAndroidDoc(uri);
+      const text = formatAndroidDocsFetch(uri, docResult);
+      return {
+        content: withDisclaimer([{ type: "text", text }]),
+        isError: docResult.ok ? undefined : true,
+      };
     }
 
     default:

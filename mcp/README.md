@@ -125,6 +125,8 @@ Every developer tool is **free**: setup guides for every platform, code samples,
 |---|---|
 | `search_models` | Searches Sketchfab for free 3D models (BYOK — set `SKETCHFAB_API_KEY`) |
 | `analyze_project` | Scans a local SceneView project on disk — detects platform, extracts version, flags outdated deps and known anti-patterns |
+| `search_android_docs` | Searches Google's stock Android docs knowledge base (needs the `android` CLI on PATH) |
+| `fetch_android_doc` | Fetches a full Android docs entry by its `kb://...` URI (needs the `android` CLI on PATH) |
 
 ### 2 resources
 

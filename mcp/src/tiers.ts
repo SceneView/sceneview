@@ -33,6 +33,8 @@ const FREE_TOOLS: readonly string[] = [
   "get_platform_roadmap",
   "search_models",
   "analyze_project",
+  "search_android_docs",
+  "fetch_android_doc",
 
   // Setup guides (moved from Pro in 4.0.5)
   "get_ios_setup",

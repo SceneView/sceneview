@@ -105,17 +105,27 @@ The helper auto-installs the CLI to `~/.local/bin/android` on first use and fall
 has no `--device` flag in v0.7 — but `android layout --device=<serial>` does work).
 Telemetry is disabled via `--no-metrics` on every invocation.
 
-**SceneView agent skill.** This repo ships a `sceneview` skill at
-[`agents/sceneview/SKILL.md`](agents/sceneview/SKILL.md). Install it once with:
+**SceneView agent skills.** This repo ships three platform-specific agent
+skills under [`agents/`](agents/) — see [`agents/REGISTRY.md`](agents/REGISTRY.md):
+
+- [`agents/sceneview/SKILL.md`](agents/sceneview/SKILL.md) — Android (Jetpack Compose + ARCore)
+- [`agents/sceneview-ios/SKILL.md`](agents/sceneview-ios/SKILL.md) — Apple (SwiftUI + RealityKit, iOS/macOS/visionOS)
+- [`agents/sceneview-web/SKILL.md`](agents/sceneview-web/SKILL.md) — Web (Filament.js + WebXR)
+
+Install them with:
 
 ```bash
-bash .claude/scripts/install-sceneview-skill.sh
+bash .claude/scripts/install-sceneview-skill.sh        # Android
+bash .claude/scripts/install-sceneview-ios-skill.sh    # iOS / macOS / visionOS
+bash .claude/scripts/install-sceneview-web-skill.sh    # Web
 ```
 
-After install, `android skills list` shows `sceneview` under the `xr` category,
-making the API contract, recipes, and migration guide available to any AI agent
-on the host. `bash .claude/scripts/android-env-check.sh --fix` does the same plus
-installs the `android` CLI itself.
+After install, `android skills list` shows `sceneview`, `sceneview-ios` and
+`sceneview-web` under the `xr` category, making the API contract, recipes, and
+migration guide available to any AI agent on the host.
+`bash .claude/scripts/android-env-check.sh --fix` installs the Android skill plus
+the `android` CLI itself. The Android skill's Google `android-cli` registry
+submission (issue #1082) is tracked in [`agents/REGISTRY.md`](agents/REGISTRY.md).
 
 **Emulator-first QA (mandatory).** Routine demo QA runs on a reusable ARCore-ready
 emulator — **never on a personal device**. Bootstrap it once on a fresh host:
@@ -528,8 +538,10 @@ Hooks trigger automatically on specific Claude Code actions:
 | `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |
 | `android-env-check.sh` | Sanity check for the Android dev env — `--fix` installs the CLI + SceneView skill |
-| `install-sceneview-skill.sh` | Copies `agents/sceneview/` to `~/.android/cli/skills/xr/sceneview/` |
-| `check-sceneview-skill.sh` | Verifies `agents/sceneview/` content (API identifiers, demo refs, frontmatter) is in sync with the library source. Runs in `quality-gate.sh`, `pr-check.yml`, and daily via `maintenance.yml` |
+| `install-sceneview-skill.sh` | Copies `agents/sceneview/` (Android skill) to `~/.android/cli/skills/xr/sceneview/` |
+| `install-sceneview-ios-skill.sh` | Copies `agents/sceneview-ios/` (Apple skill) to `~/.android/cli/skills/xr/sceneview-ios/` |
+| `install-sceneview-web-skill.sh` | Copies `agents/sceneview-web/` (Web skill) to `~/.android/cli/skills/xr/sceneview-web/` |
+| `check-sceneview-skill.sh` | Verifies all three `agents/sceneview*/` skills (API identifiers, demo refs, frontmatter) are in sync with the library source. Runs in `quality-gate.sh`, `pr-check.yml`, and daily via `maintenance.yml` |
 
 ### Version location map
 

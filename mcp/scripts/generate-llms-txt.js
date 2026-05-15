@@ -71,6 +71,13 @@ const body = `export const LLMS_TXT = ${JSON.stringify(content)};\n`;
 
 writeFileSync(outFile, `${header}\n${body}`);
 
-console.log(
+// Log to stderr, never stdout. `npm pack` / `npm publish` ALWAYS run the
+// package's own `prepare` script — the `--ignore-scripts` flag does NOT
+// suppress a package's own lifecycle scripts — and `npm pack --dry-run
+// --json` writes its file-list JSON to stdout. A banner on stdout
+// interleaves with that JSON and intermittently truncates it, surfacing
+// as an `EOF` parse error in `package-files.test.ts` (see #1113). The
+// sibling generate-version.js already logs to stderr for the same reason.
+console.error(
   `[generate-llms-txt] wrote ${outFile} (${content.length} chars from ${sourcePath})`,
 );

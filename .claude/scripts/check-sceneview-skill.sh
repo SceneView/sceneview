@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# check-sceneview-skill.sh — Validate the SceneView agent skill content
+# check-sceneview-skill.sh — Validate the SceneView agent skills content
 # against the actual library source. Wired into the quality gate so that
-# `agents/sceneview/` cannot drift away from `sceneview/`, `arsceneview/`,
-# and the demos under `samples/android-demo/`.
+# `agents/sceneview/`, `agents/sceneview-ios/` and `agents/sceneview-web/`
+# cannot drift away from `sceneview/`, `arsceneview/`, `SceneViewSwift/`,
+# `sceneview-web/`, and the platform demo apps.
 #
 # What it catches:
 #   1. Hallucinated APIs — every identifier in a Kotlin code block of
@@ -13,10 +14,12 @@
 #      llms.txt.
 #   2. Dead demo refs — every `samples/android-demo/.../demos/*.kt`
 #      filename mentioned in recipes.md must exist on disk.
-#   3. YAML frontmatter — every SKILL.md must parse, with `name`,
-#      `description`, `metadata.last-updated` fields present.
+#   3. YAML frontmatter — every SKILL.md (Android, iOS, web) must parse,
+#      with `name`, `description`, `metadata.last-updated` fields present.
 #   4. Staleness — `last-updated` must not be in the future and not
 #      older than 180 days from today (warns).
+#   5. iOS/web demo refs — every `*Demo.swift` / `*.kt` demo filename
+#      cited in the iOS / web skills must exist on disk.
 #
 # Usage:
 #   bash .claude/scripts/check-sceneview-skill.sh            # full check
@@ -78,9 +81,14 @@ section() {
   printf "\n${CYAN}-- %s --${NC}\n" "$1"
 }
 
-section "1. Frontmatter"
+section "1. Frontmatter (all skills)"
 
-python3 - "$SKILL_DIR/SKILL.md" <<'PY' || FAILURES=$((FAILURES + 1))
+# Validate every SceneView skill's SKILL.md frontmatter: the Android skill plus
+# the iOS and web skills, if present. Each must carry name / description /
+# metadata.last-updated, and last-updated must be sane.
+for SKILL in agents/sceneview agents/sceneview-ios agents/sceneview-web; do
+  [[ -f "$SKILL/SKILL.md" ]] || continue
+  python3 - "$SKILL/SKILL.md" <<'PY' || FAILURES=$((FAILURES + 1))
 import sys, re, datetime
 path = sys.argv[1]
 text = open(path, encoding="utf-8").read()
@@ -92,22 +100,23 @@ fm = m.group(1)
 required = ["name:", "description:", "metadata:"]
 for key in required:
     if key not in fm:
-        print(f"  ✗ frontmatter missing '{key}'")
+        print(f"  ✗ {path}: frontmatter missing '{key}'")
         sys.exit(1)
 last_updated_match = re.search(r"last-updated:\s*['\"]?(\d{4}-\d{2}-\d{2})", fm)
 if not last_updated_match:
-    print("  ✗ frontmatter missing metadata.last-updated (YYYY-MM-DD)")
+    print(f"  ✗ {path}: frontmatter missing metadata.last-updated (YYYY-MM-DD)")
     sys.exit(1)
 last_updated = datetime.date.fromisoformat(last_updated_match.group(1))
 today = datetime.date.today()
 if last_updated > today:
-    print(f"  ✗ last-updated {last_updated} is in the future")
+    print(f"  ✗ {path}: last-updated {last_updated} is in the future")
     sys.exit(1)
 age = (today - last_updated).days
 if age > 180:
-    print(f"  ! last-updated {last_updated} is {age} days old (consider refresh)")
-print(f"  ✓ frontmatter valid, last-updated {last_updated} ({age}d ago)")
+    print(f"  ! {path}: last-updated {last_updated} is {age} days old (consider refresh)")
+print(f"  ✓ {path}: frontmatter valid, last-updated {last_updated} ({age}d ago)")
 PY
+done
 
 section "2. API identifiers exist in source"
 
@@ -264,10 +273,75 @@ fi
 
 section "4. Skill is installable"
 
-if [[ -x .claude/scripts/install-sceneview-skill.sh ]]; then
-  pass "install-sceneview-skill.sh exists and is executable"
-else
-  fail "install-sceneview-skill.sh missing or not executable"
+for INSTALLER in \
+  "install-sceneview-skill.sh:agents/sceneview" \
+  "install-sceneview-ios-skill.sh:agents/sceneview-ios" \
+  "install-sceneview-web-skill.sh:agents/sceneview-web"; do
+  script="${INSTALLER%%:*}"
+  skilldir="${INSTALLER##*:}"
+  [[ -d "$skilldir" ]] || continue
+  if [[ -x ".claude/scripts/$script" ]]; then
+    pass "$script exists and is executable"
+  else
+    fail "$script missing or not executable (skill at $skilldir)"
+  fi
+done
+
+section "5. iOS / web demo references resolve"
+
+# The iOS skill cites *Demo.swift files under samples/ios-demo; the web skill
+# cites *.kt under sceneview-web/ and samples/web-demo/. Verify every cited
+# demo filename exists so the skills never point an agent at a dead file.
+python3 - <<'PY'
+import re, pathlib
+
+failures = 0
+
+# --- iOS: *Demo.swift cited in agents/sceneview-ios ---
+ios_skill = pathlib.Path("agents/sceneview-ios")
+ios_demos = pathlib.Path("samples/ios-demo/SceneViewDemo/Views/Demos")
+if ios_skill.is_dir() and ios_demos.is_dir():
+    available = {p.name for p in ios_demos.glob("*.swift")}
+    referenced = set()
+    swift_re = re.compile(r"\b([A-Z][A-Za-z0-9]*Demo\.swift)\b")
+    for md in ios_skill.rglob("*.md"):
+        for m in swift_re.finditer(md.read_text(encoding="utf-8")):
+            referenced.add(m.group(1))
+    missing = sorted(referenced - available)
+    if missing:
+        print(f"  ✗ {len(missing)} iOS demo file(s) referenced but missing from {ios_demos}")
+        for name in missing:
+            print(f"    - {name}")
+        failures += 1
+    else:
+        print(f"  ✓ all {len(referenced)} referenced iOS demo files exist")
+
+# --- web: sceneview-web/src/.../*.kt cited in agents/sceneview-web ---
+web_skill = pathlib.Path("agents/sceneview-web")
+web_src = pathlib.Path("sceneview-web/src/jsMain")
+if web_skill.is_dir() and web_src.is_dir():
+    available = {p.name for p in web_src.rglob("*.kt")}
+    referenced = set()
+    # only match explicit `Name.kt` source-file citations (e.g. `SceneView.kt`)
+    kt_re = re.compile(r"`([A-Za-z][A-Za-z0-9]*\.kt)`")
+    for md in web_skill.rglob("*.md"):
+        for m in kt_re.finditer(md.read_text(encoding="utf-8")):
+            referenced.add(m.group(1))
+    missing = sorted(referenced - available)
+    if missing:
+        print(f"  ✗ {len(missing)} web source file(s) referenced but missing from {web_src}")
+        for name in missing:
+            print(f"    - {name}")
+        failures += 1
+    else:
+        print(f"  ✓ all {len(referenced)} referenced web source files exist")
+
+import sys
+sys.exit(1 if failures else 0)
+PY
+IOSWEB_RC=$?
+if [[ "$IOSWEB_RC" -ne 0 ]]; then
+  FAILURES=$((FAILURES + 1))
 fi
 
 # Print summary
