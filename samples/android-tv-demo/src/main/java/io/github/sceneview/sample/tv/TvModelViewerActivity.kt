@@ -223,13 +223,16 @@ private fun TvModelViewerScreen(updateManager: InAppUpdateManager? = null) {
         )
 
         // Play in-app update banner — overlays the top of the screen during
-        // DOWNLOADING / READY_TO_INSTALL only (no-op otherwise). The Restart
-        // button is regular Material 3 — focusable via the D-pad without extra
-        // wiring. Tested by Google on Leanback; FLEXIBLE is the supported flow.
+        // DOWNLOADING / READY_TO_INSTALL only (no-op otherwise). On TV the
+        // Restart CTA must grab D-pad focus the moment the banner appears, so
+        // we hand UpdateBanner a FocusRequester it auto-requests on the
+        // READY_TO_INSTALL transition. FLEXIBLE is the supported Leanback flow.
+        val restartFocusRequester = remember { FocusRequester() }
         updateManager?.let { mgr ->
             UpdateBanner(
                 updateManager = mgr,
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.TopCenter),
+                restartFocusRequester = restartFocusRequester
             )
         }
     }

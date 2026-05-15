@@ -13,6 +13,10 @@
 
 - **New `night_sky` HDR environment** bundled across iOS and Android demos — a dramatic Milky Way starfield over a dark landscape (Poly Haven [`dikhololo_night`](https://polyhaven.com/a/dikhololo_night) by Greg Zaal, **CC0 1.0** public domain). iOS exposes it as `SceneEnvironment.nightSky` (added to `allPresets`, so it auto-surfaces in the demo's environment picker); Android adds a "Night Sky" chip to `EnvironmentDemo`. Pairs well with metallic PBR materials for chrome-mirror reflections. Web demo does not bundle HDRs and is unaffected.
 
+### Changed — iOS demo
+
+- **The AR tab launcher now doubles as a discovery surface ([#1253](https://github.com/sceneview/sceneview/issues/1253))** — a 2×3 grid of headline AR demo cards under the "Start AR Camera" CTA (Plane Placement, Instant Placement, AR Lighting, AR Recording, Orbital AR, AR Debug), each opening the demo full-screen — closing the launcher-parity gap with Android's `ArLauncherScreen`. The AR tab's placed-model count is also derived from the live anchor collection so it can no longer drift.
+
 ### Fixed — iOS demo
 
 - **`AppStoreUpdater` snooze is now version-keyed instead of a 7-day TTL ([#1231](https://github.com/sceneview/sceneview/issues/1231))** — dismissing one release's update banner no longer hides a *newer* release's banner; a new App Store version invalidates the snooze automatically, matching the Web/Flutter/RN samples. The `SceneViewDemoTests` unit-test target is now wired into `SceneViewDemo.xcodeproj` so the `AppStoreUpdater` tests run in CI ([#1227](https://github.com/sceneview/sceneview/issues/1227)).
@@ -139,6 +143,10 @@ So the bug is Cloud-Console-side configuration drift, not an APK-side regression
 - **Secondary Camera demo — restore PiP overlay ([PR #1213](https://github.com/sceneview/sceneview/pull/1213))** — `SecondaryCameraDemo.kt` was renamed "Camera Presets" in commit `dfc241d5` and lost its picture-in-picture overlay; the chips ended up just snapping the main camera, defeating the "multi-camera" pitch even though the registry entry still ships the `PictureInPicture` icon + "Picture-in-picture camera view" subtitle. Two `SceneView`s now share the same engine/loaders and render the helmet simultaneously: the main view keeps the default orbital camera (user-interactive), and a small `SurfaceType.TextureSurface` PiP overlay top-start binds a dedicated `rememberCameraNode` driven by the Top / Side / Front / Corner chips via `LaunchedEffect(cameraPreset)`. Title restored to "Secondary Camera (PiP)" so `DemoInteractionTest.secondaryCamera_pipAngles` finds it again. Two correctness invariants doc'd inline: each `SceneView` gets its OWN `rememberModelInstance` (sharing one across views would double-destroy `modelInstance.root` on dispose — SIGABRT — and reparent child light/camera nodes off whichever ModelNode built last) and the PiP receives `cameraManipulator = null` (without it the SceneView frame loop writes `cameraNode.transform = manipulator.getTransform()` every frame, clobbering the `LaunchedEffect` preset writes). iOS gets the matching "Coming soon" placeholder under `.advanced` (`SamplesTab.swift`, `pip.fill` SF Symbol, v4.4) — `SceneView` Swift currently uses an internal `@State private var camera = CameraControls(mode:)` with no per-instance `cameraNode` binding, so a true RealityKit PiP needs new SceneViewSwift public API (tracked for v4.4).
 
 No library APIs change. No new releases of `:sceneview` / `:arsceneview` / `:sceneview-core` are required — the Cloud Anchor on-device fix is entirely Cloud Console configuration; the Secondary Camera fix is scoped to `samples/android-demo/`.
+
+### Changed — in-app update (samples)
+
+- **`InAppUpdateManagerTest` now covers the intermediate `DOWNLOADING` state + non-zero `downloadProgress` ([#1229](https://github.com/sceneview/sceneview/issues/1229)); `UpdateBanner` auto-focuses its "Restart" CTA on D-pad hosts ([#1228](https://github.com/sceneview/sceneview/issues/1228))** — the TV demo passes an optional `restartFocusRequester` so the Restart button grabs focus when an update reaches `READY_TO_INSTALL`; phone hosts leave it `null` and are unaffected.
 
 ## v4.3.5 — Pixel 9 production polish: AR demo UX fixes + FR i18n + CI dedup + iOS pull-to-refresh (2026-05-15)
 
