@@ -1,11 +1,21 @@
 {
   "name": "sceneview-web",
-  "version": "4.4.0",
-  "description": "One-liner 3D for the web — SceneView.modelViewer('canvas', 'model.glb'). Powered by Filament.js WASM.",
+  "version": "4.5.0",
+  "description": "One-liner 3D for the web \u2014 SceneView.modelViewer('canvas', 'model.glb'). Powered by Filament.js WASM.",
   "main": "sceneview.js",
   "author": "SceneView Tools",
   "license": "MIT",
-  "keywords": ["3d", "ar", "filament", "webgl", "wasm", "pbr", "gltf", "model-viewer", "sceneview"],
+  "keywords": [
+    "3d",
+    "ar",
+    "filament",
+    "webgl",
+    "wasm",
+    "pbr",
+    "gltf",
+    "model-viewer",
+    "sceneview"
+  ],
   "homepage": "https://sceneview.github.io",
   "repository": {
     "type": "git",

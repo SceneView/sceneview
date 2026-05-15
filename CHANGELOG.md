@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v4.5.0 — visionOS immersive-space skybox + fragment changelog system + iOS unlit/reactive-light parity + CI hardening (2026-05-15)
+
+### Changed
+
+- **Adopted a towncrier-style fragment changelog ([#1337](https://github.com/sceneview/sceneview/issues/1337)).** PRs now drop a small file in `changelog.d/` instead of editing `CHANGELOG.md`'s `## Unreleased` anchor, so parallel PRs no longer conflict on the changelog. `.claude/scripts/collate-changelog.sh X.Y.Z` collates the fragments into a new `## vX.Y.Z` section at release time. `Closes #1337`.
+
 ### Added — iOS
 
 - **visionOS immersive-space skybox ([#1235](https://github.com/sceneview/sceneview/issues/1235)).** A `SceneView` pulled into a fully immersive `ImmersiveSpace` now renders its `showSkybox` HDR environment as a background. The new `.immersiveSpace()` modifier opts in; the HDR is mapped onto an inverted sphere parented under a `WorldComponent` root, since `RealityViewContent.environment` (the windowed iOS / macOS `.skybox(_:)` path from #1215) is unavailable on visionOS. Windowed / volumetric visionOS scenes are unchanged.
