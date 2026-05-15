@@ -129,10 +129,18 @@ After your changes are merged, the Discord bot will award you the **Contributor*
 
 **Docs-only PRs** — changes confined to `*.md`, `docs/**`, `website-static/**`,
 `marketing/**`, `branding/**`, `llms*.txt`, or `LICENSE` — skip the Android +
-MCP `quality-gate.yml`, `ci.yml`, and `render-tests.yml` checks by design.
-The diff cannot affect runtime behaviour, so spending 10-20 min of emulator
-time to re-render the same screenshots is pure noise. You will see fewer
-green checks than on a code PR; this is correct.
+MCP build and verification jobs by design. The diff cannot affect runtime
+behaviour, so spending 10-20 min of emulator time to re-build and re-render
+is pure noise. You will see fewer green checks than on a code PR; this is
+correct. Specifically:
+
+- **`quality-gate.yml`** and **`pr-check.yml`** carry a `paths-ignore` filter
+  for those paths, so neither triggers on a docs-only PR.
+- **`ci.yml`** carries an equivalent `paths-ignore` filter (it also ignores
+  `mcp*/**`, which `quality-gate.yml` deliberately does not).
+- **`render-tests.yml`** never runs on *any* pull request — it is push-to-main
+  + `workflow_dispatch` only — so docs-only PRs skip it for that reason rather
+  than via a path filter.
 
 If your docs PR needs to force a full CI run (for example, you suspect a
 markdown change has accidentally invalidated an example referenced from
