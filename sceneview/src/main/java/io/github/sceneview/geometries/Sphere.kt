@@ -12,6 +12,14 @@ import io.github.sceneview.math.Position
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * A UV sphere [Geometry] generated from a stack/slice grid, with smooth per-vertex normals
+ * and UV coordinates, suitable for use as a renderable mesh (e.g. attached to a `SphereNode`).
+ *
+ * Instances are immutable once built; create one with the [Builder] and mutate it afterwards
+ * through [update]. All Filament buffer operations run synchronously and must be called on
+ * the main thread.
+ */
 class Sphere private constructor(
     primitiveType: PrimitiveType,
     vertices: List<Vertex>,
@@ -33,21 +41,43 @@ class Sphere private constructor(
     primitivesOffsets,
     boundingBox
 ) {
+    /**
+     * Builder for [Sphere]. Configure [radius], [center] and the [stacks]/[slices]
+     * tessellation, then call [build].
+     */
     class Builder : Geometry.Builder(PrimitiveType.TRIANGLES) {
+        /** Sphere radius in scene units. Defaults to [DEFAULT_RADIUS]. */
         var radius: Float = DEFAULT_RADIUS
             private set
+
+        /** Local-space position of the sphere center. Defaults to [DEFAULT_CENTER] (the origin). */
         var center: Position = DEFAULT_CENTER
             private set
+
+        /** Number of horizontal subdivisions (latitude bands). Higher is smoother. Defaults to [DEFAULT_STACKS]. */
         var stacks: Int = DEFAULT_STACKS
             private set
+
+        /** Number of vertical subdivisions (longitude segments). Higher is smoother. Defaults to [DEFAULT_SLICES]. */
         var slices: Int = DEFAULT_SLICES
             private set
 
+        /** Sets the sphere radius in scene units. Returns this builder for chaining. */
         fun radius(radius: Float) = apply { this.radius = radius }
+
+        /** Sets the local-space center of the sphere. Returns this builder for chaining. */
         fun center(center: Position) = apply { this.center = center }
+
+        /** Sets the number of latitude bands. Returns this builder for chaining. */
         fun stacks(stacks: Int) = apply { this.stacks = stacks }
+
+        /** Sets the number of longitude segments. Returns this builder for chaining. */
         fun slices(slices: Int) = apply { this.slices = slices }
 
+        /**
+         * Builds the [Sphere], allocating its Filament vertex and index buffers on [engine].
+         * Must be called on the main thread.
+         */
         override fun build(engine: Engine): Sphere {
             vertices(getVertices(radius, center, stacks, slices))
             primitivesIndices(getIndices(stacks, slices))
@@ -60,15 +90,27 @@ class Sphere private constructor(
         }
     }
 
+    /** Current sphere radius in scene units. */
     var radius: Float = radius
         private set
+
+    /** Current local-space center of the sphere. */
     var center: Position = center
         private set
+
+    /** Current number of latitude bands. */
     var stacks: Int = stacks
         private set
+
+    /** Current number of longitude segments. */
     var slices: Int = slices
         private set
 
+    /**
+     * Regenerates the sphere vertices in place and re-uploads them to the existing Filament
+     * vertex buffer. The index buffer is rebuilt only when [stacks] or [slices] change. Must
+     * be called on the main thread. Returns this geometry for chaining.
+     */
     fun update(
         engine: Engine,
         radius: Float = this.radius,

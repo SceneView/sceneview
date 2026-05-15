@@ -1,0 +1,2 @@
+<!-- category: Tests -->
+- **JaCoCo coverage delta gate ([#973](https://github.com/sceneview/sceneview/issues/973)).** A committed baseline (`.claude/data/jacoco-baseline.txt`) records per-module line coverage, and `.claude/scripts/jacoco-delta-check.sh` fails when a PR drops coverage more than the configurable `threshold_pp` (0.5pp default). Wired into the `unit-test` CI job as an informational, non-blocking step for now — promoting it to a hard gate once it has been green for two consecutive weeks is the `#973` follow-up.

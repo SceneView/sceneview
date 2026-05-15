@@ -26,6 +26,7 @@ import com.google.android.filament.LightManager
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.environment.rememberHDREnvironment
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
@@ -115,9 +116,12 @@ fun DoublePendulumDemo(onBack: () -> Unit) {
         lookAt(Position(0f, 0f, 0f))
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_double_pendulum_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text(
                 "Upper link: ${"%.2f".format(length1)} m",
@@ -158,6 +162,7 @@ fun DoublePendulumDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
+            onFrame = firstFrame.onFrame,
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,

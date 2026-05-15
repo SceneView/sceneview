@@ -12,6 +12,15 @@ import io.github.sceneview.math.Position
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * A capsule [Geometry] — a cylinder side capped by two hemispheres — generated with smooth
+ * per-vertex normals and UV coordinates, suitable for use as a renderable mesh.
+ *
+ * [height] is the length of the straight cylindrical section only; the total extent along
+ * the axis is `height + 2 * radius`. Instances are immutable once built; create one with the
+ * [Builder] and mutate it afterwards through [update]. All Filament buffer operations run
+ * synchronously and must be called on the main thread.
+ */
 class Capsule private constructor(
     primitiveType: PrimitiveType,
     vertices: List<Vertex>,
@@ -34,24 +43,50 @@ class Capsule private constructor(
     primitivesOffsets,
     boundingBox
 ) {
+    /**
+     * Builder for [Capsule]. Configure [radius], [height], [center] and the
+     * [capStacks]/[sideSlices] tessellation, then call [build].
+     */
     class Builder : Geometry.Builder(PrimitiveType.TRIANGLES) {
+        /** Radius of the hemispherical caps and the cylinder side, in scene units. Defaults to [DEFAULT_RADIUS]. */
         var radius: Float = DEFAULT_RADIUS
             private set
+
+        /** Length of the straight cylindrical section only, in scene units. Defaults to [DEFAULT_HEIGHT]. */
         var height: Float = DEFAULT_HEIGHT
             private set
+
+        /** Local-space position of the capsule center. Defaults to [DEFAULT_CENTER] (the origin). */
         var center: Position = DEFAULT_CENTER
             private set
+
+        /** Number of latitude bands per hemispherical cap. Higher is smoother. Defaults to [DEFAULT_CAP_STACKS]. */
         var capStacks: Int = DEFAULT_CAP_STACKS
             private set
+
+        /** Number of segments around the axis. Higher is smoother. Defaults to [DEFAULT_SIDE_SLICES]. */
         var sideSlices: Int = DEFAULT_SIDE_SLICES
             private set
 
+        /** Sets the radius in scene units. Returns this builder for chaining. */
         fun radius(radius: Float) = apply { this.radius = radius }
+
+        /** Sets the cylindrical section length in scene units. Returns this builder for chaining. */
         fun height(height: Float) = apply { this.height = height }
+
+        /** Sets the local-space center of the capsule. Returns this builder for chaining. */
         fun center(center: Position) = apply { this.center = center }
+
+        /** Sets the number of latitude bands per cap. Returns this builder for chaining. */
         fun capStacks(capStacks: Int) = apply { this.capStacks = capStacks }
+
+        /** Sets the number of segments around the axis. Returns this builder for chaining. */
         fun sideSlices(sideSlices: Int) = apply { this.sideSlices = sideSlices }
 
+        /**
+         * Builds the [Capsule], allocating its Filament vertex and index buffers on [engine].
+         * Must be called on the main thread.
+         */
         override fun build(engine: Engine): Capsule {
             vertices(getVertices(radius, height, center, capStacks, sideSlices))
             primitivesIndices(getIndices(capStacks, sideSlices))
@@ -64,17 +99,31 @@ class Capsule private constructor(
         }
     }
 
+    /** Current radius of the caps and cylinder side, in scene units. */
     var radius: Float = radius
         private set
+
+    /** Current length of the straight cylindrical section, in scene units. */
     var height: Float = height
         private set
+
+    /** Current local-space center of the capsule. */
     var center: Position = center
         private set
+
+    /** Current number of latitude bands per hemispherical cap. */
     var capStacks: Int = capStacks
         private set
+
+    /** Current number of segments around the axis. */
     var sideSlices: Int = sideSlices
         private set
 
+    /**
+     * Regenerates the capsule vertices in place and re-uploads them to the existing Filament
+     * vertex buffer. The index buffer is rebuilt only when [capStacks] or [sideSlices] change.
+     * Must be called on the main thread. Returns this geometry for chaining.
+     */
     fun update(
         engine: Engine,
         radius: Float = this.radius,

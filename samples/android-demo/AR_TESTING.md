@@ -5,19 +5,53 @@
 
 ## TL;DR — what's tested
 
-Two layers of real-rendering tests in `samples/android-demo/src/androidTest/`:
+Three layers of real-rendering tests in `samples/android-demo/src/androidTest/`:
 
 1. **`DemoRenderingScreenshotTest`** (3D demos): launches each demo via deep-link,
    waits N seconds, screenshots via UiAutomator, compares to a golden in
    `androidTest/assets/render-goldens/`.
 2. **`ARDemoPlaybackSmokeTest`** (AR demos): for each MP4 fixture in
    `androidTest/assets/ar-recordings/`, replays it via
-   `ARSceneView(playbackDataset = file)`, screenshots, compares to a golden in
-   `androidTest/assets/ar-render-goldens/`.
+   `ARSceneView(playbackDataset = file)`, screenshots once after a fixed wait,
+   compares to a golden in `androidTest/assets/ar-render-goldens/`. A crash smoke
+   test with a single visual check.
+3. **`ARPlaybackScreenshotTest`** (AR frame-indexed regression, #1050): replays the
+   **bundled** ARCore recording (`src/debug/assets/ar-recordings/`) and captures the
+   rendered AR frame at **fixed ARCore frame indices** (f=30/60/120/180), comparing
+   each to a golden in `androidTest/assets/ar-screenshot-goldens/`. See
+   [Frame-indexed AR screenshot regression](#frame-indexed-ar-screenshot-regression-1050)
+   below.
 
-Both run on `connectedDebugAndroidTest` (real device / hardware-accelerated emulator —
+All run on `connectedDebugAndroidTest` (real device / hardware-accelerated emulator —
 SwiftShader CI crashes on Filament pixel readback). Diff images on failure dump to
 `/sdcard/Android/data/io.github.sceneview.demo/files/render-test-output/` for review.
+
+## Frame-indexed AR screenshot regression (#1050)
+
+`ARDemoPlaybackSmokeTest` captures once, after a fixed `Thread.sleep(...)`. That is
+enough as a crash smoke test, but a `sleep`-gated capture lands on a different ARCore
+frame every run — replay advances faster or slower than wall-clock depending on
+emulator load. `ARPlaybackScreenshotTest` fixes this:
+
+- The demo bumps a cross-thread counter — `DemoSettings.arPlaybackFrameCount` — once
+  per consumed ARCore frame during playback (`onSessionUpdated`). It is reset to `0`
+  every time a playback `ARSceneView` mounts.
+- The test **polls** that counter and fires a capture exactly when each target frame
+  index is reached (f=30/60/120/180). Same frame, every run, every machine.
+- Captures are pixel-compared to goldens in `androidTest/assets/ar-screenshot-goldens/`.
+
+### Re-recording / first-time golden capture
+
+The `ar-screenshot-goldens/` dir starts **empty** (only a README). The first run
+takes the *record path* — captures are written to the device and the assertion is
+`assumeTrue`-skipped. Pull, review, and commit them as goldens. Full step-by-step
+flow, plus the critical "capture goldens on the CI emulator profile, not a host-GPU
+dev emulator" warning, is in
+[`src/androidTest/assets/ar-screenshot-goldens/README.md`](src/androidTest/assets/ar-screenshot-goldens/README.md).
+
+CI runs this pipeline in the `ar-demo-playback-screenshots` job of
+`.github/workflows/render-tests.yml`, on a pinned emulator profile (api-30 /
+`google_apis` / `x86_64` / `swiftshader_indirect`) so goldens stay reproducible.
 
 ## The AR record-once playback-many workflow
 
