@@ -12,6 +12,7 @@
 
 ### Changed — CI
 
+- **`ci.yml`'s "Build & lint" job split into parallel `build` / `lint` / `unit-test` jobs, and `quality-gate.yml` switched to a shallow checkout ([#1311](https://github.com/sceneview/sceneview/issues/1311)).** The three Android jobs share the Gradle cache and run concurrently (~3 min wall-clock saved); the quality gate drops `fetch-depth: 0` since its scripts only diff against the working tree / HEAD.
 - **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
 
 ## v4.4.0 — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Double Pendulum physics demo + `sceneview-swift` mirror retired (2026-05-15)
