@@ -204,12 +204,15 @@ struct SamplesTab: View {
             DemoItem(title: "Custom Mesh", icon: "diamond.fill", subtitle: "Vertices, normals & triangle indices", category: .geometry) {
                 CustomMeshDemo()
             },
-            DemoItem(
-                comingSoonTitle: "Animated Model",
-                icon: "figure.run",
-                subtitle: "Skinning, rig-driven animation playback",
-                category: .geometry
-            ),
+            DemoItem(title: "Animation", icon: "figure.run", subtitle: "Skinning, rig-driven animation playback", category: .geometry) {
+                AnimationDemo()
+            },
+            DemoItem(title: "Model Viewer", icon: "cube.transparent.fill", subtitle: "Full-screen hero with a Surprise streamer", category: .geometry) {
+                ModelViewerDemo()
+            },
+            DemoItem(title: "Multi-Model Park", icon: "tree.fill", subtitle: "Themed scene composed of 4 streamed models", category: .geometry) {
+                MultiModelDemo()
+            },
 
             // MARK: Content
 
@@ -283,7 +286,7 @@ struct SamplesTab: View {
                 CameraControlsDemo()
             },
             DemoItem(title: "Auto Rotate", icon: "rotate.3d.fill", subtitle: "Continuous rotation animation", category: .advanced) {
-                AnimationDemo()
+                AutoRotateDemo()
             },
             DemoItem(title: "Scene Gallery", icon: "square.grid.3x3.fill", subtitle: "Multiple shapes in one scene", category: .advanced) {
                 SceneGalleryDemo()
@@ -306,6 +309,13 @@ struct SamplesTab: View {
                 subtitle: "Local environment reflections",
                 category: .advanced
             ),
+            DemoItem(
+                comingSoonTitle: "Secondary Camera (PiP)",
+                icon: "pip.fill",
+                subtitle: "Picture-in-picture from a second camera",
+                category: .advanced,
+                version: "4.4"
+            ),
         ]
 
         // MARK: AR -- iOS only platform-wise; most features still ported from Android
@@ -323,12 +333,9 @@ struct SamplesTab: View {
             DemoItem(title: "AR Lighting", icon: "lightbulb.max.fill", subtitle: "Compare .mainLight / .fillLight modifier presets", category: .ar) {
                 ARLightingDemo()
             },
-            DemoItem(
-                comingSoonTitle: "AR Plane Placement",
-                icon: "arkit",
-                subtitle: "Tap a detected plane to place a model",
-                category: .ar
-            ),
+            DemoItem(title: "AR Plane Placement", icon: "arkit", subtitle: "Tap a detected plane to place a model", category: .ar) {
+                ARPlacementDemo()
+            },
             DemoItem(
                 comingSoonTitle: "AR Image Tracking",
                 icon: "viewfinder.circle.fill",
@@ -371,12 +378,9 @@ struct SamplesTab: View {
                 subtitle: "Real-world depth masks virtual objects",
                 category: .ar
             ),
-            DemoItem(
-                comingSoonTitle: "AR Instant Placement",
-                icon: "bolt.fill",
-                subtitle: "Place models without plane detection",
-                category: .ar
-            ),
+            DemoItem(title: "AR Instant Placement", icon: "bolt.fill", subtitle: "Place models without plane detection", category: .ar) {
+                ARInstantPlacementDemo()
+            },
             DemoItem(
                 comingSoonTitle: "AR Terrain Anchors",
                 icon: "mountain.2.fill",

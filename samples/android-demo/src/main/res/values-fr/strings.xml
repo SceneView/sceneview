@@ -232,7 +232,7 @@
     <string name="demo_shape_subtitle">Polygones 2D extrudés</string>
     <string name="demo_reflection_probes_title">Sondes de réflexion</string>
     <string name="demo_reflection_probes_subtitle">Réflexions cubemap locales</string>
-    <string name="demo_secondary_camera_title">Préréglages caméra</string>
+    <string name="demo_secondary_camera_title">Caméra secondaire (PiP)</string>
     <string name="demo_secondary_camera_subtitle">Vue caméra incrustée</string>
     <string name="demo_debug_overlay_title">Surcouche de débogage</string>
     <string name="demo_debug_overlay_subtitle">Surcouche de statistiques de performance</string>

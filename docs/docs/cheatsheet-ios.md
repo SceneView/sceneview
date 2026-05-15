@@ -391,6 +391,29 @@ model?.stopAllAnimations()
 
 ---
 
+## Demo parity status (#1194)
+
+The iOS demo app now ships these Stage 2 (#1152) streaming demos as
+proper iOS ports of the Android equivalents. They consume the curated
+`SampleAssets` registry via `SketchfabAssetResolver`, fall back to
+bundled USDZs when no Sketchfab key is configured, and are reachable
+via deep-link as well as the Samples tab.
+
+| Demo | Deep-link id | iOS file | Status |
+|---|---|---|---|
+| Animation (5-model carousel) | `animation` | `AnimationDemo.swift` | Ported (cinematic camera shots + IBL slider are Android-only) |
+| Model Viewer (Surprise me) | `model-viewer` | `ModelViewerDemo.swift` | Ported |
+| Multi-Model Park | `multi-model` | `MultiModelDemo.swift` | Ported |
+| AR Plane Placement | `ar-placement` | `ARPlacementDemo.swift` | Ported (no per-model editing yet) |
+| AR Instant Placement | (Samples tab) | `ARInstantPlacementDemo.swift` | Ported (approximates via `.estimatedPlane` raycasts) |
+| Physics (streamed bodies) | `physics` | `PhysicsDemo.swift` | Ported (bundled cubes + 4 streamed crash-test meshes; capped at 20 active bodies for RealityKit) |
+
+The pre-1194 placeholder shape — `model-viewer` / `multi-model` routing
+to `SceneGalleryDemo` — is gone. Both deep-links now land on dedicated
+SwiftUI demos.
+
+---
+
 ## iOS parity status (#1036)
 
 Some Android APIs map imperfectly to iOS because RealityKit / ARKit do

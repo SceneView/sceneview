@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — iOS skybox renders + true-orbit camera + Cloud Anchor docs hotfix + `sceneview-swift` mirror retired
+## Unreleased — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Cloud Anchor docs hotfix + `sceneview-swift` mirror retired
 
 ### Fixed — iOS rendering
 
@@ -28,6 +28,34 @@
 
 Special thanks to **[Eliott Radcliffe (@radcli14)](https://github.com/radcli14)** — the skybox + true-orbit camera fixes were ported with `Co-authored-by` credit from his [sceneview-swift PR #1](https://github.com/sceneview/sceneview-swift/pull/1). The asset-pipeline tutorial referenced by #1222 is from his [`blender-to-realitykit`](https://github.com/radcli14/blender-to-realitykit) repo (MIT, 17⭐).
 ### v4.3.6 docs hotfix — Cloud Anchor ERROR_NOT_AUTHORIZED post-SHA-1 troubleshooting ([#1177](https://github.com/sceneview/sceneview/issues/1177) follow-up)
+### iOS Stage 2 demo parity catch-up ([#1194](https://github.com/sceneview/sceneview/issues/1194))
+
+Six Android-only Sketchfab-streaming demos shipped by Stage 2 ([#1152](https://github.com/sceneview/sceneview/issues/1152)) now have proper iOS ports so the cross-platform parity guarantee (`feedback_ios_mirror_android.md`: iOS V1 == strict Android subset, no hidden gaps) holds end-to-end. The previous placeholder shape — `model-viewer` / `multi-model` deep-links routing to `SceneGalleryDemo` — is gone.
+
+### Added — iOS samples
+
+- **`AnimationDemo.swift`** — 5-model carousel (bundled cyberpunk character + 4 `animation`-category streamed slugs) with play / pause / speed slider / loop chips. Cinematic camera shots (Hero / Reveal / Vertigo / Tracking) + IBL intensity slider from Android remain Android-only — see the iOS demo's settings sheet for the upfront roadmap note.
+- **`ModelViewerDemo.swift`** — full-screen `cyberpunk_hovercar` hero with a "Surprise me" extended button that searches the Sketchfab catalogue server-side, downloads the pick via `SketchfabService.downloadModel`, and replaces the hero in place. Button hidden when `SketchfabConfig.apiKey` is `nil` (App Store builds) so we don't ship a non-functional affordance.
+- **`MultiModelDemo.swift`** — themed "Park" diorama (tree / bench / dog / bird) composed from the 4 streamed `park`-category slugs. Per-model visibility chips + spin toggle wired through `AnchorEntity` + `SceneView.autoRotate(speed:)`.
+- **`ARPlacementDemo.swift`** — tap-to-place AR demo with a 5-bundle cycle and the 6 streamed `ar_placement`-category chips. Reuses `SceneViewSwift`'s `ARSceneView(onTapOnPlane:)` raycast hook.
+- **`ARInstantPlacementDemo.swift`** — instant-placement variant with a toggle. ARKit doesn't expose `Config.InstantPlacementMode.LOCAL_Y_UP` directly; the iOS port approximates via `.estimatedPlane` raycasts so taps land before plane geometry has fully converged.
+- **`PhysicsDemo.swift`** — rewritten from the v4.3.x cubes-only version to the Stage 2 streaming shape: bundled cubes default + 4 streamed `physics`-category crash-test meshes (vase / stool / barrel / amphora). Drop count capped at 20 active bodies because RealityKit's `PhysicsBodyComponent` slows past that.
+
+### Changed — iOS plumbing
+
+- **`AutoRotateDemo.swift`** struct renamed from `AnimationDemo` → `AutoRotateDemo` to free up the canonical name. The "Auto Rotate" Samples-tab entry continues to point at this struct; the new "Animation" entry routes to `AnimationDemo.swift`.
+- **`SamplesTab.swift`** — added Model Viewer / Multi-Model Park entries under Geometry, and promoted "AR Plane Placement" + "AR Instant Placement" from `Coming soon` to fully wired demos.
+- **`DemoDeepLinkRegistry.swift`** — `model-viewer` and `multi-model` ids no longer route to the `SceneGalleryDemo` placeholder; both land on the dedicated demos. `ar-placement` newly routed to `ARPlacementDemo`.
+
+### Fixed — pre-existing AppStoreUpdater build break
+
+- `AppStoreUpdater.swift:66` default parameter `currentVersion: @escaping () -> String? = AppStoreUpdater.bundleVersion` was losing the `@MainActor` global-actor isolation under Swift 6 strict concurrency, breaking the iOS demo build on main. Added `@MainActor` on both the parameter type and the stored field so the implicit `@MainActor` from the class scope propagates correctly. Surfaced while validating [#1194](https://github.com/sceneview/sceneview/issues/1194); the regression landed in [#1216](https://github.com/sceneview/sceneview/pull/1216) earlier today.
+
+### Docs
+
+- **`docs/docs/cheatsheet-ios.md`** — new "Demo parity status (#1194)" section above the existing "iOS parity status (#1036)" table, summarising the six ports and the honest-subset notes (cinematic camera, per-model editing, sceneview-core physics).
+
+No library APIs change. No new releases of `:sceneview` / `:arsceneview` / `:sceneview-core` are required.
 
 Production Cloud Anchor users still hitting `ERROR_NOT_AUTHORIZED` on v4.3.5 after the App Signing key SHA-1 was added to the Google Cloud API key restrictions. v4.3.3 ([PR #1197](https://github.com/sceneview/sceneview/pull/1197)) shipped the SHA-1 runbook + actionable in-app error pointing only at that one cause, but field experience showed there are 4 other Cloud-Console-side causes that look identical at the device.
 
@@ -54,7 +82,11 @@ So the bug is Cloud-Console-side configuration drift, not an APK-side regression
 
 - **`.claude/scripts/verify-arcore-key.sh` reminder footer broadened** to direct maintainers reading the CI log at the new 5-step checklist rather than only the SHA-1 runbook.
 
-No library APIs change. No new releases of `:sceneview` / `:arsceneview` / `:sceneview-core` are required — the on-device fix is entirely Cloud Console configuration.
+### Fixed — android-demo
+
+- **Secondary Camera demo — restore PiP overlay ([PR #1213](https://github.com/sceneview/sceneview/pull/1213))** — `SecondaryCameraDemo.kt` was renamed "Camera Presets" in commit `dfc241d5` and lost its picture-in-picture overlay; the chips ended up just snapping the main camera, defeating the "multi-camera" pitch even though the registry entry still ships the `PictureInPicture` icon + "Picture-in-picture camera view" subtitle. Two `SceneView`s now share the same engine/loaders and render the helmet simultaneously: the main view keeps the default orbital camera (user-interactive), and a small `SurfaceType.TextureSurface` PiP overlay top-start binds a dedicated `rememberCameraNode` driven by the Top / Side / Front / Corner chips via `LaunchedEffect(cameraPreset)`. Title restored to "Secondary Camera (PiP)" so `DemoInteractionTest.secondaryCamera_pipAngles` finds it again. Two correctness invariants doc'd inline: each `SceneView` gets its OWN `rememberModelInstance` (sharing one across views would double-destroy `modelInstance.root` on dispose — SIGABRT — and reparent child light/camera nodes off whichever ModelNode built last) and the PiP receives `cameraManipulator = null` (without it the SceneView frame loop writes `cameraNode.transform = manipulator.getTransform()` every frame, clobbering the `LaunchedEffect` preset writes). iOS gets the matching "Coming soon" placeholder under `.advanced` (`SamplesTab.swift`, `pip.fill` SF Symbol, v4.4) — `SceneView` Swift currently uses an internal `@State private var camera = CameraControls(mode:)` with no per-instance `cameraNode` binding, so a true RealityKit PiP needs new SceneViewSwift public API (tracked for v4.4).
+
+No library APIs change. No new releases of `:sceneview` / `:arsceneview` / `:sceneview-core` are required — the Cloud Anchor on-device fix is entirely Cloud Console configuration; the Secondary Camera fix is scoped to `samples/android-demo/`.
 
 ## v4.3.5 — Pixel 9 production polish: AR demo UX fixes + FR i18n + CI dedup + iOS pull-to-refresh (2026-05-15)
 
@@ -91,7 +123,6 @@ Five demo polish bugs caught in the Pixel 9 production audit. All are scoped to 
 - **i18n: missing French translations for streamed-model credits sheet + asset-source chips ([#1204](https://github.com/sceneview/sceneview/issues/1204))** — `values-fr/strings.xml` adds the 7 keys flagged by the post-#1099/#1160 audit: `credits_sheet_title` / `credits_sheet_subtitle` / `credits_sheet_footer` / `credits_row_open_cd` for the streamed-model attribution sheet, and `demo_chip_bundled` / `demo_chip_streamed` / `demo_chip_streaming` for the DemoScaffold asset-source chip. The `demo_ar_streetscape_*` keys called out in the original issue body were already translated; this PR closes the broader audit gap discovered by `comm -23 used_keys.txt fr_keys.txt` (139 used keys, 7 had EN entries but no FR entries).
 
 - **Debug Overlay — single-sphere case spawned off-screen at (-0.9, -0.9, 0) ([#1212](https://github.com/sceneview/sceneview/issues/1212))** — `DebugOverlayDemo.kt` now computes the grid footprint from the *actual* node count: `cols = min(10, count)`, `rows = min(10, ceil(count / cols))`, `layers = ceil(count / (cols × rows))`, then offsets each sphere by `-(axisLen - 1) / 2 × NODE_SPACING` so the cluster mean is *always* at origin. At count=1 → cols=rows=layers=1 → offsets all zero → sphere lands at (0, 0, 0) where the camera is looking. At count=100..1000 the new formula collapses to the same 10×10×N centered footprint as before. The previous formula `(i % 10) - 5` baked in a "10 wide" assumption that put count=1 at (-0.9, -0.9, 0) — 3.6× outside the camera frustum at the SINGLE_SPHERE_DISTANCE = 0.8 m camera distance. `autoFitDistance(...)` updated to read the new grid footprint so framing stays consistent.
-
 
 ## v4.3.4 — Pixel 9 production hotfix: AR Face Mesh + Instant Placement UX + UTF-8 + iOS LightingDemo (2026-05-15)
 

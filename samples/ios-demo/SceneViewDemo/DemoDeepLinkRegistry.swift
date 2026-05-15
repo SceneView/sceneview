@@ -66,16 +66,12 @@ enum DemoDeepLinkRegistry {
         case "image":         ImageDemo()
         case "animation":     AnimationDemo()
 
-        // Android has dedicated `model-viewer` (single hero model, orbit camera)
-        // and `multi-model` (multiple models on a tabletop) demos. iOS doesn't
-        // have 1:1 ports — the Sketchfab Explore tab IS the canonical iOS
-        // model-viewer experience, but it's a Tab in the main TabView, not a
-        // standalone View we can present modally from a sheet. Route both ids
-        // to SceneGalleryDemo so the user lands on real 3D content (multiple
-        // shapes in a composed scene) instead of the "Coming soon" placeholder
-        // they would otherwise hit. Closes #1015.
-        case "model-viewer":  SceneGalleryDemo()
-        case "multi-model":   SceneGalleryDemo()
+        // iOS now ships dedicated `ModelViewerDemo` and `MultiModelDemo` (#1194
+        // Stage 2 parity catch-up). Both route to real ports of the Android
+        // demos rather than the Scene Gallery fallback that was used in
+        // v4.3.x as a temporary placeholder. Closes #1015 properly.
+        case "model-viewer":  ModelViewerDemo()
+        case "multi-model":   MultiModelDemo()
 
         // Lighting + effects.
         case "lighting":      LightingDemo()
@@ -86,6 +82,15 @@ enum DemoDeepLinkRegistry {
 
         // Interaction.
         case "camera-controls": CameraControlsDemo()
+
+        // AR placement (#1194 Stage 2). Route the well-known `ar-placement`
+        // deep-link id to the dedicated iOS port.
+        case "ar-placement":
+            #if os(iOS)
+            ARPlacementDemo()
+            #else
+            DeepLinkPlaceholder(id: id, reason: "AR demos are iOS-only on this build.")
+            #endif
 
         default:
             DeepLinkPlaceholder(id: id, reason: "This demo isn't available in the iOS app yet — open it on Android, or browse the Scenes tab for the full iOS catalog.")
