@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Tests
+
+- **Regression pins for three untested AR rendering fixes from the 2026-05-14 batch ([#1120](https://github.com/sceneview/sceneview/issues/1120)).** New JVM tests pin the `environmentalHdrSpecularFilter = true` default (#1086), the no-double-close hoisted cubemap upload callback (#1091), and the 7 `@Volatile` `LightEstimator` toggles (#1095).
+
 ### Added — CI
 
 - **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
