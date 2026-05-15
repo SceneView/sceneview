@@ -129,10 +129,19 @@ class DemoInteractionTest {
     }
 
     /**
-     * Launches [DemoHostActivity] for the given demo id (see `DemoRegistry.ALL_DEMOS`),
+     * Launches [DemoHostActivity] for the given demo id (see [ALL_DEMOS]),
      * bypassing the home list scroll entirely. Waits until the demo's title bar appears.
+     *
+     * The expected title is resolved from [ALL_DEMOS] via `context.getString(titleRes)`
+     * rather than passed as a literal — so the `By.text(...)` match works on ANY device
+     * locale. A hard-coded English literal silently broke the whole suite on a French
+     * device (see #1257): every key in `values-fr/strings.xml` resolves to a French
+     * title the matcher would never find.
      */
-    private fun openDemo(demoId: String, expectedTitle: String) {
+    private fun openDemo(demoId: String) {
+        val titleRes = ALL_DEMOS.firstOrNull { it.id == demoId }?.titleRes
+            ?: error("openDemo: demo id '$demoId' is not registered in ALL_DEMOS")
+        val expectedTitle = context.getString(titleRes)
         val intent = Intent().apply {
             setClassName(pkg, "$pkg.DemoHostActivity")
             putExtra(DemoHostActivity.EXTRA_DEMO_ID, demoId)
@@ -374,7 +383,7 @@ class DemoInteractionTest {
 
     @Test
     fun lighting_allThreeLightTypes() {
-        openDemo("lighting", "Lighting")
+        openDemo("lighting")
         screenshot("01_lighting_directional_default")
 
         tap("Point")
@@ -403,7 +412,7 @@ class DemoInteractionTest {
 
     @Test
     fun fog_fullScreen() {
-        openDemo("fog", "Fog")
+        openDemo("fog")
         screenshot("05_fog_enabled_mist")
 
         // Toggle off / on
@@ -426,7 +435,7 @@ class DemoInteractionTest {
 
     @Test
     fun physics_dropAndReset() {
-        openDemo("physics", "Physics")
+        openDemo("physics")
         screenshot("11_physics_initial")
 
         tap("Drop")
@@ -448,7 +457,7 @@ class DemoInteractionTest {
 
     @Test
     fun geometryPrimitives_allShapes() {
-        openDemo("geometry", "Geometry Primitives")
+        openDemo("geometry")
         screenshot("15_geometry_cube_default")
 
         tap("Sphere")
@@ -468,7 +477,7 @@ class DemoInteractionTest {
 
     @Test
     fun customMesh_autoRotateAndOrbit() {
-        openDemo("custom-mesh", "Custom Mesh")
+        openDemo("custom-mesh")
         screenshot("20_customMesh_autoRotate_on")
 
         tap("Auto-Rotate")
@@ -493,7 +502,7 @@ class DemoInteractionTest {
 
     @Test
     fun shape_allPolygons() {
-        openDemo("shape", "All Shapes")
+        openDemo("shape")
         screenshot("23_shape_triangle_default")
 
         tap("Star")
@@ -510,7 +519,7 @@ class DemoInteractionTest {
 
     @Test
     fun multiModel_visibilityChips() {
-        openDemo("multi-model", "Multi Model")
+        openDemo("multi-model")
         screenshot("27_multiModel_all_visible")
 
         tap("Avocado")
@@ -531,7 +540,7 @@ class DemoInteractionTest {
         // Defaults in PostProcessingDemo: SSAO=off, MSAA=off, FXAA=on, Dithering=on
         // (recommended production setup — FXAA & temporal dithering are cheap and
         // noticeably improve quality on mobile GPUs).
-        openDemo("post-processing", "Post-Processing")
+        openDemo("post-processing")
         screenshot("31_postProc_defaults")
 
         tap("SSAO (Ambient Occlusion)")      // SSAO → on
@@ -562,7 +571,7 @@ class DemoInteractionTest {
         // dashboard (the FPS/Frame/Nodes/Tris stats overlay is now always-on). The Reset
         // button is the only stable interactive control — we tap it to confirm the spawn
         // count drops back to the baseline preset without crashing the scene.
-        openDemo("debug-overlay", "Debug Overlay")
+        openDemo("debug-overlay")
         screenshot("36_debugOverlay_initial")
 
         tap("Reset")
@@ -573,7 +582,7 @@ class DemoInteractionTest {
 
     @Test
     fun animation_loopVsOnce() {
-        openDemo("animation", "Auto Rotate")
+        openDemo("animation")
         screenshot("39_animation_loop_default")
 
         tap("Once")
@@ -595,7 +604,7 @@ class DemoInteractionTest {
 
     @Test
     fun environment_hdrGallery() {
-        openDemo("environment", "Environment Gallery")
+        openDemo("environment")
         screenshot("42_env_studio_default")
 
         tap("Studio Warm")
@@ -645,7 +654,7 @@ class DemoInteractionTest {
             "BillboardNode / ImageNode teardown order is fixed in sceneview/. (#887)"
     )
     fun billboard_visibilityChips() {
-        openDemo("billboard", "Billboard")
+        openDemo("billboard")
         screenshot("49_billboard_both_visible")
         tap("Billboard Panel"); screenshot("50_billboard_only_fixed")
         tap("Fixed Image"); screenshot("51_billboard_none")
@@ -655,7 +664,7 @@ class DemoInteractionTest {
 
     @Test
     fun secondaryCamera_pipAngles() {
-        openDemo("secondary-camera", "Secondary Camera (PiP)")
+        openDemo("secondary-camera")
         screenshot("53_secondaryCam_top_default")
 
         tap("Side")
@@ -675,7 +684,7 @@ class DemoInteractionTest {
 
     @Test
     fun gestureEditing_editableAndReset() {
-        openDemo("gesture-editing", "Gesture Editing")
+        openDemo("gesture-editing")
         screenshot("58_gesture_editable_default")
 
         tap("Editable")
@@ -700,7 +709,7 @@ class DemoInteractionTest {
 
     @Test
     fun linesPaths_fullScreen() {
-        openDemo("lines-paths", "Lines & Paths")
+        openDemo("lines-paths")
         screenshot("62_linesPaths_both_default")
 
         tap("Line"); screenshot("63_linesPaths_no_line")
@@ -720,7 +729,7 @@ class DemoInteractionTest {
 
     @Test
     fun dynamicSky_timeAndTurbidity() {
-        openDemo("dynamic-sky", "Dynamic Sky")
+        openDemo("dynamic-sky")
         screenshot("72_sky_default")
 
         dragSlider("Time of Day:", fraction = 0.1f)   // dawn
@@ -746,7 +755,7 @@ class DemoInteractionTest {
 
     @Test
     fun reflectionProbes_sliders() {
-        openDemo("reflection-probes", "Reflection Probes")
+        openDemo("reflection-probes")
         screenshot("76_probes_default")
 
         dragSlider("Probe Radius:", fraction = 1.0f)
@@ -773,7 +782,7 @@ class DemoInteractionTest {
 
     @Test
     fun image_scaleSlider() {
-        openDemo("image", "Image Planes")
+        openDemo("image")
         screenshot("79_image_default_scale")
 
         dragSlider("Scale:", fraction = 1.0f)
@@ -790,7 +799,7 @@ class DemoInteractionTest {
 
     @Test
     fun textLabels_fontSizeSlider() {
-        openDemo("text", "Text Nodes")
+        openDemo("text")
         screenshot("82_text_default")
 
         dragSlider("Font Size:", fraction = 1.0f)
@@ -814,7 +823,7 @@ class DemoInteractionTest {
 
     @Test
     fun viewNode_visibleAndTapCounter() {
-        openDemo("view-node", "View Node")
+        openDemo("view-node")
         screenshot("88_viewNode_visible_default")
 
         // ViewNode's "Tap me" Button is rendered inside a Compose hierarchy attached to
@@ -843,7 +852,7 @@ class DemoInteractionTest {
 
     @Test
     fun video_initialRender() {
-        openDemo("video", "Video")
+        openDemo("video")
         Thread.sleep(1500)  // let the video texture warm up
         screenshot("92_video_initial")
 
@@ -857,7 +866,7 @@ class DemoInteractionTest {
 
     @Test
     fun modelViewer_initialRender() {
-        openDemo("model-viewer", "Model Viewer")
+        openDemo("model-viewer")
         screenshot("93_modelViewer_initial")
     }
 
@@ -868,7 +877,7 @@ class DemoInteractionTest {
      */
     @Test
     fun modelViewer_cameraGestures() {
-        openDemo("model-viewer", "Model Viewer")
+        openDemo("model-viewer")
 
         // ── One-finger orbit (left/right) ────────────────────────────────────────────
         orbit(pixels = 400); screenshot("93a_modelViewer_orbit_right")
@@ -891,7 +900,7 @@ class DemoInteractionTest {
         // that + a bounded orbit+pinchClose+reopen cycle for full coverage. The
         // zoom-in case is covered by the `gestureEditing_*` test which pinches a
         // model node (not a manipulator) — different code path.
-        openDemo("model-viewer", "Model Viewer")
+        openDemo("model-viewer")
         pinch(open = false, percent = 0.25f); screenshot("93e_modelViewer_zoom_out")
     }
 
@@ -899,7 +908,7 @@ class DemoInteractionTest {
 
     @Test
     fun collision_shapeTapAndReset() {
-        openDemo("collision", "Collision & Hit Test")
+        openDemo("collision")
         screenshot("85_collision_default")
 
         val w = device.displayWidth
