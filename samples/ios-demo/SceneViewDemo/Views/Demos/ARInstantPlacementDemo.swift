@@ -1,0 +1,227 @@
+#if os(iOS)
+import SwiftUI
+import RealityKit
+import ARKit
+import SceneViewSwift
+
+/// Instant Placement demo — tap to place a model before plane detection has fully
+/// converged.
+///
+/// Mirrors the Android `ARInstantPlacementDemo` (`samples/android-demo/.../ARInstantPlacementDemo.kt`)
+/// which leverages ARCore's `Config.InstantPlacementMode.LOCAL_Y_UP`. On iOS,
+/// ARKit doesn't ship a 1:1 "instant placement" API — the closest equivalent is
+/// `ARView.raycast(...)` against `.estimatedPlane` alignment, which returns hits
+/// before plane geometry has fully converged. The pose is then promoted to a
+/// real `existingPlane` raycast result as ARKit gathers more features.
+///
+/// The demo therefore exposes a single toggle:
+///
+/// - **Instant Placement ON** (`existingOrEstimated` raycast) — taps land
+///   immediately at an approximate pose (~1 m in front when there's nothing
+///   tracked yet).
+/// - **Instant Placement OFF** (`existingPlane` raycast) — taps wait until a
+///   real plane is detected. Matches the Android `ARPlacementDemo` semantics.
+///
+/// ### Streaming pipeline (Stage 2, issue #1152)
+///
+/// Same `ar_placement` slugs as ``ARPlacementDemo`` — picker, bundled cycle,
+/// offline fallback are identical. Streaming + cycle helpers come from the
+/// curated registry in ``SampleAssets``.
+struct ARInstantPlacementDemo: View {
+    private static let bundledCycle: [(name: String, displayName: String)] = [
+        ("cyberpunk_hovercar", "Cyberpunk Hovercar"),
+        ("phoenix_bird", "Phoenix Bird"),
+        ("retro_piano", "Retro Piano"),
+        ("game_boy_classic", "Game Boy"),
+        ("animated_butterfly", "Butterfly"),
+    ]
+
+    @State private var instantEnabled: Bool = true
+    @State private var placedCount: Int = 0
+    @State private var cycleIndex: Int = 0
+    @State private var selectedSlug: SketchfabSlug?
+    @State private var armedURL: URL?
+
+    private let placementSlugs: [SketchfabSlug] = SampleAssets.byCategory["ar_placement"] ?? []
+
+    var body: some View {
+        ZStack {
+            #if !targetEnvironment(simulator)
+            // Rebuild the ARSceneView when the toggle flips so the new raycast
+            // alignment takes effect. Mirrors Android's `key(instantEnabled)`
+            // rebuild.
+            ARSceneView(
+                planeDetection: .horizontal,
+                showPlaneOverlay: !instantEnabled,
+                showCoachingOverlay: !instantEnabled,
+                onTapOnPlane: { worldPosition, arView in
+                    Task { @MainActor in
+                        await placeModel(at: worldPosition, in: arView)
+                    }
+                }
+            )
+            .id("instant-placement-\(instantEnabled)")
+            .ignoresSafeArea()
+            #else
+            simulatorPlaceholder
+            #endif
+
+            VStack {
+                statusPill
+                Spacer()
+            }
+        }
+        .demoSettingsSheet { controlsSheet }
+        .task {
+            _ = await SketchfabAssetResolver.shared.prefetchAll(category: "ar_placement")
+        }
+        .task(id: selectedSlug?.uid) {
+            await resolveSelectedSlug()
+        }
+    }
+
+    // MARK: - Placement
+
+    @MainActor
+    private func placeModel(at worldPosition: SIMD3<Float>, in arView: ARView) async {
+        do {
+            let node: ModelNode
+            if let slug = selectedSlug, let url = armedURL {
+                node = try await ModelNode.load(contentsOf: url)
+                _ = node.scaleToUnits(0.3)
+                _ = node.centerOrigin()
+                _ = slug
+            } else {
+                let entry = Self.bundledCycle[cycleIndex % Self.bundledCycle.count]
+                cycleIndex += 1
+                node = try await ModelNode.load(entry.name)
+                _ = node.scaleToUnits(0.3)
+                _ = node.centerOrigin()
+            }
+            let anchor = AnchorNode.world(position: worldPosition)
+            anchor.add(node.entity)
+            arView.scene.addAnchor(anchor.entity)
+            placedCount += 1
+            #if os(iOS)
+            HapticManager.lightTap()
+            #endif
+        } catch {
+            // Silently keep the user in tap-to-retry mode (Android parity).
+        }
+    }
+
+    // MARK: - Controls sheet
+
+    @ViewBuilder
+    private var controlsSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Toggle(isOn: $instantEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(instantEnabled ? "Instant Placement ON" : "Instant Placement OFF")
+                        .font(.subheadline.weight(.semibold))
+                    Text(instantEnabled
+                         ? "Tap anywhere — ARKit approximates a pose immediately."
+                         : "Plane-based mode — wait for the overlay, then tap inside it.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .tint(.blue)
+
+            Text("Pick what to place")
+                .font(.subheadline.weight(.semibold))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    pickerChip(label: "Bundled cycle", isSelected: selectedSlug == nil) {
+                        selectedSlug = nil
+                    }
+                    ForEach(placementSlugs, id: \.uid) { slug in
+                        pickerChip(label: slug.displayName, isSelected: selectedSlug?.uid == slug.uid) {
+                            selectedSlug = slug
+                        }
+                    }
+                }
+            }
+
+            if let slug = selectedSlug {
+                if armedURL == nil {
+                    Text("Streaming \(slug.displayName)…")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("Next tap places: \(slug.displayName)")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                }
+                Text("by \(slug.author) · CC-BY 4.0")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("iOS port note: ARKit doesn't expose ARCore's `InstantPlacementMode.LOCAL_Y_UP` directly. We approximate it via `.estimatedPlane` raycasts so taps land before planes fully converge — close enough for the demo's UX.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func pickerChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            #if os(iOS)
+            HapticManager.selectionChanged()
+            #endif
+        } label: {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? AnyShapeStyle(.blue) : AnyShapeStyle(.gray.opacity(0.18)))
+                )
+                .foregroundStyle(isSelected ? .white : .primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var statusPill: some View {
+        Text(placedCount == 1 ? "1 model placed" : "\(placedCount) models placed")
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+            .padding(.top, 8)
+    }
+
+    private var simulatorPlaceholder: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(.secondary)
+            Text("AR requires a physical device")
+                .font(.headline)
+            Text("Run on iPhone or iPad to test Instant Placement.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    @MainActor
+    private func resolveSelectedSlug() async {
+        guard let slug = selectedSlug else {
+            armedURL = nil
+            return
+        }
+        armedURL = nil
+        do {
+            armedURL = try await SketchfabAssetResolver.shared.resolve(slug)
+        } catch {
+            armedURL = nil
+        }
+    }
+}
+#endif

@@ -48,7 +48,7 @@ final class AppStoreUpdater: ObservableObject {
     private let session: URLSession
     private let defaults: UserDefaults
     private let now: () -> Date
-    private let currentVersionProvider: () -> String?
+    private let currentVersionProvider: @MainActor () -> String?
 
     private static let lastCheckKey = "sceneview.update.lastCheckAt"
     private static let snoozedUntilKey = "sceneview.update.snoozedUntil"
@@ -63,7 +63,7 @@ final class AppStoreUpdater: ObservableObject {
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = Date.init,
-        currentVersion: @escaping () -> String? = AppStoreUpdater.bundleVersion
+        currentVersion: @MainActor @escaping () -> String? = AppStoreUpdater.bundleVersion
     ) {
         self.session = session
         self.defaults = defaults

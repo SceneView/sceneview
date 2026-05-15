@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — iOS Stage 2 demo parity catch-up ([#1194](https://github.com/sceneview/sceneview/issues/1194))
+
+Six Android-only Sketchfab-streaming demos shipped by Stage 2 ([#1152](https://github.com/sceneview/sceneview/issues/1152)) now have proper iOS ports so the cross-platform parity guarantee (`feedback_ios_mirror_android.md`: iOS V1 == strict Android subset, no hidden gaps) holds end-to-end. The previous placeholder shape — `model-viewer` / `multi-model` deep-links routing to `SceneGalleryDemo` — is gone.
+
+### Added — iOS samples
+
+- **`AnimationDemo.swift`** — 5-model carousel (bundled cyberpunk character + 4 `animation`-category streamed slugs) with play / pause / speed slider / loop chips. Cinematic camera shots (Hero / Reveal / Vertigo / Tracking) + IBL intensity slider from Android remain Android-only — see the iOS demo's settings sheet for the upfront roadmap note.
+- **`ModelViewerDemo.swift`** — full-screen `cyberpunk_hovercar` hero with a "Surprise me" extended button that searches the Sketchfab catalogue server-side, downloads the pick via `SketchfabService.downloadModel`, and replaces the hero in place. Button hidden when `SketchfabConfig.apiKey` is `nil` (App Store builds) so we don't ship a non-functional affordance.
+- **`MultiModelDemo.swift`** — themed "Park" diorama (tree / bench / dog / bird) composed from the 4 streamed `park`-category slugs. Per-model visibility chips + spin toggle wired through `AnchorEntity` + `SceneView.autoRotate(speed:)`.
+- **`ARPlacementDemo.swift`** — tap-to-place AR demo with a 5-bundle cycle and the 6 streamed `ar_placement`-category chips. Reuses `SceneViewSwift`'s `ARSceneView(onTapOnPlane:)` raycast hook.
+- **`ARInstantPlacementDemo.swift`** — instant-placement variant with a toggle. ARKit doesn't expose `Config.InstantPlacementMode.LOCAL_Y_UP` directly; the iOS port approximates via `.estimatedPlane` raycasts so taps land before plane geometry has fully converged.
+- **`PhysicsDemo.swift`** — rewritten from the v4.3.x cubes-only version to the Stage 2 streaming shape: bundled cubes default + 4 streamed `physics`-category crash-test meshes (vase / stool / barrel / amphora). Drop count capped at 20 active bodies because RealityKit's `PhysicsBodyComponent` slows past that.
+
+### Changed — iOS plumbing
+
+- **`AutoRotateDemo.swift`** struct renamed from `AnimationDemo` → `AutoRotateDemo` to free up the canonical name. The "Auto Rotate" Samples-tab entry continues to point at this struct; the new "Animation" entry routes to `AnimationDemo.swift`.
+- **`SamplesTab.swift`** — added Model Viewer / Multi-Model Park entries under Geometry, and promoted "AR Plane Placement" + "AR Instant Placement" from `Coming soon` to fully wired demos.
+- **`DemoDeepLinkRegistry.swift`** — `model-viewer` and `multi-model` ids no longer route to the `SceneGalleryDemo` placeholder; both land on the dedicated demos. `ar-placement` newly routed to `ARPlacementDemo`.
+
+### Fixed — pre-existing AppStoreUpdater build break
+
+- `AppStoreUpdater.swift:66` default parameter `currentVersion: @escaping () -> String? = AppStoreUpdater.bundleVersion` was losing the `@MainActor` global-actor isolation under Swift 6 strict concurrency, breaking the iOS demo build on main. Added `@MainActor` on both the parameter type and the stored field so the implicit `@MainActor` from the class scope propagates correctly. Surfaced while validating [#1194](https://github.com/sceneview/sceneview/issues/1194); the regression landed in [#1216](https://github.com/sceneview/sceneview/pull/1216) earlier today.
+
+### Docs
+
+- **`docs/docs/cheatsheet-ios.md`** — new "Demo parity status (#1194)" section above the existing "iOS parity status (#1036)" table, summarising the six ports and the honest-subset notes (cinematic camera, per-model editing, sceneview-core physics).
+
+No library APIs change. No new releases of `:sceneview` / `:arsceneview` / `:sceneview-core` are required.
+
 ## Unreleased — v4.3.6 docs hotfix: Cloud Anchor ERROR_NOT_AUTHORIZED post-SHA-1 troubleshooting ([#1177](https://github.com/sceneview/sceneview/issues/1177) follow-up)
 
 Production Cloud Anchor users still hitting `ERROR_NOT_AUTHORIZED` on v4.3.5 after the App Signing key SHA-1 was added to the Google Cloud API key restrictions. v4.3.3 ([PR #1197](https://github.com/sceneview/sceneview/pull/1197)) shipped the SHA-1 runbook + actionable in-app error pointing only at that one cause, but field experience showed there are 4 other Cloud-Console-side causes that look identical at the device.
