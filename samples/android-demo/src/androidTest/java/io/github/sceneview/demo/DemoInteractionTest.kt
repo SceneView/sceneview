@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.provider.MediaStore
+import io.github.sceneview.demo.R
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -667,16 +668,18 @@ class DemoInteractionTest {
         openDemo("secondary-camera")
         screenshot("53_secondaryCam_top_default")
 
-        tap("Side")
+        // Chip labels resolved from string resources (R.string.demo_secondary_camera_chip_*,
+        // added in PR #1270) so the tap matcher works on any device locale — see #1282.
+        tap(context.getString(R.string.demo_secondary_camera_chip_side))
         screenshot("54_secondaryCam_side")
 
-        tap("Front")
+        tap(context.getString(R.string.demo_secondary_camera_chip_front))
         screenshot("55_secondaryCam_front")
 
-        tap("Corner")
+        tap(context.getString(R.string.demo_secondary_camera_chip_corner))
         screenshot("56_secondaryCam_corner")
 
-        tap("Top")
+        tap(context.getString(R.string.demo_secondary_camera_chip_top))
         screenshot("57_secondaryCam_top_back")
     }
 
