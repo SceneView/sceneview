@@ -1106,8 +1106,8 @@ Most are default parameter values in `SceneView`/`ARSceneView` — call them exp
 | `rememberEnvironment(environmentLoader, isOpaque)` | `Environment` | IBL + skybox environment |
 | `rememberEnvironment(environmentLoader) { ... }` | `Environment` | Custom environment from lambda |
 | `rememberCameraNode(engine) { ... }` | `CameraNode` | Custom camera with apply block |
-| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default |
-| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat |
+| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default; apply block is reactive (re-runs on recomposition, so Compose-state-driven intensity/direction/color update live) |
+| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat; apply block is reactive (same as `rememberMainLightNode`) |
 | `rememberCameraManipulator(orbitHomePosition?, targetPosition?)` | `CameraManipulator?` | Orbit/pan/zoom camera controller |
 | `rememberOnGestureListener(...)` | `OnGestureListener` | Gesture callbacks for tap/drag/pinch |
 | `rememberViewNodeManager()` | `ViewNode.WindowManager` | Required for ViewNode composables |

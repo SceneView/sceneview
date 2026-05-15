@@ -14,6 +14,10 @@
 
 - **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
 
+### Fixed
+
+- **`SceneView` main/fill light mutations are now reactive ([#1306](https://github.com/sceneview/sceneview/issues/1306)).** `rememberMainLightNode` / `rememberFillLightNode` re-run their `apply` block on every recomposition (via `SideEffect`), so Compose-state-driven light properties (intensity, direction, color) propagate to the Filament scene without re-keying the `remember` — matching the iOS `RealityView.update:` reactive light contract.
+
 ### Changed — Samples
 
 - **Migrated the remaining `samples/android-demo` demos to the `rememberMaterialInstance` / `rememberUnlitMaterialInstance` helpers ([#971](https://github.com/sceneview/sceneview/issues/971)).** `CollisionDemo`, `LightingDemo`, `VideoDemo`, `ARStreetscapeDemo`, `GeometryDemo`, `DebugOverlayDemo`, `PhysicsDemo` and the shared `Axes3DNode` no longer allocate `MaterialInstance` handles via raw `materialLoader.create*` without disposal — the helpers own the lifecycle. Behaviour-preserving.
