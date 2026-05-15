@@ -67,7 +67,11 @@ jobs:
   publish-api-docs:
     name: Publish API docs
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Headroom for the worst case: 3 Dokka retry attempts × `timeout_minutes:
+    # 10` (#1127) + checkout/setup-gradle + the gh-pages deploy step (#1252).
+    # The previous 15 would have killed the job mid-retry before the wrapper
+    # could exhaust its 3 attempts.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -95,7 +99,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           max_attempts: 3
-          timeout_minutes: 15
+          timeout_minutes: 10
           retry_on: error
           # Dokka 2.2.0 (bumped in gradle/libs.versions.toml#L59) removed V1
           # mode. The V1 task `dokkaHtml` now errors with "Cannot run Dokka
@@ -114,6 +118,75 @@ jobs:
             arsceneview/build/dokka/
           retention-days: 1
           if-no-files-found: ignore
+
+      # Arrange the just-generated Dokka HTML under a versioned tree so the
+      # gh-pages deploy below publishes it to a stable, browseable URL.
+      # Layout written into ./aggregated-dokka/ :
+      #   <version>/sceneview/index.html      ← :sceneview module API
+      #   <version>/arsceneview/index.html    ← :arsceneview module API
+      #   latest/sceneview/index.html         ← copy of the just-tagged version
+      #   latest/arsceneview/index.html
+      # Combined with `destination_dir: api/sceneview` + `keep_files: true`
+      # in the deploy step, this produces:
+      #   sceneview.github.io/api/sceneview/<version>/sceneview/
+      #   sceneview.github.io/api/sceneview/latest/sceneview/
+      # See #1252.
+      - name: Arrange Dokka HTML for gh-pages
+        id: arrange-dokka
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION=$(grep '^VERSION_NAME=' gradle.properties | cut -d= -f2)
+          else
+            VERSION=${GITHUB_REF_NAME#v}
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Dokka V2 (`dokkaGenerateHtml`) writes to `<module>/build/dokka/html/`.
+          SCENEVIEW_HTML="sceneview/build/dokka/html"
+          ARSCENEVIEW_HTML="arsceneview/build/dokka/html"
+          if [ ! -f "$SCENEVIEW_HTML/index.html" ] || [ ! -f "$ARSCENEVIEW_HTML/index.html" ]; then
+            echo "::error::Dokka HTML missing — expected $SCENEVIEW_HTML/index.html and $ARSCENEVIEW_HTML/index.html"
+            exit 1
+          fi
+          for slot in "$VERSION" latest; do
+            mkdir -p "aggregated-dokka/$slot/sceneview" "aggregated-dokka/$slot/arsceneview"
+            cp -r "$SCENEVIEW_HTML/." "aggregated-dokka/$slot/sceneview/"
+            cp -r "$ARSCENEVIEW_HTML/." "aggregated-dokka/$slot/arsceneview/"
+          done
+          echo "Arranged Dokka HTML for v$VERSION (+ latest/) under aggregated-dokka/"
+          find aggregated-dokka -maxdepth 2 -type d | sort
+
+      # Publish the versioned Dokka tree to the marketing-site repo
+      # `sceneview/sceneview.github.io` so `sceneview.github.io/api/sceneview/*`
+      # finally serves a browseable API reference (was 404 since v4.3.3).
+      #
+      # Auth: SSH `deploy_key` (secrets.PAGES_DEPLOY_KEY) — the SAME deploy key
+      # `deploy-website.yml` already uses for the cross-repo Pages push, so no
+      # new secret is required.
+      #
+      # `keep_files: true` is critical: the target repo also hosts the
+      # marketing site (deployed by deploy-website.yml) and previously-released
+      # API versions — without it, actions-gh-pages would wipe everything not
+      # in `publish_dir`. With `destination_dir: api/sceneview`, only that
+      # subtree is touched; the site root and other `/api/sceneview/<ver>/`
+      # folders are preserved across deploys.
+      #
+      # Only runs on real tag pushes — on workflow_dispatch the working tree
+      # may not match a published tag, so we skip to avoid mislabelling
+      # `latest/`.
+      - name: Deploy Dokka to sceneview.github.io
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          external_repository: sceneview/sceneview.github.io
+          publish_branch: main
+          publish_dir: ./aggregated-dokka
+          destination_dir: api/sceneview
+          keep_files: true
+          commit_message: "deploy: API docs for ${{ github.ref_name }}"
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
 
   # ── 3. Publish MCP to npm ──────────────────────────────────────────────────
   publish-mcp:
