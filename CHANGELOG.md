@@ -91,6 +91,10 @@ Six Android-only Sketchfab-streaming demos shipped by Stage 2 ([#1152](https://g
 - **`SamplesTab.swift`** — added Model Viewer / Multi-Model Park entries under Geometry, and promoted "AR Plane Placement" + "AR Instant Placement" from `Coming soon` to fully wired demos.
 - **`DemoDeepLinkRegistry.swift`** — `model-viewer` and `multi-model` ids no longer route to the `SceneGalleryDemo` placeholder; both land on the dedicated demos. `ar-placement` newly routed to `ARPlacementDemo`.
 
+### Fixed — iOS Stage 2 demo polish ([#1280](https://github.com/sceneview/sceneview/issues/1280))
+
+- `ARPlacementDemo` / `ARInstantPlacementDemo` gain a "Clear all placed models" control that tears down every placed anchor (placed anchors previously accumulated for the demo's lifetime); `ARInstantPlacementDemo`'s Instant/Plane toggle doc-comment + copy now honestly state both modes use the same `.estimatedPlane` raycast (the toggle only shows/hides the plane + coaching overlays); `ModelViewerDemo`'s "Surprise me" failures now surface a transient error banner instead of failing silently; and a confusing double-negation in `MultiModelDemo` was simplified.
+
 ### Fixed — pre-existing AppStoreUpdater build break
 
 - `AppStoreUpdater.swift:66` default parameter `currentVersion: @escaping () -> String? = AppStoreUpdater.bundleVersion` was losing the `@MainActor` global-actor isolation under Swift 6 strict concurrency, breaking the iOS demo build on main. Added `@MainActor` on both the parameter type and the stored field so the implicit `@MainActor` from the class scope propagates correctly. Surfaced while validating [#1194](https://github.com/sceneview/sceneview/issues/1194); the regression landed in [#1216](https://github.com/sceneview/sceneview/pull/1216) earlier today.

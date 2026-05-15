@@ -97,7 +97,7 @@ struct MultiModelDemo: View {
             .ignoresSafeArea()
             .id("multi-model-spin-\(spinScene)")
 
-            if !loadedEntities.isEmpty == false && loadError == nil {
+            if loadedEntities.isEmpty && loadError == nil {
                 VStack(spacing: 12) {
                     ProgressView().tint(.white)
                     Text("Loading park scene…")

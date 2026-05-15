@@ -46,7 +46,6 @@ struct ARPlacementDemo: View {
         ("animated_butterfly", "Butterfly"),
     ]
 
-    @State private var placedCount: Int = 0
     @State private var cycleIndex: Int = 0
     /// `nil` → bundled cycle mode. Non-nil → the user picked a streamed slug.
     @State private var selectedSlug: SketchfabSlug?
@@ -55,6 +54,21 @@ struct ARPlacementDemo: View {
     @State private var armedURL: URL?
     /// Lost-anchor / placement errors surfaced as a transient banner.
     @State private var lastError: String?
+    /// Anchors placed by tapping. Retained so "Clear all placed models" can
+    /// tear them down — `placedCount` is always derived from this collection
+    /// so the two never drift apart.
+    @State private var placedAnchors: [AnchorEntity] = []
+    /// Weak handle on the live `ARView`, captured from the tap callback, so the
+    /// clear-all control can remove anchors from `arView.scene`.
+    @State private var arViewRef: ARViewBox = ARViewBox()
+
+    /// Reference box for the non-`Sendable`/non-`Equatable` `ARView` so it can
+    /// live in SwiftUI `@State` without triggering view-identity churn.
+    private final class ARViewBox {
+        weak var value: ARView?
+    }
+
+    private var placedCount: Int { placedAnchors.count }
 
     private let placementSlugs: [SketchfabSlug] = SampleAssets.byCategory["ar_placement"] ?? []
 
@@ -122,7 +136,8 @@ struct ARPlacementDemo: View {
                 let anchor = AnchorNode.world(position: worldPosition)
                 anchor.add(node.entity)
                 arView.scene.addAnchor(anchor.entity)
-                placedCount += 1
+                arViewRef.value = arView
+                placedAnchors.append(anchor.entity)
                 #if os(iOS)
                 HapticManager.lightTap()
                 #endif
@@ -134,7 +149,8 @@ struct ARPlacementDemo: View {
             let anchor = AnchorNode.world(position: worldPosition)
             anchor.add(node.entity)
             arView.scene.addAnchor(anchor.entity)
-            placedCount += 1
+            arViewRef.value = arView
+            placedAnchors.append(anchor.entity)
             #if os(iOS)
             HapticManager.lightTap()
             #endif
@@ -142,6 +158,21 @@ struct ARPlacementDemo: View {
         } catch {
             lastError = "Could not place model: \(error.localizedDescription)"
         }
+    }
+
+    /// Removes every placed anchor from the AR scene and resets the count.
+    /// Safe to call when nothing is placed — the loop simply does nothing.
+    @MainActor
+    private func clearAllPlacedModels() {
+        if let arView = arViewRef.value {
+            for anchor in placedAnchors {
+                arView.scene.removeAnchor(anchor)
+            }
+        }
+        placedAnchors.removeAll()
+        #if os(iOS)
+        HapticManager.mediumTap()
+        #endif
     }
 
     // MARK: - Controls sheet
@@ -193,9 +224,13 @@ struct ARPlacementDemo: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Clear-all isn't wired (placed anchors are owned by the ARView's
-            // scene at this layer); a future revision could expose
-            // arView.scene.anchors and tear them down here.
+            Button(role: .destructive) {
+                clearAllPlacedModels()
+            } label: {
+                Label("Clear all placed models", systemImage: "trash")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .disabled(placedCount == 0)
         }
     }
 

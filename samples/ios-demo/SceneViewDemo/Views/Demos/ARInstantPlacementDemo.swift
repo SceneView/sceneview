@@ -11,16 +11,27 @@ import SceneViewSwift
 /// which leverages ARCore's `Config.InstantPlacementMode.LOCAL_Y_UP`. On iOS,
 /// ARKit doesn't ship a 1:1 "instant placement" API — the closest equivalent is
 /// `ARView.raycast(...)` against `.estimatedPlane` alignment, which returns hits
-/// before plane geometry has fully converged. The pose is then promoted to a
-/// real `existingPlane` raycast result as ARKit gathers more features.
+/// before plane geometry has fully converged.
 ///
-/// The demo therefore exposes a single toggle:
+/// ### Honest-subset note — what the toggle actually does
 ///
-/// - **Instant Placement ON** (`existingOrEstimated` raycast) — taps land
-///   immediately at an approximate pose (~1 m in front when there's nothing
-///   tracked yet).
-/// - **Instant Placement OFF** (`existingPlane` raycast) — taps wait until a
-///   real plane is detected. Matches the Android `ARPlacementDemo` semantics.
+/// `ARSceneView`'s tap raycast (`ARSceneView.swift` `handleTap`) is hardcoded to
+/// `allowing: .estimatedPlane, alignment: .any`. It has no per-call hook to switch
+/// raycast alignment, so **both toggle positions place models through the same
+/// `.estimatedPlane` raycast** — taps always land before plane geometry has fully
+/// converged.
+///
+/// The toggle is therefore a *coaching/overlay* switch, not a raycast-mode switch:
+///
+/// - **Instant Placement ON** — no plane overlay, no coaching overlay. The UI
+///   encourages tapping straight away on the estimated-plane raycast.
+/// - **Instant Placement OFF** — plane overlay + coaching overlay are shown, so
+///   the user can wait for a converged plane before tapping. The raycast itself
+///   is identical; only the visual guidance differs.
+///
+/// A true per-mode `existingPlane` vs `estimatedPlane` switch would require an
+/// alignment parameter on `ARSceneView`'s tap raycast — tracked as a future API
+/// addition rather than faked at the demo layer.
 ///
 /// ### Streaming pipeline (Stage 2, issue #1152)
 ///
@@ -37,10 +48,24 @@ struct ARInstantPlacementDemo: View {
     ]
 
     @State private var instantEnabled: Bool = true
-    @State private var placedCount: Int = 0
     @State private var cycleIndex: Int = 0
     @State private var selectedSlug: SketchfabSlug?
     @State private var armedURL: URL?
+    /// Anchors placed by tapping. Retained so "Clear all placed models" can
+    /// tear them down — `placedCount` is always derived from this collection
+    /// so the two never drift apart.
+    @State private var placedAnchors: [AnchorEntity] = []
+    /// Weak handle on the live `ARView`, captured from the tap callback, so the
+    /// clear-all control can remove anchors from `arView.scene`.
+    @State private var arViewRef: ARViewBox = ARViewBox()
+
+    /// Reference box for the non-`Sendable`/non-`Equatable` `ARView` so it can
+    /// live in SwiftUI `@State` without triggering view-identity churn.
+    private final class ARViewBox {
+        weak var value: ARView?
+    }
+
+    private var placedCount: Int { placedAnchors.count }
 
     private let placementSlugs: [SketchfabSlug] = SampleAssets.byCategory["ar_placement"] ?? []
 
@@ -101,13 +126,29 @@ struct ARInstantPlacementDemo: View {
             let anchor = AnchorNode.world(position: worldPosition)
             anchor.add(node.entity)
             arView.scene.addAnchor(anchor.entity)
-            placedCount += 1
+            arViewRef.value = arView
+            placedAnchors.append(anchor.entity)
             #if os(iOS)
             HapticManager.lightTap()
             #endif
         } catch {
             // Silently keep the user in tap-to-retry mode (Android parity).
         }
+    }
+
+    /// Removes every placed anchor from the AR scene and resets the count.
+    /// Safe to call when nothing is placed — the loop simply does nothing.
+    @MainActor
+    private func clearAllPlacedModels() {
+        if let arView = arViewRef.value {
+            for anchor in placedAnchors {
+                arView.scene.removeAnchor(anchor)
+            }
+        }
+        placedAnchors.removeAll()
+        #if os(iOS)
+        HapticManager.mediumTap()
+        #endif
     }
 
     // MARK: - Controls sheet
@@ -120,8 +161,8 @@ struct ARInstantPlacementDemo: View {
                     Text(instantEnabled ? "Instant Placement ON" : "Instant Placement OFF")
                         .font(.subheadline.weight(.semibold))
                     Text(instantEnabled
-                         ? "Tap anywhere — ARKit approximates a pose immediately."
-                         : "Plane-based mode — wait for the overlay, then tap inside it.")
+                         ? "Overlays hidden — tap anywhere, ARKit approximates a pose immediately."
+                         : "Plane + coaching overlays shown — wait for a plane, then tap inside it.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -159,7 +200,15 @@ struct ARInstantPlacementDemo: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("iOS port note: ARKit doesn't expose ARCore's `InstantPlacementMode.LOCAL_Y_UP` directly. We approximate it via `.estimatedPlane` raycasts so taps land before planes fully converge — close enough for the demo's UX.")
+            Button(role: .destructive) {
+                clearAllPlacedModels()
+            } label: {
+                Label("Clear all placed models", systemImage: "trash")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .disabled(placedCount == 0)
+
+            Text("iOS port note: ARKit doesn't expose ARCore's `InstantPlacementMode.LOCAL_Y_UP` directly. Taps always use an `.estimatedPlane` raycast so they land before planes fully converge. The toggle here only shows/hides the plane + coaching overlays — it does not change the raycast alignment.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

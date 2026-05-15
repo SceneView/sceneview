@@ -33,6 +33,9 @@ struct ModelViewerDemo: View {
     @State private var loadedNode: ModelNode?
     @State private var loadError: String?
     @State private var surpriseInFlight: Bool = false
+    /// Transient banner shown when a "Surprise me" roll fails (network error,
+    /// empty search result). Mirrors ``ARPlacementDemo``'s `lastError` capsule.
+    @State private var surpriseError: String?
     /// When non-nil, the demo is rendering a streamed pick instead of the
     /// bundled hero. We surface the title in the status pill so the user can
     /// tell which model is on screen right now.
@@ -45,6 +48,10 @@ struct ModelViewerDemo: View {
             sceneView
             VStack {
                 Spacer()
+                if let surpriseError {
+                    errorBanner(surpriseError)
+                        .padding(.bottom, 8)
+                }
                 if let name = streamedDisplayName {
                     sourcePill(text: "Streamed: \(name)")
                         .padding(.bottom, 8)
@@ -98,6 +105,15 @@ struct ModelViewerDemo: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial, in: Capsule())
             .foregroundStyle(.primary)
+    }
+
+    private func errorBanner(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Color.red.opacity(0.85), in: Capsule())
+            .foregroundStyle(.white)
     }
 
     private var surpriseButton: some View {
@@ -165,6 +181,7 @@ struct ModelViewerDemo: View {
     @MainActor
     private func rollSurpriseModel() async {
         surpriseInFlight = true
+        surpriseError = nil
         defer { surpriseInFlight = false }
 
         do {
@@ -187,7 +204,10 @@ struct ModelViewerDemo: View {
                     break
                 }
             }
-            guard let pick = picked else { return }
+            guard let pick = picked else {
+                surfaceTransientError("No surprise model available right now — try again.")
+                return
+            }
 
             // Download via the same service the resolver uses. We bypass the
             // resolver here because the result isn't in our curated
@@ -201,9 +221,22 @@ struct ModelViewerDemo: View {
             loadedNode = node
             streamedDisplayName = pick.name
         } catch {
-            // On failure we silently keep the hero on screen, matching Android.
-            // The button is re-enabled by the `defer` block above so the user
-            // can try again.
+            // Keep the current hero on screen, but surface a transient banner so
+            // a network failure isn't completely silent. The button is re-enabled
+            // by the `defer` block above so the user can try again.
+            surfaceTransientError("Couldn't roll a model: \(error.localizedDescription)")
+        }
+    }
+
+    /// Shows a transient error banner that auto-dismisses after a few seconds.
+    @MainActor
+    private func surfaceTransientError(_ message: String) {
+        surpriseError = message
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if surpriseError == message {
+                surpriseError = nil
+            }
         }
     }
 }
