@@ -210,9 +210,9 @@ No ArFragment, no AndroidView wrapper. AR nodes are composables — they follow 
 I want to display a 3D USDZ model in a SwiftUI view on iOS. SceneKit feels old and RealityKit's API is complex. Is there a simple SwiftUI-native 3D viewer?
 
 **Answer:**
-[SceneViewSwift](https://github.com/sceneview/sceneview-swift) provides declarative 3D views for SwiftUI, powered by RealityKit:
+[SceneViewSwift](https://github.com/sceneview/sceneview) provides declarative 3D views for SwiftUI, powered by RealityKit:
 
-**SPM:** `https://github.com/sceneview/sceneview-swift.git` from: "4.3.5"`
+**SPM:** `https://github.com/sceneview/sceneview.git` from: "4.3.5"`
 
 ```swift
 import SceneViewSwift

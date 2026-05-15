@@ -36,6 +36,19 @@ fi
 echo -e "Source of truth (gradle.properties): ${GREEN}$SOURCE_VERSION${NC}"
 echo ""
 
+# ─── Helper: portable in-place sed (BSD vs GNU) ──────────────────────────
+# BSD sed (macOS dev machines) requires `sed -i ''` — an explicit empty
+# backup suffix. GNU sed (Linux CI runners) treats `''` as a script and
+# errors. Detect which flavour is on PATH once and dispatch accordingly.
+# Usage: _sed_inplace "s/foo/bar/" path/to/file   (#1226)
+if sed --version >/dev/null 2>&1; then
+    # GNU sed — `--version` is GNU-only; BSD sed errors on it.
+    _sed_inplace() { sed -i "$@"; }
+else
+    # BSD/macOS sed — needs the empty backup-suffix argument.
+    _sed_inplace() { local script="$1"; shift; sed -i '' "$script" "$@"; }
+fi
+
 # ─── Helper: check a version ─────────────────────────────────────────────
 declare -a LOCATIONS=()
 declare -a VERSIONS=()
@@ -414,7 +427,7 @@ if [ "$FIX_MODE" = "--fix" ] && [ "$ERRORS" -gt 0 ]; then
         if [ -f "$PROPS" ]; then
             CURRENT=$(grep '^VERSION_NAME=' "$PROPS" | cut -d= -f2)
             if [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-                sed -i '' "s/^VERSION_NAME=.*/VERSION_NAME=$SOURCE_VERSION/" "$PROPS"
+                _sed_inplace "s/^VERSION_NAME=.*/VERSION_NAME=$SOURCE_VERSION/" "$PROPS"
                 echo -e "  Fixed: $module/gradle.properties ($CURRENT -> $SOURCE_VERSION)"
             fi
         fi
@@ -445,7 +458,7 @@ with open('$PKG_JSON', 'w') as f:
     if [ -f "$PUBSPEC" ]; then
         CURRENT=$(grep '^version:' "$PUBSPEC" | awk '{print $2}')
         if [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-            sed -i '' "s/^version: .*/version: $SOURCE_VERSION/" "$PUBSPEC"
+            _sed_inplace "s/^version: .*/version: $SOURCE_VERSION/" "$PUBSPEC"
             echo -e "  Fixed: flutter/sceneview_flutter/pubspec.yaml ($CURRENT -> $SOURCE_VERSION)"
         fi
     fi
@@ -454,7 +467,7 @@ with open('$PKG_JSON', 'w') as f:
     if [ -f "$FLUTTER_ANDROID_GRADLE" ]; then
         CURRENT=$(grep "^version " "$FLUTTER_ANDROID_GRADLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1)
         if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-            sed -i '' "s/^version '$CURRENT'/version '$SOURCE_VERSION'/" "$FLUTTER_ANDROID_GRADLE"
+            _sed_inplace "s/^version '$CURRENT'/version '$SOURCE_VERSION'/" "$FLUTTER_ANDROID_GRADLE"
             echo -e "  Fixed: flutter/.../android/build.gradle ($CURRENT -> $SOURCE_VERSION)"
         fi
     fi
@@ -463,7 +476,7 @@ with open('$PKG_JSON', 'w') as f:
     if [ -f "$PODSPEC" ]; then
         CURRENT=$(grep "s\.version" "$PODSPEC" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1)
         if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-            sed -i '' "s/s\.version *= *'$CURRENT'/s.version          = '$SOURCE_VERSION'/" "$PODSPEC"
+            _sed_inplace "s/s\.version *= *'$CURRENT'/s.version          = '$SOURCE_VERSION'/" "$PODSPEC"
             echo -e "  Fixed: flutter/.../ios/sceneview_flutter.podspec ($CURRENT -> $SOURCE_VERSION)"
         fi
     fi
@@ -484,7 +497,7 @@ with open('$PKG_JSON', 'w') as f:
         for docfile in llms.txt README.md CLAUDE.md docs/docs/index.md docs/docs/quickstart.md docs/docs/llms-full.txt docs/docs/cheatsheet.md docs/docs/platforms.md docs/docs/migration.md docs/docs/android-xr.md; do
             F="$REPO_ROOT/$docfile"
             if [ -f "$F" ] && grep -q "io\.github\.sceneview:.*$OLD_V" "$F" 2>/dev/null; then
-                sed -i '' "s/io\.github\.sceneview:\([^:]*\):$OLD_V/io.github.sceneview:\1:$SOURCE_VERSION/g" "$F"
+                _sed_inplace "s/io\.github\.sceneview:\([^:]*\):$OLD_V/io.github.sceneview:\1:$SOURCE_VERSION/g" "$F"
                 echo -e "  Fixed: $docfile (artifact refs $OLD_V -> $SOURCE_VERSION)"
             fi
         done
@@ -495,7 +508,7 @@ with open('$PKG_JSON', 'w') as f:
         for OLD_V in $OLD_VERSIONS; do
             [ "$OLD_V" = "$SOURCE_VERSION" ] && continue
             if grep -q "$OLD_V" "$WEBSITE_INDEX" 2>/dev/null; then
-                sed -i '' "s/$OLD_V/$SOURCE_VERSION/g" "$WEBSITE_INDEX"
+                _sed_inplace "s/$OLD_V/$SOURCE_VERSION/g" "$WEBSITE_INDEX"
                 echo -e "  Fixed: website-static/index.html ($OLD_V -> $SOURCE_VERSION)"
             fi
         done
@@ -528,7 +541,7 @@ with open('$VERSION_JSON', 'w') as f:
     if [ -f "$WEB_DEMO_MAIN_KT" ]; then
         CURRENT=$(grep -E 'const val SDK_VERSION' "$WEB_DEMO_MAIN_KT" | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | tr -d '"' | head -1 || echo "")
         if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-            sed -i '' "s/const val SDK_VERSION = \"$CURRENT\"/const val SDK_VERSION = \"$SOURCE_VERSION\"/" "$WEB_DEMO_MAIN_KT"
+            _sed_inplace "s/const val SDK_VERSION = \"$CURRENT\"/const val SDK_VERSION = \"$SOURCE_VERSION\"/" "$WEB_DEMO_MAIN_KT"
             echo -e "  Fixed: samples/web-demo Main.kt SDK_VERSION ($CURRENT -> $SOURCE_VERSION)"
         fi
     fi
@@ -538,8 +551,8 @@ with open('$VERSION_JSON', 'w') as f:
     if [ -f "$WEB_DEMO_INDEX" ]; then
         CURRENT=$(grep -E "var BUILD_VERSION = '" "$WEB_DEMO_INDEX" | grep -oE "'[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'" | tr -d "'" | head -1 || echo "")
         if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-            sed -i '' "s/var BUILD_VERSION = '$CURRENT'/var BUILD_VERSION = '$SOURCE_VERSION'/" "$WEB_DEMO_INDEX"
-            sed -i '' "s/v$CURRENT/v$SOURCE_VERSION/g" "$WEB_DEMO_INDEX"
+            _sed_inplace "s/var BUILD_VERSION = '$CURRENT'/var BUILD_VERSION = '$SOURCE_VERSION'/" "$WEB_DEMO_INDEX"
+            _sed_inplace "s/v$CURRENT/v$SOURCE_VERSION/g" "$WEB_DEMO_INDEX"
             echo -e "  Fixed: samples/web-demo index.html ($CURRENT -> $SOURCE_VERSION)"
         fi
     fi
@@ -563,7 +576,7 @@ with open('$RN_DEMO_PKG', 'w') as f:
     if [ -f "$RN_DEMO_APP" ]; then
         CURRENT=$(grep -E "const VERSION = '" "$RN_DEMO_APP" | grep -oE "'[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'" | tr -d "'" | head -1 || echo "")
         if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
-            sed -i '' "s/const VERSION = '$CURRENT'/const VERSION = '$SOURCE_VERSION'/" "$RN_DEMO_APP"
+            _sed_inplace "s/const VERSION = '$CURRENT'/const VERSION = '$SOURCE_VERSION'/" "$RN_DEMO_APP"
             echo -e "  Fixed: samples/react-native-demo App.tsx VERSION ($CURRENT -> $SOURCE_VERSION)"
         fi
     fi

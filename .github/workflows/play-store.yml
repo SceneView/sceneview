@@ -340,7 +340,9 @@ jobs:
           VERSION_NAME: ${{ needs.build.outputs.version_name }}
         run: |
           python3 -m venv /tmp/promote-venv
-          /tmp/promote-venv/bin/pip install --quiet google-auth requests
+          # Pinned exact versions — this job runs with PLAY_STORE_SERVICE_ACCOUNT_JSON
+          # in env, so a compromised PyPI release must not be pullable here (#1230).
+          /tmp/promote-venv/bin/pip install --quiet google-auth==2.38.0 requests==2.32.3
 
           /tmp/promote-venv/bin/python3 << 'PYEOF'
           import json, os, sys, requests
@@ -454,7 +456,8 @@ jobs:
           LISTING_DIR: samples/android-demo/distribution/play-store
         run: |
           python3 -m venv /tmp/listing-venv
-          /tmp/listing-venv/bin/pip install --quiet google-auth requests
+          # Pinned exact versions — credential-bearing job (#1230).
+          /tmp/listing-venv/bin/pip install --quiet google-auth==2.38.0 requests==2.32.3
 
           /tmp/listing-venv/bin/python3 << 'PYEOF'
           import json, os, sys, pathlib, requests

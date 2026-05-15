@@ -30,6 +30,10 @@
 
 - **`sceneview-swift` SPM mirror retired in favour of monorepo-direct package resolution ([PR #1215](https://github.com/sceneview/sceneview/pull/1215))** — every install snippet across docs, codelabs, GPT prompts, `.github/copilot-instructions.md`, `SceneViewSwift/README.md`, `llms.txt` (4 copies — root, docs, website-static, well-known), the website (`index.html` / `docs.html` / `playground.html`), the PWA manifest, the schema.org `sameAs` graph, and the bundled MCP `llms-txt.ts` now points at `https://github.com/sceneview/sceneview(.git)`. The `sceneview/sceneview-swift` mirror has been archived read-only; its frozen `v4.0.0` tag still resolves for SPM consumers pinned to the old URL, but no further releases will be cut there. Existing consumers should re-add the package in Xcode pointing at the monorepo URL — the root `Package.swift` (added in [PR #920](https://github.com/sceneview/sceneview/pull/920)) declares the `SceneViewSwift` product.
 
+### Changed — CI / scripts hardening
+
+- **CI/scripts hardening batch** ([#1226](https://github.com/sceneview/sceneview/issues/1226), [#1230](https://github.com/sceneview/sceneview/issues/1230), [#1237](https://github.com/sceneview/sceneview/issues/1237), [#1114](https://github.com/sceneview/sceneview/issues/1114)) — new `check-sceneview-swift-urls.sh` PR gate forbids reintroducing the archived `sceneview-swift` mirror URL; `sync-versions.sh` now uses a portable `_sed_inplace` helper (BSD/GNU); publish-time `pip install` calls in `play-store.yml` / `app-store.yml` are pinned to exact versions. CONTRIBUTING.md now documents that docs-only PRs skip the quality-gate + render-tests ([#1128](https://github.com/sceneview/sceneview/issues/1128)).
+
 ### Fixed — in-app update polish across all 6 sample platforms ([#1244](https://github.com/sceneview/sceneview/issues/1244)–[#1249](https://github.com/sceneview/sceneview/issues/1249))
 
 Follow-ups to [PR #1216](https://github.com/sceneview/sceneview/pull/1216) (in-app auto-update feature) — six small, platform-specific hardening fixes that bring the auto-update behaviour to parity across Android, Web, React Native, Flutter, iOS and macOS:

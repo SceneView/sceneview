@@ -76,7 +76,7 @@ Ready-to-submit entries for major awesome lists. Each section is a PR-ready addi
 **Section:** Libraries / 3D & AR
 
 ```markdown
-- [SceneViewSwift](https://github.com/sceneview/sceneview-swift) - 3D & AR views for SwiftUI powered by RealityKit. iOS 17+, macOS 14+, visionOS 1+. Declarative scene graph matching Compose API on Android.
+- [SceneViewSwift](https://github.com/sceneview/sceneview) - 3D & AR views for SwiftUI powered by RealityKit. iOS 17+, macOS 14+, visionOS 1+. Declarative scene graph matching Compose API on Android.
 ```
 
 ---

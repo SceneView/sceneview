@@ -140,6 +140,19 @@ if [ -x ".claude/scripts/check-deprecated-api.sh" ]; then
     fi
 fi
 
+# Check for references to the archived `sceneview/sceneview-swift` SPM mirror.
+# The mirror was retired in PR #1215 — SceneViewSwift resolves from the
+# monorepo root Package.swift. A new mirror-URL reference points users at a
+# dead resolution path (#1237).
+if [ -x ".claude/scripts/check-sceneview-swift-urls.sh" ]; then
+    if bash .claude/scripts/check-sceneview-swift-urls.sh > /tmp/check-sceneview-swift-urls.log 2>&1; then
+        check "No archived sceneview-swift mirror URLs" "PASS" ""
+    else
+        SWIFT_URL_COUNT=$(grep -cE '^    [^ ]' /tmp/check-sceneview-swift-urls.log 2>/dev/null || echo "?")
+        check "Archived sceneview-swift mirror URLs" "FAIL" "$SWIFT_URL_COUNT file(s); see /tmp/check-sceneview-swift-urls.log"
+    fi
+fi
+
 echo ""
 
 # ─── 4a. SceneView Agent Skill Drift ───────────────────────────────────

@@ -66,6 +66,23 @@ jobs:
         shell: bash
         run: bash .claude/scripts/check-sceneview-skill.sh
 
+  # ── Archived SPM mirror URL guard ───────────────────────────────────────
+  # The `sceneview/sceneview-swift` SPM mirror was archived in PR #1215 —
+  # SwiftViewSwift now resolves from the monorepo root Package.swift. Any
+  # NEW reference to the dead mirror URL (a stale paste or AI-suggestion
+  # regression) points users at a dead resolution path. This guard greps
+  # the tracked tree and fails on any hit outside the historical allowlist.
+  # Sub-second; no JDK or Gradle needed. Closes #1237.
+  check-sceneview-swift-urls:
+    name: Forbid archived sceneview-swift mirror URLs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run check-sceneview-swift-urls.sh
+        shell: bash
+        run: bash .claude/scripts/check-sceneview-swift-urls.sh
+
   # ── KMP core (all targets) ──────────────────────────────────────────────
   # ci.yml's `web-desktop` job compiles `:sceneview-core:jsMainClasses` but
   # not the full KMP `assemble` (which builds iosArm64/iosSimulatorArm64/
