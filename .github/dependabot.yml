@@ -59,3 +59,18 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore(web)"
+
+  # pip — Python deps installed inside CI/publish workflows.
+  # The deps live in .github/workflows/requirements/*.txt (one file per
+  # workflow); the workflows `pip install -r` them. Dependabot's `pip`
+  # ecosystem only scans requirements files, never inline `pip install x==y`
+  # lines in workflow YAML — so this entry restores automated bumps (#1286).
+  - package-ecosystem: "pip"
+    directory: "/.github/workflows/requirements"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(ci)"

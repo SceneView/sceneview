@@ -16,7 +16,7 @@ dependencies:
     git:
       url: https://github.com/sceneview/sceneview
       path: flutter/sceneview_flutter
-      ref: v4.0.9
+      ref: v4.4.0
 ```
 
 ## Usage
