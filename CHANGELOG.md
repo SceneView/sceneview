@@ -29,6 +29,7 @@
 ### Changed — CI
 
 - **`release.yml` now deploys the generated Dokka API docs to `sceneview.github.io/api/sceneview/<version>/` + `/latest/` and wraps Dokka generation in a 3× retry to tolerate transient Maven Central 503s ([#1252](https://github.com/sceneview/sceneview/issues/1252), [#1127](https://github.com/sceneview/sceneview/issues/1127)).**
+- `Deploy iOS App to App Store` is now tag-only — fixes Apple upload-limit failures on every main merge ([#1318](https://github.com/sceneview/sceneview/issues/1318)).
 
 ### Changed — MCP
 
