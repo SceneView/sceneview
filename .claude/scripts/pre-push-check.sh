@@ -16,7 +16,7 @@ echo "  SceneView Pre-Push Quality Gate"
 echo "═══════════════════════════════════════════"
 
 # 1. Android compilation
-echo -e "\n${YELLOW}[1/8] Compiling sceneview...${NC}"
+echo -e "\n${YELLOW}[1/10] Compiling sceneview...${NC}"
 if ./gradlew :sceneview:compileReleaseKotlin --quiet 2>/dev/null; then
     echo -e "${GREEN}  ✓ sceneview compiles${NC}"
 else
@@ -24,7 +24,7 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-echo -e "${YELLOW}[2/8] Compiling arsceneview...${NC}"
+echo -e "${YELLOW}[2/10] Compiling arsceneview...${NC}"
 if ./gradlew :arsceneview:compileReleaseKotlin --quiet 2>/dev/null; then
     echo -e "${GREEN}  ✓ arsceneview compiles${NC}"
 else
@@ -33,7 +33,7 @@ else
 fi
 
 # 2. Unit tests
-echo -e "\n${YELLOW}[3/8] Running sceneview unit tests...${NC}"
+echo -e "\n${YELLOW}[3/10] Running sceneview unit tests...${NC}"
 if ./gradlew :sceneview:test --quiet 2>/dev/null; then
     echo -e "${GREEN}  ✓ sceneview tests pass${NC}"
 else
@@ -41,7 +41,7 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-echo -e "${YELLOW}[4/8] Running arsceneview unit tests...${NC}"
+echo -e "${YELLOW}[4/10] Running arsceneview unit tests...${NC}"
 if ./gradlew :arsceneview:testDebugUnitTest --quiet 2>/dev/null; then
     echo -e "${GREEN}  ✓ arsceneview tests pass${NC}"
 else
@@ -50,7 +50,7 @@ else
 fi
 
 # 3. Screenshot tests (Roborazzi — Android, JVM, no emulator)
-echo -e "\n${YELLOW}[5/8] Verifying Android screenshot goldens...${NC}"
+echo -e "\n${YELLOW}[5/10] Verifying Android screenshot goldens...${NC}"
 SNAPSHOTS_DIR="samples/android-demo/src/test/snapshots"
 if [ -d "$SNAPSHOTS_DIR" ] && [ "$(ls -A $SNAPSHOTS_DIR 2>/dev/null)" ]; then
     if ./gradlew :samples:android-demo:verifyRoborazziDebug --quiet 2>/dev/null; then
@@ -64,7 +64,7 @@ else
 fi
 
 # 4. Screenshot tests iOS (Pillow pixel comparison against simulator goldens)
-echo -e "${YELLOW}[6/8] Verifying iOS screenshot goldens...${NC}"
+echo -e "${YELLOW}[6/10] Verifying iOS screenshot goldens...${NC}"
 IOS_GOLDENS="samples/ios-demo/goldens"
 if xcrun simctl list devices | grep -q "Booted" 2>/dev/null; then
     if [ -d "$IOS_GOLDENS" ] && [ "$(ls -A $IOS_GOLDENS/*.png 2>/dev/null)" ]; then
@@ -82,7 +82,7 @@ else
 fi
 
 # 5. Version sync
-echo -e "\n${YELLOW}[7/8] Checking version sync...${NC}"
+echo -e "\n${YELLOW}[7/10] Checking version sync...${NC}"
 MISMATCHES=$(bash .claude/scripts/sync-versions.sh 2>/dev/null | grep "MISMATCH" | grep -v "migration.md" | grep -v "Errors" | wc -l | tr -d ' ')
 if [ "$MISMATCHES" = "0" ]; then
     echo -e "${GREEN}  ✓ All versions aligned${NC}"
@@ -92,7 +92,7 @@ else
 fi
 
 # 6. Website JS syntax
-echo -e "\n${YELLOW}[8/9] Validating website JS...${NC}"
+echo -e "\n${YELLOW}[8/10] Validating website JS...${NC}"
 NODE_CMD=$(which node 2>/dev/null || which /opt/homebrew/bin/node 2>/dev/null || which /usr/local/bin/node 2>/dev/null || echo "")
 if [ -n "$NODE_CMD" ]; then
     if "$NODE_CMD" -c website-static/js/sceneview.js 2>/dev/null; then
@@ -109,7 +109,7 @@ fi
 # Scans every samples/* for broken bundled paths or dead CDN URLs so the
 # class of bugs fixed in session 34 (TV demo pointing at non-existent
 # models/*.glb, web-demo pointing at 404 CDN URLs) cannot come back.
-echo -e "\n${YELLOW}[9/9] Validating demo app asset references...${NC}"
+echo -e "\n${YELLOW}[9/10] Validating demo app asset references...${NC}"
 # --no-cdn to keep pre-push fast; CI runs the full check with CDN hits.
 if bash .claude/scripts/validate-demo-assets.sh --no-cdn > /tmp/validate-demo-assets.log 2>&1; then
     echo -e "${GREEN}  ✓ All demo asset refs resolve${NC}"
@@ -117,6 +117,25 @@ else
     echo -e "${RED}  ✗ Demo apps reference assets that don't exist:${NC}"
     tail -30 /tmp/validate-demo-assets.log | sed 's/^/      /'
     ERRORS=$((ERRORS + 1))
+fi
+
+# 8. SceneView agent skill drift
+# Catches the case where a library API was renamed/removed without updating
+# `agents/sceneview/` (the published android-CLI agent skill). The same check
+# runs in quality-gate.sh, pr-check.yml and daily via maintenance.yml — but
+# the lighter pre-push gate skipped it, so a skill-only push could land drift
+# without ever hitting quality-gate.sh. Invoke it directly here too.
+echo -e "\n${YELLOW}[10/10] Checking agent skill drift...${NC}"
+if [ -f .claude/scripts/check-sceneview-skill.sh ]; then
+    if bash .claude/scripts/check-sceneview-skill.sh > /tmp/skill-drift.log 2>&1; then
+        echo -e "${GREEN}  ✓ agents/sceneview/ in sync with library source${NC}"
+    else
+        echo -e "${RED}  ✗ Agent skill drift — agents/sceneview/ out of sync:${NC}"
+        tail -30 /tmp/skill-drift.log | sed 's/^/      /'
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo -e "${YELLOW}  ⚠ check-sceneview-skill.sh not found, skipping${NC}"
 fi
 
 # Summary
