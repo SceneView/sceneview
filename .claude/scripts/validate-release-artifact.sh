@@ -25,11 +25,25 @@
 # `android_cli_describe` therefore wraps `aapt2` (badging for `.apk`, xmltree of
 # the protobuf base manifest for `.aab`).
 #
+# ⛔ A pre-upload *validation guard* must NEVER block a release because of its
+# OWN missing tooling. So this script draws a hard line between two failure
+# kinds:
+#
+#   * "the artifact is wrong"  → exit 1 (BLOCK the release — that is the point)
+#   * "the validation tooling
+#      is unavailable"          → exit 0 (WARN + SKIP — a release must not be
+#                                 blocked because `aapt2` couldn't be located)
+#
+# The `android_cli_describe` helper signals these apart: it returns 2 when
+# `aapt2` itself is missing, and 1 when the artifact genuinely can't be read.
+#
 # Usage:
 #   validate-release-artifact.sh <artifact> <expected-package> \
 #       <expected-version-name> <expected-version-code>
 #
-# Exit codes: 0 = artifact OK; 1 = mismatch / unreadable artifact / bad args.
+# Exit codes:
+#   0 = artifact OK, OR validation skipped because tooling is unavailable
+#   1 = genuine mismatch (wrong package / versionName / versionCode) or bad args
 
 set -euo pipefail
 
@@ -49,15 +63,38 @@ EXPECT_CODE="$4"
 
 fail() {
   # `::error::` so the message is surfaced as a GitHub Actions annotation.
+  # Used ONLY for genuine artifact problems — these MUST block the release.
   echo "::error::$*" >&2
   exit 1
+}
+
+skip() {
+  # `::warning::` so the message is surfaced as a GitHub Actions annotation
+  # without failing the job. Used when the *validation tooling* is unavailable —
+  # a guard must never block a release because of its own missing tooling.
+  echo "::warning::$*" >&2
+  echo "[validate-artifact] SKIPPED — validation tooling unavailable, not blocking the release." >&2
+  exit 0
 }
 
 [[ -f "$ARTIFACT" ]] || fail "release artifact not found: $ARTIFACT"
 
 echo "[validate-artifact] describing $ARTIFACT"
-DESC="$(android_cli_describe "$ARTIFACT")" \
-  || fail "could not read $ARTIFACT — 'aapt2' could not introspect the artifact"
+# `android_cli_describe` exit codes: 0 = OK, 1 = artifact unreadable,
+# 2 = `aapt2` tooling unavailable. `set -e` would abort on any non-zero, so
+# capture the status explicitly and branch: tooling failure → warn+skip,
+# artifact failure → hard fail.
+DESC=""
+DESCRIBE_RC=0
+DESC="$(android_cli_describe "$ARTIFACT")" || DESCRIBE_RC=$?
+if [[ "$DESCRIBE_RC" -eq 2 ]]; then
+  skip "AAB manifest validation skipped — 'aapt2' could not be located" \
+       "(not on PATH, not under \$ANDROID_SDK_ROOT/build-tools). This is a" \
+       "tooling gap, not an artifact problem; the upload proceeds unvalidated."
+elif [[ "$DESCRIBE_RC" -ne 0 ]]; then
+  fail "could not introspect $ARTIFACT — the artifact appears corrupt or is" \
+       "an unsupported format. Refusing to upload an unverifiable release."
+fi
 
 echo "$DESC"
 
