@@ -117,6 +117,21 @@ making the API contract, recipes, and migration guide available to any AI agent
 on the host. `bash .claude/scripts/android-env-check.sh --fix` does the same plus
 installs the `android` CLI itself.
 
+**Emulator-first QA (mandatory).** Routine demo QA runs on a reusable ARCore-ready
+emulator — **never on a personal device**. Bootstrap it once on a fresh host:
+
+```bash
+bash .claude/scripts/setup-ar-emulator.sh
+```
+
+This creates/configures a `Pixel_7a` AVD (virtualscene back camera, emulated front
+camera for Augmented Faces, 4 GB RAM, host GPU), boots it headless, and installs
+Google Play Services for AR. Re-run anytime — it's idempotent. `--check` inspects
+state read-only; `--clean` wipes and recreates. The emulator covers all 3D demos
+and AR UI/state QA. AR features that need real world tracking (Cloud Anchor,
+Streetscape/VPS, face mesh against a live face) still need a physical-device
+AR Record — request one rather than driving someone's personal phone over USB.
+
 ## Samples
 
 One unified showcase app per platform — all features integrated into tabs.
@@ -508,6 +523,7 @@ Hooks trigger automatically on specific Claude Code actions:
 | `cross-platform-check.sh` | Compare Android vs iOS vs Web API surface, report gaps |
 | `release-checklist.sh` | Pre-release validation (versions, changelog, tests, etc.) |
 | `lib/android-cli.sh` | Shared helpers for Google's `android` CLI (screenshot, layout, install+launch) with `adb` fallback |
+| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only), `--clean` (wipe+recreate). **Use this for routine QA — never QA on a personal device.** |
 | `qa-android-demos.sh` | QA loop over every demo — uses `android layout`/`screen capture` for the UI dump and screenshots |
 | `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |

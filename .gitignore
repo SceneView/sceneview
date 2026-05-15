@@ -155,6 +155,10 @@ samples/screenshots/qa_log*.txt
 tools/qa-screenshots/*
 # but keep dated targeted-evidence folders (one per umbrella audit)
 !tools/qa-screenshots/2026-05-14-targeted
+# keep the v4.3.5 emulator QA sweep evidence (#1241)
+!tools/qa-screenshots/android
+tools/qa-screenshots/android/*
+!tools/qa-screenshots/android/v4.3.5-qa
 
 # Google Drive / iCloud Drive sync-conflict duplicates.
 # When the same file is touched concurrently in two checkouts of a synced
