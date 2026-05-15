@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **iOS demo: Samples tab black rectangle ([#1392](https://github.com/sceneview/sceneview/issues/1392)).** Tapping a 3D demo in the Samples tab opened it in a `.medium`-detent `.sheet`, which rendered the demo's full-screen `SceneView` (RealityView) viewport as a black, half-height panel covering the demo-card list and the Settings button. Every available demo now opens in a `.fullScreenCover`; the partial `.sheet` is reserved for the lightweight `ComingSoonScreen`, which has no 3D surface.
