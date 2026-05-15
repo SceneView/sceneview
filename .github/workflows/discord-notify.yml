@@ -33,15 +33,19 @@ jobs:
       - name: Post release to Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # User-controlled fields — passed via env, never interpolated into the
+          # inline script, to prevent GitHub Actions shell script injection.
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "DISCORD_WEBHOOK_URL secret is not set — skipping notification."
             exit 0
           fi
 
-          PRERELEASE="${{ github.event.release.prerelease }}"
-
-          if [ "$PRERELEASE" = "true" ]; then
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
             EMOJI="🧪"
             LABEL="Pre-release"
           else
@@ -50,9 +54,9 @@ jobs:
           fi
 
           PAYLOAD=$(jq -n \
-            --arg title "$EMOJI $LABEL: ${{ github.event.release.tag_name }}" \
-            --arg name "${{ github.event.release.name }}" \
-            --arg url "${{ github.event.release.html_url }}" \
+            --arg title "$EMOJI $LABEL: $RELEASE_TAG_NAME" \
+            --arg name "$RELEASE_NAME" \
+            --arg url "$RELEASE_URL" \
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{title: $title, description: ("**" + $name + "**\n\n[View release notes](" + $url + ")"), color: 3447003, footer: {text: "SceneView — 3D & AR SDK"}, timestamp: $ts}]}')
 
@@ -74,6 +78,12 @@ jobs:
       - name: Post new issue to Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # User-controlled fields — passed via env, never interpolated into the
+          # inline script, to prevent GitHub Actions shell script injection.
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
         run: |
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "DISCORD_WEBHOOK_URL secret is not set — skipping notification."
@@ -81,10 +91,10 @@ jobs:
           fi
 
           PAYLOAD=$(jq -n \
-            --arg title "🐛 New Issue #${{ github.event.issue.number }}" \
-            --arg issue_title "${{ github.event.issue.title }}" \
-            --arg url "${{ github.event.issue.html_url }}" \
-            --arg author "${{ github.event.issue.user.login }}" \
+            --arg title "🐛 New Issue #$ISSUE_NUMBER" \
+            --arg issue_title "$ISSUE_TITLE" \
+            --arg url "$ISSUE_URL" \
+            --arg author "$ISSUE_AUTHOR" \
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{title: $title, description: ("**" + $issue_title + "**\n\nOpened by [" + $author + "](https://github.com/" + $author + ")\n[View issue](" + $url + ")"), color: 15105570, footer: {text: "SceneView — 3D & AR SDK"}, timestamp: $ts}]}')
 
