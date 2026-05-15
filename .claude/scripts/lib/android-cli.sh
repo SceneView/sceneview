@@ -194,6 +194,31 @@ sys.exit(1)
 PY
 }
 
+# android_cli_describe <apk> [output.txt]
+# Runs `android describe` on a built APK to dump its manifest metadata —
+# package, exposed activities, intent filters, permissions, features.
+# Echoes the raw `android describe` output on stdout (also written to
+# <output.txt> when a path is given). Returns 1 if the CLI is missing or
+# the APK does not exist; the caller decides whether that is fatal.
+# `android describe` reads the APK file directly — no device needed.
+android_cli_describe() {
+  local apk="$1"
+  local out="${2:-}"
+  if [[ ! -f "$apk" ]]; then
+    echo "[android-cli] describe: APK not found: $apk" >&2
+    return 1
+  fi
+  if ! android_cli_locate; then
+    echo "[android-cli] describe requires the android CLI; install via android_cli_ensure" >&2
+    return 1
+  fi
+  if [[ -n "$out" ]]; then
+    "$ANDROID_CLI_BIN" "${ANDROID_CLI_GLOBAL_FLAGS[@]}" describe "$apk" | tee "$out"
+  else
+    "$ANDROID_CLI_BIN" "${ANDROID_CLI_GLOBAL_FLAGS[@]}" describe "$apk"
+  fi
+}
+
 # android_cli_install_and_launch <apk> <package/activity> [serial]
 # Wraps `android run --apks ... --activity ... [--device ...]` which combines install+start.
 # `activity` should be in `pkg/.Class` form (e.g. `io.github.sceneview.demo/.MainActivity`).
