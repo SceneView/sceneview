@@ -7,6 +7,9 @@ import AVFoundation
 
 /// Verifies all node types can be instantiated, have non-nil entities,
 /// and support builder method chaining on all Apple platforms.
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class PlatformTests: XCTestCase {
 
     // MARK: - Instantiation & entity non-nil

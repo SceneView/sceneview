@@ -5,6 +5,9 @@ import XCTest
 import RealityKit
 import AVFoundation
 
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class EdgeCaseTests: XCTestCase {
 
     // MARK: - GeometryNode zero/negative dimensions

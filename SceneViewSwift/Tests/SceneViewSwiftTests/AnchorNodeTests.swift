@@ -9,6 +9,9 @@ import RealityKit
 /// SceneViewSwift does not have a dedicated AnchorNode type, but RealityKit's
 /// AnchorEntity is the standard way to anchor content. These tests verify
 /// basic anchor entity behavior that SceneView relies on.
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class AnchorNodeTests: XCTestCase {
 
     // MARK: - World anchor creation

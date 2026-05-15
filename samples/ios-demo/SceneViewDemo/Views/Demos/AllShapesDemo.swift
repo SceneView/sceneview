@@ -21,7 +21,15 @@ struct GeometryDemo: View {
                     ), -0.3),
                     (GeometryNode.cylinder(radius: 0.1, height: 0.25, color: .systemGreen), 0.0),
                     (GeometryNode.cone(height: 0.25, radius: 0.12, color: .systemOrange), 0.3),
-                    (GeometryNode.plane(width: 0.25, depth: 0.25, color: .systemPurple), 0.6),
+                    // `GeometryNode.plane` builds the mesh in the XZ plane (flat,
+                    // normal pointing +Y) to match the Android convention. From
+                    // this demo's downward-tilted orbit camera it renders
+                    // edge-on (invisible), so we stand it upright via a +90°
+                    // rotation around X — the plane now faces +Z toward the
+                    // camera. Library default stays XZ; call `.rotation(...)` to
+                    // re-orient a plane for a camera-facing layout (issue #1058).
+                    (GeometryNode.plane(width: 0.25, depth: 0.25, color: .systemPurple)
+                        .rotation(angle: .pi / 2, axis: [1, 0, 0]), 0.6),
                 ]
 
                 for (node, x) in shapes {

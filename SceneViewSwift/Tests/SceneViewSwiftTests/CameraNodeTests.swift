@@ -3,6 +3,9 @@ import XCTest
 import RealityKit
 @testable import SceneViewSwift
 
+// Test classes run on the main actor: their RealityKit node factories
+// (`LightNode.directional`, `node.entity`, …) are `@MainActor`. (#1054)
+@MainActor
 final class CameraNodeTests: XCTestCase {
 
     func testInit() {
