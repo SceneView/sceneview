@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **iOS `FogNode.heightFalloff` / `heightBased` are now honestly documented as a RealityKit parity gap ([#1380](https://github.com/sceneview/sceneview/issues/1380)).** the height gradient was a silent no-op — a uniform translucent sphere cannot vary opacity by world height; the parameter is kept for Android parity but now clearly documents that height-based fog renders identically to exponential fog on iOS ([#1373](https://github.com/sceneview/sceneview/issues/1373)).
+
 - **iOS `GeometryNode` / `ShapeNode` `unlit: true` now returns a flat `UnlitMaterial` ([#1359](https://github.com/sceneview/sceneview/issues/1359)).** The `unlit:` parameter previously produced a lit `SimpleMaterial` that still reacted to scene lighting, contradicting the KDoc contract — it now yields an `UnlitMaterial`, matching `ImageNode` and `GeometryMaterial.unlit`.
 
 - **`SceneView` main/fill light mutations are now reactive ([#1306](https://github.com/sceneview/sceneview/issues/1306)).** `rememberMainLightNode` / `rememberFillLightNode` re-run their `apply` block on every recomposition (via `SideEffect`), so Compose-state-driven light properties (intensity, direction, color) propagate to the Filament scene without re-keying the `remember` — matching the iOS `RealityView.update:` reactive light contract.
