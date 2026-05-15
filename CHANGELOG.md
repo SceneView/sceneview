@@ -2,6 +2,10 @@
 
 ## Unreleased — iOS skybox renders + true-orbit camera + iOS Stage 2 demo parity + Cloud Anchor docs hotfix + `sceneview-swift` mirror retired
 
+### Added — Agent skills
+
+- **Published `sceneview-ios` and `sceneview-web` agent skills, and documented the Android `sceneview` skill's `android-cli` registry submission ([#1080](https://github.com/sceneview/sceneview/issues/1080), [#1081](https://github.com/sceneview/sceneview/issues/1081), [#1082](https://github.com/sceneview/sceneview/issues/1082)).** New `agents/sceneview-ios/` (SwiftUI + RealityKit) and `agents/sceneview-web/` (Filament.js + WebXR) skills with install scripts; `check-sceneview-skill.sh` now validates all three; submission packet and steps tracked in `agents/REGISTRY.md`.
+
 ### Removed — Samples
 
 - **Removed the French localization from the sample apps — sample apps are English-only by design ([#1294](https://github.com/sceneview/sceneview/issues/1294)).** Deleted `samples/android-demo/.../res/values-fr/strings.xml`; the default English resources remain the single source of truth.
