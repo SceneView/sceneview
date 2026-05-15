@@ -1,17 +1,22 @@
 name: iOS CI
 
 on:
+  # `sceneview-core/**` is shared KMP logic consumed by the Apple
+  # (RealityKit) renderer, so an iOS-affecting core change must re-run
+  # iOS CI — it also triggers Android CI in ci.yml's path filter. See #1295.
   push:
     branches: [main]
     paths:
       - 'SceneViewSwift/**'
       - 'samples/ios-demo/**'
+      - 'sceneview-core/**'
       - '.github/workflows/ios.yml'
   pull_request:
     branches: [main]
     paths:
       - 'SceneViewSwift/**'
       - 'samples/ios-demo/**'
+      - 'sceneview-core/**'
       - '.github/workflows/ios.yml'
   workflow_dispatch:
 
