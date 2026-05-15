@@ -65,19 +65,18 @@ enum class DemoStatus {
 /**
  * One entry in the curated demo list shown on the Samples tab.
  *
- * String content is referenced through Android resources so locale flips
- * (English / French today, more locales tomorrow) take effect at runtime
- * without re-shipping. Closes #1099 / #955.
+ * String content is referenced through Android resources to keep literals
+ * out of code and defined in a single place. The sample app is English-only
+ * by design — see #1294. Closes #1099 / #955.
  *
  * @param id          Stable identifier used by the deep-link router
  *                    (`sceneview://demo/<id>`) and as a Compose key.
  * @param titleRes    Short headline shown on the card — resolved with
  *                    [androidx.compose.ui.res.stringResource] at the call site.
  * @param subtitleRes One-line description rendered under [titleRes].
- * @param category    Stable, non-translated category key. Used as a map key
- *                    when grouping demos and to look up the per-category
- *                    accent colour — see [categoryDisplayNameRes] for the
- *                    localized header label.
+ * @param category    Stable category key. Used as a map key when grouping
+ *                    demos and to look up the per-category accent colour —
+ *                    see [categoryDisplayNameRes] for the display header label.
  * @param icon        Material icon used to give the card visual identity
  *                    in the absence of a captured 3D thumbnail.
  * @param status      See [DemoStatus]. Defaults to [DemoStatus.Working].
@@ -92,9 +91,9 @@ data class DemoEntry(
 )
 
 /**
- * Stable category keys. NEVER translate these strings — they are map keys
- * and registry filters. Use [categoryDisplayNameRes] to obtain the locale-
- * specific header label.
+ * Stable category keys — they are map keys and registry filters, never
+ * shown to the user. Use [categoryDisplayNameRes] to obtain the display
+ * header label.
  */
 object DemoCategory {
     const val BASICS_3D = "3D Basics"
@@ -116,9 +115,9 @@ val DEMO_CATEGORIES = listOf(
 )
 
 /**
- * Maps a stable category key to its localized display-name resource ID.
+ * Maps a stable category key to its display-name resource ID.
  * Unknown keys fall back to [R.string.category_3d] (safe default — never
- * surfaces a raw key like "3D Basics" on the FR locale).
+ * surfaces a raw key like "3D Basics" to the user).
  */
 @StringRes
 fun categoryDisplayNameRes(category: String): Int = when (category) {

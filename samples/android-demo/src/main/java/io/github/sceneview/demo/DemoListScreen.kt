@@ -163,7 +163,7 @@ fun DemoListScreen(
                         // BuildConfig.VERSION_NAME comes from gradle.properties /
                         // CI build args — hard-coding here would drift every
                         // release. The formatted resource carries the "v" prefix
-                        // and label in the active locale.
+                        // and label.
                         text = stringResource(R.string.samples_footer_version, BuildConfig.VERSION_NAME),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
