@@ -1,0 +1,134 @@
+name: CI Gate
+
+# Single always-on aggregator status check for branch protection.
+#
+# WHY THIS EXISTS (#1314)
+# ----------------------
+# `main` is merged fire-and-forget (`gh pr merge --squash --auto`). For
+# auto-merge to actually gate on CI, branch protection must require a
+# status check. But the repo's real CI workflows (ci.yml, pr-check.yml,
+# quality-gate.yml, ios.yml, telemetry-ci.yml) all use workflow-level
+# `paths`/`paths-ignore` filters — so a docs-only or scripts-only PR runs
+# ZERO of their jobs. Requiring any of those checks directly would leave
+# such a PR stuck on "Expected — waiting for status" forever.
+#
+# DESIGN CHOICE
+# -------------
+# A GitHub job can only `needs:` jobs in its OWN workflow, and the repo
+# has FIVE PR-triggered workflows with different path filters — a single
+# `needs:`-based gate cannot see across them. A `workflow_run`-triggered
+# gate is unreliable as a required check (its check run attaches to the
+# branch, not the PR head SHA, so the PR merge box never sees it).
+#
+# So this is a dedicated workflow with a `pull_request` trigger and NO
+# path filter — it therefore runs on EVERY PR and ALWAYS reports the
+# `CI Gate` status. Its single job polls the GitHub Checks API for the
+# PR head SHA, waits for every OTHER check run to finish, and:
+#   - FAILS  if any other check concluded `failure`/`cancelled`/`timed_out`
+#   - PASSES if every other check is `success`, `skipped`, or `neutral`
+# A path-filtered-out workflow simply produces no check runs for that SHA
+# (or its `if:`-skipped jobs report `skipped`) — either way the gate is
+# green, so docs/scripts/CI-only PRs merge without jamming.
+#
+# Branch protection on `main` requires ONLY this `CI Gate` check.
+
+on:
+  pull_request:
+    branches: [main]
+    # ⛔ Intentionally NO paths / paths-ignore filter. This workflow MUST
+    # run on every PR so the `CI Gate` status is always reported — that
+    # is the whole point of the aggregator pattern (#1314).
+  workflow_dispatch:
+
+concurrency:
+  group: ci-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  checks: read
+  contents: read
+
+jobs:
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Aggregate all PR check conclusions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+          # This job's own check run name — excluded from the aggregation
+          # so the gate never waits on itself.
+          SELF_CHECK: CI Gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # workflow_dispatch has no PR context — nothing to aggregate.
+          if [ -z "${HEAD_SHA:-}" ]; then
+            echo "No pull_request context (manual dispatch) — nothing to gate."
+            exit 0
+          fi
+
+          echo "Aggregating check runs for $REPO @ $HEAD_SHA"
+
+          # Poll until every non-self check run for this SHA has finished.
+          # GitHub registers a workflow's check runs within a few seconds
+          # of the PR event, so we wait briefly before the first read to
+          # avoid a false "all green" on an empty list.
+          deadline=$(( $(date +%s) + 25 * 60 ))
+          sleep 30
+
+          while :; do
+            # All check runs for the head commit (handles >100 via paging).
+            runs=$(gh api --paginate \
+              "repos/$REPO/commits/$HEAD_SHA/check-runs" \
+              --jq '.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}')
+
+            # Drop this gate's own check run from consideration.
+            others=$(echo "$runs" | jq -c --arg self "$SELF_CHECK" 'select(.name != $self)')
+
+            if [ -z "$others" ]; then
+              echo "No other check runs reported for this SHA yet."
+            fi
+
+            pending=$(echo "$others" | jq -r 'select(.status != "completed") | .name')
+            if [ -z "$pending" ]; then
+              break
+            fi
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timed out waiting for CI checks to complete:"
+              echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+              exit 1
+            fi
+
+            echo "Waiting for checks to finish:"
+            echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+            sleep 20
+          done
+
+          echo ""
+          echo "All other check runs completed. Conclusions:"
+          echo "$others" | jq -r '"  - \(.name): \(.conclusion)"' | sort -u
+
+          # A real failure flips the gate red. `skipped`/`neutral`/`success`
+          # all pass — path-filtered-out jobs report `skipped`.
+          failed=$(echo "$others" \
+            | jq -r 'select(.conclusion == "failure"
+                          or .conclusion == "cancelled"
+                          or .conclusion == "timed_out"
+                          or .conclusion == "action_required"
+                          or .conclusion == "stale") | .name')
+
+          if [ -n "$failed" ]; then
+            echo ""
+            echo "::error::One or more required CI checks failed:"
+            echo "$failed" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+            exit 1
+          fi
+
+          echo ""
+          echo "CI Gate passed — every CI check succeeded or was skipped."
