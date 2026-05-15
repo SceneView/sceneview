@@ -151,6 +151,11 @@ final class FogNodeTests: XCTestCase {
 
     // MARK: - Height-based specific
 
+    // `heightFalloff` is stored for Android API parity but the height gradient is
+    // not rendered on iOS (RealityKit has no native fog API; a uniform translucent
+    // sphere cannot vary opacity by world height). See FogNode.heightFalloff docs
+    // and issue #1380. These tests pin the documented store-only behavior.
+
     func testHeightBasedFogSetsHeightFalloff() {
         let fog = FogNode.heightBased(density: 0.1, height: 5.0)
         XCTAssertEqual(fog.heightFalloff, 5.0, accuracy: 0.001)
@@ -160,6 +165,31 @@ final class FogNodeTests: XCTestCase {
         var fog = FogNode.heightBased(density: 0.1, height: 1.0)
         fog.heightFalloff = 3.0
         XCTAssertEqual(fog.heightFalloff, 3.0, accuracy: 0.001)
+    }
+
+    /// Height-based fog renders identically to exponential fog on iOS: the height
+    /// gradient is a documented RealityKit parity gap (#1380). Verifies that
+    /// changing `heightFalloff` does not alter the rendered material/mesh, so the
+    /// API is honestly a store-only no-op rather than silently pretending.
+    func testHeightFalloffDoesNotAffectRenderedMaterial() {
+        let exponential = FogNode.exponential(density: 0.1)
+        let heightBased = FogNode.heightBased(density: 0.1, height: 5.0)
+
+        // Same density -> same translucent-sphere approximation on iOS.
+        XCTAssertEqual(
+            exponential.entity.model?.materials.count,
+            heightBased.entity.model?.materials.count
+        )
+        XCTAssertEqual(exponential.endDistance, heightBased.endDistance, accuracy: 0.001)
+        XCTAssertEqual(exponential.startDistance, heightBased.startDistance, accuracy: 0.001)
+
+        // Mutating heightFalloff must not change the entity scale (no updateScale call).
+        var fog = heightBased
+        let scaleBefore = fog.entity.scale
+        fog.heightFalloff = 42.0
+        XCTAssertEqual(fog.entity.scale.x, scaleBefore.x, accuracy: 0.001)
+        XCTAssertEqual(fog.entity.scale.y, scaleBefore.y, accuracy: 0.001)
+        XCTAssertEqual(fog.entity.scale.z, scaleBefore.z, accuracy: 0.001)
     }
 
     // MARK: - Material

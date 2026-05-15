@@ -162,6 +162,65 @@ public struct CameraControls: Sendable {
         self.sensitivity = sensitivity
     }
 
+    // MARK: - Fit-to-bounds framing (#1026 / #1041)
+
+    /// Computes the orbit radius (camera-to-target distance) at which a
+    /// content bounding box of the given extents exactly fits inside the
+    /// perspective frustum, with a small margin.
+    ///
+    /// The previous behaviour (#1026) translated the content centroid to
+    /// the orbit pivot but kept the orbit radius fixed at `2.0` — so small
+    /// models rendered as a speck in a near-empty viewport and large models
+    /// overflowed and clipped on every edge. This computes a radius that
+    /// scales-to-fit, closing the #1041 follow-up.
+    ///
+    /// The box is treated as its bounding sphere (half its space diagonal)
+    /// so the fit holds for every orbit angle, not just the front view.
+    /// The camera looks at the box centre, so the required distance is
+    /// `sphereRadius / sin(halfFov)`. The frustum is narrower on whichever
+    /// axis has the smaller FOV — for portrait phones that is the
+    /// horizontal axis (`aspect < 1`), so both the vertical FOV and the
+    /// aspect-derived horizontal FOV are considered and the smaller half-FOV
+    /// wins.
+    ///
+    /// - Parameters:
+    ///   - boundsExtents: The full width / height / depth of the content
+    ///     bounding box, in meters (RealityKit `BoundingBox.extents`).
+    ///   - fovYDegrees: The perspective camera's vertical field of view in
+    ///     degrees (SceneView's baseline is `60`).
+    ///   - aspect: Viewport aspect ratio (`width / height`). Portrait phones
+    ///     are `< 1`. Defaults to `0.46` — the iPhone 16e portrait ratio
+    ///     (1206 × 2622 pt) — used when the live viewport size is unknown.
+    ///   - margin: Extra padding factor applied to the fitted radius so the
+    ///     content does not touch the viewport edges. Default `1.15`
+    ///     (15 % breathing room).
+    /// - Returns: The orbit radius that frames the box, clamped to
+    ///   `[minRadius, maxRadius]`.
+    public func fitRadius(
+        boundsExtents: SIMD3<Float>,
+        fovYDegrees: Float,
+        aspect: Float = 0.46,
+        margin: Float = 1.15
+    ) -> Float {
+        // Bounding-sphere radius — half the box's space diagonal — so the
+        // fit is orbit-angle invariant.
+        let half = boundsExtents * 0.5
+        let sphereRadius = simd_length(half)
+        guard sphereRadius.isFinite, sphereRadius > 0 else { return orbitRadius }
+
+        let fovY = max(fovYDegrees, 1) * .pi / 180
+        // Horizontal FOV from the vertical FOV and the viewport aspect.
+        let safeAspect = (aspect.isFinite && aspect > 0) ? aspect : 0.46
+        let fovX = 2 * atan(tan(fovY / 2) * safeAspect)
+        // The limiting axis is the one with the *smaller* FOV.
+        let halfFov = min(fovY, fovX) / 2
+        let sinHalf = sin(halfFov)
+        guard sinHalf > 0 else { return orbitRadius }
+
+        let fitted = (sphereRadius / sinHalf) * margin
+        return Swift.min(Swift.max(fitted, minRadius), maxRadius)
+    }
+
     // MARK: - Computed Camera Position
 
     /// Computes the camera position from current orbit parameters.

@@ -427,9 +427,30 @@ private struct SceneViewRepresentation: View {
     @State private var isDragging = false
 
     /// Set to `true` once ``refreshContentCentering()`` has translated
-    /// `entities.contentRoot` so subsequent frames are a cheap no-op.
-    /// Closes #1026.
+    /// `entities.contentRoot` AND dollied the orbit radius to fit the
+    /// content bounds, so subsequent frames are a cheap no-op.
+    /// Closes #1026 / #1041.
     @State private var didCenterContent = false
+
+    /// Monotonic counter bumped by the content-framing driver task while
+    /// ``didCenterContent`` is still `false`. Reading it inside the
+    /// `RealityView` body forces SwiftUI to re-evaluate the view — and
+    /// therefore re-run the `update:` closure — every ~33 ms until the
+    /// async-loaded content's `visualBounds` becomes valid and the
+    /// fit-to-bounds pass runs. Without this driver the `update:` closure
+    /// only fires on the handful of frames right after `setupScene`
+    /// (before streamed models populate) and then stalls, so the camera
+    /// never re-frames. Closes #1026 / #1041.
+    @State private var framingTick: Int = 0
+
+    /// Live viewport aspect ratio (`width / height`), captured by the
+    /// `GeometryReader` wrapping the `RealityView`. Drives the
+    /// fit-to-bounds framing (#1041) so the camera distance accounts for
+    /// the real frustum width — portrait phones are `< 1` and clip
+    /// horizontally if the framing assumes a square viewport. `nil` until
+    /// the first layout pass; the fit math falls back to the iPhone-16e
+    /// portrait ratio while unknown.
+    @State private var viewportAspect: Float? = nil
 
     // Reactive light-slot caches — compared in `update:` closure to detect when the
     // caller mutated `.mainLight(_:)` / `.fillLight(_:)` so the corresponding entity
@@ -508,6 +529,32 @@ private struct SceneViewRepresentation: View {
                     }
                 }
             }
+            .task {
+                // Content-framing driver (#1026 / #1041). The RealityView
+                // `update:` closure only fires while SwiftUI re-evaluates
+                // the view — for a static (non-auto-rotating) scene that is
+                // just the first few frames after `setupScene`, before
+                // async-loaded models / streamed Sketchfab assets have
+                // populated their meshes. Their `visualBounds` is still
+                // empty then, so the fit-to-bounds pass keeps deferring and
+                // the camera never re-frames.
+                //
+                // This task bumps `framingTick` (which the RealityView body
+                // reads) every ~33 ms so `update:` keeps running until the
+                // bounds become valid and `refreshContentCentering()` flips
+                // `didCenterContent`. It then exits — zero ongoing cost for
+                // the rest of the scene's lifetime. A hard cap stops the
+                // poll after ~10 s for content that never produces bounds.
+                guard autoCenterContentEnabled else { return }
+                var elapsed: UInt64 = 0
+                let interval: UInt64 = 33_000_000          // ~30 Hz
+                let timeout: UInt64 = 10_000_000_000       // 10 s
+                while !Task.isCancelled && !didCenterContent && elapsed < timeout {
+                    try? await Task.sleep(nanoseconds: interval)
+                    elapsed += interval
+                    framingTick &+= 1
+                }
+            }
             .task(id: "\(sceneEnvironment?.name ?? "")|\(sceneEnvironment?.showSkybox == true)") {
                 // Load and apply IBL environment when it changes. The id
                 // also tracks `showSkybox` so toggling the skybox flag on
@@ -534,6 +581,53 @@ private struct SceneViewRepresentation: View {
     @ViewBuilder
     private var realityViewContent: some View {
         #if os(iOS) || os(visionOS) || os(macOS)
+        // GeometryReader captures the live viewport aspect ratio so the
+        // fit-to-bounds framing (#1041) accounts for the real frustum
+        // width. Portrait phones have aspect < 1 and would clip content
+        // horizontally if the framing assumed a square viewport.
+        GeometryReader { proxy in
+            realityView
+                .onChange(of: proxy.size) { _, newSize in
+                    updateViewportAspect(newSize)
+                }
+                .onAppear { updateViewportAspect(proxy.size) }
+                // The framing-driver task bumps `framingTick` every ~33 ms
+                // until the content is framed. `onChange` is a guaranteed
+                // delivery point (unlike relying on the RealityView
+                // `update:` closure re-firing), so the fit-to-bounds pass
+                // runs here directly until it succeeds. Closes #1026 / #1041.
+                .onChange(of: framingTick) { _, _ in
+                    if autoCenterContentEnabled {
+                        refreshContentCentering()
+                    }
+                }
+        }
+        #else
+        // RealityView requires macOS 15.0+; fall back to a placeholder on older SDKs
+        Text("3D view requires macOS 15.0 or later")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
+    }
+
+    /// Records the viewport aspect ratio from a layout size. Re-frames the
+    /// content on the next `update:` tick if the aspect changed materially
+    /// (device rotation, split-view resize) so the fit stays correct.
+    private func updateViewportAspect(_ size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        let aspect = Float(size.width / size.height)
+        let previous = viewportAspect
+        viewportAspect = aspect
+        // A rotation / resize after the initial fit invalidates the framing.
+        // Re-arm the one-shot pass so the next frame re-fits to the new
+        // frustum. Threshold avoids re-framing on sub-pixel layout jitter.
+        if let previous, abs(previous - aspect) > 0.01 {
+            didCenterContent = false
+        }
+    }
+
+    #if os(iOS) || os(visionOS) || os(macOS)
+    @ViewBuilder
+    private var realityView: some View {
         RealityView { realityContent in
             setupScene(&realityContent)
         } update: { content in
@@ -585,12 +679,8 @@ private struct SceneViewRepresentation: View {
             refreshImmersiveSkybox()
             #endif
         }
-        #else
-        // RealityView requires macOS 15.0+; fall back to a placeholder on older SDKs
-        Text("3D view requires macOS 15.0 or later")
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #endif
     }
+    #endif
 
     // MARK: - Scene Setup
 
@@ -771,16 +861,23 @@ private struct SceneViewRepresentation: View {
     // MARK: - Auto-center content (#1026)
 
     /// Translates ``SceneEntities/contentRoot`` so the centroid of its
-    /// `visualBounds` lands at the parent (`entities.root`) origin. Runs
-    /// once on the first frame the bounds are non-empty — most async
-    /// model loads complete within a handful of frames after `setupScene`.
+    /// `visualBounds` lands at the parent (`entities.root`) origin, and
+    /// dollies the orbit camera to a distance that fits the content
+    /// bounding box inside the viewport frustum. Runs once on the first
+    /// frame the bounds are non-empty — most async model loads complete
+    /// within a handful of frames after `setupScene`.
     ///
-    /// Without this, iOS demos placing content at e.g. `z = -2` render
-    /// in the bottom-third of the viewport: the default perspective
-    /// camera at `[0, 0.3, 2]` looks at world origin, but content is far
-    /// from origin. Android achieves the same effect via the per-demo
-    /// `ModelNode(centerOrigin = …)` parameter; iOS now does it at the
-    /// library level so every demo benefits without per-demo plumbing.
+    /// Without this, iOS demos render badly framed: the default
+    /// perspective camera sat at a fixed `[0, 0.3, 2]` looking at world
+    /// origin, so content placed at e.g. `z = -2` rendered in the
+    /// bottom-third of the viewport (#1026), and even centred content was
+    /// the wrong *size* — small models a speck in a near-empty viewport,
+    /// large models overflowing and clipped on every edge (#1041). This
+    /// pass fixes both: it centres the content centroid on the orbit
+    /// pivot AND scales the orbit radius to fit the bounds. Android
+    /// achieves the same effect via the per-demo `ModelNode(centerOrigin
+    /// = …)` parameter + hand-tuned camera distance; iOS now does it at
+    /// the library level so every demo benefits without per-demo plumbing.
     ///
     /// Opt-out via ``SceneView/autoCenterContent(_:)`` for scenes that
     /// rely on intentional off-centre placement.
@@ -808,8 +905,40 @@ private struct SceneViewRepresentation: View {
         guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite else { return }
         let extentMax = max(extents.x, extents.y, extents.z)
         guard extentMax > Self.minVisualExtent else { return }
+        // 1. Centre the content centroid on the orbit pivot (world origin).
         entities.contentRoot.position = -bounds.center
+        // 2. Adapt the zoom-radius limits to the content size BEFORE
+        //    computing the fit, so `fitRadius`'s internal clamp does not
+        //    fight the fit. The fixed `minRadius = 1.0` / `maxRadius = 50`
+        //    defaults are tuned for ~1 m demo content; a 0.1 m model needs
+        //    a closer min and a 30 m scene a farther max. Bracket the
+        //    limits around the bounding-sphere radius so the user can
+        //    still pinch in to roughly fill the frame and out to ~10×.
+        let sphereRadius = simd_length(extents * 0.5)
+        if sphereRadius.isFinite, sphereRadius > 0 {
+            camera.minRadius = max(sphereRadius * 0.5, 0.05)
+            camera.maxRadius = max(camera.maxRadius, sphereRadius * 20)
+        }
+        // 3. Dolly the orbit radius so the bounding box fits the frustum
+        //    with a small margin, accounting for the vertical FOV and the
+        //    live viewport aspect ratio (#1041). Without this the camera
+        //    sat at the fixed `2.0` default — too far for small models,
+        //    too close for large ones. The fit keeps the camera's
+        //    azimuth / elevation so only the distance changes.
+        camera.orbitRadius = camera.fitRadius(
+            boundsExtents: extents,
+            fovYDegrees: Self.baselineFov,
+            aspect: viewportAspect ?? 0.46
+        )
         didCenterContent = true
+        // 4. Apply the new pose to the perspective camera entity in THIS
+        //    frame. `applyCamera()` runs *before* this method in the
+        //    `update:` closure, so without an immediate apply the fitted
+        //    radius would only take effect on a subsequent `update:` tick
+        //    — and mutating `@State` from inside `update:` does not
+        //    reliably schedule one. Re-running `applyCamera()` here makes
+        //    the fit visible on the same frame the bounds became valid.
+        applyCamera()
     }
 
     // MARK: - Environment IBL

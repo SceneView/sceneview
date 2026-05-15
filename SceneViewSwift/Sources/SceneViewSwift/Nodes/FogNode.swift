@@ -14,6 +14,11 @@ import AppKit
 /// fog API, `FogNode` places a translucent sphere around the camera origin to
 /// approximate the effect.
 ///
+/// - Note: The ``heightBased(density:height:color:)`` factory and ``heightFalloff``
+///   property are kept for Android API parity, but the height gradient itself is
+///   **not rendered on iOS** — a uniform translucent sphere cannot vary opacity by
+///   world height. On iOS, height-based fog looks identical to exponential fog.
+///
 /// ```swift
 /// SceneView { content in
 ///     let fog = FogNode.linear(start: 1.0, end: 20.0)
@@ -58,10 +63,22 @@ public struct FogNode: Sendable {
         }
     }
 
-    /// Height falloff in world-space meters. Fog is denser below this height.
+    /// Height falloff in world-space meters, mirroring Android's `FogNode.heightFalloff`.
+    ///
+    /// - Important: **The height gradient is not rendered on iOS.** On Android, fog
+    ///   uses Filament's native `View.setFog` which exposes a true per-pixel
+    ///   `heightFalloff`. RealityKit has no native fog API, so `FogNode` approximates
+    ///   fog with a single uniform translucent sphere (see ``makeFog(density:start:end:heightFalloff:color:)``).
+    ///   A uniform-color `UnlitMaterial` cannot vary opacity by world height — that
+    ///   would require a custom `ShaderGraphMaterial`. The value is stored and kept
+    ///   for Android API parity, but height-based fog renders identically to
+    ///   exponential fog on iOS. See ``heightBased(density:height:color:)``.
     public var heightFalloff: Float {
         get { _heightFalloff }
         set {
+            // Stored for Android API parity only — see the property doc-comment.
+            // RealityKit's UnlitMaterial cannot render a height gradient, so no
+            // rebuildMaterial()/updateScale() call is intentional here (not a bug).
             _heightFalloff = newValue
         }
     }
@@ -133,11 +150,18 @@ public struct FogNode: Sendable {
         return makeFog(density: density, start: 0.5, end: 40.0, heightFalloff: 0, color: color)
     }
 
-    /// Creates height-based fog that is denser below the given height.
+    /// Creates height-based fog, mirroring Android's `FogNode.heightBased`.
+    ///
+    /// - Important: **The height gradient is not rendered on iOS.** RealityKit has no
+    ///   native fog API, so `FogNode` approximates fog with a uniform translucent
+    ///   sphere that cannot vary opacity by world height. On iOS this factory behaves
+    ///   identically to ``exponential(density:color:)`` — the `height` argument is
+    ///   stored on ``heightFalloff`` for Android API parity only. Use Android for
+    ///   true height-based fog (Filament's native `View.setFog`). See ``heightFalloff``.
     ///
     /// - Parameters:
     ///   - density: Fog density in [0.0, 1.0]. Default 0.05.
-    ///   - height: Height falloff in meters. Fog is denser below this height. Default 1.0.
+    ///   - height: Height falloff in meters (stored, not rendered on iOS). Default 1.0.
     ///   - color: Fog color. Default `.white`.
     /// - Returns: A configured `FogNode`.
     public static func heightBased(

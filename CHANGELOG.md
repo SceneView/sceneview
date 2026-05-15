@@ -2,13 +2,19 @@
 
 ## Unreleased
 
-### Fixed — iOS
+## v4.5.0 — visionOS immersive-space skybox + fragment changelog system + iOS unlit/reactive-light parity + CI hardening (2026-05-15)
 
-- ios demo cleanup + android parity: tab renamed scenes→samples, category taxonomy aligned to android, animation/auto-rotate + ar recording duplicates removed, dead explore buttons removed, settings pill no longer overlaps the controls fab, copy fixes ([#1373](https://github.com/sceneview/sceneview/issues/1373)).
+### Changed
+
+- **Adopted a towncrier-style fragment changelog ([#1337](https://github.com/sceneview/sceneview/issues/1337)).** PRs now drop a small file in `changelog.d/` instead of editing `CHANGELOG.md`'s `## Unreleased` anchor, so parallel PRs no longer conflict on the changelog. `.claude/scripts/collate-changelog.sh X.Y.Z` collates the fragments into a new `## vX.Y.Z` section at release time. `Closes #1337`.
 
 ### Added — iOS
 
 - **visionOS immersive-space skybox ([#1235](https://github.com/sceneview/sceneview/issues/1235)).** A `SceneView` pulled into a fully immersive `ImmersiveSpace` now renders its `showSkybox` HDR environment as a background. The new `.immersiveSpace()` modifier opts in; the HDR is mapped onto an inverted sphere parented under a `WorldComponent` root, since `RealityViewContent.environment` (the windowed iOS / macOS `.skybox(_:)` path from #1215) is unavailable on visionOS. Windowed / volumetric visionOS scenes are unchanged.
+
+### Fixed — iOS
+
+- **camera auto-framing now scales-to-fit the scene bounds ([#1026](https://github.com/sceneview/sceneview/issues/1026), [#1041](https://github.com/sceneview/sceneview/issues/1041)).** the `SceneView` default camera now dollies to a distance that fits the content bounding box in the viewport — accounting for the vertical fov and live aspect ratio — instead of sitting at a fixed pose, so models are no longer rendered too small, too low, clipped, or overflowing across the ios demos.
 
 ### Added — Documentation
 
@@ -35,6 +41,8 @@
 - **Nightly full-CI safety-net workflow ([#1324](https://github.com/sceneview/sceneview/issues/1324)).** `nightly-ci.yml` runs the full heavy validation surface (compile + builds + unit tests + render tests + quality gate) against `main` HEAD once a night, reusing the existing workflows via `workflow_call`, so a path-gated-out regression still surfaces within 24h. Not a PR gate.
 
 ### Fixed
+
+- **iOS `FogNode.heightFalloff` / `heightBased` are now honestly documented as a RealityKit parity gap ([#1380](https://github.com/sceneview/sceneview/issues/1380)).** the height gradient was a silent no-op — a uniform translucent sphere cannot vary opacity by world height; the parameter is kept for Android parity but now clearly documents that height-based fog renders identically to exponential fog on iOS ([#1373](https://github.com/sceneview/sceneview/issues/1373)).
 
 - **iOS `GeometryNode` / `ShapeNode` `unlit: true` now returns a flat `UnlitMaterial` ([#1359](https://github.com/sceneview/sceneview/issues/1359)).** The `unlit:` parameter previously produced a lit `SimpleMaterial` that still reacted to scene lighting, contradicting the KDoc contract — it now yields an `UnlitMaterial`, matching `ImageNode` and `GeometryMaterial.unlit`.
 
