@@ -6,16 +6,17 @@ name: CI Gate
 # ----------------------
 # `main` is merged fire-and-forget (`gh pr merge --squash --auto`). For
 # auto-merge to actually gate on CI, branch protection must require a
-# status check. But the repo's real CI workflows (ci.yml, pr-check.yml,
-# quality-gate.yml, ios.yml, telemetry-ci.yml) all use workflow-level
-# `paths`/`paths-ignore` filters — so a docs-only or scripts-only PR runs
-# ZERO of their jobs. Requiring any of those checks directly would leave
-# such a PR stuck on "Expected — waiting for status" forever.
+# status check. But the repo's real CI workflows (ci.yml, ios.yml,
+# telemetry-ci.yml) all use workflow-level `paths`/`paths-ignore` filters
+# — and ci.yml additionally per-job `if:`-gates jobs on a path filter — so
+# a docs-only or scripts-only PR runs ZERO (or `skipped`) jobs. Requiring
+# any of those checks directly would leave such a PR stuck on
+# "Expected — waiting for status" forever.
 #
 # DESIGN CHOICE
 # -------------
 # A GitHub job can only `needs:` jobs in its OWN workflow, and the repo
-# has FIVE PR-triggered workflows with different path filters — a single
+# has several PR-triggered workflows with different path filters — a single
 # `needs:`-based gate cannot see across them. A `workflow_run`-triggered
 # gate is unreliable as a required check (its check run attaches to the
 # branch, not the PR head SHA, so the PR merge box never sees it).
