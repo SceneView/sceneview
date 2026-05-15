@@ -14,6 +14,10 @@
 
 - **Migrated the remaining `samples/android-demo` demos to the `rememberMaterialInstance` / `rememberUnlitMaterialInstance` helpers ([#971](https://github.com/sceneview/sceneview/issues/971)).** `CollisionDemo`, `LightingDemo`, `VideoDemo`, `ARStreetscapeDemo`, `GeometryDemo`, `DebugOverlayDemo`, `PhysicsDemo` and the shared `Axes3DNode` no longer allocate `MaterialInstance` handles via raw `materialLoader.create*` without disposal — the helpers own the lifecycle. Behaviour-preserving.
 
+### Fixed — Web
+
+- **`sceneview-web` stale `SCENEVIEW_VERSION` + auto-center not resetting on a 2nd model load ([#1357](https://github.com/sceneview/sceneview/issues/1357)).** The `@JsExport`-reachable `SCENEVIEW_VERSION` was two majors stale (`3.6.0`); it now reports `4.4.0` and is pinned by a jsTest. `SceneView.loadModel` now resets `didCenterContent` so a model loaded after the first one was auto-centered gets re-centered, mirroring Android's `SceneAutoCenterState.reset()`.
+
 ### Fixed — CI security
 
 - **`discord-notify.yml` no longer interpolates user-controlled `github.event.*` fields into inline shell scripts ([#1313](https://github.com/sceneview/sceneview/issues/1313)).** Issue title/author and release name/tag now pass through `env:` and are referenced as quoted shell variables, closing a GitHub Actions script-injection vector.
