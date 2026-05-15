@@ -36,7 +36,6 @@ AVD_NAME="Pixel_7a"
 AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 AVD_CONFIG="$AVD_HOME/$AVD_NAME.avd/config.ini"
 SYSTEM_IMAGE="system-images;android-36;google_apis_playstore;arm64-v8a"
-DEVICE_PROFILE="pixel_7"  # avdmanager device profile id (pixel_7a is not in stock list on every host)
 
 # Detect arch for the system image
 HOST_ARCH="$(uname -m)"
