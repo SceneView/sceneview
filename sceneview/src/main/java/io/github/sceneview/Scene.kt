@@ -118,6 +118,14 @@ import io.github.sceneview.node.findActivity
  * @param isOpaque              Whether the render target is opaque. Default `true`.
  * @param renderQuality         One-line preset applied to `view` ([RenderQuality.Default],
  *                              [RenderQuality.Cinematic], or [RenderQuality.Performance]).
+ * @param autoCenterContent     When `true` (default), the library translates all DSL [content]
+ *                              nodes once — on the first frame their union bounding box is
+ *                              non-empty — so the content centroid lands at the orbit pivot and
+ *                              renders centred in the viewport without each node needing
+ *                              `ModelNode(centerOrigin = …)`. Lights / camera are passed as
+ *                              separate parameters, never DSL children, so they are unaffected.
+ *                              Mirrors the iOS `autoCenterContent` feature (#1026). Pass `false`
+ *                              for scenes with intentional off-centre placement.
  * @param renderer              Filament [Renderer]. Use [rememberRenderer].
  * @param scene                 Filament [Scene] graph, shareable across views. Use [rememberScene].
  * @param environment           IBL + skybox environment. Use [rememberEnvironment].
@@ -181,6 +189,14 @@ fun SceneView(
      * preset is applied.
      */
     renderQuality: RenderQuality = RenderQuality.Default,
+    /**
+     * When `true` (default), all DSL [content] nodes are parented to an intermediate content-root
+     * node which is translated once — on the first frame the content's union bounding box is
+     * non-empty — so the content centroid lands at the orbit pivot and renders centred. Mirrors
+     * the iOS library-level `autoCenterContent` feature (#1026 / PR #1038). Pass `false` to keep
+     * strict per-node placement semantics for scenes with intentional off-centre composition.
+     */
+    autoCenterContent: Boolean = true,
     /**
      * A [Renderer] instance represents an operating system's window.
      * Typically, applications create a [Renderer] per window.
@@ -320,15 +336,49 @@ fun SceneView(
         }
     }
 
+    // ── Auto-center content (#1026 — port of the iOS library-level autoCenterContent) ────────────
+    //
+    // Intermediate content-root node. When `autoCenterContent` is on, every DSL `content` node is
+    // parented to it instead of being added to the Filament scene directly — the `nodeManager`
+    // propagates the children automatically via its `onChildAdded` hook. Translating this single
+    // node once recentres the whole scene without touching lights / camera (those are separate
+    // `SceneView` parameters, never DSL children, so they stay put — exactly like iOS keeping
+    // lights on `entities.root` rather than `contentRoot`). When `autoCenterContent` is off the
+    // content root is unused and nodes register directly, preserving pre-#1051 behaviour.
+
+    val contentRoot = remember(engine) { Node(engine) }
+    val autoCenterState = remember { SceneAutoCenterState() }
+
+    DisposableEffect(autoCenterContent, contentRoot) {
+        if (autoCenterContent) {
+            nodeManager.addNode(contentRoot)
+        }
+        onDispose {
+            if (autoCenterContent) {
+                nodeManager.removeNode(contentRoot)
+            }
+        }
+    }
+
     // ── DSL nodes → Filament scene sync ──────────────────────────────────────────────────────────
 
     val childNodesRef = remember { AtomicReference(emptyList<Node>()) }
 
-    LaunchedEffect(nodeManager) {
+    LaunchedEffect(nodeManager, autoCenterContent, contentRoot) {
         var prevNodes = emptyList<Node>()
         snapshotFlow { scopeChildNodes.toList() }.collect { newNodes ->
-            (prevNodes - newNodes.toSet()).forEach { nodeManager.removeNode(it) }
-            (newNodes - prevNodes.toSet()).forEach { nodeManager.addNode(it) }
+            if (autoCenterContent) {
+                // Parent / unparent under the content root — `nodeManager` follows via onChildAdded.
+                (prevNodes - newNodes.toSet()).forEach { node ->
+                    if (node.parent == contentRoot) node.parent = null
+                }
+                (newNodes - prevNodes.toSet()).forEach { node -> node.parent = contentRoot }
+                // Content changed — re-run the one-shot centering on the next non-empty frame.
+                autoCenterState.reset()
+            } else {
+                (prevNodes - newNodes.toSet()).forEach { nodeManager.removeNode(it) }
+                (newNodes - prevNodes.toSet()).forEach { nodeManager.addNode(it) }
+            }
             prevNodes = newNodes
             childNodesRef.set(newNodes)
         }
@@ -456,6 +506,10 @@ fun SceneView(
     // never moves. Reading through a state ref here makes the frame loop pick up
     // every recomposition without restarting.
     val currentCameraManipulator = rememberUpdatedState(cameraManipulator)
+    // Read through a state ref so toggling `autoCenterContent` at runtime is picked up by the
+    // frame loop without restarting it (the loop's LaunchedEffect is keyed on engine/renderer/
+    // view/scene only).
+    val currentAutoCenterContent = rememberUpdatedState(autoCenterContent)
 
     LaunchedEffect(engine, renderer, view, scene) {
         while (true) {
@@ -467,6 +521,14 @@ fun SceneView(
                 sceneRenderer.renderFrame(frameTimeNanos) {
                     modelLoader.updateLoad()
                     childNodesRef.get().forEach { it.onFrame(frameTimeNanos) }
+
+                    // Library-level auto-center (#1026). One-shot: no-op once the content has been
+                    // centred, and skipped while the content bounds are still empty (async model
+                    // loads not finished). Runs here so it sees post-`updateLoad` geometry, on the
+                    // main render thread — Filament transform / renderable reads require it.
+                    if (currentAutoCenterContent.value) {
+                        autoCenterState.maybeCenter(contentRoot)
+                    }
 
                     currentCameraManipulator.value?.let { manipulator ->
                         val lastTime = lastFrameTimeNanosRef.get().takeIf { it != 0L }
@@ -1313,6 +1375,7 @@ fun Scene(
     view: View = rememberView(engine),
     isOpaque: Boolean = true,
     renderQuality: RenderQuality = RenderQuality.Default,
+    autoCenterContent: Boolean = true,
     renderer: Renderer = rememberRenderer(engine),
     scene: Scene = rememberScene(engine),
     environment: Environment = rememberEnvironment(environmentLoader, isOpaque = isOpaque),
@@ -1340,6 +1403,7 @@ fun Scene(
     view = view,
     isOpaque = isOpaque,
     renderQuality = renderQuality,
+    autoCenterContent = autoCenterContent,
     renderer = renderer,
     scene = scene,
     environment = environment,
