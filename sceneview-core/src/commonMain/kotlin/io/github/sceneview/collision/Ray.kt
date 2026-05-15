@@ -23,20 +23,30 @@ class Ray {
         setDirection(direction)
     }
 
+    /** Sets the ray origin. The vector is copied, not retained. */
     fun setOrigin(origin: Vector3) {
         Preconditions.checkNotNull(origin, "Parameter \"origin\" was null.")
         this.origin.set(origin)
     }
 
+    /** Returns a copy of the ray origin. Mutating it does not affect the ray. */
     fun getOrigin(): Vector3 = Vector3(origin)
 
+    /** Sets the ray direction. The value is normalized before being stored. */
     fun setDirection(direction: Vector3) {
         Preconditions.checkNotNull(direction, "Parameter \"direction\" was null.")
         this.direction.set(direction.normalized())
     }
 
+    /** Returns a copy of the (normalized) ray direction. */
     fun getDirection(): Vector3 = Vector3(direction)
 
+    /**
+     * Returns the point along the ray at the given [distance] from the origin.
+     *
+     * Computed as `origin + direction * distance`. Since the direction is normalized,
+     * [distance] is in the same units as the origin.
+     */
     fun getPoint(distance: Float): Vector3 = Vector3.add(origin, direction.scaled(distance))
 
     override fun toString(): String = "[Origin:$origin, Direction:$direction]"

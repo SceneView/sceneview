@@ -150,12 +150,14 @@ data class AABB(
     val min: Vector3,
     val max: Vector3
 ) {
+    /** The geometric center (midpoint of [min] and [max]). */
     val center: Vector3 get() = Vector3(
         (min.x + max.x) / 2f,
         (min.y + max.y) / 2f,
         (min.z + max.z) / 2f
     )
 
+    /** The full extents of the box along each axis (`max - min`). */
     val size: Vector3 get() = Vector3(
         max.x - min.x,
         max.y - min.y,
