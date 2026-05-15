@@ -67,7 +67,11 @@ def load_catalog() -> list[dict]:
     if isinstance(data, list):
         return data
     if isinstance(data, dict) and "models" in data:
-        return data["models"]
+        # Credit both 3D models and HDR environments. Environments only
+        # surface in CREDITS.md once they carry full attribution metadata
+        # (author + license + sourceUrl) — bare entries are reported under
+        # "Missing metadata", same as incomplete models.
+        return list(data["models"]) + list(data.get("environments", []))
     print(f"error: {CATALOG} has unexpected top-level structure", file=sys.stderr)
     sys.exit(1)
 

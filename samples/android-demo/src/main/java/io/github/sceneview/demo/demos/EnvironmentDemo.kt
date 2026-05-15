@@ -52,7 +52,8 @@ fun EnvironmentDemo(onBack: () -> Unit) {
             EnvOption("Outdoor Cloudy", "environments/outdoor_cloudy_2k.hdr"),
             EnvOption("Chinese Garden", "environments/chinese_garden_2k.hdr"),
             EnvOption("Sunset", "environments/sunset_2k.hdr"),
-            EnvOption("Rooftop Night", "environments/rooftop_night_2k.hdr")
+            EnvOption("Rooftop Night", "environments/rooftop_night_2k.hdr"),
+            EnvOption("Night Sky", "environments/night_sky_2k.hdr")
         )
     }
     // `lux = null` keeps the v4.1.0 balanced 10k default (#1075). The 30k preset

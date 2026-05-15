@@ -12,7 +12,7 @@ Source of truth: [`assets/catalog.json`](catalog.json). This file is generated
 by [`.claude/scripts/generate-credits.py`](../.claude/scripts/generate-credits.py).
 Re-run the script after any catalog edit to keep both files in sync.
 
-Total models: **67** (plus 11 pending metadata, 7 pending license review).
+Total models: **68** (plus 17 pending metadata, 7 pending license review).
 
 ---
 
@@ -88,6 +88,10 @@ Total models: **67** (plus 11 pending metadata, 7 pending license review).
 - **[Sunglasses](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SunglassesKhronos)** by Khronos — [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)
 - **[Water Bottle](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/WaterBottle)** by KhronosGroup — [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 
+## Poly Haven
+
+- **[Night Sky (Dikhololo Night)](https://polyhaven.com/a/dikhololo_night)** by Greg Zaal — [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+
 ## Fab
 
 - **[A Red Car](https://www.fab.com/listings/c86be43c-3923-4c98-b752-40bedb121239)** by SerjogaSan — [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)
@@ -111,7 +115,7 @@ Replace or remove before the next store publication:
 
 ---
 
-## Missing metadata (11 entries)
+## Missing metadata (17 entries)
 
 These entries in `catalog.json` lack at least one of `author`, `license`,
 `sourceUrl`, or use a license this script does not recognise. Fill in the
@@ -128,4 +132,10 @@ missing fields so they can be credited properly:
 - `night_city` — missing: author
 - `kindred_lol` — missing: author
 - `cozy_living_room` — missing: author
+- `rooftop_night` — missing: author, license, sourceUrl
+- `studio` — missing: author, license, sourceUrl
+- `sunset` — missing: author, license, sourceUrl
+- `outdoor_cloudy` — missing: author, license, sourceUrl
+- `studio_warm` — missing: author, license, sourceUrl
+- `autumn_field` — missing: author, license, sourceUrl
 
