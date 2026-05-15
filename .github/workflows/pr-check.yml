@@ -35,53 +35,97 @@ permissions:
   contents: read
 
 jobs:
-  # ── Deprecated API regression detector ──────────────────────────────────
-  # Sub-second guard against AI sessions reintroducing the pre-v3.6
-  # composable names (renamed in commit e6a26a06). quality-gate.yml runs
-  # the same check, but a standalone job here surfaces the failure to PR
-  # authors without waiting for the full gate to finish. Don't write the
-  # old names verbatim in this comment — the validator greps source files
-  # and would flag the comment itself, as it did on commit ae433620.
-  check-deprecated-api:
-    name: Check for deprecated SceneView API refs
+  # ── Repo hygiene checks ─────────────────────────────────────────────────
+  # One job consolidating the 5 micro grep/validate gates that used to each
+  # surface as their own top-level status check (see #1305). Each gate runs
+  # as a sequential step; `if: always()` on the later steps means a PR
+  # author sees EVERY violation in a single run instead of fixing them one
+  # check at a time. The job still fails red if any gate fails because each
+  # step's non-zero exit propagates to the job result.
+  #
+  # The 5 gates merged here (formerly standalone jobs):
+  #   - Check for deprecated SceneView API refs
+  #   - Check SceneView agent skill is in sync with source
+  #   - Forbid archived sceneview-swift mirror URLs
+  #   - Validate demo app asset references
+  #   - Validate workflow shell blocks (dash + shellcheck)
+  #
+  # NOTE FOR MAINTAINERS: if any of those 5 old check NAMES was a required
+  # status check in the branch-protection rule for `main`, update the rule
+  # to require `Repo hygiene checks` instead — otherwise PRs will sit
+  # forever waiting on a check name that no longer exists.
+  #
+  # Don't write deprecated composable names verbatim in these comments —
+  # check-deprecated-api.sh greps source files and would flag the comment
+  # itself, as it did on commit ae433620.
+  repo-hygiene:
+    name: Repo hygiene checks
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - name: Run check-deprecated-api.sh
+
+      # Deprecated API regression detector — sub-second guard against AI
+      # sessions reintroducing the pre-v3.6 composable names (renamed in
+      # commit e6a26a06).
+      - name: Check for deprecated SceneView API refs
         shell: bash
         run: bash .claude/scripts/check-deprecated-api.sh --all
 
-  # ── SceneView agent skill drift detector ────────────────────────────────
-  # Catches hallucinated APIs in agents/sceneview/ (e.g. `rememberARSession`
-  # or `AnchorNode.image()`) BEFORE merge — see PR #1072 for the kind of
-  # drift this guard prevents. Sub-second; no JDK or Gradle needed.
-  check-sceneview-skill:
-    name: Check SceneView agent skill is in sync with source
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-      - name: Run check-sceneview-skill.sh
+      # SceneView agent skill drift detector — catches hallucinated APIs in
+      # agents/sceneview/ (e.g. `rememberARSession` or `AnchorNode.image()`)
+      # BEFORE merge — see PR #1072 for the kind of drift this prevents.
+      - name: Check SceneView agent skill is in sync with source
+        if: always()
         shell: bash
         run: bash .claude/scripts/check-sceneview-skill.sh
 
-  # ── Archived SPM mirror URL guard ───────────────────────────────────────
-  # The `sceneview/sceneview-swift` SPM mirror was archived in PR #1215 —
-  # SwiftViewSwift now resolves from the monorepo root Package.swift. Any
-  # NEW reference to the dead mirror URL (a stale paste or AI-suggestion
-  # regression) points users at a dead resolution path. This guard greps
-  # the tracked tree and fails on any hit outside the historical allowlist.
-  # Sub-second; no JDK or Gradle needed. Closes #1237.
-  check-sceneview-swift-urls:
-    name: Forbid archived sceneview-swift mirror URLs
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-      - name: Run check-sceneview-swift-urls.sh
+      # Archived SPM mirror URL guard — the `sceneview/sceneview-swift` SPM
+      # mirror was archived in PR #1215; SceneViewSwift now resolves from the
+      # monorepo root Package.swift. Any NEW reference to the dead mirror URL
+      # points users at a dead resolution path. Closes #1237.
+      - name: Forbid archived sceneview-swift mirror URLs
+        if: always()
         shell: bash
         run: bash .claude/scripts/check-sceneview-swift-urls.sh
+
+      # Workflow shell-block validation — pre-validates `script:` blocks in
+      # every .github/workflows/*.yml against `dash` so we catch bashisms
+      # before they ship to CI. Closes #1114.
+      - name: Install dash + shellcheck
+        if: always()
+        shell: bash
+        run: |
+          # Both ship in ubuntu-latest, but pin explicitly so the job is
+          # self-contained on any runner image refresh.
+          if ! command -v dash >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq dash
+          fi
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+          fi
+          # PyYAML — already in the runner image, but assert.
+          python3 -c "import yaml" || pip install --quiet pyyaml
+
+      - name: Validate workflow shell blocks (dash + shellcheck)
+        if: always()
+        shell: bash
+        run: bash .claude/scripts/check-workflow-scripts.sh
+
+      # Demo app asset integrity — catches broken model/HDR references in
+      # any samples/* demo app, both for bundled file paths and CDN URLs.
+      # Self-test first so a regressed validator can't report a false PASS.
+      - name: Self-test validate-demo-assets.sh
+        if: always()
+        shell: bash
+        run: bash .claude/scripts/test-validate-demo-assets.sh
+
+      - name: Validate demo app asset references
+        if: always()
+        shell: bash
+        run: bash .claude/scripts/validate-demo-assets.sh
 
   # ── KMP core (all targets) ──────────────────────────────────────────────
   # ci.yml's `web-desktop` job compiles `:sceneview-core:jsMainClasses` but
@@ -103,58 +147,3 @@ jobs:
       - name: KMP unit tests (JS)
         continue-on-error: true
         run: ./gradlew :sceneview-core:jsTest --stacktrace
-
-  # ── Workflow shell-block validation ─────────────────────────────────────
-  # Pre-validates `script:` blocks in every .github/workflows/*.yml against
-  # `dash` so we catch bashisms before they ship to CI. The
-  # ReactiveCircus/android-emulator-runner@v2 action exec's each line via
-  # `sh -c`, which is dash on Linux runners — a `[[ ... ]]` or multi-line
-  # `while ... done` block silently fails there. Closes #1114.
-  check-workflow-scripts:
-    name: Validate workflow shell blocks (dash + shellcheck)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install dash + shellcheck
-        shell: bash
-        run: |
-          # Both ship in ubuntu-latest, but pin explicitly so the job is
-          # self-contained on any runner image refresh.
-          if ! command -v dash >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq dash
-          fi
-          if ! command -v shellcheck >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq shellcheck
-          fi
-          # PyYAML — already in the runner image, but assert.
-          python3 -c "import yaml" || pip install --quiet pyyaml
-
-      - name: Run check-workflow-scripts.sh
-        shell: bash
-        run: bash .claude/scripts/check-workflow-scripts.sh
-
-  # ── Demo app asset integrity ────────────────────────────────────────────
-  # Catches broken model/HDR references in any samples/* demo app, both
-  # for bundled file paths and for CDN URLs. quality-gate.yml runs the
-  # same check, but surfacing it as its own job gives fast PR feedback.
-  validate-demo-assets:
-    name: Validate demo app asset references
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@v6
-
-      # Self-test first: assert the validator still detects broken refs on
-      # a synthetic fixture. If this regresses, the real run below will
-      # report a false PASS and we'll miss actual bugs.
-      - name: Self-test validate-demo-assets.sh
-        run: bash .claude/scripts/test-validate-demo-assets.sh
-
-      - name: Run validate-demo-assets.sh (full, with CDN checks)
-        run: bash .claude/scripts/validate-demo-assets.sh
