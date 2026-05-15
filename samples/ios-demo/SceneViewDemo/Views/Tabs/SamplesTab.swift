@@ -4,9 +4,11 @@ import SceneViewSwift
 /// Samples tab — curated preset scenes grouped by category, presented as
 /// Liquid Glass cards in a scrollable list.
 ///
-/// Tapping a sample opens it in a `.sheet` with `.regularMaterial` background
-/// (medium/large detents) — perfect for non-immersive 3D demos. AR demos that
-/// need full camera feed open in a `.fullScreenCover` instead.
+/// Tapping an available sample opens it in a `.fullScreenCover`: every demo
+/// mounts a full-screen `SceneView` (RealityView) viewport that needs the whole
+/// screen — a partial sheet detent renders the 3D surface as a black, half-height
+/// panel that obscures the list (#1392). Only the lightweight `ComingSoonScreen`
+/// (a plain scrollable info screen, no 3D surface) uses the `.sheet`.
 ///
 /// A `3D / AR` filter chip at the top filters the visible categories.
 struct SamplesTab: View {
@@ -31,17 +33,14 @@ struct SamplesTab: View {
         }
     }
 
-    /// Demos that need a full camera feed or heavy 3D viewport must take the
-    /// whole screen — a sheet detent would clip the AR camera and gestures.
-    private static let fullScreenIDs: Set<String> = [
-        "AR Debug (Rerun)",
-        "Orbital AR",
-    ]
-
     private static func shouldOpenFullScreen(_ scene: DemoItem) -> Bool {
-        // All real AR demos take the whole screen.
-        if scene.category == .ar && scene.status.isAvailable { return true }
-        return fullScreenIDs.contains(scene.title)
+        // Every available demo mounts a full-screen `SceneView` (RealityView)
+        // viewport. A partial `.medium` sheet detent renders that 3D surface as
+        // a black, half-height panel that covers the Samples list (#1392), so
+        // all available demos — 3D and AR alike — take the whole screen.
+        // Coming-soon entries route to the lightweight `ComingSoonScreen` and
+        // stay in the `.sheet`.
+        scene.status.isAvailable
     }
 
     private var filteredScenes: [DemoItem] {
