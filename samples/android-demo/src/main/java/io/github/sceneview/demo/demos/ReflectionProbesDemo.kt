@@ -22,6 +22,7 @@ import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberCameraNode
@@ -79,9 +80,12 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
         staticYaw = 30f,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_reflection_probes_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text(
                 "Probe Radius: %.1f m".format(probeRadius),
@@ -113,7 +117,9 @@ fun ReflectionProbesDemo(onBack: () -> Unit) {
                 scene = scene,
                 cameraNode = cameraNode,
                 cameraManipulator = cameraManipulator,
-                onFrame = { _ ->
+                onFrame = { frameTimeNanos ->
+                    // Dismiss the first-frame scrim once Filament presents a frame.
+                    firstFrame.onFrame(frameTimeNanos)
                     // Push the latest camera world position into compose state so the
                     // ReflectionProbeNode below can enable/disable itself based on
                     // actual distance instead of always comparing against the origin.

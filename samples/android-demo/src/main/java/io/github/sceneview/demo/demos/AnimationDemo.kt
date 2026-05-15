@@ -44,6 +44,7 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
 import io.github.sceneview.demo.sketchfab.SketchfabSlug
@@ -580,9 +581,12 @@ fun AnimationDemo(onBack: () -> Unit) {
     }
     val activeManipulator = if (cameraMode == CameraMode.FREE) freeManipulator else scriptedManipulator
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_animation_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Model carousel — switches the active animated subject. Slot 0 is
             // the bundled threejs soldier; slots 1–4 stream from the `animation`
@@ -734,6 +738,7 @@ fun AnimationDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

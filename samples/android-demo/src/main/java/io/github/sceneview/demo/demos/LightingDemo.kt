@@ -36,6 +36,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
@@ -122,9 +123,12 @@ fun LightingDemo(onBack: () -> Unit) {
         durationMillis = 22_000,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_lighting_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Light type selector
             Text("Light Type", style = MaterialTheme.typography.labelLarge)
@@ -182,6 +186,7 @@ fun LightingDemo(onBack: () -> Unit) {
         androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

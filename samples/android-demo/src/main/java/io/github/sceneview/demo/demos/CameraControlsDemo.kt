@@ -25,6 +25,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.gesture.orbitHomePosition
 import io.github.sceneview.gesture.targetPosition
@@ -70,9 +71,14 @@ fun CameraControlsDemo(onBack: () -> Unit) {
     val cameraNode = rememberCameraNode(engine)
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
+    // Remembered outside the key(selectedMode, resetKey) block so the scrim
+    // only covers the genuine cold start, not every camera-mode swap.
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_camera_controls_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text(
                 text = "Camera Mode",
@@ -119,6 +125,7 @@ fun CameraControlsDemo(onBack: () -> Unit) {
                 )
                 SceneView(
                     modifier = Modifier.fillMaxSize(),
+                    onFrame = firstFrame.onFrame,
                     engine = engine,
                     modelLoader = modelLoader,
                     environmentLoader = environmentLoader,
