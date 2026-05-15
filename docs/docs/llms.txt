@@ -2,12 +2,12 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.4.0):**
-- 3D only: `io.github.sceneview:sceneview:4.4.0`
-- AR + 3D: `io.github.sceneview:arsceneview:4.4.0`
+**Android — Maven artifacts (version 4.5.0):**
+- 3D only: `io.github.sceneview:sceneview:4.5.0`
+- AR + 3D: `io.github.sceneview:arsceneview:4.5.0`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
-- `https://github.com/sceneview/sceneview.git` (from: "4.4.0")
+- `https://github.com/sceneview/sceneview.git` (from: "4.5.0")
 
 **Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.21 | **Compose BOM compatible**
 
@@ -23,8 +23,8 @@ is also archived under `/api/sceneview/<version>/`.
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.4.0")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.4.0") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.5.0")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.5.0") // AR (includes sceneview)
 }
 ```
 
@@ -1106,8 +1106,8 @@ Most are default parameter values in `SceneView`/`ARSceneView` — call them exp
 | `rememberEnvironment(environmentLoader, isOpaque)` | `Environment` | IBL + skybox environment |
 | `rememberEnvironment(environmentLoader) { ... }` | `Environment` | Custom environment from lambda |
 | `rememberCameraNode(engine) { ... }` | `CameraNode` | Custom camera with apply block |
-| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default |
-| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat |
+| `rememberMainLightNode(engine) { ... }` | `LightNode` | Primary directional light (key) with apply block — shadows ON by default; apply block is reactive (re-runs on recomposition, so Compose-state-driven intensity/direction/color update live) |
+| `rememberFillLightNode(engine) { ... }` | `LightNode` | Soft fill light opposite the main light — lifts shadows so models don't look flat; apply block is reactive (same as `rememberMainLightNode`) |
 | `rememberCameraManipulator(orbitHomePosition?, targetPosition?)` | `CameraManipulator?` | Orbit/pan/zoom camera controller |
 | `rememberOnGestureListener(...)` | `OnGestureListener` | Gesture callbacks for tap/drag/pinch |
 | `rememberViewNodeManager()` | `ViewNode.WindowManager` | Required for ViewNode composables |
@@ -2338,7 +2338,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.4.0")
+    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.5.0")
 ]
 ```
 
@@ -3081,7 +3081,7 @@ Renderer: **RealityKit**. Requires iOS 17+ / macOS 14+ / visionOS 1+.
 
 SPM dependency (Package.swift or Xcode):
 ```swift
-.package(url: "https://github.com/sceneview/sceneview.git", from: "4.4.0")
+.package(url: "https://github.com/sceneview/sceneview.git", from: "4.5.0")
 ```
 
 Import: `import SceneViewSwift`
@@ -3108,6 +3108,7 @@ View modifiers (chainable):
 ```swift
 .environment(_ environment: SceneEnvironment) -> SceneView  // IBL lighting
 .cameraControls(_ mode: CameraControlMode) -> SceneView     // .orbit (default), .pan, .firstPerson
+.recentersTargetOnOrbit(_ enabled: Bool) -> SceneView       // v4.4.0+ — re-pivot on content centroid when (re-)entering orbit; default false
 .onEntityTapped(_ handler: @escaping (Entity) -> Void) -> SceneView   // real entity hit-test (v4.2.0+)
 .autoRotate(speed: Float = 0.3) -> SceneView                // radians/s, default 0.3
 .mainLight(_ slot: LightSlot) -> SceneView                  // v4.2.0+ — see LightSlot below
@@ -3530,6 +3531,21 @@ public struct SceneEnvironment: Sendable {
 }
 ```
 
+`showSkybox: true` renders the HDR as a background. On iOS / macOS it uses
+`RealityViewContent.environment = .skybox(...)`. On visionOS a windowed /
+volumetric scene composites over passthrough and ignores the skybox; for a
+fully immersive `ImmersiveSpace` consumer, opt in with `.immersiveSpace()`
+and the HDR is rendered via a `WorldComponent`-rooted inverted sphere:
+
+```swift
+ImmersiveSpace(id: "scene") {
+    SceneView { root in /* ... */ }
+        .environment(.nightSky)   // showSkybox == true
+        .immersiveSpace()         // render the HDR skybox on visionOS
+}
+.immersionStyle(selection: .constant(.full), in: .full)
+```
+
 ---
 
 ### NodeBuilder — declarative scene composition
@@ -3559,7 +3575,7 @@ public protocol EntityProvider {
 public enum CameraControlMode: Sendable {
     case orbit         // drag rotates the scene around the orbit pivot, pinch dollies (default)
     case pan           // drag translates the target laterally, pinch dollies
-    case firstPerson   // drag rotates the view (no orbit translation), pinch adjusts FOV
+    case firstPerson   // v4.4.0+ true look-around: drag yaws/pitches the camera IN PLACE (no orbit, no teleport on mode switch), pinch adjusts FOV
 }
 
 public struct CameraControls: Sendable {
@@ -3672,7 +3688,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.4.0
+  sceneview_flutter: ^4.5.0
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).

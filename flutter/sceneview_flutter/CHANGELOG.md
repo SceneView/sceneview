@@ -1,3 +1,7 @@
+## 4.5.0
+
+- Version alignment with SceneView v4.5.0. visionOS immersive-space skybox ([#1235](https://github.com/sceneview/sceneview/issues/1235)); towncrier-style `changelog.d/` fragment changelog ([#1337](https://github.com/sceneview/sceneview/issues/1337)); iOS `GeometryNode`/`ShapeNode` `unlit:` now returns a flat `UnlitMaterial` ([#1359](https://github.com/sceneview/sceneview/issues/1359)); reactive main/fill light mutations on Android ([#1306](https://github.com/sceneview/sceneview/issues/1306)); `ARRecorder` restores the camera config on `stop()` ([#1358](https://github.com/sceneview/sceneview/issues/1358)); CI hardening (parallel jobs, nightly safety-net, script-injection fix). No public Flutter API change.
+
 ## 4.4.0
 
 - Version alignment with SceneView v4.4.0. iOS skybox rendering + true-orbit camera ([#1215](https://github.com/sceneview/sceneview/pull/1215)); iOS Stage 2 demo parity catch-up ([#1194](https://github.com/sceneview/sceneview/issues/1194)); cross-platform Double Pendulum physics demo ([#1221](https://github.com/sceneview/sceneview/issues/1221)); Flutter + React Native bridges expose `CameraControlMode`, `autoCenterContent`, `ARRecorder` ([#1053](https://github.com/sceneview/sceneview/issues/1053)); in-app update polish across all 6 sample platforms ([#1244](https://github.com/sceneview/sceneview/issues/1244)–[#1249](https://github.com/sceneview/sceneview/issues/1249)); the Swift Package mirror was retired in favour of monorepo-direct SPM resolution. No public Flutter API change.
