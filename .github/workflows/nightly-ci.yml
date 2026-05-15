@@ -1,0 +1,111 @@
+name: Nightly full CI
+
+# WHY THIS EXISTS (#1324)
+# ----------------------
+# After the main-CI slimming pass (#1311 / #1321), several heavy workflows
+# are strictly path-gated on `main`:
+#   - `CI`               — per-job path filter; skips jobs whose scope is untouched.
+#   - `Render Tests`     — runs only on render-affecting source changes.
+#   - `Build sample APKs`— runs only on real code/build-script changes.
+#   - `Deploy ... Play Store` — tag-only.
+# That is the right trade-off for the high-merge-rate cycle, but it means
+# NO single scheduled run exercises the full validation surface end-to-end.
+# `maintenance.yml` runs daily but only checks dependency versions — it does
+# not compile, test, or build APKs.
+#
+# This workflow closes that gap: once a night it runs the FULL heavy suite
+# against `main` HEAD (compile + KMP/web/flutter builds + unit tests +
+# JaCoCo + render tests + quality gate) so a path-gated-out regression that
+# slipped through still surfaces within 24h.
+#
+# It REUSES the existing workflows via `workflow_call` instead of
+# duplicating their job bodies — `ci.yml` is invoked with `force-all: true`
+# so its per-job path filter is bypassed.
+#
+# It is deliberately NOT part of the `CI Gate` aggregator and is NOT a
+# required check — it is a scheduled safety net, not a PR gate.
+
+on:
+  schedule:
+    # 04:00 UTC daily — low-traffic, and distinct from maintenance.yml (07:00).
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-ci
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Full CI build/lint/test (path filter bypassed) ────────────────────────
+  full-ci:
+    name: Full CI (forced)
+    uses: ./.github/workflows/ci.yml
+    with:
+      force-all: true
+    secrets: inherit
+
+  # ── Quality gate (version sync, security, asset/website rules, MCP tests) ─
+  quality-gate:
+    name: Quality gate
+    uses: ./.github/workflows/quality-gate.yml
+    secrets: inherit
+
+  # ── Render tests (emulator + iOS Simulator + Playwright web) ──────────────
+  render-tests:
+    name: Render tests
+    uses: ./.github/workflows/render-tests.yml
+    secrets: inherit
+
+  # ── Failure surfacing ─────────────────────────────────────────────────────
+  # If any of the reused workflows fail, open (or update) a tracking issue so
+  # the regression is visible without anyone watching the Actions tab.
+  # `render-tests` jobs are `continue-on-error` internally, so a reused
+  # render-test failure does not by itself flip this job — that is intended:
+  # SwiftShader render flake should not spam issues. A genuine compile/test
+  # regression in `full-ci` or `quality-gate` does flip it.
+  report-failure:
+    name: Report nightly failure
+    needs: [full-ci, quality-gate, render-tests]
+    if: always() && (needs.full-ci.result == 'failure' || needs.quality-gate.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FULL_CI_RESULT: ${{ needs.full-ci.result }}
+          QG_RESULT: ${{ needs.quality-gate.result }}
+        run: |
+          set -euo pipefail
+          BODY=$(printf '%s\n' \
+            "The nightly full-CI safety-net run failed against \`main\` HEAD." \
+            "" \
+            "| Reused workflow | Result |" \
+            "|---|---|" \
+            "| Full CI (forced) | $FULL_CI_RESULT |" \
+            "| Quality gate | $QG_RESULT |" \
+            "" \
+            "Run: $RUN_URL" \
+            "" \
+            "A path-gated-out regression may have reached \`main\` between per-push CI runs. Investigate the failing job above.")
+          EXISTING=$(gh issue list --repo "$REPO" --state open \
+            --search "Nightly full CI failed in:title" \
+            --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -z "$EXISTING" ]; then
+            gh issue create --repo "$REPO" \
+              --title "Nightly full CI failed — $(date -u +%Y-%m-%d)" \
+              --body "$BODY" \
+              --label "ci" \
+              || echo "::warning::Could not create nightly-failure issue"
+          else
+            gh issue comment "$EXISTING" --repo "$REPO" --body "$BODY" \
+              || echo "::warning::Could not comment on existing nightly-failure issue #$EXISTING"
+          fi
