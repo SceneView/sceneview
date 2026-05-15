@@ -54,6 +54,8 @@
 
 ### Changed — CI
 
+- **`ci.yml`'s "Build & lint" job split into parallel `build` / `lint` / `unit-test` jobs, and `quality-gate.yml` switched to a shallow checkout ([#1311](https://github.com/sceneview/sceneview/issues/1311)).** The three Android jobs share the Gradle cache and run concurrently (~3 min wall-clock saved); the quality gate drops `fetch-depth: 0` since its scripts only diff against the working tree / HEAD.
+
 - **CI/publish workflows' inline `pip install` deps moved into per-workflow `.github/workflows/requirements/*.txt` files so Dependabot's `pip` ecosystem tracks and bumps them ([#1286](https://github.com/sceneview/sceneview/issues/1286)).** Same packages, same pinned versions installed — Dependabot just cannot see inline `pip install x==y` lines in workflow YAML, so the pins would have gone stale silently.
 
 - **`render-tests.yml` reverted from a 3-shard emulator matrix back to a single job ([#1119](https://github.com/sceneview/sceneview/issues/1119)).** All 5 render-test classes are class-level `@Ignore`'d on SwiftShader CI (#803), so the shard matrix booted 3 emulators to run 0 tests — strictly more CI cost for the same coverage. The matrix scaffold can be re-applied once #803 lifts the ignores.
