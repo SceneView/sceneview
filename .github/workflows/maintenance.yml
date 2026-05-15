@@ -196,3 +196,32 @@ jobs:
           else
             echo "CI health OK ($FAILURES/7 failures)"
           fi
+
+  # ── 5. Stale claude/* branch cleanup ──────────────────────────────────────
+  # An orchestrator marathon leaves dozens of merged `claude/*` branches on
+  # `origin`. This job deletes the ones that are provably dead — fully merged
+  # into origin/main (ahead=0) OR carrying a MERGED PR (squash-merge case) —
+  # in a SINGLE `git push --delete` call. Branches with an OPEN PR or genuine
+  # unmerged commits are never touched. Worktrees are skipped (they only
+  # exist on local checkouts, not in CI).
+  branch-cleanup:
+    name: Prune merged claude/* branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write       # git push --delete
+      pull-requests: read   # gh pr view (open-PR guard)
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0    # full history — ahead-count needs all refs
+
+      - name: Prune merged remote branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --yes  : perform the deletion (merged == dead, safe to act).
+          # --no-worktrees : CI has no .claude/worktrees/ checkouts.
+          # The script's own guards (current branch, ahead>0, open PR)
+          # protect every branch that still carries live work.
+          bash .claude/scripts/cleanup-branches-worktrees.sh --yes --no-worktrees
