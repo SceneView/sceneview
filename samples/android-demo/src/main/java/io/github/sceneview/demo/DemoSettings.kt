@@ -40,4 +40,26 @@ object DemoSettings {
      * re-trigger the auto-load.
      */
     var arPendingPlaybackFile: String? by mutableStateOf(null)
+
+    /**
+     * Monotonic count of ARCore session frames the AR Record & Playback demo has
+     * consumed since the current [io.github.sceneview.ar.ARSceneView] mounted.
+     * Incremented once per `onSessionUpdated` callback (one ARCore frame each).
+     *
+     * This is the **deterministic timing signal** for frame-indexed screenshot
+     * regression — `ARPlaybackScreenshotTest` polls this counter and fires a
+     * capture exactly when the desired frame index is reached, instead of
+     * `Thread.sleep(...)` against wall-clock (which drifts with emulator load —
+     * see issue [#1050](https://github.com/sceneview/sceneview/issues/1050),
+     * "Why it's heavy" §2).
+     *
+     * Plain `Int` (not Compose state): it is written from the AR session callback
+     * and read from the instrumentation thread; we deliberately do NOT want a
+     * recomposition per frame. `@Volatile` guarantees the cross-thread read sees
+     * the latest value. The demo resets it to `0` when a playback ARSceneView is
+     * (re-)mounted so a re-run starts the frame index from a known origin.
+     */
+    @Volatile
+    @JvmField
+    var arPlaybackFrameCount: Int = 0
 }
