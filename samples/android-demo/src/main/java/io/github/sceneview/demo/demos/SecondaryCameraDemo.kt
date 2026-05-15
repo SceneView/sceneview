@@ -17,11 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -32,13 +34,20 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.SurfaceType
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.math.Position
+import io.github.sceneview.model.ModelInstance
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
-import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.utils.readBuffer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+private const val HELMET_ASSET = "models/khronos_damaged_helmet.glb"
 
 /**
  * Secondary camera (picture-in-picture) demo.
@@ -53,12 +62,15 @@ import io.github.sceneview.rememberModelLoader
  *
  * Key correctness invariants — both ship-blockers if missed:
  *
- *  1. Each view loads its own [ModelInstance]. [ModelNode]'s wrapper entity is
+ *  1. Each view gets its OWN [ModelInstance]. [ModelNode]'s wrapper entity is
  *     `modelInstance.root`, so a single instance attached to two scenes would
  *     be destroyed twice on dispose (SIGABRT) and its child light / camera
- *     nodes reparented to whichever ModelNode was built last. The two
- *     `rememberModelInstance` calls are cheap — bytes are parsed once into
- *     the shared [io.github.sceneview.loaders.ModelLoader] cache.
+ *     nodes reparented to whichever ModelNode was built last. We get two
+ *     distinct instances from one `createInstancedModel(count = 2)` call —
+ *     the GLB is parsed ONCE and the two instances share the asset's mesh /
+ *     material / texture GPU resources, while each carries its own root
+ *     entity hierarchy, so the two ModelNodes destroy distinct roots and
+ *     never double-free. (See [rememberInstancedHelmet].)
  *
  *  2. The PiP SceneView passes `cameraManipulator = null`. Without it, the
  *     SceneView frame loop (`Scene.kt`) writes
@@ -66,6 +78,9 @@ import io.github.sceneview.rememberModelLoader
  *     clobbering whatever the LaunchedEffect just set on `pipCameraNode`.
  *     The chips would fire and the PiP would visually freeze at the
  *     manipulator's home position.
+ *
+ * Both views also share a single hoisted [rememberEnvironment] so the neutral
+ * IBL / skybox is built once rather than once per SceneView.
  *
  * The PiP uses [SurfaceType.TextureSurface] so it composites correctly over
  * the main [SurfaceType.Surface] view. Placed top-start so it never collides
@@ -80,8 +95,14 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
 
-    val mainInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
-    val pipInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
+    // One environment shared by both SceneViews — the neutral IBL is otherwise
+    // loaded + built twice (each SceneView defaults to its own rememberEnvironment).
+    val environment = rememberEnvironment(environmentLoader)
+
+    // One GLB parse, two resource-sharing instances — see invariant #1.
+    val instances = rememberInstancedHelmet(modelLoader, count = 2)
+    val mainInstance = instances.getOrNull(0)
+    val pipInstance = instances.getOrNull(1)
 
     var cameraPreset by rememberSaveable { mutableStateOf(CameraPreset.TOP) }
 
@@ -119,6 +140,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             modelLoader = modelLoader,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,
+            environment = environment,
         ) {
             mainInstance?.let { instance ->
                 ModelNode(
@@ -160,6 +182,7 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
                 environmentLoader = environmentLoader,
+                environment = environment,
                 cameraNode = pipCameraNode,
                 cameraManipulator = null,
             ) {
@@ -173,6 +196,31 @@ fun SecondaryCameraDemo(onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Loads the helmet GLB once and returns [count] resource-sharing
+ * [ModelInstance]s via `ModelLoader.createInstancedModel`.
+ *
+ * Mirrors the threading contract of `rememberModelInstance`: the asset bytes
+ * are read on [Dispatchers.IO], then `createInstancedModel` (a `@MainThread`
+ * Filament call) runs back on the composition's main dispatcher inside
+ * [produceState]. Returns an empty list while loading.
+ */
+@Composable
+private fun rememberInstancedHelmet(
+    modelLoader: ModelLoader,
+    count: Int,
+): List<ModelInstance> {
+    val context = LocalContext.current
+    return produceState(emptyList(), modelLoader, count) {
+        val buffer = withContext(Dispatchers.IO) {
+            runCatching { context.assets.readBuffer(HELMET_ASSET) }.getOrNull()
+        } ?: return@produceState
+        value = runCatching { modelLoader.createInstancedModel(buffer, count) }
+            .getOrNull()
+            .orEmpty()
+    }.value
 }
 
 private enum class CameraPreset(@StringRes val labelRes: Int, val eye: Position) {
