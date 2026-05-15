@@ -230,6 +230,12 @@ struct ARTab: View {
             Text(statusText)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(.primary)
+                // The status string now carries the model name (e.g.
+                // "3 placed · tap to add PS5 Controller") — cap it to one
+                // line + allow a slight shrink so the pill never wraps or
+                // overflows the screen on an iPhone SE / large Dynamic Type.
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -440,11 +446,14 @@ private struct ARLauncherScreen: View {
     let arSupported: Bool
     let onStartArSession: () -> Void
 
-    /// Re-read on every `.onAppear` so a user who tapped "Open Settings",
-    /// flipped the camera switch and swiped back sees the CTA recover to
+    /// Re-read on scene-foreground so a user who tapped "Open Settings",
+    /// flipped the camera switch and returned sees the CTA recover to
     /// "Start AR Camera" without an app relaunch.
     @State private var cameraStatus: AVAuthorizationStatus =
         AVCaptureDevice.authorizationStatus(for: .video)
+    /// `.onAppear` does NOT re-fire when the app returns from Settings for
+    /// an already-mounted view — `scenePhase` does.
+    @Environment(\.scenePhase) private var scenePhase
 
     private var state: ARLauncherState {
         if !arSupported { return .unsupported }
@@ -481,7 +490,27 @@ private struct ARLauncherScreen: View {
     private func onCtaTap() {
         switch state {
         case .ready:
-            onStartArSession()
+            // Request camera permission from the CTA tap (a user action —
+            // Apple's recommended trigger) BEFORE entering the live session.
+            // This closes the first-run hole: previously a `.notDetermined`
+            // user tapped Start → ARSceneView mounted → OS dialog → if they
+            // denied there they were stranded in a black AR view. Now the
+            // launcher owns the prompt: granted → enter; denied → the CTA
+            // recomputes to `.cameraDenied` (Open Settings) and the user
+            // never sees a dead camera view.
+            switch cameraStatus {
+            case .authorized:
+                onStartArSession()
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    Task { @MainActor in
+                        cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+                        if granted { onStartArSession() }
+                    }
+                }
+            default:
+                break  // .denied / .restricted handled by the .cameraDenied case
+            }
         case .cameraDenied:
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 UIApplication.shared.open(url)
@@ -557,10 +586,12 @@ private struct ARLauncherScreen: View {
             Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            // Re-sync after returning from Settings (or a first-run prompt
-            // resolved while the launcher was off-screen).
-            cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        .onChange(of: scenePhase) { _, phase in
+            // Re-sync the CTA when the app returns to the foreground — the
+            // user may have flipped the camera switch in Settings.
+            if phase == .active {
+                cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            }
         }
     }
 }
