@@ -51,6 +51,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.sample.rememberMaterialInstance
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -251,16 +252,15 @@ fun VideoDemo(onBack: () -> Unit) {
                         // (not behind, where the plane would occlude it). The cube
                         // is large enough (1.0 m) to read at any camera distance,
                         // and slightly tilted so the IBL highlights catch the eye.
-                        val chromeMaterial = remember(materialLoader) {
-                            materialLoader.createColorInstance(
-                                color = androidx.compose.ui.graphics.Color(
-                                    0.92f, 0.92f, 0.95f, 1f
-                                ),
-                                metallic = 1f,
-                                roughness = 0.12f,
-                                reflectance = 0.8f,
-                            )
-                        }
+                        val chromeMaterial = rememberMaterialInstance(
+                            materialLoader,
+                            color = androidx.compose.ui.graphics.Color(
+                                0.92f, 0.92f, 0.95f, 1f
+                            ),
+                            metallic = 1f,
+                            roughness = 0.12f,
+                            reflectance = 0.8f,
+                        )
                         CubeNode(
                             size = Size(1.0f, 1.0f, 1.0f),
                             materialInstance = chromeMaterial,
@@ -274,16 +274,15 @@ fun VideoDemo(onBack: () -> Unit) {
                         // (5×5 m) to fill the lower half of every camera angle. The
                         // very low roughness + high metallic gives a near-mirror
                         // bounce of the video and the IBL.
-                        val floorMaterial = remember(materialLoader) {
-                            materialLoader.createColorInstance(
-                                color = androidx.compose.ui.graphics.Color(
-                                    0.04f, 0.04f, 0.05f, 1f
-                                ),
-                                metallic = 1f,
-                                roughness = 0.06f,
-                                reflectance = 0.95f,
-                            )
-                        }
+                        val floorMaterial = rememberMaterialInstance(
+                            materialLoader,
+                            color = androidx.compose.ui.graphics.Color(
+                                0.04f, 0.04f, 0.05f, 1f
+                            ),
+                            metallic = 1f,
+                            roughness = 0.06f,
+                            reflectance = 0.95f,
+                        )
                         PlaneNode(
                             size = Size(5f, 0.001f, 5f),
                             materialInstance = floorMaterial,

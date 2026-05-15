@@ -9,7 +9,7 @@ SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament,
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
 - `https://github.com/sceneview/sceneview.git` (from: "4.4.0")
 
-**Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.20 | **Compose BOM compatible**
+**Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.21 | **Compose BOM compatible**
 
 **API reference (Dokka):** browse the full generated API docs at
 `https://sceneview.github.io/api/sceneview/latest/sceneview/` (3D) and
@@ -1630,7 +1630,7 @@ struct MyARScreen: View {
 - **No `recordingRotation` parameter** — Android takes a `recordingRotation: Int` so the MP4 plays back upright when recorded in landscape. `RPScreenRecorder` always captures at the current screen orientation, so no per-call rotation knob is needed — the resulting clip already orients correctly for the way the user held the device.
 - **Output filename is `.mov`** (QuickTime container), not `.mp4`. Most players (Photos, QuickTime, VLC, browsers) accept both transparently.
 
-**Save to Photos (v4.3.1+)** — `try await ARRecorder.saveToPhotoLibrary(url)` wraps `PHPhotoLibrary.shared().performChanges` so the recorded `.mov` lands in the user's Photos library (mirrors Android's `ARRecorder.exportToDownloads()`). The host app's `Info.plist` MUST declare `NSPhotoLibraryAddUsageDescription` or iOS crashes the app on the first call. Throws `ARRecorderError.photoLibraryDenied` on user denial, `.photoLibrarySaveFailed` on `performChanges` error.
+**Save to Photos (v4.3.1+)** — `let localID = try await ARRecorder.saveToPhotoLibrary(url)` wraps `PHPhotoLibrary.shared().performChanges` so the recorded `.mov` lands in the user's Photos library, and returns the saved asset's `PHAsset.localIdentifier` (`String?`) so callers can deep-link to or later resolve the recording — parity with Android's `ARRecorder.exportToDownloads()` `Uri?` return. The host app's `Info.plist` MUST declare `NSPhotoLibraryAddUsageDescription` or iOS crashes the app on the first call. Throws `ARRecorderError.photoLibraryDenied` on user denial, `.photoLibrarySaveFailed` on `performChanges` error.
 
 ---
 

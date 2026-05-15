@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SceneView Web Demo — 3D Viewer, Sketchfab Search &amp; Geometry Showcase</title>
-    <meta name="description" content="SceneView Web Demo: 3D model viewer with Sketchfab search, geometry showcase, HDR environments, and WebXR AR/VR — powered by Filament.js (WASM).">
+    <title>SceneView Web Demo — 3D Viewer, Sketchfab Search, Geometry &amp; Physics Showcase</title>
+    <meta name="description" content="SceneView Web Demo: 3D model viewer with Sketchfab search, geometry showcase, a Double Pendulum physics demo, HDR environments, and WebXR AR/VR — powered by Filament.js (WASM).">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -684,6 +684,7 @@
     <nav class="tab-bar">
         <button class="tab-btn active" data-tab="models">Models</button>
         <button class="tab-btn" data-tab="geometry">Geometry</button>
+        <button class="tab-btn" data-tab="physics">Physics</button>
         <button class="tab-btn" data-tab="settings">Settings</button>
     </nav>
 
@@ -747,6 +748,36 @@
             </div>
         </div>
         <button id="geo-clear" class="geo-clear-btn">Clear All Geometry</button>
+    </div>
+
+    <!-- Physics panel — Double Pendulum -->
+    <div id="panel-physics" class="panel geometry-panel">
+        <div class="geo-card">
+            <div class="geo-card-header">
+                <span class="geo-card-title">Double Pendulum</span>
+            </div>
+            <div class="geo-controls">
+                <label>Upper link
+                    <input type="range" id="dp-length1" min="0.2" max="0.6" step="0.01" value="0.45">
+                    <span class="slider-value" id="dp-length1-value">0.45 m</span>
+                </label>
+                <label>Lower link
+                    <input type="range" id="dp-length2" min="0.2" max="0.6" step="0.01" value="0.40">
+                    <span class="slider-value" id="dp-length2-value">0.40 m</span>
+                </label>
+                <label>Gravity
+                    <input type="range" id="dp-gravity" min="1.6" max="20" step="0.1" value="9.8">
+                    <span class="slider-value" id="dp-gravity-value">9.8 m/s&sup2;</span>
+                </label>
+            </div>
+            <button id="dp-reset" class="geo-clear-btn" style="margin-top:8px">Reset &amp; drop</button>
+        </div>
+        <p style="font-size:12px;color:var(--sv-text-dim);line-height:1.5;padding:0 4px">
+            A chaotic two-link pendulum. The integrator math mirrors the shared
+            <code>DoublePendulum</code> simulation in <code>sceneview-core</code> (KMP) — the
+            same physics drives the Android and iOS demos. Adapted from
+            <a href="https://github.com/radcli14/twolinks" target="_blank">&#64;radcli14's twolinks</a>.
+        </p>
     </div>
 
     <!-- Settings panel -->
@@ -887,9 +918,38 @@
         setupSourceToggle();
         setupSearch();
         setupGeometry();
+        setupPhysics();
         setupSettings();
         setupXR();
         showCDNModels();
+        setupDeepLink();
+      }
+
+      // ---- Deep linking ----
+      //
+      // Honour a `#double-pendulum` URL fragment so the Physics demo is
+      // directly addressable, mirroring the `sceneview://demo/double-pendulum`
+      // deep link the Android and iOS demos respond to. The physics scene
+      // needs the engine ready, so the actual switch is deferred until the
+      // loading overlay clears (see flushPendingDeepLink).
+      var pendingDeepLink = null;
+
+      function setupDeepLink() {
+        var hash = (location.hash || '').replace('#', '').toLowerCase();
+        if (hash === 'double-pendulum' || hash === 'physics') {
+          pendingDeepLink = 'physics';
+        }
+        window.addEventListener('hashchange', function() {
+          var h = (location.hash || '').replace('#', '').toLowerCase();
+          if (h === 'double-pendulum' || h === 'physics') switchTab('physics');
+        });
+      }
+
+      function flushPendingDeepLink() {
+        if (pendingDeepLink == null) return;
+        var tab = pendingDeepLink;
+        pendingDeepLink = null;
+        switchTab(tab);
       }
 
       function setupCanvas() {
@@ -915,6 +975,9 @@
             // Engine init complete — surface any update snackbar deferred
             // while the loading overlay was still covering the viewport.
             flushPendingUpdateSnackbar();
+            // Engine ready — honour a `#double-pendulum` deep link now that
+            // the physics scene can actually be built.
+            flushPendingDeepLink();
           })
           .catch(function(err) {
             console.error('SceneView init failed:', err);
@@ -967,7 +1030,7 @@
           var btn = buttons[i];
           btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
         }
-        var panels = ['models', 'geometry', 'settings'];
+        var panels = ['models', 'geometry', 'physics', 'settings'];
         panels.forEach(function(p) {
           var panel = document.getElementById('panel-' + p);
           if (panel) {
@@ -979,7 +1042,16 @@
           }
         });
         // Adjust controls-info position
-        controlsInfo.style.left = (tab === 'models' || tab === 'geometry') ? '380px' : '20px';
+        var sidePanel = (tab === 'models' || tab === 'geometry' || tab === 'physics');
+        controlsInfo.style.left = sidePanel ? '380px' : '20px';
+        // The Double Pendulum runs its own physics scene; entering or leaving
+        // the Physics tab swaps the scene in/out so it never lingers behind
+        // the model viewer.
+        if (tab === 'physics') {
+          startDoublePendulum();
+        } else {
+          stopDoublePendulum();
+        }
       }
 
       // ---- Source toggle (CDN / Sketchfab) ----
@@ -1285,6 +1357,241 @@
           parseInt(c.substring(2, 4), 16) / 255,
           parseInt(c.substring(4, 6), 16) / 255
         ];
+      }
+
+      // ---- Physics: Double Pendulum (issue #1221) -----------------------
+      //
+      // Web face of the cross-platform Double Pendulum demo. The integrator
+      // below is a 1:1 JavaScript port of the shared, platform-independent
+      // `DoublePendulum` simulation in `sceneview-core`
+      // (sceneview-core/.../physics/DoublePendulum.kt) — same symplectic
+      // (semi-implicit) Euler integrator, same Lagrangian angular-acceleration
+      // equations, same 1/240 s sub-stepping. The web demo runs on the CDN
+      // `sceneview.js` engine (plain JS, no Kotlin/JS), so the physics is
+      // mirrored here verbatim rather than imported; keep the two in sync.
+      // Adapted from @radcli14's MIT-licensed `twolinks`.
+
+      // Largest dt a single integration sub-step uses — mirrors
+      // `DoublePendulum.MAX_TIME_STEP`. A chaotic pendulum needs a fine dt
+      // to keep symplectic Euler's energy band tight.
+      var DP_MAX_TIME_STEP = 1 / 240;
+      var DP_HALF_PI = Math.PI / 2;
+
+      // Mutable simulation state (mirrors DoublePendulumState). Angles are in
+      // radians from the downward vertical; positive = counter-clockwise.
+      var dpState = null;
+      var dpRunning = false;
+      var dpRafId = null;
+      var dpLastTimestamp = 0;
+      var dpLink1Asset = null;   // upper link box (CDN sceneview.js asset)
+      var dpLink2Asset = null;   // lower link box
+      var dpPivotAsset = null;   // fixed hinge marker
+
+      // Build a fresh simulation from the current slider values. The pendulum
+      // starts raised so the first frame already shows dramatic motion —
+      // identical seeding to the Android `DoublePendulumDemo`.
+      function dpSeedState() {
+        var l1 = parseFloat(document.getElementById('dp-length1').value);
+        var l2 = parseFloat(document.getElementById('dp-length2').value);
+        var g = parseFloat(document.getElementById('dp-gravity').value);
+        return {
+          // pivot fixed above the origin so the swinging mass stays framed.
+          pivotX: 0, pivotY: 0.45, pivotZ: 0,
+          length1: l1, mass1: 1, angle1: DP_HALF_PI, omega1: 0,
+          length2: l2, mass2: 1, angle2: DP_HALF_PI * 0.6, omega2: 0,
+          gravity: g, damping: 0.04
+        };
+      }
+
+      // One symplectic-Euler integration sub-step of fixed `dt`. Verbatim port
+      // of `DoublePendulum.integrate` — see the Kotlin source for the
+      // derivation of the angular accelerations.
+      function dpIntegrate(s, dt) {
+        var l1 = s.length1, l2 = s.length2;
+        var m1 = s.mass1, m2 = s.mass2;
+        var a1 = s.angle1, a2 = s.angle2;
+        var w1 = s.omega1, w2 = s.omega2;
+        var g = s.gravity;
+
+        var delta = a1 - a2;
+        var cosD = Math.cos(delta);
+        var sinD = Math.sin(delta);
+
+        var den1 = l1 * (2 * m1 + m2 - m2 * Math.cos(2 * delta));
+        var den2 = l2 * (2 * m1 + m2 - m2 * Math.cos(2 * delta));
+        // Guard against the degenerate zero-length / zero-mass case.
+        if (den1 === 0 || den2 === 0) return s;
+
+        var acc1 = (
+          -g * (2 * m1 + m2) * Math.sin(a1) -
+          m2 * g * Math.sin(a1 - 2 * a2) -
+          2 * sinD * m2 * (w2 * w2 * l2 + w1 * w1 * l1 * cosD)
+        ) / den1;
+
+        var acc2 = (
+          2 * sinD * (
+            w1 * w1 * l1 * (m1 + m2) +
+            g * (m1 + m2) * Math.cos(a1) +
+            w2 * w2 * l2 * m2 * cosD
+          )
+        ) / den2;
+
+        // Symplectic Euler: update velocities first, then advance the angles
+        // from the *new* velocities.
+        var dampFactor = Math.min(1, Math.max(0, 1 - s.damping * dt));
+        var newW1 = (w1 + acc1 * dt) * dampFactor;
+        var newW2 = (w2 + acc2 * dt) * dampFactor;
+        s.omega1 = newW1;
+        s.omega2 = newW2;
+        s.angle1 = a1 + newW1 * dt;
+        s.angle2 = a2 + newW2 * dt;
+        return s;
+      }
+
+      // Advance the simulation by `deltaSeconds`, sub-stepping at
+      // DP_MAX_TIME_STEP resolution — mirrors `DoublePendulum.step`.
+      function dpStep(s, deltaSeconds) {
+        if (deltaSeconds <= 0) return s;
+        var remaining = Math.min(deltaSeconds, 1); // never simulate >1s at once
+        while (remaining > 0) {
+          var dt = Math.min(remaining, DP_MAX_TIME_STEP);
+          dpIntegrate(s, dt);
+          remaining -= dt;
+        }
+        return s;
+      }
+
+      // World-space joint position (tip of the upper link).
+      function dpJoint(s) {
+        return [
+          s.pivotX + s.length1 * Math.sin(s.angle1),
+          s.pivotY - s.length1 * Math.cos(s.angle1),
+          s.pivotZ
+        ];
+      }
+      // World-space free tip of the lower link.
+      function dpTip(s) {
+        var j = dpJoint(s);
+        return [
+          j[0] + s.length2 * Math.sin(s.angle2),
+          j[1] - s.length2 * Math.cos(s.angle2),
+          j[2]
+        ];
+      }
+
+      // Position, orient and stretch a unit-tall (1 m along +Y) link box so its
+      // two ends sit at `from` and `to`. Mirrors the Android `applyLinkTransform`:
+      // scale Y by the segment length, centre the box at the midpoint, rotate
+      // about Z so local +Y points from `from` toward `to`.
+      function dpApplyLinkTransform(asset, from, to) {
+        if (!asset || !sceneViewInstance) return;
+        var dx = to[0] - from[0];
+        var dy = to[1] - from[1];
+        var length = Math.max(Math.sqrt(dx * dx + dy * dy), 0.001);
+        // atan2(dx, dy): 0 when the link points straight up (+Y).
+        var angleZ = -Math.atan2(dx, dy);
+        var cx = (from[0] + to[0]) * 0.5;
+        var cy = (from[1] + to[1]) * 0.5;
+        var cz = from[2];
+        dpSetTransform(asset, [cx, cy, cz], angleZ, [1, length, 1]);
+      }
+
+      // Compose translation * Z-rotation * scale into a column-major mat4 and
+      // push it to the asset root via the Filament TransformManager.
+      function dpSetTransform(asset, translation, angleZ, scale) {
+        try {
+          var tm = sceneViewInstance._engine.getTransformManager();
+          var root = asset.getRoot();
+          if (!tm.hasComponent(root)) tm.create(root);
+          var inst = tm.getInstance(root);
+          var c = Math.cos(angleZ), sn = Math.sin(angleZ);
+          var sx = scale[0], sy = scale[1], sz = scale[2];
+          // Column-major: M = T * Rz * S.
+          var m = [
+            c * sx,  sn * sx, 0,       0,
+            -sn * sy, c * sy, 0,       0,
+            0,       0,       sz,      0,
+            translation[0], translation[1], translation[2], 1
+          ];
+          tm.setTransform(inst, m);
+        } catch (e) { /* swallow — don't crash the demo */ }
+      }
+
+      function dpRenderFrame(timestamp) {
+        if (!dpRunning) return;
+        var dt = dpLastTimestamp > 0 ? (timestamp - dpLastTimestamp) / 1000 : 0;
+        dpLastTimestamp = timestamp;
+        dpStep(dpState, dt);
+        var pivot = [dpState.pivotX, dpState.pivotY, dpState.pivotZ];
+        var joint = dpJoint(dpState);
+        var tip = dpTip(dpState);
+        dpApplyLinkTransform(dpLink1Asset, pivot, joint);
+        dpApplyLinkTransform(dpLink2Asset, joint, tip);
+        dpRafId = requestAnimationFrame(dpRenderFrame);
+      }
+
+      // Build the two metallic links + pivot marker and start the loop.
+      function startDoublePendulum() {
+        if (!sceneViewInstance || dpRunning) return;
+        sceneViewInstance.clearScene();
+        geometryCount = 0;
+        dpState = dpSeedState();
+        // Thin unit-tall boxes — the frame loop stretches/orients them.
+        // Metallic grey for the links, brass-toned marker for the pivot.
+        dpLink1Asset = sceneViewInstance.createBox([0, 0, 0], [0.045, 1, 0.045], [0.60, 0.65, 0.71, 1]);
+        dpLink2Asset = sceneViewInstance.createBox([0, 0, 0], [0.04, 1, 0.04], [0.60, 0.65, 0.71, 1]);
+        dpPivotAsset = sceneViewInstance.createBox(
+          [dpState.pivotX, dpState.pivotY, dpState.pivotZ], [0.07, 0.07, 0.07], [0.84, 0.64, 0.29, 1]
+        );
+        dpRunning = true;
+        dpLastTimestamp = 0;
+        dpRafId = requestAnimationFrame(dpRenderFrame);
+        console.log('Double Pendulum started — physics mirrors sceneview-core DoublePendulum');
+      }
+
+      // Stop the loop and clear the physics scene.
+      function stopDoublePendulum() {
+        if (!dpRunning) return;
+        dpRunning = false;
+        if (dpRafId != null) { cancelAnimationFrame(dpRafId); dpRafId = null; }
+        dpLink1Asset = null;
+        dpLink2Asset = null;
+        dpPivotAsset = null;
+        if (sceneViewInstance) {
+          sceneViewInstance.clearScene();
+          geometryCount = 0;
+          // Restore the default model so leaving the tab isn't a black screen.
+          loadModel(CDN_BASE + 'khronos_damaged_helmet.glb', 'Damaged Helmet');
+        }
+      }
+
+      // Reset (re-seed) the simulation in place — keeps the same boxes.
+      function dpReset() {
+        if (!dpRunning) { startDoublePendulum(); return; }
+        dpState = dpSeedState();
+        dpLastTimestamp = 0;
+      }
+
+      function setupPhysics() {
+        var l1 = document.getElementById('dp-length1');
+        var l2 = document.getElementById('dp-length2');
+        var g = document.getElementById('dp-gravity');
+        l1.addEventListener('input', function() {
+          document.getElementById('dp-length1-value').textContent =
+            parseFloat(l1.value).toFixed(2) + ' m';
+          if (dpRunning) dpReset();
+        });
+        l2.addEventListener('input', function() {
+          document.getElementById('dp-length2-value').textContent =
+            parseFloat(l2.value).toFixed(2) + ' m';
+          if (dpRunning) dpReset();
+        });
+        g.addEventListener('input', function() {
+          document.getElementById('dp-gravity-value').textContent =
+            parseFloat(g.value).toFixed(1) + ' m/s²';
+          if (dpRunning) dpReset();
+        });
+        document.getElementById('dp-reset').addEventListener('click', dpReset);
       }
 
       // ---- Settings ----
