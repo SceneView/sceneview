@@ -134,19 +134,26 @@ fun createView(engine: Engine): View = engine.createView().apply {
  * depends on Filament — no ARCore types are involved. The `arsceneview` module calls it via
  * [rememberARView]. This avoids duplicating Filament View configuration across modules.
  *
- * The key difference from [createView] is the tone mapper: AR uses [ToneMapper.Linear] (identity)
- * instead of [ToneMapper.Filmic].
+ * The AR camera stream material (`camera_stream_flat.mat` / `camera_stream_depth.mat`) draws the
+ * live camera feed by calling Filament's `inverseTonemapSRGB()` in its fragment shader. Despite
+ * the name, that helper is **not** a plain sRGB→linear decode — the compiled shader expands to:
  *
- * The AR camera stream material applies `inverseTonemapSRGB()` in its fragment shader to convert
- * the camera image from sRGB gamma space into Filament's linear working space. If a non-linear
- * tone mapper (e.g. Filmic) is then applied as a post-process step, the camera feed gets
- * additionally curved — resulting in oversaturation, high contrast, and vignetting (issue #657).
+ *   inverseTonemapSRGB(c) = Inverse_Tonemap_Filmic(pow(c, 2.2))
  *
- * With [ToneMapper.Linear] the post-process step is a passthrough, so the full pipeline for the
- * camera background becomes:
+ * i.e. it (1) decodes sRGB gamma **and** (2) inverts Filament's *Filmic* tone-map curve. It only
+ * round-trips back to the original camera pixels if the View then re-applies the **Filmic** tone
+ * mapper as its post-process step. The full pipeline for the camera background is therefore:
  *
- *   camera sRGB → inverseTonemapSRGB → linear → ToneMapper.Linear (passthrough) → sRGB output
- *                                                                              = original image ✓
+ *   camera sRGB → pow(2.2) → Inverse_Tonemap_Filmic → working space
+ *               → ToneMapper.Filmic → sRGB output  = original camera image ✓
+ *
+ * Using [ToneMapper.Linear] here (as a previous fix for #657 did) leaves the inverse-Filmic curve
+ * baked into the feed with nothing to cancel it — the camera background comes out washed-out and
+ * low-contrast (issue #1434). [ToneMapper.Filmic] is the only tone mapper that correctly cancels
+ * the shader's `inverseTonemapSRGB`, and it is also the right curve for the virtual 3D content.
+ *
+ * Unlike [createView], the AR view keeps bloom and ambient occlusion **off** so they cannot tint
+ * the camera background — those were the real source of the oversaturation/vignetting in #657.
  *
  * Shadows are enabled by default because AR users commonly want 3D content to cast shadows on
  * detected planes. Disable via `View.setShadowingEnabled(false)` when not needed.
@@ -167,10 +174,12 @@ fun createARView(engine: Engine): View = engine.createView().apply {
     ambientOcclusionOptions = ambientOcclusionOptions.apply {
         enabled = false
     }
-    // Linear tone mapper: passthrough, preserves the camera background unchanged.
-    // See KDoc above for the full explanation.
+    // Filmic tone mapper: the AR camera-stream shader pre-applies Inverse_Tonemap_Filmic, so the
+    // Filmic post-process re-applies the matching forward curve and the camera background round-
+    // trips back to the original pixels. Using ToneMapper.Linear here leaves the inverse curve
+    // uncancelled and washes the camera feed out (issue #1434). See KDoc above for the full chain.
     colorGrading = ColorGrading.Builder()
-        .toneMapper(ToneMapper.Linear())
+        .toneMapper(ToneMapper.Filmic())
         .build(engine)
     // Shadows on by default for AR: models casting shadows onto detected planes.
     setShadowingEnabled(true)
