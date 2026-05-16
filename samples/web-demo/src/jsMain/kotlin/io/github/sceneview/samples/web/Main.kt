@@ -43,15 +43,6 @@ private const val SKETCHFAB_API =
 
 private var currentSceneView: SceneView? = null
 private var autoRotateEnabled = true
-private var currentTab = "models"
-
-/**
- * The four tab panels declared in `index.html` (`panel-models`,
- * `panel-geometry`, `panel-physics`, `panel-settings`). [switchTab] toggles
- * exactly these IDs — keep this in sync with the `data-tab` attributes on the
- * `.tab-btn` elements.
- */
-private val TAB_PANELS = arrayOf("models", "geometry", "physics", "settings")
 
 /** Counter for geometry placement offset so shapes don't overlap. */
 private var geometryCount = 0
@@ -69,8 +60,9 @@ fun main() {
     // Initialize the 3D scene with a default model
     initSceneView(canvas, "https://sceneview.github.io/models/platforms/DamagedHelmet.glb")
 
-    // Wire up tabs
-    setupTabs()
+    // Tab navigation is owned exclusively by the inline JS in `index.html`
+    // (the shipped runtime — see issue #1541). No Kotlin tab wiring here, so
+    // each `.tab-btn` click fires a single `switchTab` handler.
 
     // Wire up Sketchfab search
     setupSearch()
@@ -166,46 +158,6 @@ private fun loadModelIntoScene(url: String, name: String) {
             setupAutoRotateToggle(sceneView)
         }
     )
-}
-
-// ---- Tab navigation ----
-
-private fun setupTabs() {
-    val tabButtons = document.querySelectorAll(".tab-btn")
-    for (i in 0 until tabButtons.length) {
-        val btn = tabButtons.item(i) as? HTMLElement ?: continue
-        btn.addEventListener("click", {
-            val tab = btn.getAttribute("data-tab") ?: return@addEventListener
-            switchTab(tab)
-        })
-    }
-}
-
-private fun switchTab(tab: String) {
-    currentTab = tab
-
-    // Update tab button states
-    val tabButtons = document.querySelectorAll(".tab-btn")
-    for (i in 0 until tabButtons.length) {
-        val btn = tabButtons.item(i) as? HTMLElement ?: continue
-        val btnTab = btn.getAttribute("data-tab")
-        btn.className = if (btnTab == tab) "tab-btn active" else "tab-btn"
-    }
-
-    // Show/hide panels — every tab has a backing `panel-*` div in index.html.
-    TAB_PANELS.forEach { panelName ->
-        val panel = document.getElementById("panel-$panelName") as? HTMLElement
-        panel?.className = if (panelName == tab) {
-            panel.className.replace(" active", "") + " active"
-        } else {
-            panel.className.replace(" active", "")
-        }
-    }
-
-    // Move controls info out of the way when a side panel is active — all four
-    // tabs show a side panel, so it is always offset.
-    val controlsInfo = document.getElementById("controls-info") as? HTMLElement
-    controlsInfo?.style?.left = if (tab in TAB_PANELS) "360px" else "20px"
 }
 
 // ---- Sketchfab search ----
