@@ -1,3 +1,7 @@
+## 4.8.0
+
+- Version alignment with SceneView v4.8.0. Bottom-sheet settings refactor, web-demo tab fixes, sceneview-web GPU-leak fix, VideoNode teardown fix, React Native bridge modernized to 4.x, CI hardening, and docs refresh. The native `io.github.sceneview` dependency coordinates continue to track the last published SceneView release. No breaking Flutter API change.
+
 ## 4.7.0
 
 - Version alignment with SceneView v4.7.0. Flutter/React Native bridge surface expansion ([#909](https://github.com/sceneview/sceneview/issues/909)), APK size optimization, playground thumbnails, samples test infrastructure, render-test capability gate, and CI consolidation. No breaking Flutter API change.
