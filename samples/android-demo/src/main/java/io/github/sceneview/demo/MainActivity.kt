@@ -67,7 +67,10 @@ import io.github.sceneview.demo.ui.RootScreen
 import io.github.sceneview.sample.common.update.InAppUpdateManager
 import io.github.sceneview.sample.common.update.UpdateBanner
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
@@ -179,13 +182,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SceneViewDemoApp(activity: MainActivity? = null) {
     val navController = rememberNavController()
-    // Compose the update banner above the NavHost so a downloaded-and-ready Play
-    // update is visible from any screen (#890). The banner is a no-op when state
-    // is IDLE / CHECKING / UP_TO_DATE — it only renders during DOWNLOADING /
-    // READY_TO_INSTALL so it doesn't take screen real estate from demos.
-    activity?.updateManager?.let { mgr ->
-        UpdateBanner(updateManager = mgr)
-    }
 
     // Watch for deep-link intents. On a non-null id we either navigate
     // directly (the demo list is the start destination, so navigate adds
@@ -210,32 +206,53 @@ fun SceneViewDemoApp(activity: MainActivity? = null) {
         activity?.consumePendingDemo()
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = if (initialDemo != null) "demo/$initialDemo" else "list",
-        enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
-        exitTransition = { slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut() },
-        popEnterTransition = { slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn() },
-        popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
-    ) {
-        composable("list") {
-            // New 4-tab root (Explore / AR View / Samples / About). The legacy
-            // category-grouped DemoListScreen lives untouched inside the
-            // "Samples" tab so existing deep-link flows (`adb am start ... --es
-            // demo <id>`) and the in-app update banner remain wired up.
-            RootScreen(onDemoClick = { id -> navController.navigate("demo/$id") })
+    // Wrap the NavHost and the in-app update banner in an explicit Box so the
+    // banner is z-ordered ON TOP of every screen (#1425). Previously the banner
+    // and the NavHost were sibling root composables — the demo screens' own
+    // TopAppBar then drew over the banner, clipping the "Update ready / Restart"
+    // chrome. Drawing the banner last in the Box guarantees it stays visible.
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = if (initialDemo != null) "demo/$initialDemo" else "list",
+            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+            exitTransition = { slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut() },
+            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn() },
+            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+        ) {
+            composable("list") {
+                // New 4-tab root (Explore / AR View / Samples / About). The legacy
+                // category-grouped DemoListScreen lives untouched inside the
+                // "Samples" tab so existing deep-link flows (`adb am start ... --es
+                // demo <id>`) and the in-app update banner remain wired up.
+                RootScreen(onDemoClick = { id -> navController.navigate("demo/$id") })
+            }
+            composable("demo/{id}") { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id") ?: return@composable
+                val onBack: () -> Unit = { navController.popBackStack() }
+                DemoRouter(id = id, onBack = onBack)
+            }
+            // Note: the legacy `composable("about") { AboutScreen(...) }` route was
+            // removed (alongside `AboutScreen.kt`) because RootScreen's bottom-tab
+            // `RootTab.About → AboutTabContent()` is the only About surface — no
+            // caller ever navigated to "about". Deletion verified via grep:
+            // 0 `navigate("about")` calls anywhere. The @Ignore'd ScreenshotTest
+            // for AboutScreen stays disabled per its own comment.
         }
-        composable("demo/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id") ?: return@composable
-            val onBack: () -> Unit = { navController.popBackStack() }
-            DemoRouter(id = id, onBack = onBack)
+
+        // The update banner is a no-op when state is IDLE / CHECKING /
+        // UP_TO_DATE — it only renders during DOWNLOADING / READY_TO_INSTALL so
+        // it doesn't take screen real estate from demos (#890). The status-bar
+        // inset keeps it clear of the system bar so the banner is never clipped
+        // behind the status bar or a demo's top app bar (#1425).
+        activity?.updateManager?.let { mgr ->
+            UpdateBanner(
+                updateManager = mgr,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.statusBars),
+            )
         }
-        // Note: the legacy `composable("about") { AboutScreen(...) }` route was
-        // removed (alongside `AboutScreen.kt`) because RootScreen's bottom-tab
-        // `RootTab.About → AboutTabContent()` is the only About surface — no
-        // caller ever navigated to "about". Deletion verified via grep:
-        // 0 `navigate("about")` calls anywhere. The @Ignore'd ScreenshotTest
-        // for AboutScreen stays disabled per its own comment.
     }
 }
 

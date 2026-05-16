@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -95,6 +96,13 @@ fun DemoListScreen(
                     }
                 },
                 scrollBehavior = scrollBehavior,
+                // This Scaffold is nested inside RootScreen's Scaffold, which
+                // already consumes the status-bar inset as top content padding.
+                // Letting LargeTopAppBar apply its default status-bar inset too
+                // double-counts it — that was the large empty gap above the
+                // "Samples" header (#1425). Zero the bar's own insets so the
+                // header sits flush below the status bar.
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -102,6 +110,9 @@ fun DemoListScreen(
                 ),
             )
         },
+        // The inherited status-bar inset arrives via the outer RootScreen
+        // Scaffold; consuming it again here would re-introduce the #1425 gap.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { padding ->
         LazyVerticalGrid(
