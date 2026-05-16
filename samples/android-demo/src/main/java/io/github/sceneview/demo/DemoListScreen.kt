@@ -227,6 +227,15 @@ private fun DemoCard(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 1.dp,
+        // Hairline outline so the card boundary stays visible. In dark mode
+        // `surfaceContainer` sits only a few luminance steps above the near-black
+        // ParticleBackground, so without a stroke the cards bled into the page
+        // and the grid looked like floating text (#1443). `outlineVariant` is the
+        // M3 token for exactly this low-emphasis container divider.
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
