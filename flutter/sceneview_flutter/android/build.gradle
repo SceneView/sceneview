@@ -68,6 +68,6 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.9.0'
 
     // SceneView — 3D and AR rendering
-    implementation 'io.github.sceneview:sceneview:3.6.2'
-    implementation 'io.github.sceneview:arsceneview:3.6.2'
+    implementation 'io.github.sceneview:sceneview:4.6.2'
+    implementation 'io.github.sceneview:arsceneview:4.6.2'
 }

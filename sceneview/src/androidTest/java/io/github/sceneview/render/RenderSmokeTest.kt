@@ -11,7 +11,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -35,15 +34,6 @@ import org.junit.runner.RunWith
  * tests via [RenderTestHarness.resetScene].
  */
 @RunWith(AndroidJUnit4::class)
-@Ignore(
-    "RenderTestHarness.capturePixels() relies on Filament's async readPixels callback, " +
-            "which never fires on the Apple Silicon emulator (gfxstream OpenGL ES → Metal " +
-            "translator) — same root cause as DemoParametersRenderTest. Tracked in #803. " +
-            "Coverage on emulator is provided by samples/android-demo's UiAutomator " +
-            "DemoRenderingScreenshotTest (capture via device.takeScreenshot which works on " +
-            "any backend). Re-enable on a hardware-accelerated GPU runner or once Filament " +
-            "ships a translator-compatible readback path."
-)
 class RenderSmokeTest {
 
     companion object {
@@ -64,6 +54,9 @@ class RenderSmokeTest {
 
     @Before
     fun resetScene() {
+        // Run on a hardware-GPU runner; cleanly skip on the SwiftShader / Apple-Silicon
+        // emulator where Filament's async readPixels callback never fires (#803, #912).
+        RenderTestCapabilities.assumeGpuReadbackAvailable()
         harness.resetScene()
     }
 
