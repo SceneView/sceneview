@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **React Native & Flutter demo apps gain Materials / Animation / Environment demos ([#1362](https://github.com/sceneview/sceneview/issues/1362)).** Part of the cross-platform demo-parity umbrella: the RN and Flutter sample apps showcased only a small slice of the bridge surface. The `react-native-demo` app adds three tabs — **Materials** (lit PBR vs `unlit` geometry materials), **Animation** (auto-playing glTF clips via `ModelNode.animation`) and **Environment** (HDR image-based lighting plus the `autoCenterContent` toggle) — and its bottom tab bar is now horizontally scrollable so the catalog can keep growing. The `flutter-demo` app gains a dedicated **Demos** tab with four runnable per-feature scenes — Materials (`GeometryNode.unlit`), Model Animation (`loadModel` with animated Khronos assets), Environment (`setEnvironment` + `setAutoCenterContent`) and Camera Modes (`setCameraControlMode`) — complementing the existing flat "Bridge Features" reference checklist. Every demo uses only APIs the Fabric / PlatformView bridges actually expose; no dead UI for un-bridged features.
+
 ## v4.8.0 — Bottom-sheet settings, web & RN bridge fixes (2026-05-16)
 
 ### Added
