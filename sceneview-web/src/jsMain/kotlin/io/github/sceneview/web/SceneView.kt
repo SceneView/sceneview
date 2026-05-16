@@ -86,10 +86,11 @@ class SceneView private constructor(
     var autoCenterContent: Boolean = true
 
     /**
-     * One-shot gate for [refreshContentCentering]: tracks whether the current
-     * content generation has been centred so subsequent frames are a cheap
-     * no-op, and is [AutoCenterGate.reset] whenever new content is loaded so a
-     * 2nd model re-centres (regression #1357). Mirrors iOS's `didCenterContent`.
+     * Union-diagonal-stability gate for [refreshContentCentering]: re-frames
+     * the scene on every union-bounds growth (so a deferred async model still
+     * re-centres — #1540), and latches only once the union diagonal has
+     * settled across consecutive frames. Mirrors iOS's `lastFramedDiagonal` +
+     * `framingStabilityEpsilon` logic (#1391).
      */
     private val autoCenterGate = AutoCenterGate()
 
@@ -98,7 +99,18 @@ class SceneView private constructor(
         val asset: FilamentAsset,
         val animator: Animator?,
         var animationTime: Double = 0.0
-    )
+    ) {
+        /**
+         * The asset's root-entity transform *before* any auto-center offset
+         * was applied — captured the first frame [refreshContentCentering]
+         * touches this model. The auto-center pass re-runs every time a
+         * deferred async sibling grows the union (#1540), so it must compose
+         * each new offset onto this stored base rather than onto the
+         * already-offset transform — otherwise the translation accumulates.
+         * Filament.js represents a mat4 as a flat 16-element `number[]`.
+         */
+        var baseTransform: dynamic = null
+    }
 
     /** Orbit camera controller -- initialized when cameraControls is enabled. */
     var cameraController: OrbitCameraController? = null
@@ -309,10 +321,12 @@ class SceneView private constructor(
                 val loadedModel = LoadedModel(asset, animator)
                 models.add(loadedModel)
 
-                // A new model changes the content bounds, so the one-shot auto-center
-                // pass must run again — otherwise a 2nd model loaded after the 1st
-                // centered would stay off-center. Mirrors Android's
-                // `SceneAutoCenterState.reset()`.
+                // A new model changes the content bounds, so the auto-center pass
+                // must re-frame. The #1391-style diagonal-stability gate already
+                // re-frames on every union growth (so a deferred async model is
+                // covered even without this call — that is the #1540 fix), but an
+                // explicit reset still handles content *replacement*: a shrinking
+                // union would otherwise look "stable" and never re-frame.
                 autoCenterGate.reset()
 
                 // Load external resources (textures, buffers) referenced by the glTF.
@@ -448,6 +462,12 @@ class SceneView private constructor(
 
                 models.add(LoadedModel(asset, animator))
 
+                // Re-arm the auto-center pass — a new primitive grows the union
+                // bounds. The diagonal-stability gate also re-frames on its own
+                // (#1540), but resetting keeps geometry added after a latched
+                // pass consistent with `loadModel`.
+                autoCenterGate.reset()
+
                 // Finalize the asset — loadResources uploads vertex/index buffers to GPU.
                 // Even for self-contained GLBs (no external resources), this step is required.
                 asset.loadResources(
@@ -471,33 +491,59 @@ class SceneView private constructor(
      */
     fun fitToModels() {
         if (models.isEmpty()) return
-        val controller = cameraController ?: return
+        fitToBounds(ContentCentering.union(contentBoxes()))
+    }
 
-        // Compute the union bounding box of all loaded models
-        var minX = Double.MAX_VALUE; var minY = Double.MAX_VALUE; var minZ = Double.MAX_VALUE
-        var maxX = -Double.MAX_VALUE; var maxY = -Double.MAX_VALUE; var maxZ = -Double.MAX_VALUE
-
-        for (model in models) {
+    /**
+     * Read every loaded asset's asset-space AABB as [ContentCentering.Aabb]s.
+     *
+     * `getBoundingBox()` reports a degenerate/empty box until `loadResources()`
+     * has populated the renderables; an unreadable box (resources still in
+     * flight) is surfaced once and skipped so the pass retries next frame.
+     * Shared by [fitToModels] and [refreshContentCentering] so the union-AABB
+     * read happens exactly once per call site instead of being duplicated.
+     */
+    private fun contentBoxes(): List<ContentCentering.Aabb> = models.mapNotNull { model ->
+        try {
             val aabb = model.asset.getBoundingBox()
             val mn: dynamic = aabb.min
             val mx: dynamic = aabb.max
-            if ((mn[0] as Number).toDouble() < minX) minX = (mn[0] as Number).toDouble()
-            if ((mn[1] as Number).toDouble() < minY) minY = (mn[1] as Number).toDouble()
-            if ((mn[2] as Number).toDouble() < minZ) minZ = (mn[2] as Number).toDouble()
-            if ((mx[0] as Number).toDouble() > maxX) maxX = (mx[0] as Number).toDouble()
-            if ((mx[1] as Number).toDouble() > maxY) maxY = (mx[1] as Number).toDouble()
-            if ((mx[2] as Number).toDouble() > maxZ) maxZ = (mx[2] as Number).toDouble()
+            ContentCentering.Aabb(
+                doubleArrayOf(
+                    (mn[0] as Number).toDouble(),
+                    (mn[1] as Number).toDouble(),
+                    (mn[2] as Number).toDouble(),
+                ),
+                doubleArrayOf(
+                    (mx[0] as Number).toDouble(),
+                    (mx[1] as Number).toDouble(),
+                    (mx[2] as Number).toDouble(),
+                ),
+            )
+        } catch (e: Throwable) {
+            // The asset's bounds are not readable yet (resources still loading) — skip
+            // this model for now. Surface it once so a genuine failure is not invisible;
+            // the pass re-runs on later frames until the framing has settled.
+            console.warn("SceneView: skipping a model in auto-center (bounds not ready)", e)
+            null
         }
+    }
 
-        val cx = (minX + maxX) / 2.0
-        val cy = (minY + maxY) / 2.0
-        val cz = (minZ + maxZ) / 2.0
-        val dx = maxX - minX
-        val dy = maxY - minY
-        val dz = maxZ - minZ
-        val radius = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz) / 2.0
+    /**
+     * Dolly the orbit controller so [bounds] (the union AABB of all content)
+     * fits the frustum. A no-op when [bounds] is `null` (nothing loaded) or
+     * camera controls are disabled. Extracted so [fitToModels] and the
+     * auto-centre path ([refreshContentCentering]) share one implementation
+     * and one union-AABB read.
+     */
+    private fun fitToBounds(bounds: ContentCentering.Aabb?) {
+        if (bounds == null) return
+        val controller = cameraController ?: return
+        val center = ContentCentering.center(bounds)
+        val radius = ContentCentering.diagonal(bounds) / 2.0
+        if (radius <= 0.0) return
 
-        controller.target(cx, cy, cz)
+        controller.target(center[0], center[1], center[2])
         controller.distance = radius * 2.5
         controller.minDistance = radius * 0.5
         controller.maxDistance = radius * 10.0
@@ -505,69 +551,97 @@ class SceneView private constructor(
 
     /**
      * Translate every loaded asset's root entity so the union bounding box of
-     * all content lands centred on the world origin (the orbit-camera target).
+     * all content lands centred on the world origin (the orbit-camera target),
+     * then dolly the orbit camera so that union fits the frustum.
      *
-     * Runs once, on the first render frame where the content bounds are
-     * non-degenerate — most async model loads complete within a handful of
-     * frames after [loadModel]. A no-op once [didCenterContent] is set, and a
-     * no-op entirely when [autoCenterContent] is `false`.
+     * Runs every render frame until the content's union diagonal has settled
+     * across consecutive frames — see [AutoCenterGate]. A no-op once the gate
+     * has latched, and a no-op entirely when [autoCenterContent] is `false`.
      *
-     * Library-level port of the iOS `refreshContentCentering` (#1026): on iOS
-     * an intermediate `contentRoot` Entity is translated; the web Filament
-     * `Scene` has no parent root, so each asset's own root entity is offset
-     * instead — the visual result is identical. Closes #1052.
+     * ## #1540: deferred async models re-frame
+     *
+     * The previous design latched on the **first** non-degenerate frame, so an
+     * async model that finished *after* a sibling had already centred never
+     * re-centred — the multi-model "bunched-in-the-corner" bug #1391 fixed on
+     * iOS. This port mirrors that fix: every frame the union diagonal is
+     * measured and the pass re-frames whenever it grew (a streamed model just
+     * landed), latching only once the diagonal is stable. So a 2nd model
+     * loaded async always pulls the framing back to the combined extent.
+     *
+     * ## #1540: auto-dolly, not just auto-centre
+     *
+     * The pass now also calls [fitToBounds] with the same union AABB so the
+     * web viewer auto-DOLLIES the orbit camera to fit content size — small and
+     * large models were previously mis-framed because only auto-centring ran.
+     *
+     * Library-level port of the iOS `refreshContentCentering` (#1026 / #1391):
+     * on iOS an intermediate `contentRoot` Entity is translated; the web
+     * Filament `Scene` has no parent root, so each asset's own root entity is
+     * offset instead — the visual result is identical. Closes #1052, #1540.
      */
     private fun refreshContentCentering() {
-        if (!autoCenterGate.shouldCenter(autoCenterContent, models.isNotEmpty())) return
+        if (!autoCenterGate.shouldRun(autoCenterContent, models.isNotEmpty())) return
 
-        // Gather each asset's bounding box. `getBoundingBox()` reports the
-        // asset-space AABB, which is empty/degenerate until loadResources()
-        // has populated the renderables.
-        val boxes = models.mapNotNull { model ->
-            try {
-                val aabb = model.asset.getBoundingBox()
-                val mn: dynamic = aabb.min
-                val mx: dynamic = aabb.max
-                ContentCentering.Aabb(
-                    doubleArrayOf(
-                        (mn[0] as Number).toDouble(),
-                        (mn[1] as Number).toDouble(),
-                        (mn[2] as Number).toDouble(),
-                    ),
-                    doubleArrayOf(
-                        (mx[0] as Number).toDouble(),
-                        (mx[1] as Number).toDouble(),
-                        (mx[2] as Number).toDouble(),
-                    ),
-                )
-            } catch (e: Throwable) {
-                // The asset's bounds are not readable yet (resources still loading) — skip this
-                // model for now. Surface it once so a genuine failure is not invisible; the pass
-                // re-runs on later frames until `didCenterContent` is set.
-                console.warn("SceneView: skipping a model in auto-center (bounds not ready)", e)
-                null
-            }
+        // Single union-AABB read, shared with the dolly fit below (#1540 de-dup).
+        val union = ContentCentering.union(contentBoxes())
+        val offset = ContentCentering.centeringOffset(union) ?: return
+
+        // Skip frames where the union diagonal has not moved since the last
+        // framed pass — the scene is already settled and the gate will latch.
+        // A freshly streamed model grows the diagonal and forces a re-frame.
+        val diagonal = ContentCentering.diagonal(union)
+        if (!autoCenterGate.shouldFrame(diagonal)) {
+            autoCenterGate.recordFraming(diagonal)
+            return
         }
 
-        val offset = ContentCentering.centeringOffset(ContentCentering.union(boxes)) ?: return
-
         // Apply the centring translation to each asset's root entity via the
-        // TransformManager. Composing onto the existing transform keeps any
-        // per-model scale/position the consumer set themselves intact.
+        // TransformManager. The first time this model is touched its current
+        // transform is captured as `baseTransform`; every subsequent re-frame
+        // (a deferred async sibling grew the union — #1540) composes the new
+        // offset onto that *base* rather than onto the already-offset
+        // transform, so the translation never accumulates. Composing onto the
+        // base keeps any per-model scale/position the consumer set intact.
         val tm = engine.getTransformManager()
         for (model in models) {
             try {
                 val root = model.asset.getRoot()
                 if (!tm.hasComponent(root)) tm.create(root)
                 val instance = tm.getInstance(root)
-                val current: dynamic = tm.getTransform(instance)
-                tm.setTransform(instance, translatedMat4(current, offset))
+                if (model.baseTransform == null) {
+                    model.baseTransform = copyMat4(tm.getTransform(instance))
+                }
+                tm.setTransform(instance, translatedMat4(model.baseTransform, offset))
             } catch (e: Throwable) {
                 console.error("SceneView: auto-center failed for a model", e)
             }
         }
-        autoCenterGate.markCentered()
-        console.log("SceneView: auto-centered content (offset ${offset[0]}, ${offset[1]}, ${offset[2]})")
+
+        // Auto-dolly: fit the orbit camera to the content size (#1540). The
+        // union is already centred on the origin by the offset above, so the
+        // fit's own target re-aims at the (now origin) centroid harmlessly.
+        fitToBounds(union)
+
+        // Record this framing — latches the gate once the diagonal stabilises.
+        autoCenterGate.recordFraming(diagonal)
+        console.log(
+            "SceneView: auto-centered content (offset ${offset[0]}, ${offset[1]}, " +
+                "${offset[2]}, diagonal $diagonal)",
+        )
+    }
+
+    /**
+     * Return a fresh flat 16-element `number[]` copy of the column-major 4x4
+     * [mat]. Used to snapshot a model's base transform before the auto-center
+     * pass first offsets it (#1540), so later re-frames compose onto an
+     * immutable base.
+     */
+    private fun copyMat4(mat: dynamic): dynamic {
+        val out = js("[]")
+        for (i in 0 until 16) {
+            out.push((mat[i] as Number).toDouble())
+        }
+        return out
     }
 
     /**
@@ -576,10 +650,7 @@ class SceneView private constructor(
      * as a flat 16-element `number[]`.
      */
     private fun translatedMat4(mat: dynamic, offset: DoubleArray): dynamic {
-        val out = js("[]")
-        for (i in 0 until 16) {
-            out.push((mat[i] as Number).toDouble())
-        }
+        val out = copyMat4(mat)
         out[12] = (out[12] as Number).toDouble() + offset[0]
         out[13] = (out[13] as Number).toDouble() + offset[1]
         out[14] = (out[14] as Number).toDouble() + offset[2]
