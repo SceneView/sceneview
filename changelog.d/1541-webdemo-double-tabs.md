@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **Web demo tab navigation no longer double-fires on every click ([#1541](https://github.com/sceneview/sceneview/issues/1541)).** Tab buttons were wired twice — once by the inline JS in `index.html` (the shipped runtime, loaded via CDN `sceneview.js`) and again by a duplicate `setupTabs()` in the Gradle-compiled Kotlin `Main.kt`, which is not referenced by the page. The dead Kotlin tab path has been removed so each `.tab-btn` click runs a single `switchTab` handler.
