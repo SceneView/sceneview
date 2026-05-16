@@ -3,6 +3,7 @@
 ## Unreleased
 
 - expanded the web-demo playwright suite into full per-tab / per-demo qa coverage — exercises every models, geometry, physics and settings demo with camera interaction, canvas render assertions and console-error checks, and emits a machine-readable `web-qa-summary.json` for the device-qa orchestrator (#1564)
+- device-qa: added a maestro harness — `.maestro/android/` flows drive all 42 android demos like a real user (deep-link launch, camera-orbit drag, tap, one screenshot per demo, crash assertion), with per-category subflows and a `maestro.sh` auto-install helper; `qa-android-demos.sh` is now a thin maestro wrapper (#1562).
 
 ## v4.9.0 — Cross-platform demo catalogs, web auto-center parity & teardown safety (2026-05-16)
 
