@@ -110,7 +110,13 @@ test.describe('SceneView Web Demo Rendering', () => {
     // `panel-*` div, not just `panel-models`/`panel-geometry`. A blank side
     // panel on Models / Physics / Settings shipped because the panel-ID list
     // drifted out of sync with the `data-tab` attributes.
-    const tabs = ['models', 'geometry', 'physics', 'settings'];
+    //
+    // Issue #1362: the catalog gained Lighting / Animation / Text /
+    // Environment tabs — every one must activate its matching panel.
+    const tabs = [
+      'models', 'geometry', 'lighting', 'animation',
+      'text', 'environment', 'physics', 'settings',
+    ];
 
     for (const tab of tabs) {
       await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
@@ -132,6 +138,44 @@ test.describe('SceneView Web Demo Rendering', () => {
 
     await page.screenshot({
       path: 'test-results/06_tabs.png',
+      fullPage: false,
+    });
+  });
+
+  test('catalog tabs expose working controls (issue #1362)', async ({ page }) => {
+    await page.goto('/');
+
+    const overlay = page.locator('#loading-overlay');
+    await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
+
+    // Lighting — add a directional light, then clear added lights.
+    await page.locator('.tab-btn[data-tab="lighting"]').click();
+    await page.locator('.geo-add-btn[data-light="directional"]').click();
+    await page.locator('.geo-add-btn[data-light="point"]').click();
+    await expect(page.locator('#light-clear')).toBeVisible();
+    await page.locator('#light-clear').click();
+
+    // Animation — model selector + Play/Stop controls present.
+    await page.locator('.tab-btn[data-tab="animation"]').click();
+    await expect(page.locator('#anim-model-select')).toBeVisible();
+    await expect(page.locator('#anim-play')).toBeEnabled();
+    await expect(page.locator('#anim-stop')).toBeEnabled();
+
+    // Text — type and add a text node.
+    await page.locator('.tab-btn[data-tab="text"]').click();
+    await page.locator('#text-input').fill('Hello SceneView');
+    await page.locator('#text-add').click();
+    await expect(page.locator('#text-clear')).toBeVisible();
+
+    // Environment — preset select, intensity and bloom controls present.
+    await page.locator('.tab-btn[data-tab="environment"]').click();
+    await expect(page.locator('#env-preset')).toBeVisible();
+    await page.locator('#env-preset').selectOption('cool');
+    await page.locator('#env-bloom-toggle').click();
+    await expect(page.locator('#env-bloom-toggle')).toHaveClass(/active/);
+
+    await page.screenshot({
+      path: 'test-results/07_catalog_tabs.png',
       fullPage: false,
     });
   });

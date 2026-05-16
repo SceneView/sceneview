@@ -4,13 +4,24 @@ Browser-based 3D viewer using SceneView.js (Filament.js WASM engine).
 
 ## Features
 
-The demo has four tabs in the top tab bar:
+The demo has eight tabs in the top tab bar:
 
 - **Models** — browse 40 curated CDN models across 5 categories (Showcase,
   Vehicles, Animated, Characters, Objects), or switch the source toggle to
   **Sketchfab Search** to search downloadable 3D models from Sketchfab.
 - **Geometry** — create cubes, spheres, cylinders, and planes with color
   pickers, size sliders, and a per-shape `KHR_materials_unlit` toggle.
+- **Lighting** — add and remove directional, point, and spot lights via
+  `addLight()` / `removeNode()`, with per-type color and intensity controls.
+  Web counterpart of Android's `LightNode` demos.
+- **Animation** — load an animated glTF model and drive its keyframe/skinning
+  playback via `playAnimation()` / `stopAnimation()`, with a model picker and
+  loop toggle.
+- **Text** — render billboarded 3D text nodes via `createText()`, with
+  text/color/size controls and removal.
+- **Environment** — image-based lighting via `setEnvironmentSH()`
+  spherical-harmonic presets (Warm / Cool / Dramatic), background color, and
+  bloom strength. The bloom and background controls stay in sync with Settings.
 - **Physics** — a chaotic **Double Pendulum** simulation whose integrator math
   mirrors the shared `DoublePendulum` in `sceneview-core` (KMP). Sliders tune
   the upper/lower link lengths and gravity; **Reset & drop** re-seeds the run.
@@ -41,7 +52,9 @@ Open `src/jsMain/resources/index.html` directly in a browser, or:
 - `index.html` — self-contained single-file app (HTML + CSS + inline JS). This
   is the shipped demo; it loads `SceneView.js` from the CDN.
 - Uses `SceneView.js` from CDN (`SceneView.modelViewer()`, `createBox()`,
-  `setQuality()`, `setBloom()`, `setBackgroundColor()`, etc.).
+  `setQuality()`, `setBloom()`, `setBackgroundColor()`, `addLight()`,
+  `removeNode()`, `playAnimation()`, `stopAnimation()`, `createText()`,
+  `setEnvironmentSH()`, etc.).
 - Filament.js WASM engine loaded from CDN.
 - Sketchfab API: `GET /v3/search?type=models&downloadable=true&q={query}`.
 - CDN models: `https://cdn.jsdelivr.net/gh/sceneview/sceneview@main/assets/models/glb/`.
