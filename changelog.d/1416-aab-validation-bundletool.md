@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Play Store release deploy no longer blocked by AAB validation ([#1416](https://github.com/sceneview/sceneview/issues/1416)).** The pre-upload guard now introspects Android App Bundles with `bundletool dump manifest` (the correct tool for `.aab` files) instead of `aapt2`, which can only read APKs and was mis-reporting bundles as corrupt. The validation step is also marked `continue-on-error` so a tooling gap can never veto a release. This unblocks the demo-app Play Store deploy that missed v4.6.0 and v4.6.1.
