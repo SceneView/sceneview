@@ -229,13 +229,15 @@ fun createCollisionSystem(view: View) = CollisionSystem(view)
 class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     init {
         // 3/4 view: slightly elevated and pulled back so a typical 0.3–1 m model placed
-        // at the world origin is fully framed and centered (#1080). The previous
-        // `(0, 0, 1)` placement sat the camera 1 m dead-ahead of origin — too close for
-        // anything but a tiny object and, with no Y elevation, produced a flat,
-        // under-framed front-on view. `(0, DEFAULT_Y, DEFAULT_Z)` + `lookAt(origin)`
-        // mirrors iOS RealityKit's `look(at: .zero, from: [0, 0.3, 2])` default
-        // (`SceneViewSwift/.../SceneView.swift`) so the same scene frames identically
-        // on both platforms. Pinned in `SceneFactoriesTest.defaultCameraNodePositionIsPinned()`.
+        // at the world origin is fully framed and centered (#1080, re-tuned in #1427).
+        // The original `(0, 0, 1)` placement sat the camera 1 m dead-ahead of origin —
+        // too close for anything but a tiny object and, with no Y elevation, produced a
+        // flat, under-framed front-on view. The #1080 `(0, 0.3, 2)` placement was still
+        // "beaucoup trop zoomé" in the 2026-05-16 on-device QA, so #1427 pulls the camera
+        // further back to `(0, DEFAULT_Y, DEFAULT_Z)` + `lookAt(origin)` for more headroom.
+        // iOS RealityKit still uses `[0, 0.3, 2]` (`SceneViewSwift/.../SceneView.swift`) —
+        // a matching iOS bump is tracked alongside the auto-framing work (#1439). Pinned
+        // in `SceneFactoriesTest.defaultCameraNodePositionIsPinned()`.
         position = Position(0.0f, DEFAULT_Y, DEFAULT_Z)
         lookAt(Position(0.0f, 0.0f, 0.0f))
         // Neutral, less photographic exposure.
@@ -252,15 +254,18 @@ class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     companion object {
         /**
          * Default camera Y elevation. Small positive lift gives a natural 3/4 angle
-         * looking slightly down on origin-placed content. Matches iOS `[0, 0.3, 2]`.
+         * looking slightly down on origin-placed content. Re-tuned in #1427 from `0.3`
+         * to keep the 3/4 angle proportional to the larger [DEFAULT_Z] dolly-back.
          */
-        const val DEFAULT_Y = 0.3f
+        const val DEFAULT_Y = 0.4f
 
         /**
          * Default camera Z distance from origin. Pulls the camera back far enough to
-         * frame a typical 0.3–1 m model. Matches iOS `[0, 0.3, 2]`.
+         * frame a typical 0.3–1 m model with comfortable headroom. Re-tuned in #1427
+         * from `2.0` — the pre-#1427 value framed origin-placed models too tight
+         * ("beaucoup trop zoomé", 2026-05-16 on-device QA).
          */
-        const val DEFAULT_Z = 2.0f
+        const val DEFAULT_Z = 2.75f
 
         /** Aperture (f-stop). AR mirrors via `ARDefaultCameraNode.DEFAULT_APERTURE`. */
         const val DEFAULT_APERTURE = 12.0f

@@ -49,19 +49,21 @@ class SceneFactoriesTest {
 
     @Test
     fun defaultCameraNodePositionIsPinned() {
-        // Pin #1080 — DefaultCameraNode 3/4-view default placement. `(0, 0.3, 2)` frames a
-        // typical 0.3–1 m origin-placed model and mirrors iOS RealityKit's
-        // `look(at: .zero, from: [0, 0.3, 2])`. The pre-#1080 `(0, 0, 1)` placement was too
-        // close and flat. Changing these is a BREAKING visual + cross-platform-parity change.
+        // Pin #1080 / re-tuned #1427 — DefaultCameraNode 3/4-view default placement.
+        // #1080 set `(0, 0.3, 2)`; the 2026-05-16 on-device QA found it still framed
+        // origin-placed models too tight, so #1427 pulled the camera back to
+        // `(0, 0.4, 2.75)`. iOS RealityKit still uses `[0, 0.3, 2]` — a matching iOS
+        // bump is tracked alongside the auto-framing work (#1439). Changing these is a
+        // BREAKING visual change.
         assertEquals(
-            "DefaultCameraNode.DEFAULT_Y must stay 0.3 — matches iOS [0, 0.3, 2] (#1080).",
-            0.3f,
+            "DefaultCameraNode.DEFAULT_Y must stay 0.4 — re-tuned in #1427.",
+            0.4f,
             DefaultCameraNode.DEFAULT_Y,
             0.0f,
         )
         assertEquals(
-            "DefaultCameraNode.DEFAULT_Z must stay 2.0 — matches iOS [0, 0.3, 2] (#1080).",
-            2.0f,
+            "DefaultCameraNode.DEFAULT_Z must stay 2.75 — re-tuned in #1427.",
+            2.75f,
             DefaultCameraNode.DEFAULT_Z,
             0.0f,
         )
