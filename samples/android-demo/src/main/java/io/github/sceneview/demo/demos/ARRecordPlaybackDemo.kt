@@ -308,7 +308,17 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                                 currentMode = Mode.PLAYBACK
                                 lastSavedFile = null
                             },
+                            onOpenInPlayback = {
+                                currentMode = Mode.PLAYBACK
+                                lastSavedFile = null
+                            },
                             onShare = { shareRecording(context, file) },
+                            onOpen = { openRecordingAsVideo(context, file) },
+                            onExport = {
+                                ARRecorder.exportToDownloads(context, file)?.let {
+                                    exportToast = "Saved to Downloads/SceneView/${file.name}"
+                                } ?: run { exportToast = "Export failed — see logs" }
+                            },
                             onDismiss = { lastSavedFile = null }
                         )
                     }
@@ -317,8 +327,10 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                     Text(
                         text = "Pick a recording to replay. ARCore re-runs it as if the camera " +
                             "were live — anchors, planes and tracking all replay deterministically. " +
-                            "Tap \"Export\" to copy a recording to Downloads/SceneView/ so you can " +
-                            "pull it via `adb pull /sdcard/Download/SceneView/…` or share it.",
+                            "Each recording is a standard MP4 carrying ARCore data tracks: " +
+                            "\"Open\" plays it in any video app, \"Export\" copies it to " +
+                            "Downloads/SceneView/ for `adb pull /sdcard/Download/SceneView/…` " +
+                            "or sharing.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -326,6 +338,11 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                     RecordingsList(
                         recordings = recordings,
                         selected = currentPlaybackFile,
+                        // Highlight the file just captured this session so it's
+                        // obviously discoverable in the list — the on-device QA
+                        // session reported recordings "disappearing" after a take
+                        // because nothing pointed at the new entry (#1438).
+                        justRecorded = lastSavedFile,
                         onSelect = { file ->
                             // Re-key the ARSceneView so ARCore gets a fresh Session bound to
                             // the new playback dataset.
@@ -337,6 +354,7 @@ fun ARRecordPlaybackDemo(onBack: () -> Unit) {
                             } ?: run { exportToast = "Export failed — see logs" }
                         },
                         onShare = { file -> shareRecording(context, file) },
+                        onOpen = { file -> openRecordingAsVideo(context, file) },
                         onRefresh = { refreshRecordings() }
                     )
                 }
@@ -721,9 +739,11 @@ private fun TrackingFailureBanner(reason: TrackingFailureReason?) {
 private fun RecordingsList(
     recordings: List<File>,
     selected: File?,
+    justRecorded: File?,
     onSelect: (File) -> Unit,
     onExport: (File) -> Unit,
     onShare: (File) -> Unit,
+    onOpen: (File) -> Unit,
     onRefresh: () -> Unit
 ) {
     Card(
@@ -756,9 +776,11 @@ private fun RecordingsList(
                     RecordingRow(
                         file = file,
                         isSelected = selected?.absolutePath == file.absolutePath,
+                        isJustRecorded = justRecorded?.absolutePath == file.absolutePath,
                         onClick = { onSelect(file) },
                         onExport = { onExport(file) },
-                        onShare = { onShare(file) }
+                        onShare = { onShare(file) },
+                        onOpen = { onOpen(file) }
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -771,9 +793,11 @@ private fun RecordingsList(
 private fun RecordingRow(
     file: File,
     isSelected: Boolean,
+    isJustRecorded: Boolean,
     onClick: () -> Unit,
     onExport: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onOpen: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -782,7 +806,13 @@ private fun RecordingRow(
                 else MaterialTheme.colorScheme.surfaceVariant,
         contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
                        else MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(8.dp),
+        // A thin accent outline on the file just captured this session so the
+        // eye lands on it immediately — addresses the "recordings disappear
+        // after a take" complaint from on-device QA (#1438).
+        border = if (isJustRecorded) {
+            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
+        } else null
     ) {
         Column(
             modifier = Modifier
@@ -790,13 +820,29 @@ private fun RecordingRow(
                 .background(Color.Transparent)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            if (isJustRecorded) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiary,
+                    contentColor = MaterialTheme.colorScheme.onTertiary,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = "● Just recorded",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 text = file.name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace
             )
             Text(
-                text = "${formatBytes(file.length())} • ${formatRelativeAge(file.lastModified())}",
+                text = "MP4 + ARCore data • ${formatBytes(file.length())} • " +
+                    formatRelativeAge(file.lastModified()),
                 style = MaterialTheme.typography.labelSmall
             )
             Spacer(Modifier.height(6.dp))
@@ -808,6 +854,16 @@ private fun RecordingRow(
                     onClick = onShare,
                     modifier = Modifier.weight(1f)
                 ) { Text("Share") }
+                OutlinedButton(
+                    onClick = onOpen,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Open") }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 OutlinedButton(
                     onClick = onExport,
                     modifier = Modifier.weight(1f)
@@ -831,12 +887,25 @@ private fun RecordingRow(
     }
 }
 
+/**
+ * Post-stop confirmation card shown in RECORD mode after [ARRecorder.stop].
+ *
+ * The earlier version only said "saved" + offered Replay/Share, which left two questions
+ * from the on-device QA session unanswered (#1438): *where* did the file go, and *what*
+ * is it? This version spells out the app-private path, makes clear the file is a normal
+ * MP4 that also carries ARCore data tracks (so it opens in any video player), and offers
+ * the full set of next steps — Replay, Share, Open as video, and Export to Downloads —
+ * plus a shortcut into the Playback list so the recording is obviously discoverable.
+ */
 @Composable
 private fun SavedRecordingCallout(
     file: File,
     recordingsCount: Int,
     onReplay: () -> Unit,
+    onOpenInPlayback: () -> Unit,
     onShare: () -> Unit,
+    onOpen: () -> Unit,
+    onExport: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Card(
@@ -866,7 +935,15 @@ private fun SavedRecordingCallout(
                 fontFamily = FontFamily.Monospace
             )
             Text(
-                text = formatBytes(file.length()),
+                text = "${formatBytes(file.length())} • saved to the app's private storage",
+                style = MaterialTheme.typography.labelSmall
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "This is a standard MP4 carrying ARCore data tracks (camera, IMU, " +
+                    "planes, depth, anchors). \"Open\" plays it like any video; \"Export\" " +
+                    "copies it to Downloads/SceneView/ so Files / Photos and adb pull can " +
+                    "reach it; \"Replay\" re-runs the full AR session in the Playback tab.",
                 style = MaterialTheme.typography.labelSmall
             )
             Spacer(Modifier.height(8.dp))
@@ -878,11 +955,30 @@ private fun SavedRecordingCallout(
                     onClick = onShare,
                     modifier = Modifier.weight(1f)
                 ) { Text("Share") }
+                OutlinedButton(
+                    onClick = onOpen,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Open") }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onExport,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Export") }
                 Button(
                     onClick = onReplay,
                     modifier = Modifier.weight(1f)
                 ) { Text("Replay") }
             }
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = onOpenInPlayback,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Show in Playback list") }
             Spacer(Modifier.height(2.dp))
             OutlinedButton(
                 onClick = onDismiss,
@@ -917,6 +1013,39 @@ private fun shareRecording(context: Context, file: File) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, "Share AR recording"))
+}
+
+/**
+ * Opens the recording with a regular video viewer. ARCore datasets are valid MP4s — the
+ * AR data lives in side tracks the player ignores — so any gallery / video app can play
+ * the camera feed back. Gives the user a quick "did I capture the right thing?" check
+ * without leaving for the Playback tab. Falls back to a toast if no video app is present.
+ */
+private fun openRecordingAsVideo(context: Context, file: File) {
+    val authority = "${context.packageName}.fileprovider"
+    val uri = try {
+        FileProvider.getUriForFile(context, authority, file)
+    } catch (e: IllegalArgumentException) {
+        android.widget.Toast.makeText(
+            context,
+            "Couldn't open — FileProvider misconfigured: ${e.message}",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "video/mp4")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(intent, "Open AR recording"))
+    } catch (e: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(
+            context,
+            "No video player found — use Share or Export instead",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+    }
 }
 
 /**
