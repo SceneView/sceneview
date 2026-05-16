@@ -45,7 +45,7 @@ is_whitelisted() {
     MIGRATION.md | CHANGELOG.md | ROADMAP.md) return 0 ;;
     docs/docs/migration.md | docs/docs/migration-v4.md) return 0 ;;
     docs/docs/changelog.md | docs/docs/comparison.md) return 0 ;;
-    docs/v3.6.0-roadmap.md | docs/ios-swift-package-design.md) return 0 ;;
+    docs/archive/v3.6.0-roadmap.md | docs/ios-swift-package-design.md) return 0 ;;
     # SceneView agent skill migration guide — same role as the public
     # docs/docs/migration.md: necessarily quotes the deprecated names.
     agents/sceneview/references/migration.md) return 0 ;;
