@@ -500,4 +500,55 @@ public struct CameraControls: Sendable {
     }
 }
 
+// MARK: - Content bounds union (#1391)
+
+/// Pure helpers that compute the union axis-aligned bounding box of several
+/// content `BoundingBox`es, so the fit-to-bounds camera pass frames the
+/// *combined* extent of every loaded model rather than a single entity.
+///
+/// #1385 added the single-model fit; multi-model demos (e.g. `Multi-Model
+/// Park`) still mis-framed because they query one entity's `visualBounds`,
+/// which — when content lives under an `AnchorEntity` whose transform the
+/// anchoring system has not resolved yet, or when only some of several
+/// streamed models have populated — does not describe the union the camera
+/// should frame. Walking every child and unioning their boxes is robust to
+/// both cases. The functions are deliberately free of RealityKit *view*
+/// state so they are unit-testable on any platform.
+///
+/// Kept `internal` (reachable from the `@testable import` test target) so
+/// the public API surface stays minimal — the union is an implementation
+/// detail of `SceneView`'s built-in framing, not a consumer-facing knob.
+enum ContentBounds {
+
+    /// Unions a sequence of `BoundingBox`es into one AABB.
+    ///
+    /// Empty / degenerate boxes (RealityKit reports `min = +∞`, `max = -∞`
+    /// for an empty `BoundingBox`, so the per-axis extents are non-finite)
+    /// are skipped — an async model that has not populated its mesh yet
+    /// must not poison the union with infinities.
+    ///
+    /// - Parameter boxes: The per-entity world-space bounding boxes.
+    /// - Returns: The union AABB, or `nil` if no box was finite & non-empty.
+    static func union(of boxes: [BoundingBox]) -> BoundingBox? {
+        var lo = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var hi = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        var found = false
+        for box in boxes {
+            let bmin = box.min
+            let bmax = box.max
+            // Reject empty / non-finite boxes. `bmax >= bmin` per axis also
+            // filters RealityKit's inverted empty box (min +∞, max -∞).
+            guard bmin.x.isFinite, bmin.y.isFinite, bmin.z.isFinite,
+                  bmax.x.isFinite, bmax.y.isFinite, bmax.z.isFinite,
+                  bmax.x >= bmin.x, bmax.y >= bmin.y, bmax.z >= bmin.z
+            else { continue }
+            lo = simd_min(lo, bmin)
+            hi = simd_max(hi, bmax)
+            found = true
+        }
+        guard found else { return nil }
+        return BoundingBox(min: lo, max: hi)
+    }
+}
+
 #endif // os(iOS) || os(macOS) || os(visionOS)
