@@ -115,19 +115,17 @@ jobs:
           # mode. The V1 task `dokkaHtml` now errors with "Cannot run Dokka
           # V1 tasks when V2 mode is enabled" — observed on v4.3.3, v4.3.4,
           # v4.3.5 releases. V2 equivalent is `dokkaGenerateHtml`. Output
-          # path is unchanged (`build/dokka/html/`), so the
-          # upload-artifact step below still works as-is.
+          # path is unchanged (`build/dokka/html/`).
           command: ./gradlew :sceneview:dokkaGenerateHtml :arsceneview:dokkaGenerateHtml --no-configuration-cache
 
-      - name: Upload Dokka artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: dokka-api-docs
-          path: |
-            sceneview/build/dokka/
-            arsceneview/build/dokka/
-          retention-days: 1
-          if-no-files-found: ignore
+      # NOTE: there is intentionally NO `upload-artifact` for the Dokka
+      # output here. `docs.yml` consumes it via `download-artifact`, but
+      # `download-artifact` only resolves artifacts produced *within the
+      # same workflow run* — release.yml and docs.yml are separate runs,
+      # so the upload was dead weight. release.yml publishes the API docs
+      # itself in the gh-pages deploy steps below; on a docs-only run the
+      # `Preserve already-published Dokka API docs` step in docs.yml pulls
+      # `/api/` straight from the live site. See #1500.
 
       # Arrange the just-generated Dokka HTML under a versioned tree so the
       # gh-pages deploy below publishes it to a stable, browseable URL.

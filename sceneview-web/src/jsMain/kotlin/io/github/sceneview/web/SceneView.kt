@@ -52,6 +52,25 @@ class SceneView private constructor(
     private val lightEntities = mutableListOf<Entity>()
 
     /**
+     * Tracks the Filament `IndirectLight` (IBL) handle currently bound to the
+     * scene so [loadEnvironment] can destroy a previous IBL before binding a
+     * new one and [destroy] can release it — without this the GPU resource
+     * leaks (issue #1496).
+     */
+    private val indirectLight = EnvironmentResourceTracker<IndirectLight> {
+        engine.destroyIndirectLight(it)
+    }
+
+    /**
+     * Tracks the Filament `Skybox` handle currently bound to the scene, for the
+     * same leak-free replacement / teardown reason as [indirectLight]
+     * (issue #1496).
+     */
+    private val skybox = EnvironmentResourceTracker<Skybox> {
+        engine.destroySkybox(it)
+    }
+
+    /**
      * When `true` (default), the first render frame where the loaded content's
      * union bounding box becomes non-degenerate triggers a one-time translation
      * of every loaded asset's root entity so the scene's centroid lands at the
@@ -331,6 +350,10 @@ class SceneView private constructor(
         // Fetch and create IBL (indirect lighting) from a KTX1 file
         window.fetch(iblUrl).then { it.arrayBuffer() }.then { buffer ->
             val ibl = engine.createIblFromKtx1(buffer)
+            // Destroy the previous IBL (if any) before swapping it out, so a
+            // 2nd loadEnvironment / loadDefaultEnvironment call does not leak
+            // the prior GPU resource (issue #1496).
+            indirectLight.replaceWith(ibl)
             scene.setIndirectLight(ibl)
             console.log("SceneView: IBL loaded from $iblUrl")
         }.catch { error ->
@@ -340,8 +363,10 @@ class SceneView private constructor(
         // Optionally load a skybox from a separate KTX file
         skyboxUrl?.let { url ->
             window.fetch(url).then { it.arrayBuffer() }.then { buffer ->
-                val skybox = engine.createSkyFromKtx1(buffer)
-                scene.setSkybox(skybox)
+                val sky = engine.createSkyFromKtx1(buffer)
+                // Same leak-free swap as the IBL above (issue #1496).
+                skybox.replaceWith(sky)
+                scene.setSkybox(sky)
                 console.log("SceneView: Skybox loaded from $url")
             }.catch { error ->
                 console.error("SceneView: Error loading skybox from $url", error)
@@ -576,6 +601,14 @@ class SceneView private constructor(
         // Destroy light entities
         lightEntities.forEach { engine.destroyEntity(it) }
         lightEntities.clear()
+
+        // Destroy the environment GPU resources — IBL + skybox (issue #1496).
+        // Detach from the scene first so the engine never holds a dangling
+        // reference, then destroy the handles.
+        if (indirectLight.current != null) scene.setIndirectLight(null)
+        indirectLight.release()
+        if (skybox.current != null) scene.setSkybox(null)
+        skybox.release()
 
         // Destroy core Filament objects
         engine.destroyRenderer(renderer)

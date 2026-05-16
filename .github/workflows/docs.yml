@@ -144,9 +144,13 @@ jobs:
             echo "::error::site/web-demo/index.html missing — deploy would 404"; exit 1; }
 
       # ── 4. Include Dokka API docs ───────────────────────────────────────
-      # Dokka is built by a separate workflow (release / api docs run) and
-      # handed over as the `dokka-api-docs` artifact. On a docs-only push
-      # the artifact is absent — that is expected and not fatal.
+      # Dokka is built and published by release.yml in its own gh-pages
+      # deploy. `download-artifact` only resolves artifacts from the SAME
+      # run, so this lookup never finds a cross-run `dokka-api-docs`
+      # artifact — release.yml no longer uploads one. It is kept solely to
+      # cover a hypothetical in-run Dokka build; in practice it always
+      # falls through to the `Preserve` step below, which carries the
+      # already-published `/api/` tree forward. See #1500.
       - name: Download Dokka API docs (if available)
         id: dokka
         uses: actions/download-artifact@v8
