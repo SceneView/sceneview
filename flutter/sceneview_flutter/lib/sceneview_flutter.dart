@@ -240,10 +240,14 @@ class ModelNode {
 
 /// Describes a geometry primitive in the scene.
 ///
-/// Note: Geometry nodes are acknowledged by the native bridge but rendering
-/// is not yet implemented. This is a forward-looking API placeholder.
+/// Platform support:
+/// - **Android**: fully rendered — `cube`/`box`, `sphere`, `cylinder` and
+///   `plane` are drawn as `CubeNode` / `SphereNode` / `CylinderNode` /
+///   `PlaneNode` with a colour material (issue #909).
+/// - **iOS**: acknowledged by the native bridge but not yet rendered. The
+///   RealityKit geometry port is tracked in the #909 umbrella.
 class GeometryNode {
-  /// Geometry type: 'cube', 'sphere', 'cylinder', or 'plane'.
+  /// Geometry type: 'cube' (alias 'box'), 'sphere', 'cylinder', or 'plane'.
   final String type;
   final double x;
   final double y;
@@ -285,8 +289,13 @@ class GeometryNode {
 
 /// Describes a light source in the scene.
 ///
-/// Note: Light nodes are acknowledged by the native bridge but custom
-/// light configuration is not yet implemented. Scenes use sensible defaults.
+/// Platform support:
+/// - **Android**: fully rendered — adds a `LightNode` of the requested
+///   `directional` / `point` / `spot` type with the given [intensity],
+///   [color] and position (issue #909).
+/// - **iOS**: acknowledged by the native bridge but not yet rendered; scenes
+///   use sensible default lighting. The RealityKit light port is tracked in
+///   the #909 umbrella.
 class LightNode {
   /// Light type: 'directional', 'point', or 'spot'.
   final String type;
@@ -385,13 +394,19 @@ class SceneViewController {
     await _channel!.invokeMethod('loadModel', node.toMap());
   }
 
-  /// Add a geometry node (placeholder -- not yet rendered natively).
+  /// Add a geometry node to the scene.
+  ///
+  /// Rendered natively on Android (issue #909); acknowledged but not yet
+  /// rendered on iOS. See [GeometryNode].
   Future<void> addGeometry(GeometryNode node) async {
     _ensureAttached();
     await _channel!.invokeMethod('addGeometry', node.toMap());
   }
 
-  /// Add a light node (placeholder -- uses scene defaults on native side).
+  /// Add a light node to the scene.
+  ///
+  /// Rendered natively on Android (issue #909); acknowledged but not yet
+  /// rendered on iOS. See [LightNode].
   Future<void> addLight(LightNode node) async {
     _ensureAttached();
     await _channel!.invokeMethod('addLight', node.toMap());
