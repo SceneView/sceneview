@@ -116,33 +116,41 @@ object SampleAssets {
         ),
 
         // ── Gallery (SceneGalleryDemo) ─────────────────────────────────────
-        // 4 themed bundles. Stage 2 will fan out to ~10 via Sketchfab search.
+        // 4 variety-pack bundles. The Sketchfab uids below are still Stage 1
+        // placeholders (`GET /v3/models/<uid>` returns 404), so until a Stage 2
+        // PR verifies real downloadable uids the resolver always serves the
+        // `fallbackBundledPath`. Each gallery chip MUST therefore point at a
+        // *distinct* bundled GLB — otherwise two chips render the identical
+        // model and the demo reads as "stuck in a loop / chips do nothing"
+        // (#1433). `displayName` / `author` describe the bundled fallback that
+        // actually renders so the chip label, the credits byline and the
+        // on-screen model stay honest and consistent offline.
         SketchfabSlug(
             uid = "92f1d1eea16d422d8593f1e8c3e0ee37",
-            displayName = "Vintage Cassette",
-            author = "Stefano-Tax",
+            displayName = "Toy Car",
+            author = "Khronos Group",
             licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
             fallbackBundledPath = "models/khronos_toy_car.glb",
             scaleToUnits = 0.12f,
             hasBakedAnimation = false,
             category = "gallery",
-            tags = listOf("retro", "audio"),
+            tags = listOf("retro", "vehicle"),
         ),
         SketchfabSlug(
             uid = "5cf2d5dd1a40451595dcc0fef5dcb6a8",
-            displayName = "Polly the Parrot",
-            author = "lambertcommercial",
+            displayName = "Low-Poly Fox",
+            author = "Khronos Group",
             licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
             fallbackBundledPath = "models/khronos_fox.glb",
             scaleToUnits = 0.40f,
             hasBakedAnimation = false,
             category = "gallery",
-            tags = listOf("animal", "bird"),
+            tags = listOf("animal", "low-poly"),
         ),
         SketchfabSlug(
             uid = "61bd9ee5e30946fab26d3f8e7ef9da4f",
             displayName = "Reading Lamp",
-            author = "ArtIntellect",
+            author = "Khronos Group",
             licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
             fallbackBundledPath = "models/khronos_lantern.glb",
             scaleToUnits = 0.45f,
@@ -152,14 +160,14 @@ object SampleAssets {
         ),
         SketchfabSlug(
             uid = "ac4e6b6f6e7a4f9da4e62fadcf9eaece",
-            displayName = "Wooden Chair",
-            author = "EvgenyRodygin",
+            displayName = "Damaged Helmet",
+            author = "Khronos Group",
             licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
-            fallbackBundledPath = "models/khronos_lantern.glb",
+            fallbackBundledPath = "models/khronos_damaged_helmet.glb",
             scaleToUnits = 0.85f,
             hasBakedAnimation = false,
             category = "gallery",
-            tags = listOf("furniture"),
+            tags = listOf("hard-surface", "pbr"),
         ),
 
         // ── Animation (AnimationDemo) ──────────────────────────────────────

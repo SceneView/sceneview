@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **Scene Gallery demo no longer appears stuck in a loop ([#1433](https://github.com/sceneview/sceneview/issues/1433)).** The four gallery chips carried unverified placeholder Sketchfab uids, so every chip fell back to a bundled model — and two chips ("Reading Lamp" + "Wooden Chair") shared the *same* fallback GLB, making the chips look inert. Each gallery entry now points at a distinct bundled model with an honest label, so switching chips visibly changes the rendered model.
