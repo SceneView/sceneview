@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.sceneview.demo.ui.ParticleBackground
 
 /**
  * The Samples tab — a 2-column M3 Expressive grid of demos grouped by
@@ -83,8 +84,19 @@ fun DemoListScreen(
     }
     val dark = isSystemInDarkTheme()
 
-    Scaffold(
-        topBar = {
+    // Animated 3D particle backdrop (#1488) — a SceneView scene drawn as the
+    // bottom layer of this Box, behind the demo grid. It only exists while the
+    // Samples tab is selected (RootScreen swaps tab content), so the SceneView
+    // and its frame loop leave composition — and stop — on tab switch.
+    Box(modifier = Modifier.fillMaxSize()) {
+        ParticleBackground(modifier = Modifier.fillMaxSize())
+
+        Scaffold(
+            // Transparent so the ParticleBackground shows through; the demo
+            // cards keep their own opaque `surfaceContainer` so they stay
+            // readable on top of the scene.
+            containerColor = Color.Transparent,
+            topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.samples_title)) },
                 actions = {
@@ -103,9 +115,13 @@ fun DemoListScreen(
                 // "Samples" header (#1425). Zero the bar's own insets so the
                 // header sits flush below the status bar.
                 windowInsets = WindowInsets(0, 0, 0, 0),
+                // Semi-transparent so the particle backdrop (#1488) drifts
+                // behind the header instead of being clipped by an opaque bar;
+                // the slight surface tint keeps the title legible.
                 colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor =
+                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f),
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
@@ -184,6 +200,7 @@ fun DemoListScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                    }
                 }
             }
         }
