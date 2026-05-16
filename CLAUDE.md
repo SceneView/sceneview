@@ -34,6 +34,59 @@ the documentation until it can.
 
 ### Quality plan: `.claude/plans/v4.0-quality-plan.md`
 
+## Device QA
+
+The **autonomous device-QA harness** (umbrella [#1560](https://github.com/sceneview/sceneview/issues/1560))
+drives the demo apps **like a real user** — taps, swipes, camera-orbit drags,
+navigation — and asserts no crash across every platform, unattended (no
+screenshot-by-screenshot loop). CI-green plus self-review is not enough: a demo
+can compile, pass unit tests, and still crash the moment it renders on a device.
+
+### Run it
+
+```bash
+# Full cross-platform pass — every platform feasible on this host.
+bash .claude/scripts/device-qa.sh --platform=all
+
+# One platform, or a fast per-category subset.
+bash .claude/scripts/device-qa.sh --platform=android
+bash .claude/scripts/device-qa.sh --platform=web --fast
+```
+
+`device-qa.sh` is the single orchestrator entrypoint. It boots the
+emulator/simulator each leg needs, builds + installs the demo app, delegates to
+the per-platform harness, and aggregates every verdict into one
+`device-qa-report.json` at the repo root (override the directory with `--out`).
+Exit status is non-zero if any selected platform failed. Flags: `--platform=android|ios|web|ar|all`,
+`--fast` (per-category subset, not the full catalog), `--ci` (treat a skipped
+platform as a failure), `--out <dir>`.
+
+### What each leg covers
+
+| Leg | Harness | Drives | Report |
+|---|---|---|---|
+| `android` | Maestro flows `.maestro/android/` via `qa-android-demos.sh` | All 42 demos on an emulator | `device-qa-report.json` |
+| `ios` | Maestro flows `.maestro/ios/` via `ios-device-qa.sh` | 24 deep-linkable demos on a simulator (AR = launch-only smoke) | `device-qa-report.json` |
+| `web` | Playwright suite `samples/web-demo/tests/` | Browser 3D viewer + every catalog tab | `web-qa-summary.json` |
+| `ar` | `ar-replay-qa.sh` + `ARReplayHarnessTest` | Every Android AR demo replayed against recorded ARCore sessions — no physical device | `ar-qa-summary.json` |
+
+See [`.maestro/README.md`](.maestro/README.md) for the Maestro flow layout and
+known limitations (no pinch gesture → 3D zoom is driven via deep-link param).
+
+### Release-checkpoint mandate
+
+**A full device-QA pass runs at every release checkpoint, before tagging.**
+No release ships without a green `device-qa-report.json`. The gate is enforced
+in two places — keep both honest:
+
+- `release-checklist.sh` **section 14** fails the checklist if
+  `device-qa-report.json` is missing or reports a failed platform.
+- The `/release` skill (**Step 6.5**) runs `device-qa.sh --platform=all`
+  before the tag step.
+
+A red device-QA pass means a demo crashes for a real user — fix it before
+tagging, no exceptions.
+
 ## About
 
 SceneView provides 3D and AR as declarative UI for Android (Jetpack Compose, Filament,

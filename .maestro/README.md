@@ -5,6 +5,12 @@
 assert no crash. This is the Android/iOS leg of the autonomous device-QA
 harness (umbrella [#1560](https://github.com/sceneview/sceneview/issues/1560)).
 
+> For a full cross-platform pass (Android + iOS + web + AR replay) in one
+> command, run the orchestrator: `bash .claude/scripts/device-qa.sh --platform=all`.
+> The sections below cover running the Maestro legs directly. See
+> [`CLAUDE.md` → "Device QA"](../CLAUDE.md) for the harness overview and the
+> release-checkpoint mandate.
+
 ## Layout
 
 ```
