@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Render tests are no longer orphan `@Ignore`'d code ([#912](https://github.com/sceneview/sceneview/issues/912)).** The five headless Filament render-test classes (`RenderSmokeTest`, `LightingRenderTest`, `GeometryRenderTest`, `VisualVerificationTest`, `DemoParametersRenderTest`) were wholly class-level `@Ignore`'d — compiled but never executed, so they could never catch a regression and silently drifted. They now use a runtime capability gate (`RenderTestCapabilities.assumeGpuReadbackAvailable()`): the tests **run** on a hardware-GPU runner that opts in via `-Pandroid.testInstrumentationRunnerArguments.gpuReadback=true`, and cleanly **skip** (JUnit assumption, not orphan, not failure) on the SwiftShader / Apple-Silicon emulator where Filament's async `readPixels` callback never fires (the harness limitation tracked in [#803](https://github.com/sceneview/sceneview/issues/803)). `Closes #912`.
+
 ## v4.6.2 — CI hotfix: land the demo app on the Play Store + API docs (2026-05-16)
 
 ### Fixed
