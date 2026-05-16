@@ -3,6 +3,7 @@
 ## Unreleased
 
 - device-qa: added a maestro harness — `.maestro/android/` flows drive all 42 android demos like a real user (deep-link launch, camera-orbit drag, tap, one screenshot per demo, crash assertion), with per-category subflows and a `maestro.sh` auto-install helper; `qa-android-demos.sh` is now a thin maestro wrapper (#1562).
+- device-qa: added an autonomous ar replay harness — `ARReplayHarnessTest` drives every augmented-reality demo through a recorded arcore session headless on the emulator (no physical device), asserts no crash, and emits a machine-readable `ar-qa-summary.json`; the `ar-replay-qa.sh` script is the orchestrator entrypoint that builds, runs and pulls the verdict (#1565).
 
 ## v4.9.0 — Cross-platform demo catalogs, web auto-center parity & teardown safety (2026-05-16)
 
