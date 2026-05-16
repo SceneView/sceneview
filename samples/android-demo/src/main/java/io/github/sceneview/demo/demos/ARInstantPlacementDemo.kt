@@ -47,6 +47,8 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.demos.internal.ArPlacement
+import io.github.sceneview.demo.demos.internal.rememberTexturesSettled
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -359,13 +361,23 @@ private fun InstantPlacementScene(
                     // doc (#1184). AnchorNode under a STOPPED anchor freezes the model
                     // at the last good pose, which looks broken to the user.
                     if (lostAnchors[placed.id] != true) {
-                        AnchorNode(anchor = placed.anchor) {
+                        // visibleTrackingStates includes PAUSED so a placed model rides out
+                        // transient plane loss at its last known pose instead of vanishing;
+                        // permanent loss is still handled above via lostAnchors (#1435).
+                        AnchorNode(
+                            anchor = placed.anchor,
+                            visibleTrackingStates = ArPlacement.ANCHORED_VISIBLE_STATES
+                        ) {
                             val instance = rememberModelInstance(modelLoader, placed.assetLocation)
+                            // Gate visibility until Filament finishes uploading the model's
+                            // textures, so it doesn't flash black on placement (#1435).
+                            val textured = rememberTexturesSettled(ready = instance != null)
                             instance?.let {
                                 ModelNode(
                                     modelInstance = it,
                                     scaleToUnits = 0.3f,
                                     centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    isVisible = textured,
                                     isEditable = true
                                 )
                             }
