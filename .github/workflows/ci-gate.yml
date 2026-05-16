@@ -48,6 +48,7 @@ concurrency:
 permissions:
   checks: read
   contents: read
+  pull-requests: read
 
 jobs:
   ci-gate:
@@ -80,6 +81,71 @@ jobs:
 
           echo "Aggregating check runs for $REPO @ $HEAD_SHA"
 
+          # ── Minimum-check guard (#1543) ──────────────────────────────────
+          # WHY A NAME-BASED GUARD, NOT A BLUNT COUNT
+          # -----------------------------------------
+          # Without a lower bound, the gate can exit green prematurely: if a
+          # slow, non-path-gated workflow has not yet registered ANY check run
+          # for this SHA, the `others` set may be non-empty (some fast
+          # workflow already finished) yet still missing the workflow we
+          # actually care about — and an all-`completed` snapshot would pass.
+          #
+          # A blunt "require N checks" count is itself a false-negative trap:
+          # a legitimately light PR (e.g. docs-only) runs FEWER checks by
+          # design, so a fixed minimum would jam it forever.
+          #
+          # Instead we require, by NAME, the three jobs in `ci.yml` that have
+          # NO per-job `if:` filter and therefore run on every PR for which
+          # `ci.yml` triggers at all: `changes`, `repo-hygiene`,
+          # `quality-gate`. But `ci.yml` itself carries a workflow-level
+          # `paths-ignore` (docs / website / branding / *.md / llms*.txt /
+          # LICENSE) — for a PR that touches ONLY those paths, `ci.yml` never
+          # runs and those core checks legitimately never appear. So the
+          # requirement is conditional: we first ask GitHub for this PR's
+          # changed files and decide whether `ci.yml` is expected to run.
+          # Only when it IS expected do we block the green exit until all
+          # three core checks have been observed.
+          #
+          # This keeps the gate honest for code PRs (a missing core workflow
+          # can no longer slip through as green) without jamming doc-only PRs.
+
+          # Core check-run names from ci.yml jobs that have no `if:` gate.
+          # Keep in sync with `name:` fields in .github/workflows/ci.yml.
+          CORE_CHECKS=$'Detect changed paths\nRepo hygiene checks\nQuality gate (full)'
+
+          # Decide whether ci.yml is expected to run for this PR by replaying
+          # its workflow-level `paths-ignore`: ci.yml runs unless EVERY
+          # changed file matches an ignored path. Keep this list in sync with
+          # the `pull_request.paths-ignore` block of .github/workflows/ci.yml.
+          require_core=false
+          PR_NUMBER='${{ github.event.pull_request.number }}'
+          if [ -n "${PR_NUMBER:-}" ]; then
+            changed=$(gh api --paginate \
+              "repos/$REPO/pulls/$PR_NUMBER/files" \
+              --jq '.[].filename' || true)
+            if [ -z "$changed" ]; then
+              # Could not enumerate files (API hiccup, huge PR) — fail safe
+              # by requiring the core checks rather than risking a premature
+              # green on a code PR.
+              echo "Could not list PR files — conservatively requiring core ci.yml checks."
+              require_core=true
+            else
+              non_ignored=$(echo "$changed" | grep -vE \
+                '^(website-static/|docs/|marketing/|branding/|llms[^/]*\.txt$|LICENSE$)|(^|/)[^/]*\.md$' \
+                || true)
+              if [ -n "$non_ignored" ]; then
+                require_core=true
+                echo "PR touches non-doc paths — ci.yml is expected; requiring core checks:"
+                echo "$CORE_CHECKS" | while IFS= read -r n; do echo "  - $n"; done
+              else
+                echo "PR touches only docs/website/branding paths — ci.yml is path-filtered out; core checks not required."
+              fi
+            fi
+          else
+            echo "No PR number in context — conservatively requiring core ci.yml checks."
+            require_core=true
+          fi
+
           # Poll until every non-self check run for this SHA has finished.
           # GitHub registers a workflow's check runs within a few seconds
           # of the PR event, so we wait briefly before the first read to
@@ -89,7 +155,8 @@ jobs:
           # workflow's check runs register *after* the sleep, the first
           # loop iteration sees an empty `others` set and would pass the
           # gate prematurely. So we additionally refuse to exit green
-          # until at least one non-self check run has been observed.
+          # until at least one non-self check run has been observed AND
+          # (when applicable) every required core check has registered.
           deadline=$(( $(date +%s) + 25 * 60 ))
           sleep 30
           seen_any_other=false
@@ -103,12 +170,36 @@ jobs:
             # Drop this gate's own check run from consideration.
             others=$(echo "$runs" | jq -c --arg self "$SELF_CHECK" 'select(.name != $self)')
 
-            if [ -z "$others" ]; then
+            # Names of every non-self check run observed so far.
+            seen_names=$(echo "$others" | jq -r '.name' | sort -u)
+
+            # Core checks that are required but not yet registered.
+            missing_core=""
+            if [ "$require_core" = true ]; then
+              while IFS= read -r core; do
+                [ -z "$core" ] && continue
+                if ! echo "$seen_names" | grep -qxF "$core"; then
+                  missing_core+="${core}"$'\n'
+                fi
+              done <<< "$CORE_CHECKS"
+            fi
+
+            if [ -z "$others" ] || [ -n "$missing_core" ]; then
               if [ "$(date +%s)" -ge "$deadline" ]; then
-                echo "::error::Timed out — no other CI check runs ever registered for this SHA."
+                if [ -z "$others" ]; then
+                  echo "::error::Timed out — no other CI check runs ever registered for this SHA."
+                else
+                  echo "::error::Timed out — required core CI check runs never registered for this SHA:"
+                  echo "$missing_core" | sort -u | while IFS= read -r n; do [ -n "$n" ] && echo "  - $n"; done
+                fi
                 exit 1
               fi
-              echo "No other check runs reported for this SHA yet — waiting for at least one to register."
+              if [ -z "$others" ]; then
+                echo "No other check runs reported for this SHA yet — waiting for at least one to register."
+              else
+                echo "Waiting for required core CI check runs to register:"
+                echo "$missing_core" | sort -u | while IFS= read -r n; do [ -n "$n" ] && echo "  - $n"; done
+              fi
               sleep 20
               continue
             fi
@@ -144,11 +235,22 @@ jobs:
           # `stale` conclusion on this SHA's checks is noise, not a defect —
           # treating it as red would flip `CI Gate` red on an otherwise
           # green PR.
+          #
+          # `action_required` is NOT treated as a failure (#1543): GitHub
+          # assigns it when a workflow on a fork PR is waiting for a
+          # maintainer to approve the run. That is a pending-equivalent
+          # state — the workflow has not failed, it simply has not been
+          # allowed to start. The poll loop above only `break`s once every
+          # non-self check run is `completed`; an `action_required` run
+          # reports status `completed` with conclusion `action_required`, so
+          # it does NOT keep the loop spinning, but it also must NOT flip the
+          # gate red. The maintainer's approval (or its absence) is the
+          # human gate for fork PRs — the aggregator stays green so the PR
+          # merge box shows the real state instead of a misleading red.
           failed=$(echo "$others" \
             | jq -r 'select(.conclusion == "failure"
                           or .conclusion == "cancelled"
-                          or .conclusion == "timed_out"
-                          or .conclusion == "action_required") | .name')
+                          or .conclusion == "timed_out") | .name')
 
           if [ -n "$failed" ]; then
             echo ""
