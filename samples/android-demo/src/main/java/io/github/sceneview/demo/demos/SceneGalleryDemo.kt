@@ -113,12 +113,16 @@ fun SceneGalleryDemo(onBack: () -> Unit) {
 
     // Per-demo offline indicator chip (#1152 Stage 3). When no API key is
     // configured we know up-front the resolver will fall back to bundled
-    // GLBs; while a slug is selected and `resolvedPath` is still null we
-    // surface a "Streaming…" pill; otherwise "Streamed (cached)".
+    // GLBs; otherwise the chip mirrors the centre LoadingScrim exactly so the
+    // two never contradict each other (#1465): it stays "Streaming…" until the
+    // model is fully parsed into a `ModelInstance` — not merely while the file
+    // path resolves — and only then flips to "Streamed (cached)". Gating on
+    // `modelInstance` (the same signal the LoadingScrim uses) keeps the chip
+    // and the spinner in lockstep.
     val assetSource = when {
         slugs.isEmpty() -> null
         SketchfabConfig.apiKey == null -> AssetSourceState.Bundled
-        resolvedPath == null -> AssetSourceState.Streaming
+        modelInstance == null -> AssetSourceState.Streaming
         else -> AssetSourceState.Streamed
     }
 
