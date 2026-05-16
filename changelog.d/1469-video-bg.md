@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Video demo:** the viewport background is now a clean neutral black instead of a light near-white wash (or a stale gradient leftover from the previous screen). The demo loaded its HDR environment with `createSkybox = false`, leaving a `null` skybox — Filament does not clear background pixels without a skybox, so the uncleared swap-chain buffer leaked through and broke the dark theme every other demo uses. The HDR IBL is now paired with an explicit opaque black skybox (#1469).

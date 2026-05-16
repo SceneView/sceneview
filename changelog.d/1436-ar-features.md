@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- AR Face Mesh demo: the face mesh now actually tracks. `Session.Feature.FRONT_CAMERA` only makes the front camera *eligible* — the session stayed on the default BACK camera config, so `AugmentedFaceMode.MESH3D` produced zero trackables and no mesh ever appeared. The demo now passes `sessionCameraConfig = ::frontCameraConfig` so ARCore opens the selfie camera. Added a public `frontCameraConfig(session)` helper in `arsceneview` for any Augmented Faces consumer (#1436).

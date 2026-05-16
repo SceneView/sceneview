@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Animation demo model no longer renders as a black silhouette against the HDR environment ([#1468](https://github.com/sceneview/sceneview/issues/1468)).** The demo's `rooftop_night` skybox renders at full HDR luminance, but the image-based light defaulted to only 5,000 lux — half SceneView's balanced 10k default — so the soldier read as unlit against the bright sky. The default IBL intensity now matches the balanced 10k default; the slider still lets users dial down for a darker, atmospheric look.
