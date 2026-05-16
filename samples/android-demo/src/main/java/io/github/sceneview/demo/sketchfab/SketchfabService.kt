@@ -248,12 +248,25 @@ class SketchfabService private constructor(
             }
             val body = response.body
             destination.parentFile?.mkdirs()
-            if (destination.exists()) destination.delete()
+            // Stream into a per-call unique temp file, then atomically rename
+            // onto `destination`. Concurrent downloads of the same uid (the
+            // prefetch + per-slug resolve fan-out) therefore never share an
+            // output stream and can't leave a truncated GLB in the cache.
+            val temp = File.createTempFile(
+                "${destination.nameWithoutExtension}-",
+                ".glb.tmp",
+                destination.parentFile,
+            )
             try {
-                destination.outputStream().use { out ->
+                temp.outputStream().use { out ->
                     body.byteStream().use { input -> input.copyTo(out) }
                 }
+                if (!temp.renameTo(destination)) {
+                    temp.copyTo(destination, overwrite = true)
+                    temp.delete()
+                }
             } catch (io: IOException) {
+                temp.delete()
                 throw SketchfabError.DownloadFailed(io.message ?: "io error")
             }
         }
