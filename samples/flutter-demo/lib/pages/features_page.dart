@@ -106,7 +106,7 @@ class _FeaturesPageState extends State<FeaturesPage> {
 
 // After onViewCreated:
 controller.loadModel(ModelNode(modelPath: url));
-controller.setEnvironment('environments/studio.hdr');
+controller.setEnvironment('environments/studio_small.hdr');
 controller.addLight(LightNode(type: 'directional'));
 controller.addGeometry(GeometryNode(type: 'cube'));
 controller.clearScene();''',

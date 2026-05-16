@@ -15,7 +15,7 @@ fun EditableModelViewer() {
         modifier = Modifier.fillMaxSize(),
         engine = engine,
         modelLoader = modelLoader,
-        environment = rememberEnvironment(engine, "envs/studio.hdr"),
+        environment = rememberEnvironment(engine, "environments/studio_2k.hdr"),
         cameraManipulator = rememberCameraManipulator()
     ) {
         model?.let {

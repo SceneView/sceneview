@@ -16,7 +16,7 @@ fun ModelWithEnvironment() {
         engine = engine,
         modelLoader = modelLoader,
         // HDR environment provides both indirect lighting (IBL) and skybox
-        environment = rememberEnvironment(engine, "envs/studio.hdr"),
+        environment = rememberEnvironment(engine, "environments/studio_2k.hdr"),
         cameraManipulator = rememberCameraManipulator()
     ) {
         model?.let {
@@ -77,18 +77,24 @@ struct MyApp: App {
 
 ## Available Environments
 
+These are the HDR files bundled with `android-demo` under
+`src/main/assets/environments/`:
+
 | Environment | Description | Best for |
 |---|---|---|
-| `studio.hdr` | Neutral studio lighting | Product shots, model viewers |
-| `outdoor.hdr` | Outdoor daylight | Architectural scenes |
-| `sunset.hdr` | Warm golden hour | Atmospheric scenes |
-| `night.hdr` | Dark environment | Dramatic lighting |
+| `studio_2k.hdr` | Neutral studio lighting | Product shots, model viewers |
+| `studio_warm_2k.hdr` | Warm studio lighting | Product shots with a warmer tone |
+| `outdoor_cloudy_2k.hdr` | Overcast outdoor daylight | Architectural scenes |
+| `chinese_garden_2k.hdr` | Outdoor garden | Natural / scenic scenes |
+| `sunset_2k.hdr` | Warm golden hour | Atmospheric scenes |
+| `rooftop_night_2k.hdr` | City rooftop at night | Dramatic urban lighting |
+| `night_sky_2k.hdr` | Dark night sky | Dramatic, low-key lighting |
 
 ## Key Points
 
-- `rememberEnvironment(engine, "envs/studio.hdr")` loads the HDR file from assets
+- `rememberEnvironment(engine, "environments/studio_2k.hdr")` loads the HDR file from assets
 - HDR environments provide **Image-Based Lighting** (IBL) for realistic reflections
 - They also set the skybox (background) — set `skybox = false` to keep a solid background
 - Combine IBL with `LightNode` for direct light sources (sun, lamps)
 - `LightNode`'s `apply` is a **named parameter**, not a trailing lambda: `apply = { ... }`
-- All HDR files should be in `src/main/assets/envs/` for Android
+- All HDR files should be in `src/main/assets/environments/` for Android
