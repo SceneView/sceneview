@@ -1,0 +1,3 @@
+<!-- category: Fixed -->
+- Docs: reconciled `samples/README.md` with the actual `DemoRegistry` — corrected the android-demo demo count (now 42: 28 non-AR + 14 AR), fixed the tab list (Explore, AR View, Samples, About), and removed rows advertising demos that don't exist (`gltf-camera`, `ar-point-cloud`, `autopilot-demo`).
+- Docs: fixed HDR asset paths across `samples/recipes/` (`environment-lighting.md`, `multi-model.md`, `editable-model.md`) to match the bundled `environments/*_2k.hdr` files, and corrected the Flutter `features_page.dart` snippet to reference the real `environments/studio_small.hdr` asset.
