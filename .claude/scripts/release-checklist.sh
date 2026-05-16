@@ -232,6 +232,44 @@ for f in llms.txt README.md CLAUDE.md CHANGELOG.md LICENSE CONTRIBUTING.md SECUR
 done
 echo ""
 
+# ─── 14. Device-QA gate ─────────────────────────────────────────────────
+# The autonomous cross-platform device-QA harness (umbrella #1560, slice
+# #1566) must have produced a GREEN `device-qa-report.json` before a release
+# is tagged — a red device-QA pass means a demo crashes on a real device for
+# at least one platform.
+#
+# This is a release BLOCKER. To satisfy it, run before tagging:
+#   bash .claude/scripts/device-qa.sh --platform=all
+# That produces `device-qa-report.json` at the repo root; this check reads
+# its aggregated `status` field. `DEVICE_QA_REPORT=<path>` overrides the
+# location (e.g. a CI artifact downloaded into the workspace).
+echo -e "${CYAN}--- Device-QA Gate ---${NC}"
+
+DQ_REPORT="${DEVICE_QA_REPORT:-device-qa-report.json}"
+if [ -f "$DQ_REPORT" ]; then
+    DQ_STATUS=$(python3 -c "import json,sys; print(json.load(open('$DQ_REPORT')).get('status','?'))" 2>/dev/null || echo "?")
+    DQ_FAILED=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('totals',{}).get('failed','?'))" 2>/dev/null || echo "?")
+    DQ_SKIPPED=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('totals',{}).get('skipped','?'))" 2>/dev/null || echo "?")
+    case "$DQ_STATUS" in
+        passed)
+            if [ "$DQ_SKIPPED" = "0" ]; then
+                check "device-qa-report.json" "PASS" "all platforms green"
+            else
+                check "device-qa-report.json" "WARN" "green but $DQ_SKIPPED platform(s) skipped — re-run device-qa.sh --ci"
+            fi
+            ;;
+        failed)
+            check "device-qa-report.json" "FAIL" "$DQ_FAILED platform(s) failed — fix before tagging"
+            ;;
+        *)
+            check "device-qa-report.json" "FAIL" "unreadable status ($DQ_STATUS)"
+            ;;
+    esac
+else
+    check "device-qa-report.json" "FAIL" "missing — run: bash .claude/scripts/device-qa.sh --platform=all"
+fi
+echo ""
+
 # ─── Summary ───────────────────────────────────────────────────────────
 echo -e "${CYAN}=== Release Readiness Summary ===${NC}"
 echo ""
