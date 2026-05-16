@@ -121,7 +121,8 @@ jobs:
   # ── 3. SceneView agent skill drift ────────────────────────────────────────
   # Catches the case where a library API was renamed/removed between releases
   # without updating `agents/sceneview/` (the published agent skill). Daily
-  # cadence is enough — the same check also runs on every PR via pr-check.yml.
+  # cadence is enough — the same check also runs on every PR via ci.yml's
+  # `repo-hygiene` job.
   skill-drift:
     name: SceneView agent skill drift
     runs-on: ubuntu-latest

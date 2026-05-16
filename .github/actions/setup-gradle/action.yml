@@ -27,7 +27,7 @@ runs:
     # `cache: gradle` shortcut on setup-java (wrapper + deps only) with the
     # official gradle/actions/setup-gradle@v6, which also caches the Gradle
     # build cache (compiled task outputs) for richer hit rates across
-    # ci/pr-check/build-apks/render-tests. Mirrors quality-gate.yml.
+    # ci/build-apks/render-tests.
     # `cache-read-only` on every non-push event so PRs (incl. forks) read
     # but never write the cache; pushes to main repopulate it.
     - name: Set up Gradle
@@ -38,8 +38,7 @@ runs:
     # Verify the checked-in gradle-wrapper.jar matches the SHA of a known-good
     # Gradle distribution. A malicious PR can otherwise sneak a tampered
     # wrapper jar into the repo and have it executed by every downstream
-    # `./gradlew` call. Previously enforced by pr-check.yml's `compile-android`
-    # job; centralised here in 2026-05-15 so every workflow that calls
+    # `./gradlew` call. Centralised here so every workflow that calls
     # `./gradlew` inherits the guard.
     - name: Validate Gradle wrapper
       uses: gradle/actions/wrapper-validation@v6
