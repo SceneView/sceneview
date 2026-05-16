@@ -21,7 +21,7 @@ import org.w3c.dom.HTMLInputElement
  * - Sketchfab search bar (fetch API) replaces hardcoded model list
  * - Geometry showcase: cube, sphere, cylinder, plane with color pickers
  * - WebXR AR/VR toggle buttons
- * - Tab-based navigation (Model Viewer / Geometry)
+ * - Tab-based navigation (Models / Geometry / Physics / Settings)
  * - Responsive dark theme
  * - SDK version 4.3.1 badge
  *
@@ -43,7 +43,15 @@ private const val SKETCHFAB_API =
 
 private var currentSceneView: SceneView? = null
 private var autoRotateEnabled = true
-private var currentTab = "viewer"
+private var currentTab = "models"
+
+/**
+ * The four tab panels declared in `index.html` (`panel-models`,
+ * `panel-geometry`, `panel-physics`, `panel-settings`). [switchTab] toggles
+ * exactly these IDs — keep this in sync with the `data-tab` attributes on the
+ * `.tab-btn` elements.
+ */
+private val TAB_PANELS = arrayOf("models", "geometry", "physics", "settings")
 
 /** Counter for geometry placement offset so shapes don't overlap. */
 private var geometryCount = 0
@@ -184,9 +192,8 @@ private fun switchTab(tab: String) {
         btn.className = if (btnTab == tab) "tab-btn active" else "tab-btn"
     }
 
-    // Show/hide panels
-    val panels = arrayOf("viewer", "geometry")
-    panels.forEach { panelName ->
+    // Show/hide panels — every tab has a backing `panel-*` div in index.html.
+    TAB_PANELS.forEach { panelName ->
         val panel = document.getElementById("panel-$panelName") as? HTMLElement
         panel?.className = if (panelName == tab) {
             panel.className.replace(" active", "") + " active"
@@ -195,9 +202,10 @@ private fun switchTab(tab: String) {
         }
     }
 
-    // Move controls info out of the way when side panel is active
+    // Move controls info out of the way when a side panel is active — all four
+    // tabs show a side panel, so it is always offset.
     val controlsInfo = document.getElementById("controls-info") as? HTMLElement
-    controlsInfo?.style?.left = if (tab == "viewer" || tab == "geometry") "360px" else "20px"
+    controlsInfo?.style?.left = if (tab in TAB_PANELS) "360px" else "20px"
 }
 
 // ---- Sketchfab search ----
