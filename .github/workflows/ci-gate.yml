@@ -31,6 +31,26 @@ name: CI Gate
 # (or its `if:`-skipped jobs report `skipped`) — either way the gate is
 # green, so docs/scripts/CI-only PRs merge without jamming.
 #
+# `action_required` is treated as PENDING, not failure (#1543): a fork PR's
+# checks sit in `action_required` until a maintainer approves the run. That
+# is not a defect — flipping `CI Gate` red would block a legitimate fork PR
+# that is merely awaiting approval. The gate keeps waiting for those checks
+# to be approved-then-completed (until the deadline), exactly as it would
+# for any other in-progress check.
+#
+# CORE-CHECK GUARD (#1543)
+# ------------------------
+# Without a lower bound on the checks observed, the gate can pass green if a
+# slow, non-path-gated workflow has not yet registered ANY check run by the
+# time every *already-registered* `others` check has completed. To close
+# that race the gate refuses to exit green until every check in
+# `REQUIRED_CHECKS` (below) has been observed for this SHA — UNLESS none of
+# `ci.yml`'s checks appear at all, which is the legitimate signature of a
+# docs-only PR (ci.yml is workflow-level `paths-ignore`-filtered). This is a
+# name-based "wait for these IF expected" guard, so it never false-negatives
+# a genuinely light docs-only PR while still catching a core check that is
+# simply slow to register.
+#
 # Branch protection on `main` requires ONLY this `CI Gate` check.
 
 on:
@@ -68,6 +88,17 @@ jobs:
           # This job's own check run name — excluded from the aggregation
           # so the gate never waits on itself.
           SELF_CHECK: CI Gate
+          # Core checks that `ci.yml` ALWAYS produces on a non-docs PR — the
+          # `changes`, `repo-hygiene` and `quality-gate` jobs have no per-job
+          # `if:` path gate, so when `ci.yml` runs at all, all three appear.
+          # The gate refuses to exit green until every one of these has been
+          # observed for the head SHA (see CORE-CHECK GUARD note above), so a
+          # slow-to-register core workflow can't be missed. Newline-separated.
+          # Keep in sync with the un-`if:`-gated job `name:`s in ci.yml.
+          REQUIRED_CHECKS: |
+            Detect changed paths
+            Repo hygiene checks
+            Quality gate (full)
         shell: bash
         run: |
           set -euo pipefail
@@ -89,10 +120,14 @@ jobs:
           # workflow's check runs register *after* the sleep, the first
           # loop iteration sees an empty `others` set and would pass the
           # gate prematurely. So we additionally refuse to exit green
-          # until at least one non-self check run has been observed.
+          # until at least one non-self check run has been observed AND
+          # every expected core check (see REQUIRED_CHECKS) has registered.
           deadline=$(( $(date +%s) + 25 * 60 ))
           sleep 30
           seen_any_other=false
+
+          # Normalise REQUIRED_CHECKS into a clean, non-empty list.
+          required_checks=$(echo "${REQUIRED_CHECKS:-}" | sed '/^[[:space:]]*$/d')
 
           while :; do
             # All check runs for the head commit (handles >100 via paging).
@@ -115,19 +150,67 @@ jobs:
 
             seen_any_other=true
 
-            pending=$(echo "$others" | jq -r 'select(.status != "completed") | .name')
-            if [ -z "$pending" ] && [ "$seen_any_other" = true ]; then
+            # All check-run names observed for this SHA (completed or not).
+            observed_names=$(echo "$others" | jq -r '.name' | sort -u)
+
+            # CORE-CHECK GUARD (#1543): if ANY core check has appeared then
+            # ci.yml is running for this PR (it is not a docs-only PR), so
+            # ALL core checks are expected — keep waiting until every one of
+            # them has registered. If NONE have appeared the PR is docs-only
+            # (ci.yml is paths-ignore-filtered out) and the guard is a no-op,
+            # so a legitimately light docs PR is never blocked.
+            missing_core=""
+            any_core_seen=false
+            if [ -n "$required_checks" ]; then
+              while IFS= read -r rc; do
+                [ -z "$rc" ] && continue
+                if echo "$observed_names" | grep -qxF "$rc"; then
+                  any_core_seen=true
+                else
+                  missing_core="${missing_core}${rc}"$'\n'
+                fi
+              done <<< "$required_checks"
+            fi
+            # Only enforce the guard once ci.yml has shown its hand.
+            if [ "$any_core_seen" != true ]; then
+              missing_core=""
+            fi
+
+            # `action_required` (#1543) is a fork-PR awaiting-maintainer-
+            # approval state. GitHub reports it with `status: completed,
+            # conclusion: action_required`, so it slips past the bare
+            # `status != "completed"` filter. Treat it as PENDING-equivalent:
+            # keep waiting (a maintainer may approve it) rather than letting
+            # the loop break and the `failed` set flip the gate red.
+            pending=$(echo "$others" | jq -r \
+              'select(.status != "completed" or .conclusion == "action_required") | .name')
+            if [ -z "$pending" ] && [ -z "$missing_core" ] && [ "$seen_any_other" = true ]; then
               break
             fi
 
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::Timed out waiting for CI checks to complete:"
-              echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+              echo "::error::Timed out waiting for CI checks to complete."
+              if [ -n "$pending" ]; then
+                echo "  Still running / awaiting approval:"
+                echo "$pending" | sort -u | while IFS= read -r n; do echo "    - $n"; done
+              fi
+              if [ -n "$missing_core" ]; then
+                echo "  Expected core checks that never registered:"
+                echo "$missing_core" | sed '/^[[:space:]]*$/d' | sort -u \
+                  | while IFS= read -r n; do echo "    - $n"; done
+              fi
               exit 1
             fi
 
-            echo "Waiting for checks to finish:"
-            echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+            if [ -n "$pending" ]; then
+              echo "Waiting for checks to finish (running, or fork PR awaiting approval):"
+              echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+            fi
+            if [ -n "$missing_core" ]; then
+              echo "Waiting for expected core checks to register:"
+              echo "$missing_core" | sed '/^[[:space:]]*$/d' | sort -u \
+                | while IFS= read -r n; do echo "  - $n"; done
+            fi
             sleep 20
           done
 
@@ -144,11 +227,16 @@ jobs:
           # `stale` conclusion on this SHA's checks is noise, not a defect —
           # treating it as red would flip `CI Gate` red on an otherwise
           # green PR.
+          #
+          # `action_required` is NOT treated as a failure (#1543): it is the
+          # fork-PR awaiting-maintainer-approval state, handled as pending in
+          # the wait loop above. The loop only breaks once no check is in
+          # `action_required` any more, so it cannot reach this set — but it
+          # is excluded here too for defence in depth.
           failed=$(echo "$others" \
             | jq -r 'select(.conclusion == "failure"
                           or .conclusion == "cancelled"
-                          or .conclusion == "timed_out"
-                          or .conclusion == "action_required") | .name')
+                          or .conclusion == "timed_out") | .name')
 
           if [ -n "$failed" ]; then
             echo ""
