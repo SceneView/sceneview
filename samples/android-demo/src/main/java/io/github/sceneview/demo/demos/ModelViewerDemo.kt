@@ -83,12 +83,17 @@ fun ModelViewerDemo(onBack: () -> Unit) {
     val resolver = remember(context) { SketchfabAssetResolver.getInstance(context) }
     val hasSketchfabKey = remember { SketchfabConfig.apiKey != null }
 
-    // The streamed model is loaded via the URL overload — null `streamedFileUrl`
-    // skips this branch (Kotlin elvis returns null which keeps the bundled
-    // helmet below as the displayed instance).
-    val streamedModelInstance = streamedFileUrl?.let { url ->
-        rememberModelInstance(modelLoader, url)
-    }
+    // The streamed model is loaded via the URL overload. This MUST be called
+    // unconditionally — wrapping a @Composable in `streamedFileUrl?.let { }`
+    // makes the composer group appear/disappear with `streamedFileUrl`, so the
+    // `produceState` inside `rememberModelInstance` lands in an unstable slot.
+    // The State it returns then fails to invalidate the scope that reads
+    // `streamedModelInstance` when the load completes, leaving `assetSource`
+    // pinned at `Streaming` for the whole session even though the model is
+    // loaded and interactive (#1464). `rememberStreamedModelInstance` keeps the
+    // call site stable and simply returns null while no stream is active.
+    val streamedModelInstance =
+        rememberStreamedModelInstance(modelLoader, streamedFileUrl)
     // The bundled hero — assets/models/khronos_damaged_helmet.glb. Loaded
     // eagerly so the first frame after launch shows the hero shot.
     val bundledModelInstance =
@@ -197,6 +202,37 @@ fun ModelViewerDemo(onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Loads the streamed Sketchfab model for [streamedFileUrl], or returns `null`
+ * when no stream is active (`streamedFileUrl == null`).
+ *
+ * Why a dedicated helper instead of `streamedFileUrl?.let { rememberModelInstance(...) }`:
+ * a `@Composable` invoked inside `?.let` is a **conditional** call — the
+ * composer group for `rememberModelInstance`'s internal `produceState` only
+ * exists while `streamedFileUrl` is non-null. When the load finishes and
+ * `produceState` emits the loaded instance, the snapshot State sits in that
+ * conditionally-present group and does not reliably invalidate the caller that
+ * reads the result. The `assetSource` chip therefore stayed stuck on
+ * `Streaming` even after the model was fully loaded and interactive (#1464).
+ *
+ * Calling `rememberModelInstance` unconditionally here keeps its group in a
+ * fixed slot, so the State invalidates the caller correctly and the chip
+ * transitions `Streaming → Streamed` the moment the model is ready. The empty
+ * sentinel path returns `null` without ever touching the loader.
+ */
+@Composable
+private fun rememberStreamedModelInstance(
+    modelLoader: io.github.sceneview.loaders.ModelLoader,
+    streamedFileUrl: String?,
+): io.github.sceneview.model.ModelInstance? {
+    // rememberModelInstance is called on every recomposition, in a stable slot.
+    // When there is no active stream we feed it an empty path: the URL overload
+    // sees a scheme-less location, the asset reader fails fast, and it returns
+    // null — no model is loaded and the bundled helmet keeps rendering.
+    val instance = rememberModelInstance(modelLoader, streamedFileUrl ?: "")
+    return if (streamedFileUrl == null) null else instance
 }
 
 /**
