@@ -49,6 +49,25 @@ internal object ContentCentering {
         (box.min[2] + box.max[2]) / 2.0,
     )
 
+    /** Per-axis extents `(max - min)` of [box], `[ex, ey, ez]`. */
+    fun extents(box: Aabb): DoubleArray = doubleArrayOf(
+        box.max[0] - box.min[0],
+        box.max[1] - box.min[1],
+        box.max[2] - box.min[2],
+    )
+
+    /**
+     * Length of [box]'s space diagonal — the single scalar the auto-centre
+     * gate uses to detect "the union grew" when an async model lands and to
+     * decide when the framing has settled. Mirrors iOS `simd_length(extents)`.
+     * Returns `0.0` for a `null` box (nothing loaded yet).
+     */
+    fun diagonal(box: Aabb?): Double {
+        if (box == null) return 0.0
+        val e = extents(box)
+        return kotlin.math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2])
+    }
+
     /**
      * Whether [box]'s extents are finite and large enough to be considered
      * loaded content worth centring.
