@@ -428,9 +428,18 @@ private struct SceneViewRepresentation: View {
 
     /// Set to `true` once ``refreshContentCentering()`` has translated
     /// `entities.contentRoot` AND dollied the orbit radius to fit the
-    /// content bounds, so subsequent frames are a cheap no-op.
-    /// Closes #1026 / #1041.
+    /// content bounds AND the content bounds have stopped growing across
+    /// consecutive framing ticks, so subsequent frames are a cheap no-op.
+    /// Closes #1026 / #1041 / #1391.
     @State private var didCenterContent = false
+
+    /// Diagonal of the content union AABB the last framing pass fitted to.
+    /// `refreshContentCentering()` re-frames whenever the union grows by
+    /// more than ``framingStabilityEpsilon`` — this is what makes a
+    /// multi-model scene re-fit as each streamed model lands (#1391),
+    /// rather than latching on the first model the way #1385 did. Latches
+    /// `didCenterContent` once two consecutive ticks see a stable union.
+    @State private var lastFramedDiagonal: Float = 0
 
     /// Monotonic counter bumped by the content-framing driver task while
     /// ``didCenterContent`` is still `false`. Reading it inside the
@@ -887,25 +896,77 @@ private struct SceneViewRepresentation: View {
     /// populated yet, and the pass is deferred to the next frame.
     private static let minVisualExtent: Float = 0.001
 
+    /// Relative change in the content union diagonal below which the
+    /// framing is considered "stable". Once a tick sees the union diagonal
+    /// move by less than this fraction since the last fitted diagonal, the
+    /// pass latches `didCenterContent` and the driver task exits. Tolerant
+    /// enough to ignore sub-millimetre jitter, tight enough that a freshly
+    /// streamed model (which grows the union materially) always re-frames.
+    private static let framingStabilityEpsilon: Float = 0.01
+
+    /// Computes the union axis-aligned bounding box of every content
+    /// entity, expressed in `entities.contentRoot`-local space.
+    ///
+    /// Walks the whole `contentRoot` sub-tree and unions each entity's
+    /// `visualBounds(relativeTo: contentRoot)`. This is the multi-model fix
+    /// (#1391): `contentRoot.visualBounds(...)` on its own can under-report
+    /// when models live under an `AnchorEntity` whose transform RealityKit's
+    /// anchoring system has not resolved yet, and #1385 only ever framed a
+    /// single entity. Unioning every descendant box is robust to both: a
+    /// scene of four streamed park models frames the *combined* extent.
+    ///
+    /// Querying relative to `contentRoot` keeps the result invariant of
+    /// `entities.root`'s per-frame rotation + pinch scale (the same reason
+    /// the single-entity path used `relativeTo: contentRoot`).
+    ///
+    /// - Returns: The union AABB, or `nil` if no descendant has finite,
+    ///   non-empty bounds yet (async loads still in flight).
+    @MainActor
+    private func contentUnionBounds() -> BoundingBox? {
+        var boxes: [BoundingBox] = []
+        // Iterative pre-order walk — no recursion depth concerns, and the
+        // `contentRoot` itself is skipped (it is a transform-only node).
+        var stack: [Entity] = Array(entities.contentRoot.children)
+        while let entity = stack.popLast() {
+            stack.append(contentsOf: entity.children)
+            // `relativeTo: contentRoot` gives every box in the same frame
+            // of reference so the union is meaningful. `visualBounds`
+            // already includes the entity's own descendants, but unioning
+            // per-entity is harmless (idempotent) and lets a child whose
+            // parent reports empty still contribute.
+            let box = entity.visualBounds(relativeTo: entities.contentRoot)
+            boxes.append(box)
+        }
+        return ContentBounds.union(of: boxes)
+    }
+
     @MainActor
     private func refreshContentCentering() {
         guard !didCenterContent else { return }
-        // Query bounds in contentRoot-local space so they're invariant of
-        // `entities.root`'s rotation + scale (applied every frame by
-        // `applyCamera()`). Sampling `relativeTo: entities.root` would
-        // rescale extents with pinch-zoom, opening a race where an
-        // early-pinch + slow-loading model flips the `minVisualExtent`
-        // gate true/false between frames and centres at the wrong moment.
-        let bounds = entities.contentRoot.visualBounds(relativeTo: entities.contentRoot)
+        // Union AABB of every content entity, in contentRoot-local space —
+        // see `contentUnionBounds()`. Sampling relative to `contentRoot`
+        // (not `entities.root`) keeps the extents invariant of the per-frame
+        // rotation + pinch-zoom scale, avoiding a race where an early pinch
+        // flips the `minVisualExtent` gate between frames.
+        guard let bounds = contentUnionBounds() else { return }
         let extents = bounds.extents
         // Skip empty / degenerate bounds — async loads not done yet.
-        // RealityKit's empty `BoundingBox` returns `min = +∞`, `max = -∞`
-        // so the `max - min` extents are non-finite (or zero for a
-        // zero-extent placeholder); both cases are caught here.
         guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite else { return }
         let extentMax = max(extents.x, extents.y, extents.z)
         guard extentMax > Self.minVisualExtent else { return }
-        // 1. Centre the content centroid on the orbit pivot (world origin).
+
+        // Re-frame whenever the union grew (a streamed model just landed).
+        // The diagonal is the single scalar that captures "size changed".
+        // Once it is stable vs the last fitted pass, latch and stop — this
+        // is what fixes the #1385 one-shot latch that froze multi-model
+        // scenes on whichever 1-2 models loaded first (#1391).
+        let diagonal = simd_length(extents)
+        let stable = lastFramedDiagonal > 0
+            && abs(diagonal - lastFramedDiagonal)
+                <= Self.framingStabilityEpsilon * max(diagonal, lastFramedDiagonal)
+        lastFramedDiagonal = diagonal
+
+        // 1. Centre the union centroid on the orbit pivot (world origin).
         entities.contentRoot.position = -bounds.center
         // 2. Adapt the zoom-radius limits to the content size BEFORE
         //    computing the fit, so `fitRadius`'s internal clamp does not
@@ -930,7 +991,11 @@ private struct SceneViewRepresentation: View {
             fovYDegrees: Self.baselineFov,
             aspect: viewportAspect ?? 0.46
         )
-        didCenterContent = true
+        // Only latch once the union has settled across consecutive ticks —
+        // until then the driver task keeps re-framing as more models land.
+        if stable {
+            didCenterContent = true
+        }
         // 4. Apply the new pose to the perspective camera entity in THIS
         //    frame. `applyCamera()` runs *before* this method in the
         //    `update:` closure, so without an immediate apply the fitted

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **`VideoNode.destroy()` no longer risks a native SIGABRT ([#1497](https://github.com/sceneview/sceneview/issues/1497)).** `destroy()` freed the external `Texture`/`Stream` immediately after destroying the `MaterialInstance` that referenced them — the exact ordering that triggers Filament's `Invalid texture still bound to MaterialInstance` abort, since MaterialInstance reclamation is coupled to the render loop rather than to the `destroy()` call site. Teardown now drains the frame pipeline (`Engine.drainFramePipeline()`) between destroying the MaterialInstance and freeing the external texture/stream, mirroring the safe pattern documented on the sibling `ImageNode`. Adds `VideoNodeTest` pinning the teardown ordering.
+
 ## v4.7.0 — Bridge expansion, slimmer APK & demo-app polish (2026-05-16)
 
 ### Added
