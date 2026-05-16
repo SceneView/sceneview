@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **Edge-to-edge insets in the Android demo ([#1425](https://github.com/sceneview/sceneview/issues/1425)).** Removed the large empty gap above the "Samples" tab header — the nested `LargeTopAppBar` no longer double-counts the status-bar inset already applied by the root `Scaffold`. The in-app "Update ready / Restart" banner is now z-ordered above every screen and inset below the status bar, so it is no longer clipped behind a demo's top app bar.
