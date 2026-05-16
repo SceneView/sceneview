@@ -1,0 +1,2 @@
+<!-- category: Changed -->
+- **AR demo:** Strengthened the Record & Playback demo's end-of-recording UX. After Stop, the saved-recording callout now explains where the file lives and that it is a standard MP4 carrying ARCore data tracks, and offers Replay, Share, Open (play as a normal video) and Export-to-Downloads. The just-recorded file is highlighted with a "Just recorded" badge in the Playback list so it is obviously discoverable. ([#1438](https://github.com/sceneview/sceneview/issues/1438))
