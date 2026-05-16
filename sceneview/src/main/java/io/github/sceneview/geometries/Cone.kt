@@ -15,6 +15,14 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+/**
+ * A cone [Geometry] with a circular base and an apex, generated with smooth side normals and
+ * a flat base cap, suitable for use as a renderable mesh.
+ *
+ * Instances are immutable once built; create one with the [Builder] and mutate it afterwards
+ * through [update]. All Filament buffer operations run synchronously and must be called on
+ * the main thread.
+ */
 class Cone private constructor(
     primitiveType: PrimitiveType,
     vertices: List<Vertex>,
@@ -36,21 +44,43 @@ class Cone private constructor(
     primitivesOffsets,
     boundingBox
 ) {
+    /**
+     * Builder for [Cone]. Configure [radius], [height], [center] and [sideCount], then
+     * call [build].
+     */
     class Builder : Geometry.Builder(PrimitiveType.TRIANGLES) {
+        /** Radius of the circular base in scene units. Defaults to [DEFAULT_RADIUS]. */
         var radius: Float = DEFAULT_RADIUS
             private set
+
+        /** Total height from base to apex in scene units. Defaults to [DEFAULT_HEIGHT]. */
         var height: Float = DEFAULT_HEIGHT
             private set
+
+        /** Local-space position of the cone center (midpoint of the axis). Defaults to [DEFAULT_CENTER]. */
         var center: Position = DEFAULT_CENTER
             private set
+
+        /** Number of segments around the base. Higher is smoother. Defaults to [DEFAULT_SIDE_COUNT]. */
         var sideCount: Int = DEFAULT_SIDE_COUNT
             private set
 
+        /** Sets the base radius in scene units. Returns this builder for chaining. */
         fun radius(radius: Float) = apply { this.radius = radius }
+
+        /** Sets the total height in scene units. Returns this builder for chaining. */
         fun height(height: Float) = apply { this.height = height }
+
+        /** Sets the local-space center of the cone. Returns this builder for chaining. */
         fun center(center: Position) = apply { this.center = center }
+
+        /** Sets the number of segments around the base. Returns this builder for chaining. */
         fun sideCount(sideCount: Int) = apply { this.sideCount = sideCount }
 
+        /**
+         * Builds the [Cone], allocating its Filament vertex and index buffers on [engine].
+         * Must be called on the main thread.
+         */
         override fun build(engine: Engine): Cone {
             vertices(getVertices(radius, height, center, sideCount))
             primitivesIndices(getIndices(sideCount))
@@ -63,15 +93,27 @@ class Cone private constructor(
         }
     }
 
+    /** Current base radius in scene units. */
     var radius: Float = radius
         private set
+
+    /** Current total height in scene units. */
     var height: Float = height
         private set
+
+    /** Current local-space center of the cone. */
     var center: Position = center
         private set
+
+    /** Current number of segments around the base. */
     var sideCount: Int = sideCount
         private set
 
+    /**
+     * Regenerates the cone vertices in place and re-uploads them to the existing Filament
+     * vertex buffer. The index buffer is rebuilt only when [sideCount] changes. Must be
+     * called on the main thread. Returns this geometry for chaining.
+     */
     fun update(
         engine: Engine,
         radius: Float = this.radius,

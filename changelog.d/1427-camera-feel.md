@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **Camera feel re-tuned across 3D model demos ([#1427](https://github.com/sceneview/sceneview/issues/1427)).** The default camera now sits further back (`DefaultCameraNode` Z `2.0` → `2.75`, Y `0.3` → `0.4`) so origin-placed models are no longer framed too tight. Orbit/pan sensitivity is reduced (`orbitSpeed` `0.005` → `0.003`) so finger drag tracks the model more calmly, and pinch-zoom is made more responsive (`DEFAULT_PINCH_ZOOM_SPEED` `1/30` → `1/18`) so zooming no longer feels sluggish.

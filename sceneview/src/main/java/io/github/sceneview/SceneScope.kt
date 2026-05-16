@@ -533,9 +533,24 @@ open class SceneScope @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP_PREFIX) constru
                 node.setMaterialInstanceAt(0, materialInstance)
                 prevSphereMaterial.value = materialInstance
             }
-            node.position = position
-            node.rotation = rotation
-            node.scale = scale
+        }
+        // Push declarative transform props ONLY when they actually change — never on every
+        // recomposition. A bare `SideEffect { node.position = position }` re-runs after each
+        // successful recomposition and clobbers any position a frame-loop driver
+        // (PhysicsBody, animations, camera follow) wrote via `node.onFrame` in between, so
+        // PhysicsDemo spheres never appeared to move. Component-wise keys (not the Float3
+        // wrapper — `dev.romainguy.kotlin.math.Float3` uses reference equality, so a freshly
+        // allocated `Position(x = …)` always `!=` the previous instance) let
+        // `DisposableEffect` stay idle while a frame driver owns the node. Mirrors the fix
+        // already applied to the bare `Node` composable above.
+        DisposableEffect(node, position.x, position.y, position.z) {
+            node.position = position; onDispose {}
+        }
+        DisposableEffect(node, rotation.x, rotation.y, rotation.z) {
+            node.rotation = rotation; onDispose {}
+        }
+        DisposableEffect(node, scale.x, scale.y, scale.z) {
+            node.scale = scale; onDispose {}
         }
         NodeLifecycle(node, content)
     }

@@ -50,7 +50,8 @@ class CameraGestureMathTest {
     }
 
     @Test fun pinchZoomDelta_defaultConstants_haveExpectedValues() {
-        assertEquals(1f / 30f, CameraGestureDetector.DefaultCameraManipulator.DEFAULT_PINCH_ZOOM_SPEED, 1e-6f)
+        // DEFAULT_PINCH_ZOOM_SPEED re-tuned in #1427: 1/30 → 1/18 (pinch felt "hyper lent").
+        assertEquals(1f / 18f, CameraGestureDetector.DefaultCameraManipulator.DEFAULT_PINCH_ZOOM_SPEED, 1e-6f)
         assertEquals(0.7f, CameraGestureDetector.DefaultCameraManipulator.DEFAULT_PINCH_ZOOM_DAMPING, 1e-6f)
     }
 

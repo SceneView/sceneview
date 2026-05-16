@@ -24,7 +24,6 @@ import org.junit.AfterClass
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -55,14 +54,6 @@ import kotlin.math.sin
  * [VisualVerificationTest] to avoid SwiftShader Engine destroy crashes (#803).
  */
 @RunWith(AndroidJUnit4::class)
-@Ignore(
-    "Filament swapchain readPixels() is not supported on the Apple M3 Metal emulator " +
-            "translator (readPixels callback never fires, even with CONFIG_READABLE swapchain + " +
-            "flushAndWait). Runs fine on physical devices. Tracked in #803. Run manually with:\n" +
-            "./gradlew :sceneview:connectedDebugAndroidTest " +
-            "-Pandroid.testInstrumentationRunnerArguments.class=" +
-            "io.github.sceneview.render.DemoParametersRenderTest"
-)
 class DemoParametersRenderTest {
 
     companion object {
@@ -160,6 +151,9 @@ h1{border-bottom:1px solid #30363d;padding-bottom:12px}
 
     @Before
     fun resetScene() {
+        // Run on a hardware-GPU runner; cleanly skip on the SwiftShader / Apple-Silicon
+        // emulator where Filament's async readPixels callback never fires (#803, #912).
+        RenderTestCapabilities.assumeGpuReadbackAvailable()
         // Destroy every node created in the previous test so its Renderable releases the
         // MaterialInstance reference. Otherwise materialLoader.destroy() (or the next material
         // create) trips a Filament precondition: "destroying MaterialInstance X still in use".

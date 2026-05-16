@@ -500,15 +500,15 @@ struct FeaturedARDemo: Identifiable {
     static let all: [FeaturedARDemo] = [
         FeaturedARDemo(
             id: "ar-placement",
-            title: "Plane Placement",
-            subtitle: "Tap a detected surface to place a model",
+            title: "Tap to Place",
+            subtitle: "Tap a detected plane to place a model",
             icon: "arkit",
             destination: AnyView(ARPlacementDemo())
         ),
         FeaturedARDemo(
             id: "ar-instant-placement",
             title: "Instant Placement",
-            subtitle: "Place models without waiting for plane detection",
+            subtitle: "Place models before plane detection converges",
             icon: "bolt.fill",
             destination: AnyView(ARInstantPlacementDemo())
         ),
@@ -529,14 +529,14 @@ struct FeaturedARDemo: Identifiable {
         FeaturedARDemo(
             id: "ar-orbital",
             title: "Orbital AR",
-            subtitle: "Models orbit around you in AR",
+            subtitle: "Models orbit around you in a personal solar system",
             icon: "circle.dotted",
             destination: AnyView(OrbitalARDemo())
         ),
         FeaturedARDemo(
             id: "ar-rerun",
-            title: "AR Debug (Rerun)",
-            subtitle: "Stream camera pose & planes to the Rerun viewer",
+            title: "Rerun Debug",
+            subtitle: "Stream camera pose and planes to the Rerun viewer",
             icon: "antenna.radiowaves.left.and.right",
             destination: AnyView(RerunDebugDemo())
         ),

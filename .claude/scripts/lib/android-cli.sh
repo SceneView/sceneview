@@ -194,6 +194,93 @@ sys.exit(1)
 PY
 }
 
+# android_cli_locate_aapt2
+# Resolves the `aapt2` binary and echoes its path on stdout. Returns 0 on
+# success, 1 if it genuinely cannot be found.
+#
+# `aapt2` is NOT on PATH on most CI runners — it ships *inside* the Android SDK
+# at `<sdk>/build-tools/<version>/aapt2`, not in `<sdk>/platform-tools` (which
+# IS the dir that gets added to PATH). So:
+#   1. Try a bare `aapt2` on PATH first (covers dev machines that symlink it).
+#   2. Otherwise walk `${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/*` and
+#      pick the newest version directory that contains an executable `aapt2`.
+android_cli_locate_aapt2() {
+  if command -v aapt2 >/dev/null 2>&1; then
+    command -v aapt2
+    return 0
+  fi
+  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  if [[ -n "$sdk" && -d "$sdk/build-tools" ]]; then
+    local bt
+    # `sort -V` orders build-tools dirs by semantic version; `tail` → newest.
+    # The loop walks newest→oldest so a partially-installed newest dir without
+    # an `aapt2` falls through to the next-newest instead of failing outright.
+    while IFS= read -r bt; do
+      [[ -z "$bt" ]] && continue
+      if [[ -x "$bt/aapt2" ]]; then
+        echo "$bt/aapt2"
+        return 0
+      fi
+    done < <(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d 2>/dev/null \
+             | sort -Vr)
+  fi
+  return 1
+}
+
+# android_cli_describe <apk-or-aab>
+# Echoes the artifact's manifest metadata (package / versionName / versionCode …)
+# on stdout so callers can grep it.
+#
+# Return codes are meaningful to callers (validate-release-artifact.sh):
+#   0  → artifact introspected OK, metadata on stdout
+#   1  → the artifact itself is unreadable / corrupt / unsupported
+#   2  → the TOOLING (`aapt2`) is unavailable — distinct from a bad artifact so
+#        a validation guard can warn+skip instead of hard-failing a release.
+#
+# NOTE on tooling: the `android` CLI's `describe` subcommand (v0.7) analyzes a
+# *project directory*, not a built artifact — it has no artifact-introspection
+# mode. The correct tool for reading a built `.apk` / `.aab` manifest is
+# `aapt2`, which ships with the Android SDK build-tools the runner already has
+# (resolved via `android_cli_locate_aapt2` — it is NOT on PATH).
+# This helper therefore uses `aapt2`:
+#   - `.apk` → `aapt2 dump badging` reads it directly.
+#   - `.aab` → the protobuf `base/manifest/AndroidManifest.xml` is unzipped and
+#              decoded with `aapt2 dump xmltree`.
+android_cli_describe() {
+  local artifact="$1"
+  if [[ ! -f "$artifact" ]]; then
+    echo "[android-cli] describe: artifact not found: $artifact" >&2
+    return 1
+  fi
+  local aapt2
+  if ! aapt2="$(android_cli_locate_aapt2)"; then
+    echo "[android-cli] describe: aapt2 not found — not on PATH and not under" \
+         "\${ANDROID_SDK_ROOT:-\$ANDROID_HOME}/build-tools/*" >&2
+    return 2
+  fi
+  case "$artifact" in
+    *.aab)
+      # An .aab is a zip; its manifest is protobuf-encoded — `aapt2 dump badging`
+      # cannot read a bundle, so extract + xmltree the base module manifest.
+      local tmp; tmp="$(mktemp -d)"
+      if command -v unzip >/dev/null 2>&1 \
+         && unzip -o -q "$artifact" "base/manifest/AndroidManifest.xml" -d "$tmp" 2>/dev/null \
+         && [[ -f "$tmp/base/manifest/AndroidManifest.xml" ]]; then
+        "$aapt2" dump xmltree --file "base/manifest/AndroidManifest.xml" "$tmp/base"
+        local rc=$?
+        rm -rf "$tmp"
+        return $rc
+      fi
+      rm -rf "$tmp"
+      echo "[android-cli] describe: could not extract base manifest from $artifact" >&2
+      return 1
+      ;;
+    *)
+      "$aapt2" dump badging "$artifact"
+      ;;
+  esac
+}
+
 # android_cli_install_and_launch <apk> <package/activity> [serial]
 # Wraps `android run --apks ... --activity ... [--device ...]` which combines install+start.
 # `activity` should be in `pkg/.Class` form (e.g. `io.github.sceneview.demo/.MainActivity`).

@@ -430,6 +430,17 @@ private fun ModeContent(
 
     val playbackDataset: File? = if (mode == Mode.PLAYBACK) playbackFile else null
 
+    // Reset the cross-thread frame counter whenever a playback ARSceneView is
+    // (re-)mounted, so a fresh `connectedDebugAndroidTest` run — or a re-tapped
+    // recording — starts the frame index from a known origin (0). Keyed on the
+    // dataset so swapping recordings re-zeroes. See DemoSettings.arPlaybackFrameCount
+    // and ARPlaybackScreenshotTest (#1050).
+    LaunchedEffect(playbackDataset) {
+        if (playbackDataset != null) {
+            io.github.sceneview.demo.DemoSettings.arPlaybackFrameCount = 0
+        }
+    }
+
     ARSceneView(
         modifier = Modifier.fillMaxSize(),
         engine = engine,
@@ -447,6 +458,14 @@ private fun ModeContent(
             // Stateless side-channel pattern (#876) — recordFrame publishes the
             // session per call, mirroring RerunBridge.logFrame. Idempotent.
             recorder.recordFrame(session)
+            // Frame-indexed screenshot regression hook (#1050): bump the
+            // cross-thread counter once per consumed ARCore frame during
+            // playback so ARPlaybackScreenshotTest can capture at deterministic
+            // frame indices instead of wall-clock sleeps. No-op for live mode —
+            // a live session has no reproducible frame timeline to gate on.
+            if (mode == Mode.PLAYBACK) {
+                io.github.sceneview.demo.DemoSettings.arPlaybackFrameCount++
+            }
         },
         onTrackingFailureChanged = { trackingFailureReason = it },
         onGestureListener = rememberOnGestureListener(

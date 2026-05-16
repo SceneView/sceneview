@@ -77,6 +77,13 @@ fun TextDemo(onBack: () -> Unit) {
             // camera framing on a phone portrait viewport. y=±0.22 keeps the top and
             // bottom labels fully inside the viewport (y=±0.32 still cropped the top
             // label on the portrait FOV).
+            //
+            // Each label's quad material is marked double-sided: TextNode does not face
+            // the camera on its own (no cameraPositionProvider is wired here), so when
+            // the camera orbits behind a label the default single-sided culling makes
+            // it vanish entirely — see #1426. setDoubleSided is a per-MaterialInstance
+            // override on the ubershader, so this is a code-only change (no .filamat
+            // recompile) that keeps the back of every label readable.
             // Top: user text with white on dark background
             TextNode(
                 text = inputText,
@@ -85,7 +92,8 @@ fun TextDemo(onBack: () -> Unit) {
                 backgroundColor = 0xCC000000.toInt(),
                 widthMeters = 0.7f,
                 heightMeters = 0.18f,
-                position = Position(x = 0f, y = 0.22f)
+                position = Position(x = 0f, y = 0.22f),
+                apply = { materialInstance.setDoubleSided(true) },
             )
 
             // Center: fixed label with SceneView Primary on dark surface
@@ -96,7 +104,8 @@ fun TextDemo(onBack: () -> Unit) {
                 backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.7f,
                 heightMeters = 0.18f,
-                position = Position(x = 0f, y = 0f)
+                position = Position(x = 0f, y = 0f),
+                apply = { materialInstance.setDoubleSided(true) },
             )
 
             // Bottom: fixed label with SceneView Accent tint
@@ -107,7 +116,8 @@ fun TextDemo(onBack: () -> Unit) {
                 backgroundColor = 0xCC161B22.toInt(),  // SceneView SurfaceDim
                 widthMeters = 0.7f,
                 heightMeters = 0.18f,
-                position = Position(x = 0f, y = -0.22f)
+                position = Position(x = 0f, y = -0.22f),
+                apply = { materialInstance.setDoubleSided(true) },
             )
         }
     }

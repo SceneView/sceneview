@@ -431,14 +431,27 @@ private fun BoxScope.DemoSettingsLayer(
         }
 
         // Medium-tick haptic when the user moves between detents.
+        //
+        // `rememberModalBottomSheetState` starts at `SheetValue.Hidden`, so this
+        // effect fires once with `Hidden` *before* the sheet has animated open.
+        // Treating that initial value as a dismiss would slam `expanded = false`
+        // and kill the sheet on every demo (#1420). Only honour `Hidden` as a
+        // dismiss after the sheet has actually settled in a shown detent at
+        // least once — the actual outside-tap / back-gesture dismiss is already
+        // handled by `onDismissRequest`, this branch just keeps `expanded` in
+        // sync if the sheet collapses by any other path.
+        var hasShown by remember { mutableStateOf(false) }
         LaunchedEffect(sheetState.currentValue) {
             when (sheetState.currentValue) {
                 SheetValue.Expanded,
                 SheetValue.PartiallyExpanded -> {
+                    hasShown = true
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 }
                 SheetValue.Hidden -> {
-                    expanded = false
+                    if (hasShown) {
+                        expanded = false
+                    }
                 }
             }
         }

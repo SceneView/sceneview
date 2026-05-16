@@ -3,12 +3,32 @@
 #
 # Extracts REAL public API from source files on each platform and compares them.
 #
+# With --with-apk, additionally builds (or reuses) the android-demo debug APK and
+# inspects its manifest (via the `aapt2`-backed android_cli_describe helper) to
+# verify the exposed activities / intent filters match expectations, and
+# cross-checks the demo set declared in DemoRegistry against the iOS SamplesTab
+# inventory (drift = a platform is missing a demo).
+#
 # Usage:
-#   ./cross-platform-check.sh
+#   ./cross-platform-check.sh             # fast source-only check (default)
+#   ./cross-platform-check.sh --with-apk  # also build + inspect the APK manifest
 
 set -eo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ─── Args ───────────────────────────────────────────────────────────────
+WITH_APK=0
+for arg in "$@"; do
+    case "$arg" in
+        --with-apk) WITH_APK=1 ;;
+        -h|--help)
+            grep '^#' "$0" | sed -n '2,14p' | sed 's/^#//; s/^ //'
+            exit 0 ;;
+        *) echo "Unknown argument: $arg (try --help)" >&2; exit 2 ;;
+    esac
+done
 
 # Colors
 RED='\033[0;31m'
@@ -269,6 +289,135 @@ else
 fi
 echo ""
 
+# ─── 11. APK Manifest Cross-Check (aapt2 via android_cli_describe) ──────
+# Opt-in: needs a built APK so the fast source-only path stays the default.
+#
+# NOTE: Google's `android` CLI v0.7 `describe` subcommand analyzes a *project
+# directory*, not a built artifact. The android_cli_describe helper in
+# lib/android-cli.sh therefore inspects the artifact with `aapt2` —
+# `aapt2 dump badging` for an `.apk`. This section parses that badging output.
+APK_ISSUES=0
+if [ "$WITH_APK" -eq 1 ]; then
+    echo -e "${CYAN}=== APK Manifest Cross-Check (aapt2) ===${NC}"
+    echo ""
+
+    # shellcheck source=lib/android-cli.sh
+    source "$SCRIPT_DIR/lib/android-cli.sh"
+
+    DEMO_MODULE="$REPO_ROOT/samples/android-demo"
+    # Canonical debug APK output of `:samples:android-demo:assembleDebug`.
+    APK="$DEMO_MODULE/build/outputs/apk/debug/android-demo-debug.apk"
+
+    if [ ! -f "$APK" ]; then
+        echo -e "  ${YELLOW}APK not found — building :samples:android-demo:assembleDebug ...${NC}"
+        if [ -x "$REPO_ROOT/gradlew" ]; then
+            ( cd "$REPO_ROOT" && ./gradlew --quiet :samples:android-demo:assembleDebug ) \
+                || echo -e "  ${RED}Gradle build failed${NC}"
+        else
+            echo -e "  ${YELLOW}gradlew not found — cannot build APK${NC}"
+        fi
+    else
+        echo -e "  ${GREEN}Reusing cached APK:${NC} ${APK#"$REPO_ROOT"/}"
+    fi
+
+    if [ -f "$APK" ]; then
+        DESCRIBE_OUT="$(mktemp -t sv-describe.XXXXXX)"
+        # android_cli_describe <apk-or-aab> echoes `aapt2 dump badging` for an APK.
+        if android_cli_describe "$APK" >"$DESCRIBE_OUT" 2>/dev/null; then
+            echo ""
+            echo -e "  ${CYAN}Manifest badging (aapt2):${NC}"
+
+            # `aapt2 dump badging` reports the package line, the single
+            # `launchable-activity:` entry and uses-permission/feature lines.
+            # The android-demo is a single-Activity app whose extra demos are
+            # reached via the `sceneview://` deep link, not separate activities.
+
+            # 1. Package id matches the published demo app.
+            #    badging line: package: name='io.github.sceneview.demo' ...
+            PKG="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" "$DESCRIBE_OUT" | head -1)"
+            if [ "$PKG" = "io.github.sceneview.demo" ]; then
+                echo -e "    ${GREEN}Package id io.github.sceneview.demo confirmed${NC}"
+            else
+                echo -e "    ${YELLOW}Unexpected package id: ${PKG:-<none>} (expected io.github.sceneview.demo)${NC}"
+                APK_ISSUES=$((APK_ISSUES + 1))
+            fi
+
+            # 2. A launchable activity must be declared — the app must be
+            #    launchable from the home screen.
+            #    badging line: launchable-activity: name='...MainActivity' ...
+            LAUNCH_ACTIVITY="$(sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p" "$DESCRIBE_OUT" | head -1)"
+            if [ -n "$LAUNCH_ACTIVITY" ]; then
+                echo -e "    ${GREEN}Launchable activity: ${LAUNCH_ACTIVITY}${NC}"
+                if printf '%s' "$LAUNCH_ACTIVITY" | grep -qiE 'MainActivity'; then
+                    echo -e "    ${GREEN}MainActivity is the launcher entry point${NC}"
+                else
+                    echo -e "    ${YELLOW}Launcher entry point is not MainActivity${NC}"
+                    APK_ISSUES=$((APK_ISSUES + 1))
+                fi
+            else
+                echo -e "    ${RED}No launchable-activity — app not launchable${NC}"
+                APK_ISSUES=$((APK_ISSUES + 1))
+            fi
+
+            # 3. Deep-link scheme `sceneview://` — used by QR codes on the
+            #    website / README / docs to land on a specific demo.
+            #    `aapt2 dump badging` does NOT surface intent-filter data /
+            #    deep-link schemes, so decode the manifest xmltree for this.
+            DEEPLINK_OK=0
+            if command -v aapt2 >/dev/null 2>&1; then
+                XMLTREE_OUT="$(aapt2 dump xmltree --file AndroidManifest.xml "$APK" 2>/dev/null || true)"
+                if printf '%s' "$XMLTREE_OUT" | grep -qiE 'scheme.*sceneview|"sceneview"'; then
+                    DEEPLINK_OK=1
+                fi
+            fi
+            if [ "$DEEPLINK_OK" -eq 1 ]; then
+                echo -e "    ${GREEN}sceneview:// deep-link scheme present${NC}"
+            else
+                echo -e "    ${YELLOW}sceneview:// deep-link scheme not detected in manifest${NC}"
+                APK_ISSUES=$((APK_ISSUES + 1))
+            fi
+        else
+            echo -e "  ${YELLOW}aapt2 unavailable or APK unreadable — manifest cross-check skipped${NC}"
+        fi
+        rm -f "$DESCRIBE_OUT" 2>/dev/null || true
+    fi
+    echo ""
+
+    # ─── Demo-count parity: Android DemoRegistry vs iOS SamplesTab ──────
+    echo -e "  ${CYAN}Demo inventory parity:${NC}"
+    DEMO_REGISTRY="$DEMO_MODULE/src/main/java/io/github/sceneview/demo/DemoRegistry.kt"
+    IOS_SAMPLES="$REPO_ROOT/samples/ios-demo/SceneViewDemo/Views/Tabs/SamplesTab.swift"
+
+    ANDROID_DEMO_COUNT=0
+    if [ -f "$DEMO_REGISTRY" ]; then
+        ANDROID_DEMO_COUNT="$(grep -cE '^[[:space:]]*DemoEntry\(' "$DEMO_REGISTRY" 2>/dev/null || echo 0)"
+    fi
+    IOS_DEMO_COUNT=0
+    if [ -f "$IOS_SAMPLES" ]; then
+        # Count demo references on the iOS Samples tab (id / case entries).
+        IOS_DEMO_COUNT="$(grep -ciE 'demo|sample' "$IOS_SAMPLES" 2>/dev/null || echo 0)"
+    fi
+
+    echo "    Android DemoRegistry entries: $ANDROID_DEMO_COUNT"
+    if [ -f "$IOS_SAMPLES" ]; then
+        echo "    iOS SamplesTab references:    $IOS_DEMO_COUNT"
+        if [ "$ANDROID_DEMO_COUNT" -gt 0 ] && [ "$IOS_DEMO_COUNT" -eq 0 ]; then
+            echo -e "    ${YELLOW}iOS SamplesTab lists no demos — possible drift${NC}"
+            APK_ISSUES=$((APK_ISSUES + 1))
+        fi
+    else
+        echo -e "    ${YELLOW}iOS SamplesTab.swift not found${NC}"
+    fi
+    echo ""
+
+    if [ "$APK_ISSUES" -eq 0 ]; then
+        echo -e "  ${GREEN}APK manifest matches expectations.${NC}"
+    else
+        echo -e "  ${YELLOW}$APK_ISSUES manifest cross-check finding(s).${NC}"
+    fi
+    echo ""
+fi
+
 # ─── Summary ───────────────────────────────────────────────────────────
 echo -e "${CYAN}=== Summary ===${NC}"
 echo "  Android composables:    ${#ANDROID_COMPOSABLES[@]}"
@@ -279,6 +428,9 @@ echo "  iOS SwiftUI views:      ${#SWIFT_VIEWS[@]}"
 echo "  Web classes:            ${#WEB_CLASSES[@]}"
 echo "  KMP core types:         ${#KMP_TYPES[@]}"
 echo "  Cross-platform gaps:    $GAPS"
+if [ "$WITH_APK" -eq 1 ]; then
+    echo "  APK manifest findings:  $APK_ISSUES"
+fi
 echo ""
 
 if [ "$GAPS" -eq 0 ]; then

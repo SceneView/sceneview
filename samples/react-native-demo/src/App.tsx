@@ -24,6 +24,7 @@ import {
   type CameraControlMode,
 } from '@sceneview-sdk/react-native';
 import { UpdateChecker } from './UpdateChecker';
+import { DoublePendulumTab } from './DoublePendulumTab';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +37,7 @@ interface SketchfabResult {
   user: { displayName: string };
 }
 
-type TabId = 'search' | 'geometry' | 'lights' | 'ar';
+type TabId = 'search' | 'geometry' | 'lights' | 'physics' | 'ar';
 
 interface PlaygroundShape {
   id: string;
@@ -50,7 +51,7 @@ interface PlaygroundShape {
 // Constants
 // ---------------------------------------------------------------------------
 
-const VERSION = '4.5.0';
+const VERSION = '4.6.2';
 
 const ENVIRONMENT = 'environments/studio_small.hdr';
 
@@ -58,6 +59,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'search', label: 'Search', icon: 'Q' },
   { id: 'geometry', label: 'Geometry', icon: 'G' },
   { id: 'lights', label: 'Lights', icon: 'L' },
+  { id: 'physics', label: 'Physics', icon: 'P' },
   { id: 'ar', label: 'AR', icon: 'A' },
 ];
 
@@ -687,6 +689,7 @@ export default function App() {
       case 'search': return <SearchTab />;
       case 'geometry': return <GeometryTab />;
       case 'lights': return <LightsTab />;
+      case 'physics': return <DoublePendulumTab />;
       case 'ar': return <ARTab />;
     }
   };

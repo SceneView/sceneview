@@ -33,7 +33,6 @@ import io.github.sceneview.math.Rotation
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
-import io.github.sceneview.rememberOnGestureListener
 import io.github.sceneview.sample.rememberMaterialInstance
 
 /**
@@ -56,9 +55,12 @@ fun CustomMeshDemo(onBack: () -> Unit) {
     val sphereMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Primary)
     val bondMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Accent)
 
-    // Hero yaw auto-pauses on first camera gesture so orbit/pinch don't fight the spin.
-    // Triggered by the user's Auto-Rotate switch.
-    val (rotationY, onHeroGesture) = rememberPausableHeroYaw(
+    // The molecule spins on its own node, independently of the camera, so it's driven
+    // purely by the explicit Auto-Rotate switch — toggling off freezes it at the current
+    // pose, toggling on resumes from there. We deliberately do NOT auto-pause on a stray
+    // camera gesture: the spin and the orbit don't fight (different transforms), and a
+    // silent pause-on-tap made the demo look like it "stopped on its own" (#1431).
+    val (rotationY, _) = rememberPausableHeroYaw(
         trigger = rotating, durationMillis = 8_000, staticYaw = 0f,
     )
 
@@ -102,11 +104,6 @@ fun CustomMeshDemo(onBack: () -> Unit) {
             cameraManipulator = rememberCameraManipulator(
                 orbitHomePosition = Position(0f, 0.1f, 2f),
                 targetPosition = Position(0f, 0f, 0f),
-            ),
-            onGestureListener = rememberOnGestureListener(
-                onSingleTapUp = { _, _ -> onHeroGesture() },
-                onDoubleTap = { _, _ -> onHeroGesture() },
-                onScroll = { _, _, _, _ -> onHeroGesture() },
             ),
         ) {
             // Molecule-like structure: center atom + 4 outer atoms connected by bonds.

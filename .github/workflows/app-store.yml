@@ -132,7 +132,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: samples/ios-demo/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          # Hash the checked-in `Package.resolved` (#1360) — the nested
+          # `xcshareddata/swiftpm/Package.resolved` does not exist until
+          # Xcode resolves packages, so it yields a constant empty hash.
+          key: spm-${{ runner.os }}-${{ hashFiles('samples/ios-demo/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
       - name: Resolve Swift Package dependencies
@@ -552,7 +555,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: samples/ios-demo/SourcePackages
-          key: spm-macos-${{ runner.os }}-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          # Hash the checked-in `Package.resolved` (#1360) — the nested
+          # `xcshareddata/swiftpm/Package.resolved` does not exist until
+          # Xcode resolves packages, so it yields a constant empty hash.
+          key: spm-macos-${{ runner.os }}-${{ hashFiles('samples/ios-demo/Package.resolved') }}
           restore-keys: spm-macos-${{ runner.os }}-
 
       - name: Resolve Swift Package dependencies

@@ -53,7 +53,12 @@ jobs:
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The internal poll loop self-terminates at a 25-min deadline (+30s
+    # warm-up sleep). The job timeout sits comfortably above that so the
+    # loop's own "::error:: timed out waiting for …" message is what
+    # surfaces — a hard runner kill would give no diagnostic. 35 min keeps
+    # a ~9-min cushion above the internal ~25.5-min worst case (#1360).
+    timeout-minutes: 35
     steps:
       - name: Aggregate all PR check conclusions
         env:
