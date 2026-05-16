@@ -1949,6 +1949,10 @@ fun ARFaceTracking() {
 
     ARSceneView(
         sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
+        // REQUIRED: FRONT_CAMERA alone only makes the front camera eligible — the session
+        // stays on the default BACK camera until sessionCameraConfig selects a FRONT config.
+        // Without ::frontCameraConfig, AugmentedFaceMode.MESH3D yields no faces and no mesh.
+        sessionCameraConfig = ::frontCameraConfig,
         sessionConfiguration = { _, config ->
             config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D
         },

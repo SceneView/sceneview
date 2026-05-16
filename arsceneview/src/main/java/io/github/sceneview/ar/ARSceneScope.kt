@@ -389,9 +389,15 @@ class ARSceneScope internal constructor(
      * [AugmentedFace] tracking is active. Requires the session to be configured with
      * `AugmentedFaceMode.MESH3D` and the front camera.
      *
+     * **Both `sessionFeatures` and `sessionCameraConfig` must be set.** `FRONT_CAMERA` only
+     * makes the front camera eligible; the session stays on the default BACK camera until
+     * `sessionCameraConfig = ::frontCameraConfig` actually selects a FRONT-facing config —
+     * without it `AugmentedFaceMode.MESH3D` yields no trackables and no mesh ever appears.
+     *
      * ```kotlin
      * ARSceneView(
      *     sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
+     *     sessionCameraConfig = ::frontCameraConfig,
      *     sessionConfiguration = { _, config ->
      *         config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D
      *     },

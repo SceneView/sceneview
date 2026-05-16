@@ -25,6 +25,7 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.ar.frontCameraConfig
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
@@ -40,6 +41,11 @@ import io.github.sceneview.sample.rememberUnlitMaterialInstance
  * detect face meshes. When a face is detected, an [AugmentedFaceNode] renders a translucent
  * unlit-blue mesh overlay on the user's face — alpha 0.4 so the user's actual facial features
  * remain visible underneath the fitted topology.
+ *
+ * Augmented Faces needs **two** session settings, not one: `sessionFeatures` must include
+ * [Session.Feature.FRONT_CAMERA] *and* `sessionCameraConfig` must select a FRONT-facing
+ * [com.google.ar.core.CameraConfig] via `::frontCameraConfig`. The feature flag alone leaves
+ * the session on the default BACK camera and the mesh never tracks (#1436).
  *
  * Requires a device with a front-facing camera and ARCore face mesh support.
  */
@@ -81,6 +87,15 @@ fun ARFaceDemo(onBack: () -> Unit) {
                 materialLoader = materialLoader,
                 planeRenderer = false,
                 sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
+                // CRITICAL for Augmented Faces (#1436). `sessionFeatures = FRONT_CAMERA`
+                // only makes the front camera *eligible* — it does NOT switch the camera.
+                // ARSceneView's default `sessionCameraConfig` is `highestResolutionCameraConfig`,
+                // which is hardwired to `FacingDirection.BACK`. So without this override the
+                // session runs the BACK camera, `AugmentedFaceMode.MESH3D` yields zero
+                // trackables, and the face mesh never appears — exactly the "j'ai jamais vu
+                // marcher ça" symptom. `frontCameraConfig` selects a FRONT-facing CameraConfig
+                // so ARCore actually opens the selfie camera and the face mesh can track.
+                sessionCameraConfig = ::frontCameraConfig,
                 // No `cameraExposure` override — issue #1179. The previous
                 // `cameraExposure = -1.5f` rendered the entire scene fully black on
                 // Pixel 9 v4.3.0 production.
