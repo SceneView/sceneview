@@ -59,9 +59,15 @@ fun FogDemo(onBack: () -> Unit) {
         )
     }
 
-    var fogEnabled by remember { mutableStateOf(true) }
-    var fogDensity by remember { mutableFloatStateOf(0.15f) }
-    var selectedPreset by remember { mutableStateOf(presets[0]) }
+    // Defaults captured once so the bottom-sheet "Reset" button (#1154 Stage 3)
+    // can restore them without duplicating the literals.
+    val defaultEnabled = true
+    val defaultDensity = 0.15f
+    val defaultPreset = presets[0]
+
+    var fogEnabled by remember { mutableStateOf(defaultEnabled) }
+    var fogDensity by remember { mutableFloatStateOf(defaultDensity) }
+    var selectedPreset by remember { mutableStateOf(defaultPreset) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -87,6 +93,11 @@ fun FogDemo(onBack: () -> Unit) {
         title = stringResource(R.string.demo_fog),
         onBack = onBack,
         firstFrameRendered = firstFrame.rendered,
+        onResetSettings = {
+            fogEnabled = defaultEnabled
+            fogDensity = defaultDensity
+            selectedPreset = defaultPreset
+        },
         controls = {
             // Enable / disable toggle — toggleable on the whole row so tapping the
             // label flips the state, and UiAutomator finds a clickable ancestor.
