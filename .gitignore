@@ -137,6 +137,10 @@ samples/react-native-demo/ios/Models/
 samples/web-demo/src/jsMain/resources/models/
 samples/web-demo/src/jsMain/resources/environments/
 
+# ── Playwright web-demo QA artifacts ──
+samples/web-demo/test-results/
+samples/web-demo/playwright-report/
+
 # Local MCP workspace artifacts (not canonical — canonical code is in mcp/packages/)
 mcp-automotive/
 mcp-healthcare/

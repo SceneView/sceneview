@@ -1,13 +1,18 @@
 import { test, expect } from '@playwright/test';
+import { sampleCanvas } from './helpers';
 
 /**
- * SceneView Web Demo — visual regression tests.
+ * SceneView Web Demo — visual regression / smoke tests.
  *
  * These tests load the web demo page, wait for the Filament engine to
  * initialize, and capture screenshots for visual comparison.
  *
  * Screenshots are stored in `tests/render.spec.ts-snapshots/` and compared
  * on subsequent runs. Update baselines with `--update-snapshots`.
+ *
+ * Full per-tab / per-demo catalog coverage lives in `catalog.spec.ts`
+ * (issue #1564). This file stays as the lightweight load + branding +
+ * tab-regression smoke layer.
  */
 
 test.describe('SceneView Web Demo Rendering', () => {
@@ -40,32 +45,9 @@ test.describe('SceneView Web Demo Rendering', () => {
     // Give Filament a moment to render frames
     await page.waitForTimeout(2000);
 
-    // Check that the canvas is not all-black by sampling pixel data
-    const canvasHasContent = await page.evaluate(() => {
-      const canvas = document.getElementById('scene-canvas') as HTMLCanvasElement;
-      if (!canvas) return false;
-      const ctx = canvas.getContext('2d') || canvas.getContext('webgl2') || canvas.getContext('webgl');
-      if (!ctx) return false;
-
-      // For WebGL contexts, read pixels
-      if ('readPixels' in ctx) {
-        const gl = ctx as WebGL2RenderingContext;
-        const pixels = new Uint8Array(4 * 100);
-        gl.readPixels(
-          Math.floor(canvas.width / 2) - 5,
-          Math.floor(canvas.height / 2) - 5,
-          10, 10,
-          gl.RGBA, gl.UNSIGNED_BYTE, pixels
-        );
-        // Check if any pixel is non-zero (not all black)
-        let nonZero = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-          if (pixels[i] > 5 || pixels[i+1] > 5 || pixels[i+2] > 5) nonZero++;
-        }
-        return nonZero > 0;
-      }
-      return true; // 2D context — assume content
-    });
+    // Check that the canvas is not all-black by sampling pixel data via the
+    // shared helper (also used by the catalog-coverage suite).
+    const { hasContent, headlessGpuOk } = await sampleCanvas(page);
 
     // Capture screenshot regardless of content check
     await page.screenshot({
@@ -73,9 +55,9 @@ test.describe('SceneView Web Demo Rendering', () => {
       fullPage: false,
     });
 
-    // This assertion may be soft — WebGL in headless mode may not produce
-    // visible output depending on the GPU driver
-    if (!canvasHasContent) {
+    // This assertion stays soft — headless WebGL on a GPU-less runner may not
+    // produce a readable framebuffer (`headlessGpuOk: false`).
+    if (headlessGpuOk && !hasContent) {
       console.warn('Canvas appears blank — headless WebGL may not produce visible output');
     }
   });
@@ -143,17 +125,15 @@ test.describe('SceneView Web Demo Rendering', () => {
     await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
     await page.waitForTimeout(1000);
 
-    // Capture initial state
-    const screenshot1 = await page.screenshot();
+    // The CDN gallery renders `.result-card` entries — the demo has no
+    // `.model-chip` element (the old selector silently matched nothing).
+    const cards = page.locator('#model-results .result-card');
+    const count = await cards.count();
+    expect(count, 'CDN model gallery should list models').toBeGreaterThan(1);
 
-    // Click the second model chip if available
-    const chips = page.locator('#model-selector .model-chip');
-    const count = await chips.count();
-    if (count > 1) {
-      await chips.nth(1).click();
-      // Wait for model loading
-      await page.waitForTimeout(3000);
-    }
+    // Click the second model card and wait for the model to load.
+    await cards.nth(1).click();
+    await page.waitForTimeout(3000);
 
     // Capture after switch
     await page.screenshot({

@@ -50,12 +50,25 @@ Open `src/jsMain/resources/index.html` directly in a browser, or:
 
 ## Tests
 
-Playwright tests live in `tests/render.spec.ts` — page load, canvas content,
-tab switching, branding, and XR button presence. Run with:
+Playwright tests run headless against the shipped `index.html` (served by
+`http-server` — no Gradle build needed for the inline-JS path):
+
+- `tests/render.spec.ts` — load + branding + tab-regression smoke layer.
+- `tests/catalog.spec.ts` — full per-tab / per-demo QA: exercises every Models
+  / Geometry / Physics / Settings demo, drives camera orbit + zoom, samples the
+  WebGL canvas to assert a non-blank render, and asserts no console errors or
+  unhandled rejections (slice 3 of the device-QA harness, issue #1564).
+- `tests/helpers.ts` — shared canvas-sampling, console-capture and interaction
+  helpers.
+
+Run with:
 
 ```bash
 npx playwright test
 ```
+
+The run emits `test-results/web-qa-summary.json` — a flat machine-readable
+result consumed by the autonomous device-QA orchestrator runner (issue #1566).
 
 ## Requirements
 
