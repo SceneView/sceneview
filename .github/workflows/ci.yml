@@ -195,10 +195,15 @@ jobs:
         # `ARBundledRecordingsTest` (the bundled-recording ftyp/avc1/mett
         # contract suite from #1060/#1100). Not under JaCoCo because the
         # samples module has no coverage gate. See #1130.
+        #
+        # `:samples:common:testDebugUnitTest` runs the shared-helper
+        # regression suite — LifecycleAwareLaunchedEffect, LifecyclePauseGate,
+        # rememberMaterialInstance, InAppUpdateManager. See #972.
         run: |
           ./gradlew \
             :sceneview:jacocoTestReport \
             :arsceneview:jacocoTestReport \
+            :samples:common:testDebugUnitTest \
             :samples:android-demo:testDebugUnitTest \
             --stacktrace
 

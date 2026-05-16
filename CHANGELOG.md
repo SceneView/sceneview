@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Regression tests for the `samples/common` shared helpers ([#972](https://github.com/sceneview/sceneview/issues/972)).** The `LifecycleAwareLaunchedEffect` (#936) and `rememberMaterialInstance` / `rememberUnlitMaterialInstance` (#937) helpers shipped with no tests. New JVM/Robolectric suites pin their contracts: `LifecycleAwareLaunchedEffectTest` drives a real `TestLifecycleOwner` to assert the body cancels on `onStop` and re-runs from the top on `onStart`, and `RememberMaterialInstanceTest` fails if a future edit puts `metallic`/`roughness`/`reflectance` back into the `remember(...)` key (the 60 Hz `MaterialInstance` churn caught by the #937 review). `:samples:common:testDebugUnitTest` is now wired into the CI unit-test step.
+
 ### Changed
 
 - **Render tests are no longer orphan `@Ignore`'d code ([#912](https://github.com/sceneview/sceneview/issues/912)).** The five headless Filament render-test classes (`RenderSmokeTest`, `LightingRenderTest`, `GeometryRenderTest`, `VisualVerificationTest`, `DemoParametersRenderTest`) were wholly class-level `@Ignore`'d — compiled but never executed, so they could never catch a regression and silently drifted. They now use a runtime capability gate (`RenderTestCapabilities.assumeGpuReadbackAvailable()`): the tests **run** on a hardware-GPU runner that opts in via `-Pandroid.testInstrumentationRunnerArguments.gpuReadback=true`, and cleanly **skip** (JUnit assumption, not orphan, not failure) on the SwiftShader / Apple-Silicon emulator where Filament's async `readPixels` callback never fires (the harness limitation tracked in [#803](https://github.com/sceneview/sceneview/issues/803)). `Closes #912`.
