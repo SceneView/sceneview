@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v4.6.2 — CI hotfix: land the demo app on the Play Store + API docs (2026-05-16)
+
+### Fixed
+
+- **Play Store release deploy no longer blocked by AAB validation ([#1416](https://github.com/sceneview/sceneview/issues/1416)).** The pre-upload guard now introspects Android App Bundles with `bundletool dump manifest` (the correct tool for `.aab` files) instead of `aapt2`, which can only read APKs and was mis-reporting bundles as corrupt. The validation step is also marked `continue-on-error` so a tooling gap can never veto a release. This unblocks the demo-app Play Store deploy that missed v4.6.0 and v4.6.1.
+- **API-docs deploy no longer races the website deploy on a release tag ([#1417](https://github.com/sceneview/sceneview/issues/1417)).** `release.yml`'s Dokka deploy and `docs.yml`'s site deploy both push to the external `sceneview.github.io` repo; on a release tag they ran concurrently and the second push failed non-fast-forward. A shared cross-workflow `concurrency` group now serialises the two pushes so a release reliably publishes both the API docs and the site.
+
 ## v4.6.1 — CI hotfix: unblock the Play Store deploy for the demo app (2026-05-16)
 
 ### Fixed
