@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Flutter bridge: `addGeometry` / `addLight` are now rendered natively on Android ([#909](https://github.com/sceneview/sceneview/issues/909)).** These two `SceneViewController` methods previously returned `result.success(null)` without drawing anything — the Flutter demo's feature badges did not reflect that. The Android `SceneViewPlugin` now appends to reactive `geometryNodes` / `lightNodes` Compose state lists, so `cube`/`box`, `sphere`, `cylinder` and `plane` primitives and `directional`/`point`/`spot` lights render in both `SceneView` and `ARSceneView`, matching the React Native bridge. Material instances are cached per `(color, unlit)` and released on dispose. The Flutter demo's GeometryNode / LightNode feature cards are re-labelled "Android only" (the iOS RealityKit port stays tracked under the #909 umbrella). First Dart unit tests for the plugin (data-class serialization + controller attach guards) were also added.
+
 ## v4.6.2 — CI hotfix: land the demo app on the Play Store + API docs (2026-05-16)
 
 ### Fixed

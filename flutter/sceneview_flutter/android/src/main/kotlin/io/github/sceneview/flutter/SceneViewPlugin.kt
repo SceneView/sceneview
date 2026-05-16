@@ -7,12 +7,15 @@ import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import com.google.android.filament.LightManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -26,11 +29,13 @@ import io.github.sceneview.SurfaceType
 import io.github.sceneview.ar.arcore.getUpdatedPlanes
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
+import io.github.sceneview.math.Size
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.collision.HitResult
+import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 
@@ -81,6 +86,66 @@ private data class FlutterModelNode(
 )
 
 // ---------------------------------------------------------------------------
+// Geometry & light descriptors passed from Dart via method channel
+// ---------------------------------------------------------------------------
+
+/**
+ * A procedural geometry node (`cube`/`box`, `sphere`, `cylinder`, `plane`).
+ *
+ * Mirrors the React Native bridge's `GeometryNodeData` so the Flutter and RN
+ * geometry API shapes stay consistent (issue #909).
+ */
+private data class FlutterGeometryNode(
+    val type: String,
+    val position: Position = Position(0f, 0f, 0f),
+    val rotation: Rotation = Rotation(0f, 0f, 0f),
+    val size: Float = 1.0f,
+    val color: Int = 0xFF888888.toInt(),
+    /**
+     * When `true` the material ignores all scene lighting and renders the flat
+     * [color] straight to the framebuffer. See the Dart `GeometryNode.unlit`.
+     */
+    val unlit: Boolean = false,
+)
+
+/**
+ * A light source (`directional`, `point`, `spot`).
+ *
+ * Mirrors the React Native bridge's `LightNodeData` (issue #909).
+ */
+private data class FlutterLightNode(
+    val type: String = "directional",
+    val intensity: Float = 100_000f,
+    val color: Int = 0xFFFFFFFF.toInt(),
+    val position: Position = Position(0f, 4f, 0f),
+)
+
+/** Parses the `addGeometry` method-channel arguments into a [FlutterGeometryNode]. */
+private fun parseGeometryNode(call: MethodCall): FlutterGeometryNode = FlutterGeometryNode(
+    type = call.argument<String>("type") ?: "cube",
+    position = Position(
+        call.argument<Double>("x")?.toFloat() ?: 0f,
+        call.argument<Double>("y")?.toFloat() ?: 0f,
+        call.argument<Double>("z")?.toFloat() ?: 0f,
+    ),
+    size = call.argument<Double>("size")?.toFloat() ?: 1.0f,
+    color = call.argument<Number>("color")?.toInt() ?: 0xFF888888.toInt(),
+    unlit = call.argument<Boolean>("unlit") ?: false,
+)
+
+/** Parses the `addLight` method-channel arguments into a [FlutterLightNode]. */
+private fun parseLightNode(call: MethodCall): FlutterLightNode = FlutterLightNode(
+    type = call.argument<String>("type") ?: "directional",
+    intensity = call.argument<Double>("intensity")?.toFloat() ?: 100_000f,
+    color = call.argument<Number>("color")?.toInt() ?: 0xFFFFFFFF.toInt(),
+    position = Position(
+        call.argument<Double>("x")?.toFloat() ?: 0f,
+        call.argument<Double>("y")?.toFloat() ?: 4f,
+        call.argument<Double>("z")?.toFloat() ?: 0f,
+    ),
+)
+
+// ---------------------------------------------------------------------------
 // 3D SceneView
 // ---------------------------------------------------------------------------
 
@@ -107,12 +172,15 @@ class SceneViewPlatformView(
 
     // Reactive state for Compose -- updated via method channel
     private val modelNodes = mutableStateListOf<FlutterModelNode>()
+    private val geometryNodes = mutableStateListOf<FlutterGeometryNode>()
+    private val lightNodes = mutableStateListOf<FlutterLightNode>()
     private var environmentPath by mutableStateOf<String?>(null)
 
     private val composeView = ComposeView(context).apply {
         setContent {
             val engine = rememberEngine()
             val modelLoader = rememberModelLoader(engine)
+            val materialLoader = rememberMaterialLoader(engine)
             val environmentLoader = rememberEnvironmentLoader(engine)
 
             val cameraNode = rememberCameraNode(engine) {
@@ -131,6 +199,7 @@ class SceneViewPlatformView(
                 surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
+                materialLoader = materialLoader,
                 cameraNode = cameraNode,
                 environment = environment ?: rememberEnvironment(environmentLoader),
             ) {
@@ -155,6 +224,67 @@ class SceneViewPlatformView(
                         )
                     }
                 }
+
+                geometryNodes.forEach { geom ->
+                    // Cache the material instance per (color, unlit) so recomposition
+                    // does not leak a fresh MaterialInstance every frame. The unlit
+                    // flag is part of the key — switching lit ↔ unlit uses a
+                    // different .filamat, so a new instance is required.
+                    val mat = remember(geom.color, geom.unlit) {
+                        if (geom.unlit) materialLoader.createUnlitColorInstance(geom.color)
+                        else materialLoader.createColorInstance(geom.color)
+                    }
+                    DisposableEffect(geom.color, geom.unlit) {
+                        onDispose { materialLoader.destroyMaterialInstance(mat) }
+                    }
+                    when (geom.type) {
+                        "cube", "box" -> CubeNode(
+                            size = Size(geom.size, geom.size, geom.size),
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                        "sphere" -> SphereNode(
+                            radius = geom.size / 2f,
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                        "cylinder" -> CylinderNode(
+                            radius = geom.size / 2f,
+                            height = geom.size,
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                        "plane" -> PlaneNode(
+                            size = Size(geom.size, geom.size),
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                    }
+                }
+
+                lightNodes.forEach { light ->
+                    val lightType = when (light.type) {
+                        "point" -> LightManager.Type.POINT
+                        "spot" -> LightManager.Type.SPOT
+                        else -> LightManager.Type.DIRECTIONAL
+                    }
+                    LightNode(
+                        type = lightType,
+                        intensity = light.intensity,
+                        position = light.position,
+                        apply = {
+                            color(
+                                android.graphics.Color.red(light.color) / 255f,
+                                android.graphics.Color.green(light.color) / 255f,
+                                android.graphics.Color.blue(light.color) / 255f,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
@@ -168,6 +298,8 @@ class SceneViewPlatformView(
     override fun dispose() {
         channel.setMethodCallHandler(null)
         modelNodes.clear()
+        geometryNodes.clear()
+        lightNodes.clear()
         // Detach the ComposeView from any parent and dispose its composition
         // so that Filament resources (engine, loaders) are released.
         composeView.disposeComposition()
@@ -198,18 +330,21 @@ class SceneViewPlatformView(
                 result.success(null)
             }
             "addGeometry" -> {
-                // Geometry nodes are not yet supported via the bridge.
-                // SceneView's composable geometry API requires Compose DSL context
-                // which cannot be driven easily from a method channel.
+                // Geometry is rendered by appending to the reactive `geometryNodes`
+                // list, which the SceneView content lambda observes (issue #909).
+                geometryNodes.add(parseGeometryNode(call))
                 result.success(null)
             }
             "addLight" -> {
-                // Light configuration is handled by Scene's default mainLightNode.
-                // Custom light manipulation requires Compose DSL context.
+                // Light is rendered by appending to the reactive `lightNodes`
+                // list, which the SceneView content lambda observes (issue #909).
+                lightNodes.add(parseLightNode(call))
                 result.success(null)
             }
             "clearScene" -> {
                 modelNodes.clear()
+                geometryNodes.clear()
+                lightNodes.clear()
                 result.success(null)
             }
             "setEnvironment" -> {
@@ -271,6 +406,8 @@ class ARSceneViewPlatformView(
     )
 
     private val modelNodes = mutableStateListOf<FlutterModelNode>()
+    private val geometryNodes = mutableStateListOf<FlutterGeometryNode>()
+    private val lightNodes = mutableStateListOf<FlutterLightNode>()
 
     // Track which planes have already been reported to avoid duplicate callbacks.
     private val reportedPlaneIds = mutableSetOf<String>()
@@ -279,12 +416,14 @@ class ARSceneViewPlatformView(
         setContent {
             val engine = rememberEngine()
             val modelLoader = rememberModelLoader(engine)
+            val materialLoader = rememberMaterialLoader(engine)
 
             io.github.sceneview.ar.ARSceneView(
                 modifier = Modifier.fillMaxSize(),
                 surfaceType = SurfaceType.TextureSurface,
                 engine = engine,
                 modelLoader = modelLoader,
+                materialLoader = materialLoader,
                 planeRenderer = true,
                 onSessionUpdated = { _, frame ->
                     val updatedPlanes = frame.getUpdatedPlanes()
@@ -325,6 +464,65 @@ class ARSceneViewPlatformView(
                         )
                     }
                 }
+
+                geometryNodes.forEach { geom ->
+                    // Material instance cached per (color, unlit) — see the 3D
+                    // SceneView path for the rationale (issue #909).
+                    val mat = remember(geom.color, geom.unlit) {
+                        if (geom.unlit) materialLoader.createUnlitColorInstance(geom.color)
+                        else materialLoader.createColorInstance(geom.color)
+                    }
+                    DisposableEffect(geom.color, geom.unlit) {
+                        onDispose { materialLoader.destroyMaterialInstance(mat) }
+                    }
+                    when (geom.type) {
+                        "cube", "box" -> CubeNode(
+                            size = Size(geom.size, geom.size, geom.size),
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                        "sphere" -> SphereNode(
+                            radius = geom.size / 2f,
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                        "cylinder" -> CylinderNode(
+                            radius = geom.size / 2f,
+                            height = geom.size,
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                        "plane" -> PlaneNode(
+                            size = Size(geom.size, geom.size),
+                            materialInstance = mat,
+                            position = geom.position,
+                            rotation = geom.rotation,
+                        )
+                    }
+                }
+
+                lightNodes.forEach { light ->
+                    val lightType = when (light.type) {
+                        "point" -> LightManager.Type.POINT
+                        "spot" -> LightManager.Type.SPOT
+                        else -> LightManager.Type.DIRECTIONAL
+                    }
+                    LightNode(
+                        type = lightType,
+                        intensity = light.intensity,
+                        position = light.position,
+                        apply = {
+                            color(
+                                android.graphics.Color.red(light.color) / 255f,
+                                android.graphics.Color.green(light.color) / 255f,
+                                android.graphics.Color.blue(light.color) / 255f,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
@@ -338,6 +536,8 @@ class ARSceneViewPlatformView(
     override fun dispose() {
         channel.setMethodCallHandler(null)
         modelNodes.clear()
+        geometryNodes.clear()
+        lightNodes.clear()
         reportedPlaneIds.clear()
         // Detach the ComposeView from any parent and dispose its composition
         // so that Filament/ARCore resources are released.
@@ -369,13 +569,21 @@ class ARSceneViewPlatformView(
                 result.success(null)
             }
             "addGeometry" -> {
+                // Geometry is rendered by appending to the reactive `geometryNodes`
+                // list, which the ARSceneView content lambda observes (issue #909).
+                geometryNodes.add(parseGeometryNode(call))
                 result.success(null)
             }
             "addLight" -> {
+                // Light is rendered by appending to the reactive `lightNodes`
+                // list, which the ARSceneView content lambda observes (issue #909).
+                lightNodes.add(parseLightNode(call))
                 result.success(null)
             }
             "clearScene" -> {
                 modelNodes.clear()
+                geometryNodes.clear()
+                lightNodes.clear()
                 reportedPlaneIds.clear()
                 result.success(null)
             }

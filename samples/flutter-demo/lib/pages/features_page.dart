@@ -172,14 +172,15 @@ controller.clearScene();''',
             subtitle: 'Primitive shapes',
             description:
                 'Add geometry primitives (cube, sphere, cylinder, plane) '
-                'to the scene. Currently a forward-looking API placeholder.',
+                'to the scene. Rendered natively on Android; the iOS '
+                'RealityKit port is still pending (issue #909).',
             codeSnippet: '''controller.addGeometry(GeometryNode(
   type: 'cube',     // or 'sphere', 'cylinder', 'plane'
   size: 0.5,
   color: 0xFF005BC1,
   x: 0.0, y: 0.0, z: 0.0,
 ))''',
-            status: FeatureStatus.placeholder,
+            status: FeatureStatus.androidOnly,
           ),
 
           _FeatureCard(
@@ -188,14 +189,15 @@ controller.clearScene();''',
             subtitle: 'Scene lighting',
             description:
                 'Configure directional, point, or spot lights with '
-                'intensity and color. Uses scene defaults on native side.',
+                'intensity and color. Rendered natively on Android; the iOS '
+                'RealityKit port is still pending (issue #909).',
             codeSnippet: '''controller.addLight(LightNode(
   type: 'directional',  // or 'point', 'spot'
   intensity: 100000,
   color: 0xFFFFFFFF,
   x: 0.0, y: 4.0, z: 0.0,
 ))''',
-            status: FeatureStatus.placeholder,
+            status: FeatureStatus.androidOnly,
           ),
 
           _FeatureCard(
@@ -230,7 +232,7 @@ controller.clearScene();''',
 
 // -- Feature card widget --
 
-enum FeatureStatus { implemented, placeholder, planned }
+enum FeatureStatus { implemented, androidOnly, placeholder, planned }
 
 class _FeatureCard extends StatelessWidget {
   final IconData icon;
@@ -255,6 +257,7 @@ class _FeatureCard extends StatelessWidget {
 
     final (statusLabel, statusColor) = switch (status) {
       FeatureStatus.implemented => ('Implemented', Colors.green),
+      FeatureStatus.androidOnly => ('Android only', Colors.blue),
       FeatureStatus.placeholder => ('Placeholder', Colors.orange),
       FeatureStatus.planned => ('Planned', Colors.grey),
     };
