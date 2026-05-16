@@ -1,4 +1,5 @@
 import XCTest
+import RealityKit // `BoundingBox` for the #1391 content-bounds union tests
 @testable import SceneViewSwift
 
 #if os(iOS) || os(visionOS)
