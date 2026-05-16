@@ -80,23 +80,58 @@ test.describe('SceneView Web Demo Rendering', () => {
     }
   });
 
-  test('model selector is visible', async ({ page }) => {
+  test('model results panel is visible', async ({ page }) => {
     await page.goto('/');
 
     const overlay = page.locator('#loading-overlay');
     await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
 
-    // Model selector should have chips
-    const selector = page.locator('#model-selector');
-    await expect(selector).toBeVisible();
+    // The Models panel lists CDN model cards.
+    const panel = page.locator('#panel-models');
+    await expect(panel).toBeVisible();
 
-    const chips = selector.locator('.model-chip');
-    const count = await chips.count();
-    expect(count).toBeGreaterThan(0);
+    const cards = page.locator('#model-results .result-card');
+    expect(await cards.count()).toBeGreaterThan(0);
 
     // Screenshot with UI visible
     await page.screenshot({
-      path: 'test-results/03_model_selector.png',
+      path: 'test-results/03_model_results.png',
+      fullPage: false,
+    });
+  });
+
+  test('every tab activates its matching panel', async ({ page }) => {
+    await page.goto('/');
+
+    const overlay = page.locator('#loading-overlay');
+    await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
+
+    // Regression guard for issue #1503: switchTab() must toggle every
+    // `panel-*` div, not just `panel-models`/`panel-geometry`. A blank side
+    // panel on Models / Physics / Settings shipped because the panel-ID list
+    // drifted out of sync with the `data-tab` attributes.
+    const tabs = ['models', 'geometry', 'physics', 'settings'];
+
+    for (const tab of tabs) {
+      await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
+
+      // The clicked tab button is active.
+      await expect(page.locator(`.tab-btn[data-tab="${tab}"]`)).toHaveClass(/active/);
+
+      // Its matching panel is active and visible.
+      const panel = page.locator(`#panel-${tab}`);
+      await expect(panel).toHaveClass(/active/);
+      await expect(panel).toBeVisible();
+
+      // No other panel is left active.
+      for (const other of tabs) {
+        if (other === tab) continue;
+        await expect(page.locator(`#panel-${other}`)).not.toHaveClass(/active/);
+      }
+    }
+
+    await page.screenshot({
+      path: 'test-results/06_tabs.png',
       fullPage: false,
     });
   });
@@ -132,11 +167,11 @@ test.describe('SceneView Web Demo Rendering', () => {
 
     // Check logo text
     const logoText = page.locator('.logo-text');
-    await expect(logoText).toHaveText('SceneView');
+    await expect(logoText).toHaveText('SceneView Web Demo');
 
-    // Check badge
-    const badge = page.locator('.logo-badge');
-    await expect(badge).toHaveText('Web');
+    // Check version badge
+    const version = page.locator('.logo-version');
+    await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/);
 
     await page.screenshot({
       path: 'test-results/05_branding.png',
