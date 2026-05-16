@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Demo Settings sheet no longer dismisses itself instantly ([#1420](https://github.com/sceneview/sceneview/issues/1420)).** The `DemoSettingsLayer` bottom sheet treated its initial `SheetValue.Hidden` state as a dismissal, slamming the panel shut before it could animate open — making the Settings controls dead in every demo. `Hidden` is now only honoured as a dismiss once the sheet has actually settled in a shown detent.

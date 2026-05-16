@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Light Types demo no longer renders an empty black scene ([#1421](https://github.com/sceneview/sceneview/issues/1421)).** The demo composes a helmet, an off-centre backdrop wall, and a light-source marker; `autoCenterContent` centred the union of all three, shifting the helmet far off the hero camera's fixed orbit pivot. The demo now passes `autoCenterContent = false` so each node keeps its authored position and the camera frames the lit helmet as intended.
