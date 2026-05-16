@@ -23,6 +23,13 @@ on:
       - 'samples/**'
       - 'SceneViewSwift/**'
       - 'gradle/**'
+      # Build-script changes can alter a rendered frame (dependency bumps,
+      # renderer-affecting module config) just as much as `src/**` does.
+      - 'build.gradle*'
+      - '**/build.gradle*'
+      - 'settings.gradle*'
+      - 'gradle.properties'
+      - '**/gradle.properties'
   workflow_dispatch:
   # Invoked by nightly-ci.yml so the scheduled full-validation run reuses
   # this render-test definition rather than duplicating it. See #1324.

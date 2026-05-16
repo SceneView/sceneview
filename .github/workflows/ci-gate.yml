@@ -84,8 +84,15 @@ jobs:
           # GitHub registers a workflow's check runs within a few seconds
           # of the PR event, so we wait briefly before the first read to
           # avoid a false "all green" on an empty list.
+          #
+          # The fixed warm-up sleep alone is not enough: if another
+          # workflow's check runs register *after* the sleep, the first
+          # loop iteration sees an empty `others` set and would pass the
+          # gate prematurely. So we additionally refuse to exit green
+          # until at least one non-self check run has been observed.
           deadline=$(( $(date +%s) + 25 * 60 ))
           sleep 30
+          seen_any_other=false
 
           while :; do
             # All check runs for the head commit (handles >100 via paging).
@@ -97,11 +104,19 @@ jobs:
             others=$(echo "$runs" | jq -c --arg self "$SELF_CHECK" 'select(.name != $self)')
 
             if [ -z "$others" ]; then
-              echo "No other check runs reported for this SHA yet."
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "::error::Timed out — no other CI check runs ever registered for this SHA."
+                exit 1
+              fi
+              echo "No other check runs reported for this SHA yet — waiting for at least one to register."
+              sleep 20
+              continue
             fi
 
+            seen_any_other=true
+
             pending=$(echo "$others" | jq -r 'select(.status != "completed") | .name')
-            if [ -z "$pending" ]; then
+            if [ -z "$pending" ] && [ "$seen_any_other" = true ]; then
               break
             fi
 
@@ -122,12 +137,18 @@ jobs:
 
           # A real failure flips the gate red. `skipped`/`neutral`/`success`
           # all pass — path-filtered-out jobs report `skipped`.
+          #
+          # `stale` is NOT treated as a failure: GitHub marks a check run
+          # `stale` when a newer commit (or `cancel-in-progress`) supersedes
+          # its run. The current head SHA always gets a fresh run, so a
+          # `stale` conclusion on this SHA's checks is noise, not a defect —
+          # treating it as red would flip `CI Gate` red on an otherwise
+          # green PR.
           failed=$(echo "$others" \
             | jq -r 'select(.conclusion == "failure"
                           or .conclusion == "cancelled"
                           or .conclusion == "timed_out"
-                          or .conclusion == "action_required"
-                          or .conclusion == "stale") | .name')
+                          or .conclusion == "action_required") | .name')
 
           if [ -n "$failed" ]; then
             echo ""
