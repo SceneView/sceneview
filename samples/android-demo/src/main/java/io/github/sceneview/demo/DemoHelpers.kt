@@ -69,6 +69,68 @@ fun LoadingScrim(loading: Boolean, label: String = "Loading…") {
 }
 
 /**
+ * Camera-initialising scrim for AR demos.
+ *
+ * An [io.github.sceneview.ar.ARSceneView] paints its surface jet-black until ARCore
+ * opens the camera and delivers the first frame — on a cold start that can take
+ * several seconds. With no overlay the viewport reads as a frozen or crashed screen
+ * (#1473). [ARCameraInitScrim] covers the viewport with a centred spinner and a
+ * "Starting camera…" label until [initializing] flips to false, at which point
+ * Compose drops the Box from the tree and the live camera feed shows through.
+ *
+ * Drive [initializing] off the demo's first `onSessionUpdated` callback — the first
+ * invocation means ARCore has delivered a camera frame:
+ *
+ * ```kotlin
+ * var cameraReady by remember { mutableStateOf(false) }
+ * Box(Modifier.fillMaxSize()) {
+ *     ARSceneView(
+ *         onSessionUpdated = { _, _ -> cameraReady = true /* … */ },
+ *         …
+ *     ) { … }
+ *     ARCameraInitScrim(initializing = !cameraReady)
+ * }
+ * ```
+ *
+ * Place it as the last child of the [Box] that wraps the `ARSceneView` so it draws
+ * on top of the still-black viewport but below any other status overlays.
+ */
+@Composable
+fun ARCameraInitScrim(
+    initializing: Boolean,
+    label: String = "Starting camera…",
+) {
+    if (!initializing) return
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+                .padding(horizontal = 28.dp, vertical = 22.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(44.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 4.dp,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
  * First-frame signal for the [DemoScaffold] loading scrim.
  *
  * Cold-starting a SceneView demo leaves the viewport jet-black for 5–12 s while
