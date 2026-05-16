@@ -1,0 +1,2 @@
+<!-- category: Changed -->
+- **Daily maintenance digest in CI ([#1303](https://github.com/sceneview/sceneview/issues/1303)).** `maintenance.yml` now runs a report-only mirror of the `/maintain` skill — a new `.claude/scripts/maintenance-report.sh` produces a structured table (CI health, open issues/PRs, dependency drift, version sync, agent-skill drift, release decision) emitted to the workflow step-summary and an auto-updated tracking issue. The script is strictly read-only, retries transient API failures, and never blocks the workflow.
