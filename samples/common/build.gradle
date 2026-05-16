@@ -84,4 +84,11 @@ dependencies {
     testImplementation libs.robolectric
     testImplementation libs.androidx.test.junit
     testImplementation "junit:junit:4.13.2"
+    // LifecycleAwareLaunchedEffect regression tests (#972) — `TestLifecycleOwner`
+    // drives a real lifecycle through onStart/onStop on the JVM so the helper's
+    // `repeatOnLifecycle(STARTED)` cancel/restart contract can be exercised.
+    testImplementation libs.androidx.lifecycle.runtime.testing
+    // `runTest` + `UnconfinedTestDispatcher` for the coroutine-based lifecycle
+    // and LifecyclePauseGate regression tests.
+    testImplementation libs.kotlin.coroutines.test
 }

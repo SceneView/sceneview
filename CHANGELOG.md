@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Regression tests for the `samples/common` shared helpers ([#972](https://github.com/sceneview/sceneview/issues/972)).** The `LifecycleAwareLaunchedEffect` (#936) and `rememberMaterialInstance` / `rememberUnlitMaterialInstance` (#937) helpers shipped with no tests. New JVM/Robolectric suites pin their contracts: `LifecycleAwareLaunchedEffectTest` drives a real `TestLifecycleOwner` to assert the body cancels on `onStop` and re-runs from the top on `onStart`, and `RememberMaterialInstanceTest` fails if a future edit puts `metallic`/`roughness`/`reflectance` back into the `remember(...)` key (the 60 Hz `MaterialInstance` churn caught by the #937 review). `:samples:common:testDebugUnitTest` is now wired into the CI unit-test step.
+
 ## v4.6.2 — CI hotfix: land the demo app on the Play Store + API docs (2026-05-16)
 
 ### Fixed
