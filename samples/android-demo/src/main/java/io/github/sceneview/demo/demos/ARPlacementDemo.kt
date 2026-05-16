@@ -44,6 +44,7 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SampleAssets
@@ -346,6 +347,11 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                                     modelInstance = it,
                                     scaleToUnits = 0.3f,
                                     centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    // The bundled DamagedHelmet GLB carries a residual +90° X
+                                    // root rotation that lands it face-down on the plane.
+                                    // Keyed to the placed asset path so only the helmet is
+                                    // corrected; the other cycle models stay upright. See #1477.
+                                    rotation = DemoMath.placementRotationFor(placed.assetLocation),
                                     isEditable = true
                                 )
                             }
