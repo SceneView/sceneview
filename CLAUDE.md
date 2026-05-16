@@ -18,7 +18,7 @@ the documentation until it can.
 
 ### Before EVERY push to main:
 1. **Compile check**: `./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin`
-2. **Unit tests**: `./gradlew :sceneview:test :arsceneview:testDebugUnitTest`
+2. **Unit tests**: `./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest`
 3. **Bundle build** (if store-affecting): `./gradlew :samples:android-demo:bundleRelease`
 4. **Website JS** (if website changed): `node -c website-static/js/sceneview.js`
 5. **Full gate**: `bash .claude/scripts/pre-push-check.sh`
