@@ -101,7 +101,7 @@ jobs:
       kmp: ${{ steps.filter.outputs.kmp }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           # Conservative bias (#1295): when unsure whether a path is in
