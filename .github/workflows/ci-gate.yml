@@ -73,12 +73,16 @@ jobs:
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
-    # The internal poll loop self-terminates at a 25-min deadline (+30s
-    # warm-up sleep). The job timeout sits comfortably above that so the
-    # loop's own "::error:: timed out waiting for …" message is what
-    # surfaces — a hard runner kill would give no diagnostic. 35 min keeps
-    # a ~9-min cushion above the internal ~25.5-min worst case (#1360).
-    timeout-minutes: 35
+    # The internal poll loop self-terminates at a 50-min deadline (+30s
+    # warm-up sleep). It must comfortably exceed the slowest required job's
+    # own timeout — `Unit tests + coverage` is `timeout-minutes: 45` (#1554)
+    # — so a slow-but-succeeding unit-test job is still seen as completing,
+    # not as a gate timeout. The job timeout sits comfortably above the
+    # internal deadline so the loop's own "::error:: timed out waiting
+    # for …" message is what surfaces — a hard runner kill would give no
+    # diagnostic. 60 min keeps a ~9-min cushion above the internal
+    # ~50.5-min worst case (#1360, #1554).
+    timeout-minutes: 60
     steps:
       - name: Aggregate all PR check conclusions
         env:
@@ -122,7 +126,10 @@ jobs:
           # gate prematurely. So we additionally refuse to exit green
           # until at least one non-self check run has been observed AND
           # every expected core check (see REQUIRED_CHECKS) has registered.
-          deadline=$(( $(date +%s) + 25 * 60 ))
+          # 50-min internal deadline: must comfortably exceed the slowest
+          # required job's own timeout (`Unit tests + coverage` is 45 min,
+          # #1554) so a slow-but-succeeding job is seen as completing.
+          deadline=$(( $(date +%s) + 50 * 60 ))
           sleep 30
           seen_any_other=false
 

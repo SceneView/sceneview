@@ -212,7 +212,11 @@ jobs:
     needs: changes
     if: inputs.force-all || needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45 min: the full sceneview + arsceneview + samples JaCoCo pass runs
+    # close to 30 min on a slow/contended runner and tipped over once on a
+    # release PR (#1554), producing a confusing double-red. The extra
+    # headroom absorbs runner-speed variance without re-architecting.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v6
