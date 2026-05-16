@@ -163,9 +163,9 @@ import java.util.concurrent.atomic.AtomicReference
  *                                 inside this callback to choose a different mode if needed (#1063).
  * @param planeRenderer            Whether to render the AR plane grid overlay.
  * @param cameraStream             [ARCameraStream] for camera texture rendering and occlusion.
- * @param view                     Filament [View] for this scene. Use [rememberARView] (default)
- *                                 which applies [ToneMapper.Linear] to prevent the camera
- *                                 background from being over-processed by Filamic tone mapping.
+ * @param view                     Filament [View] for this scene. Use [rememberARView] (default),
+ *                                 which is tuned so the live camera background round-trips back to
+ *                                 the original camera pixels (see `createARView`).
  * @param isOpaque                 Whether the render target is opaque. Default `true`.
  * @param renderer                 Filament [Renderer]. Use [rememberRenderer].
  * @param scene                    Filament [SceneView] graph. Use [rememberScene].
