@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Play Store listing sync no longer marks a successful deploy red ([#1386](https://github.com/sceneview/sceneview/issues/1386)).** The `Sync Play Store listing (en-US)` job in `play-store.yml` is now `continue-on-error: true` and swallows a `403 Forbidden` (missing 'Edit store listing' permission) with a warning. The AAB build/publish jobs stay strict, so the listing-text sync is best-effort and can never block a release.

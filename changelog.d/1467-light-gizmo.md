@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- Movable Light demo: the draggable yellow light handle is now persistently visible. The light's orbit radius was reduced from 1.5 m to 0.75 m and its elevation clamped to ±50° so the handle stays inside the fixed camera's frustum for the whole drag, instead of swinging off-screen for most of the orbit. The handle sphere is also slightly larger (radius 0.09 m) so it reads as a clear, aimable target (#1467).
