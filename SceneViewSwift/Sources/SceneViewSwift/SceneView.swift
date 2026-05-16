@@ -433,13 +433,20 @@ private struct SceneViewRepresentation: View {
     /// Closes #1026 / #1041 / #1391.
     @State private var didCenterContent = false
 
-    /// Diagonal of the content union AABB the last framing pass fitted to.
-    /// `refreshContentCentering()` re-frames whenever the union grows by
-    /// more than ``framingStabilityEpsilon`` — this is what makes a
-    /// multi-model scene re-fit as each streamed model lands (#1391),
-    /// rather than latching on the first model the way #1385 did. Latches
-    /// `didCenterContent` once two consecutive ticks see a stable union.
-    @State private var lastFramedDiagonal: Float = 0
+    /// Tracks whether the content-union AABB has held steady long enough to
+    /// latch the framing pass. `refreshContentCentering()` re-frames whenever
+    /// the union diagonal grows (a streamed model just landed) and latches
+    /// `didCenterContent` only once the diagonal has been stable for a
+    /// sustained wall-clock window — see ``FramingStabilityTracker``.
+    ///
+    /// This replaces #1514's fragile "two consecutive ticks" latch, which
+    /// fired inside the multi-second gap between two streamed `Multi-Model
+    /// Park` models landing and so froze the camera on a partial 1–2-model
+    /// union (#1391, reopened). The duration-based hold spans those gaps.
+    @State private var framingStability = FramingStabilityTracker(
+        epsilon: SceneViewRepresentation.framingStabilityEpsilon,
+        stableHoldSeconds: SceneViewRepresentation.framingStableHoldSeconds
+    )
 
     /// Monotonic counter bumped by the content-framing driver task while
     /// ``didCenterContent`` is still `false`. Reading it inside the
@@ -550,14 +557,23 @@ private struct SceneViewRepresentation: View {
                 //
                 // This task bumps `framingTick` (which the RealityView body
                 // reads) every ~33 ms so `update:` keeps running until the
-                // bounds become valid and `refreshContentCentering()` flips
-                // `didCenterContent`. It then exits — zero ongoing cost for
-                // the rest of the scene's lifetime. A hard cap stops the
-                // poll after ~10 s for content that never produces bounds.
+                // bounds become valid, every streamed model has landed, and
+                // `refreshContentCentering()` flips `didCenterContent`. It
+                // then exits — zero ongoing cost for the rest of the scene's
+                // lifetime.
+                //
+                // The timeout caps the poll for content that never produces
+                // bounds. It must exceed the streamed-load window of the
+                // worst-case demo: `Multi-Model Park` streams four glTF
+                // models concurrently over 30–70 s on the simulator. #1514's
+                // 10 s cap stopped the driver long before the last models
+                // landed, so the camera never re-framed for them (#1391,
+                // reopened) — 90 s comfortably spans the streaming window
+                // while still bounding a genuinely stuck scene.
                 guard autoCenterContentEnabled else { return }
                 var elapsed: UInt64 = 0
                 let interval: UInt64 = 33_000_000          // ~30 Hz
-                let timeout: UInt64 = 10_000_000_000       // 10 s
+                let timeout: UInt64 = 90_000_000_000       // 90 s
                 while !Task.isCancelled && !didCenterContent && elapsed < timeout {
                     try? await Task.sleep(nanoseconds: interval)
                     elapsed += interval
@@ -897,12 +913,18 @@ private struct SceneViewRepresentation: View {
     private static let minVisualExtent: Float = 0.001
 
     /// Relative change in the content union diagonal below which the
-    /// framing is considered "stable". Once a tick sees the union diagonal
-    /// move by less than this fraction since the last fitted diagonal, the
-    /// pass latches `didCenterContent` and the driver task exits. Tolerant
-    /// enough to ignore sub-millimetre jitter, tight enough that a freshly
-    /// streamed model (which grows the union materially) always re-frames.
+    /// framing is considered "the same size". Tolerant enough to ignore
+    /// sub-millimetre jitter, tight enough that a freshly streamed model
+    /// (which grows the union materially) always re-frames. Fed into
+    /// ``FramingStabilityTracker``.
     private static let framingStabilityEpsilon: Float = 0.01
+
+    /// How long the content union must hold steady before the framing pass
+    /// latches `didCenterContent`. Must exceed the worst-case gap between two
+    /// streamed `Multi-Model Park` models landing — they load over 30–70 s,
+    /// so a multi-second hold reliably spans the inter-model gaps. Fed into
+    /// ``FramingStabilityTracker``. Closes #1391.
+    private static let framingStableHoldSeconds: Double = 2.5
 
     /// Computes the union axis-aligned bounding box of every content
     /// entity, expressed in `entities.contentRoot`-local space.
@@ -955,16 +977,18 @@ private struct SceneViewRepresentation: View {
         let extentMax = max(extents.x, extents.y, extents.z)
         guard extentMax > Self.minVisualExtent else { return }
 
-        // Re-frame whenever the union grew (a streamed model just landed).
-        // The diagonal is the single scalar that captures "size changed".
-        // Once it is stable vs the last fitted pass, latch and stop — this
-        // is what fixes the #1385 one-shot latch that froze multi-model
-        // scenes on whichever 1-2 models loaded first (#1391).
+        // Re-frame whenever the union changed (a streamed model just
+        // landed). The diagonal is the single scalar that captures "size
+        // changed". The latch only fires once the diagonal has held steady
+        // for a sustained wall-clock window — `FramingStabilityTracker`
+        // spans the multi-second gap between two streamed `Multi-Model Park`
+        // models landing, which #1514's "two consecutive ticks" latch did
+        // not, so it froze the camera on a partial 1–2-model union (#1391).
         let diagonal = simd_length(extents)
-        let stable = lastFramedDiagonal > 0
-            && abs(diagonal - lastFramedDiagonal)
-                <= Self.framingStabilityEpsilon * max(diagonal, lastFramedDiagonal)
-        lastFramedDiagonal = diagonal
+        let stable = framingStability.register(
+            diagonal: diagonal,
+            now: CFAbsoluteTimeGetCurrent()
+        )
 
         // 1. Centre the union centroid on the orbit pivot (world origin).
         entities.contentRoot.position = -bounds.center
@@ -991,8 +1015,9 @@ private struct SceneViewRepresentation: View {
             fovYDegrees: Self.baselineFov,
             aspect: viewportAspect ?? 0.46
         )
-        // Only latch once the union has settled across consecutive ticks —
-        // until then the driver task keeps re-framing as more models land.
+        // Only latch once the union has held steady for the sustained hold
+        // window (`FramingStabilityTracker`) — until then the driver task
+        // and the `update:` closure keep re-framing as more models land.
         if stable {
             didCenterContent = true
         }
