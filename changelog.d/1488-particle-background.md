@@ -1,0 +1,2 @@
+<!-- category: Added -->
+- **Animated 3D particle background on the Samples home ([#1488](https://github.com/sceneview/sceneview/issues/1488)).** The android-demo Samples tab now renders a subtle, on-brand particle field behind the demo grid — a `SceneView` scene of drifting low-poly spheres with a slow auto-orbiting camera, seeded per launch. A first visual experiment that dogfoods the SDK on the app's own home screen; tuning constants live in `ParticleBackground.kt`.

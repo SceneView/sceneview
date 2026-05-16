@@ -1,0 +1,3 @@
+<!-- category: Fixed -->
+- Physics demo: the rigid-body simulation now actually runs — the `SphereNode` composable no longer re-pushes `position`/`rotation`/`scale` to the node on every recomposition, which was clobbering the per-frame position written by `PhysicsBody` (the same fix already applied to the bare `Node` composable). Spheres now drop, bounce, and settle as intended ([#1463](https://github.com/sceneview/sceneview/issues/1463)).
+- Physics demo: re-framed the camera so the grey ground plane is vertically centred in the viewport instead of being shoved into the bottom third with its near edge clipped.

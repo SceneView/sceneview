@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **AR placement demos no longer drop the helmet face-down ([#1477](https://github.com/sceneview/sceneview/issues/1477)).** The bundled Khronos *DamagedHelmet* GLB ships a residual +90° X root rotation from its Blender export, which landed it nose-into-the-floor when placed under an ARCore plane anchor. The Cloud Anchor, Tap to Place, and Depth Occlusion demos now apply a shared `-90°` X correcting rotation at placement time so the helmet stands upright, visor forward. Other bundled cycle models are unaffected.

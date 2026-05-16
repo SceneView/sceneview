@@ -1,5 +1,6 @@
 package io.github.sceneview.demo.demos.internal
 
+import io.github.sceneview.math.Rotation
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -48,6 +49,37 @@ internal object DemoMath {
     }
 
     private fun Float.wrapTo360(): Float = ((this % 360f) + 360f) % 360f
+
+    /**
+     * Asset path of the bundled Khronos *DamagedHelmet* GLB. The helmet is the hero
+     * model for the AR placement demos (Cloud Anchor, Tap to Place, Depth Occlusion).
+     */
+    const val HELMET_ASSET = "models/khronos_damaged_helmet.glb"
+
+    /**
+     * Default placement rotation to apply to a bundled model the moment it is dropped
+     * onto an AR plane. See [#1477](https://github.com/sceneview/sceneview/issues/1477).
+     *
+     * The Khronos *DamagedHelmet* GLB ships with a root-node quaternion of
+     * `(0.7071, 0, 0, 0.7071)` — a +90° rotation about X — left over from its
+     * Blender Z-up export. When the model is placed under an ARCore plane
+     * `AnchorNode` (whose local frame is already Y-up), that residual pitch lands
+     * the helmet **face-down**, nose into the floor, with the gold exhaust nozzle
+     * pointing at the ceiling.
+     *
+     * Rather than re-author the shared bundled asset — several non-AR demos also
+     * load it and frame it correctly in their own way — every AR placement demo
+     * applies this single correcting rotation at placement time so the helmet
+     * stands upright, visor forward. All other bundled cycle models (fox, lantern,
+     * toy car, shiba) are authored upright and get the identity rotation.
+     *
+     * @param assetPath The bundled asset path passed to `rememberModelInstance`.
+     * @return The local Euler rotation (degrees) to pass to `ModelNode(rotation = …)`.
+     */
+    fun placementRotationFor(assetPath: String): Rotation = when (assetPath) {
+        HELMET_ASSET -> Rotation(x = -90f)
+        else -> Rotation(x = 0f)
+    }
 
     /**
      * Tabletop-display rotation used by [io.github.sceneview.demo.demos.MultiModelDemo].

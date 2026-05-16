@@ -115,10 +115,14 @@ fun PhysicsDemo(onBack: () -> Unit) {
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
-    // Camera slightly above scene, angled down so the floor + falling bodies are both framed.
+    // Camera above and back from the scene, angled down. The look-at target sits between
+    // the floor (y = -0.5) and the spheres' rest height (y ≈ -0.42) rather than the scene
+    // origin, so the 1.6 m ground plane is vertically centred in the viewport instead of
+    // being shoved into the bottom third with its near edge clipped (#1463). Pulled back to
+    // z = 4 so the full plane depth fits with headroom for the drop column above it.
     val cameraNode = rememberCameraNode(engine) {
-        position = Position(0f, 1.5f, 3f)
-        lookAt(Position(0f, 0f, 0f))
+        position = Position(0f, 2f, 4f)
+        lookAt(Position(0f, -0.35f, 0f))
     }
 
     val firstFrame = rememberFirstFrameState()

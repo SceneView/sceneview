@@ -67,10 +67,11 @@ open class CameraGestureDetector(
      *                           a sensible default ORBIT-mode manipulator.
      * @param pinchZoomSpeed     Per-pixel zoom multiplier applied to the inter-finger separation
      *                           delta during a pinch gesture. Lower values = smoother zoom. The
-     *                           default `1/30` (≈ 0.033) was tuned in v4.0.x after Pixel 9 review
-     *                           feedback that the previous `1/10` value felt too abrupt and made
-     *                           the camera lurch through the target during fast pinches. Set to a
-     *                           higher value (e.g. `1/5`) to restore the legacy fast-zoom feel.
+     *                           default `1/18` (≈ 0.056) was re-tuned in #1427: the v4.0.x `1/30`
+     *                           value felt too sluggish on-device ("hyper lent"), while the
+     *                           pre-v4.0.x `1/10` lurched the camera through the target during
+     *                           fast pinches. `1/18` sits between the two. Set to a higher value
+     *                           (e.g. `1/5`) to restore the legacy fast-zoom feel.
      * @param pinchZoomDamping   Non-linear damping exponent applied to the zoom delta. Values < 1
      *                           soften large pinches without sacrificing small-pinch precision
      *                           (sqrt-style curve). The default `0.7` is a gentle knee; set to
@@ -94,7 +95,10 @@ open class CameraGestureDetector(
                     orbitHomePosition?.let { orbitHomePosition(it) }
                     targetPosition?.let { targetPosition(it) }
                 }
-                .orbitSpeed(0.005f, 0.005f)
+                // Re-tuned in #1427: orbit/pan felt "beaucoup trop vite" on-device
+                // (2026-05-16 Pixel 9 QA). 0.005 → 0.003 makes finger drag track the
+                // model more calmly without feeling sluggish.
+                .orbitSpeed(0.003f, 0.003f)
                 .zoomSpeed(0.05f)
                 .build(Manipulator.Mode.ORBIT),
             pinchZoomSpeed,
@@ -143,10 +147,13 @@ open class CameraGestureDetector(
 
         companion object {
             /**
-             * Default per-pixel zoom multiplier. Tuned in v4.0.x — was `1/10` previously, which
-             * felt too abrupt on dense screens. See [pinchZoomSpeed] kdoc for tuning advice.
+             * Default per-pixel zoom multiplier. Tuned in v4.0.x from `1/10` down to `1/30`
+             * (felt too abrupt on dense screens), then re-tuned in #1427 from `1/30` up to
+             * `1/18` — the `1/30` value made pinch-zoom feel "hyper lent" in the 2026-05-16
+             * on-device QA. `1/18` restores a responsive pinch while staying well short of
+             * the abrupt legacy `1/10`. See [pinchZoomSpeed] kdoc for tuning advice.
              */
-            const val DEFAULT_PINCH_ZOOM_SPEED: Float = 1f / 30f
+            const val DEFAULT_PINCH_ZOOM_SPEED: Float = 1f / 18f
 
             /**
              * Default damping exponent for pinch deltas. Sub-1 values create a sqrt-like response
