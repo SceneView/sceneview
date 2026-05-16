@@ -59,6 +59,7 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.recording.ARRecorder
 import io.github.sceneview.ar.recording.rememberARRecorder
+import io.github.sceneview.demo.ARCameraInitScrim
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
@@ -395,6 +396,11 @@ private fun ModeContent(
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
     var isTracking by remember { mutableStateOf(false) }
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
+    // Flipped true on the first onSessionUpdated — i.e. once ARCore has opened the
+    // camera (or started replaying the dataset) and delivered a frame. Until then the
+    // ARSceneView surface is bare black, so we cover it with ARCameraInitScrim rather
+    // than leave a viewport that reads as frozen/broken (#1473).
+    var cameraReady by remember { mutableStateOf(false) }
 
     val recorder = rememberARRecorder()
     // The file we passed to recorder.start() — kept so we can hand it back to the
@@ -453,6 +459,7 @@ private fun ModeContent(
             config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
         },
         onSessionUpdated = { session: Session, frame: Frame ->
+            cameraReady = true
             latestFrame = frame
             isTracking = frame.camera.trackingState == TrackingState.TRACKING
             // Stateless side-channel pattern (#876) — recordFrame publishes the
@@ -537,6 +544,14 @@ private fun ModeContent(
     if (!isTracking) {
         TrackingFailureBanner(reason = trackingFailureReason)
     }
+
+    // Cover the still-black ARSceneView surface until ARCore delivers its first frame —
+    // either the live camera feed, or the first replayed frame in PLAYBACK mode — so the
+    // entry doesn't read as a frozen screen with a dimmed record button (#1473).
+    ARCameraInitScrim(
+        initializing = !cameraReady,
+        label = if (mode == Mode.PLAYBACK) "Starting playback…" else "Starting camera…",
+    )
 }
 
 @Composable
