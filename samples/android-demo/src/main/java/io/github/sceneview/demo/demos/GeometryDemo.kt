@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import io.github.sceneview.sample.LifecycleAwareLaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -91,6 +92,18 @@ fun GeometryDemo(onBack: () -> Unit) {
     val sphereMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[1], metallic, roughness)
     val cylinderMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[2], metallic, roughness)
     val planeMaterial = rememberMaterialInstance(materialLoader, SceneViewColors.Ramp4[3], metallic, roughness)
+
+    // The plane spins on its Y axis, so for half of every revolution its back face
+    // points at the camera. With the default single-sided culling that half-turn
+    // renders nothing and the panel appears to blink out of existence — see #1426.
+    // Mark the shared PBR material double-sided so the back face stays visible.
+    // setDoubleSided is a per-MaterialInstance override on the ubershader, so this
+    // is a code-only change — no .filamat recompile. Keyed on planeMaterial so the
+    // override survives a material re-allocation.
+    DisposableEffect(planeMaterial) {
+        planeMaterial.setDoubleSided(true)
+        onDispose { }
+    }
 
     // Continuous Y-axis spin shared by all primitives. withFrameNanos drives the
     // angle off the Choreographer so it runs at the display's refresh rate without
