@@ -36,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -118,6 +119,15 @@ enum class AssetSourceState { Streamed, Streaming, Bundled }
  *   [rememberFirstFrameState] + `SceneView(onFrame = …)`. A defensive 12 s
  *   timeout dismisses the scrim even if `onFrame` never fires. Demos that load
  *   models can still layer their own [LoadingScrim] spinner on top.
+ *
+ * Stage 3 polish (#1154):
+ * - `peekHeader` → a short status string (e.g. `"3 anchors placed"`) rendered on
+ *   the closed peek chip in place of the generic "Settings" label. Mirrors the
+ *   top-center status pills without stealing more viewport. `null` falls back to
+ *   the plain "Settings" label.
+ * - `onResetSettings != null` → a "Reset" text button is shown in the sheet
+ *   header. Tapping it lets a demo clear any in-memory tweaks back to its
+ *   defaults. `null` hides the button entirely so demos opt in.
  */
 @Composable
 fun DemoScaffold(
@@ -126,6 +136,8 @@ fun DemoScaffold(
     controls: (@Composable ColumnScope.() -> Unit)? = null,
     assetSource: AssetSourceState? = null,
     firstFrameRendered: androidx.compose.runtime.State<Boolean>? = null,
+    peekHeader: String? = null,
+    onResetSettings: (() -> Unit)? = null,
     scene: @Composable BoxScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -199,6 +211,8 @@ fun DemoScaffold(
                 DemoSettingsLayer(
                     controlsContent = controls,
                     haptic = haptic,
+                    peekHeader = peekHeader,
+                    onResetSettings = onResetSettings,
                 )
             }
         }
@@ -315,6 +329,7 @@ object DemoScaffoldTestTags {
     const val SETTINGS_FAB = "demo-settings-fab"
     const val SETTINGS_PEEK = "demo-settings-peek"
     const val SETTINGS_SHEET = "demo-settings-sheet"
+    const val SETTINGS_RESET = "demo-settings-reset"
     const val QA_PILL = "demo-qa-pill"
     const val ASSET_SOURCE_CHIP = "demo-asset-source-chip"
     const val FIRST_FRAME_SCRIM = "demo-first-frame-scrim"
@@ -329,6 +344,8 @@ object DemoScaffoldTestTags {
 private fun BoxScope.DemoSettingsLayer(
     controlsContent: @Composable ColumnScope.() -> Unit,
     haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    peekHeader: String? = null,
+    onResetSettings: (() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val sheetState: SheetState = rememberModalBottomSheetState(
@@ -337,6 +354,8 @@ private fun BoxScope.DemoSettingsLayer(
         skipPartiallyExpanded = false,
     )
     val scope = rememberCoroutineScope()
+    val openSettingsCd = stringResource(R.string.demo_settings_open)
+    val fabCd = stringResource(R.string.demo_settings_fab_cd)
 
     // FAB + peek chip pinned to the bottom-end of the scene area.
     Column(
@@ -371,7 +390,9 @@ private fun BoxScope.DemoSettingsLayer(
                         )
                     }
                     .padding(horizontal = 10.dp, vertical = 6.dp)
-                    .semantics { contentDescription = "Open demo settings" }
+                    .semantics {
+                        contentDescription = openSettingsCd
+                    }
                     .testTag(DemoScaffoldTestTags.SETTINGS_PEEK),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -382,7 +403,10 @@ private fun BoxScope.DemoSettingsLayer(
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = " Settings",
+                    // Stage 3: surface a short demo status (e.g. "3 anchors
+                    // placed") on the closed chip when the demo provides one,
+                    // else fall back to the generic "Settings" label.
+                    text = " " + (peekHeader ?: stringResource(R.string.demo_settings_title)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -400,7 +424,9 @@ private fun BoxScope.DemoSettingsLayer(
             },
             shape = CircleShape,
             modifier = Modifier
-                .semantics { contentDescription = "Demo settings" }
+                .semantics {
+                    contentDescription = fabCd
+                }
                 .testTag(DemoScaffoldTestTags.SETTINGS_FAB),
         ) {
             Icon(
@@ -421,6 +447,38 @@ private fun BoxScope.DemoSettingsLayer(
             sheetState = sheetState,
             modifier = Modifier.testTag(DemoScaffoldTestTags.SETTINGS_SHEET),
         ) {
+            // Header row pinned above the scrolling controls — carries the
+            // sheet title and, when the demo opts in, a "Reset" text button
+            // that clears any in-memory tweaks back to the demo's defaults
+            // (#1154 Stage 3). The header sits OUTSIDE the verticalScroll so a
+            // long controls list never scrolls the Reset affordance offscreen.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.demo_settings_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onResetSettings != null) {
+                    val resetCd = stringResource(R.string.demo_settings_reset_cd)
+                    TextButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onResetSettings()
+                        },
+                        modifier = Modifier
+                            .semantics { contentDescription = resetCd }
+                            .testTag(DemoScaffoldTestTags.SETTINGS_RESET),
+                    ) {
+                        Text(stringResource(R.string.demo_settings_reset))
+                    }
+                }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -450,6 +508,10 @@ private fun BoxScope.DemoSettingsLayer(
                 }
                 SheetValue.Hidden -> {
                     if (hasShown) {
+                        // Subtle tick on drag-down-to-dismiss so the gesture
+                        // gets the same tactile confirmation as a detent
+                        // change (#1154 Stage 3).
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         expanded = false
                     }
                 }

@@ -354,6 +354,13 @@
     <string name="demo_chip_streamed">Streamed (cached)</string>
     <string name="demo_chip_streaming">Streaming…</string>
     <string name="demo_chip_bundled">Bundled fallback</string>
+
+    <!-- DemoScaffold v2 bottom-sheet settings (#1154) -->
+    <string name="demo_settings_title">Settings</string>
+    <string name="demo_settings_open">Open demo settings</string>
+    <string name="demo_settings_fab_cd">Demo settings</string>
+    <string name="demo_settings_reset">Reset</string>
+    <string name="demo_settings_reset_cd">Reset demo settings to defaults</string>
     <string name="about_star_on_github">Star on GitHub</string>
     <string name="about_made_with">Made with</string>
     <string name="about_made_by"> by Thomas Gorisse</string>
