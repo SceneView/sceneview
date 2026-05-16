@@ -198,6 +198,14 @@ fun LightingDemo(onBack: () -> Unit) {
                 // is always somewhat visible (neutral_ibl.ktx), and the user's LightNode
                 // adds its directional / point / spot contribution on top.
                 mainLightNode = null,
+                // This demo intentionally composes three nodes off-centre: the helmet at
+                // origin, a 3 × 2.4 m backdrop wall behind it, and a light-source marker
+                // up-and-forward. With the default autoCenterContent the union bounding
+                // box of those three is centred — which shifts the helmet far off the
+                // HeroOrbit camera's fixed (0,0,0) pivot, leaving the viewport black
+                // (#1421). Disable it so each node keeps its authored world position and
+                // the camera orbits the helmet exactly as intended.
+                autoCenterContent = false,
                 cameraManipulator = cameraManipulator,
             ) {
                 modelInstance?.let { instance ->
