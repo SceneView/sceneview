@@ -35,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.google.android.filament.Skybox
 import dev.romainguy.kotlin.math.Float3
 import dev.romainguy.kotlin.math.lookAt
 import io.github.sceneview.SceneView
+import io.github.sceneview.safeDestroySkybox
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.rememberFirstFrameState
@@ -88,15 +90,42 @@ fun VideoDemo(onBack: () -> Unit) {
     val environmentLoader = rememberEnvironmentLoader(engine)
 
     // HDR environment for IBL — the studio_warm probe gives metallic surfaces a
-    // believable reflection (warm key + cool fill); skybox stays off so the
-    // video reads against neutral black.
+    // believable reflection (warm key + cool fill).
+    //
+    // The HDR is loaded with `createSkybox = false` (we don't want the warm
+    // studio panorama as the background), but an [Environment] with a `null`
+    // skybox leaves every untouched pixel UNCLEARED on an opaque SceneView —
+    // Filament only fills the background where a skybox is present. That left
+    // the viewport showing the swap-chain's stale / uninitialised buffer (a
+    // light near-white wash, or a leftover gradient from the previous screen),
+    // which broke the dark theme every other demo uses (#1469).
+    //
+    // Fix: keep the HDR IBL for reflections but pair it with an explicit opaque
+    // BLACK skybox so the background is always a clean neutral black — exactly
+    // what the default `rememberEnvironment` does (`createEnvironment` builds a
+    // black skybox), and what the demo's "video reads against neutral black"
+    // intent always meant.
     val hdrEnvironment = rememberHDREnvironment(
         environmentLoader,
         "environments/studio_warm_2k.hdr",
         createSkybox = false,
     )
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
-    val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
+    val blackSkybox = remember(engine) {
+        Skybox.Builder()
+            .color(floatArrayOf(0f, 0f, 0f, 1f))
+            .build(engine)
+    }
+    DisposableEffect(blackSkybox) {
+        onDispose { engine.safeDestroySkybox(blackSkybox) }
+    }
+    // While the HDR is still decoding, fall back to the default environment
+    // (which already carries a black skybox). Once the HDR is ready, reuse its
+    // IBL but swap in the guaranteed-black skybox so the background never
+    // exposes the uncleared swap-chain.
+    val activeEnvironment = hdrEnvironment?.let { hdr ->
+        remember(hdr, blackSkybox) { hdr.copy(skybox = blackSkybox) }
+    } ?: fallbackEnvironment
 
     // MediaPlayer reading from the BUNDLED `assets/videos/sample.mp4` (517 KB) — works
     // offline, in airplane mode, on Play Store reviewer's metered network, and
