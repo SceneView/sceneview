@@ -1,5 +1,6 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,9 +18,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.rotateRad
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
@@ -27,7 +33,11 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import dev.romainguy.kotlin.math.Float4
 import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.ar.arcore.getProjectionTransform
+import io.github.sceneview.ar.arcore.transform
+import io.github.sceneview.ar.arcore.viewTransform
 import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
@@ -43,7 +53,10 @@ import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import java.io.File
 import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sin
 
 /**
@@ -221,6 +234,73 @@ private val ORBITAL_PLANETS: List<Planet> = run {
 
 private const val ORBIT_RADIUS = 1.5f
 
+/**
+ * Index into [ORBITAL_PLANETS] of the "target to chase" — the model the off-screen
+ * directional indicator points at (issue #1482). Slot 4 is the bundled toy car, the
+ * orbiting object the QA tester referred to as "the flying car". It is a deliberately
+ * slow-orbiting (0.10 rad/s), kid-friendly anchor model, so it stays a stable, easy
+ * target for the user to turn toward and "catch".
+ */
+private const val TARGET_PLANET_INDEX = 4
+
+/**
+ * Near/far clip planes (metres) used when asking ARCore for the camera projection
+ * matrix. The values are not visually critical here — they only affect the depth
+ * range of the projection, and we discard depth (we keep only the clip-space sign
+ * and the x/y direction). The range simply has to bracket the 1.5 m orbit radius.
+ */
+private const val PROJECTION_NEAR = 0.05f
+private const val PROJECTION_FAR = 30f
+
+/**
+ * On-screen state for the directional indicator that points at the off-screen target
+ * (issue #1482). `null` whenever the target is comfortably inside the camera frustum —
+ * in that case no arrow is drawn and the user can simply see the model.
+ *
+ * @param angleRad direction, in radians, from the screen centre toward the target,
+ *   measured in Compose screen space (0 = +X / right, π/2 = +Y / down). Used both to
+ *   place the arrow on the viewport edge and to rotate the arrow glyph.
+ */
+private data class OffscreenTarget(val angleRad: Float)
+
+/**
+ * Projects [targetWorld] (an ARCore world-space position) to the camera and decides
+ * whether it is off-screen. Returns an [OffscreenTarget] with the screen-space
+ * direction toward it, or `null` when the target is inside the camera frustum.
+ *
+ * The projection is the standard `clip = projection · view · worldPoint`:
+ *
+ * - `clip.w <= 0` means the point is **behind** the camera. The perspective divide
+ *   would mirror x/y, so we negate the clip x/y to recover the true direction and
+ *   always treat the point as off-screen.
+ * - otherwise `ndc = clip.xy / clip.w` is in `[-1, 1]` when on-screen. The point is
+ *   considered visible only when both components are within `[-1, 1]`.
+ *
+ * The returned angle is in Compose screen space, where +Y points **down** — hence the
+ * `-ndcY` (NDC / OpenGL Y points up).
+ */
+private fun computeOffscreenTarget(frame: Frame, targetWorld: Position): OffscreenTarget? {
+    val camera = frame.camera
+    if (camera.trackingState != TrackingState.TRACKING) return null
+
+    val viewProjection =
+        camera.getProjectionTransform(PROJECTION_NEAR, PROJECTION_FAR) * camera.viewTransform
+    val clip = viewProjection * Float4(targetWorld, w = 1.0f)
+
+    val behindCamera = clip.w <= 0f
+    // Guard against a near-zero w (target almost exactly on the camera plane) which
+    // would blow the divide up — treat it as "behind" and use raw clip x/y direction.
+    val safeW = if (kotlin.math.abs(clip.w) < 1e-4f) 1e-4f else clip.w
+    val ndcX = if (behindCamera) -clip.x else clip.x / safeW
+    val ndcY = if (behindCamera) -clip.y else clip.y / safeW
+
+    val onScreen = !behindCamera && ndcX in -1f..1f && ndcY in -1f..1f
+    if (onScreen) return null
+
+    // Compose screen Y points down, NDC Y points up — flip Y for the screen-space angle.
+    return OffscreenTarget(angleRad = atan2(-ndcY, ndcX))
+}
+
 @Composable
 fun OrbitalARDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
@@ -274,6 +354,15 @@ fun OrbitalARDemo(onBack: () -> Unit) {
     }
     val orbitSeconds = orbitNanos / 1_000_000_000f
 
+    // Directional indicator state (#1482). Non-null whenever the chase target
+    // (the toy car, slot TARGET_PLANET_INDEX) is outside the camera frustum — the
+    // overlay then draws an edge arrow pointing the user toward it. Recomputed once
+    // per AR frame in onSessionUpdated.
+    var offscreenTarget by remember { mutableStateOf<OffscreenTarget?>(null) }
+    // Viewport size in pixels, captured from the Compose layout so the indicator can
+    // be clamped to the real edge of the AR surface.
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+
     // Per-demo offline indicator (#1152 Stage 3): if every streamed slot has
     // resolved to a real `File` (Sketchfab CDN), surface "Streamed". If some
     // are still null, we're "Streaming…". If `SketchfabConfig.apiKey` is
@@ -305,7 +394,11 @@ fun OrbitalARDemo(onBack: () -> Unit) {
             )
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { viewportSize = it }
+        ) {
             ARSceneView(
                 modifier = Modifier.fillMaxSize(),
                 engine = engine,
@@ -328,6 +421,36 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                         userAnchor = runCatching {
                             session.createAnchor(Pose.IDENTITY)
                         }.getOrNull()
+                    }
+                    // Off-screen target indicator (#1482). Project the chase target's
+                    // current world position into the camera and, when it falls outside
+                    // the frustum, surface the screen-space direction toward it so the
+                    // edge arrow can guide the user to turn and catch it.
+                    val anchor = userAnchor
+                    offscreenTarget = if (anchor != null && isTracking) {
+                        runCatching {
+                            val target = ORBITAL_PLANETS[TARGET_PLANET_INDEX]
+                            val targetAngle =
+                                (target.initialAngleRad + target.orbitSpeed * orbitSeconds) %
+                                    (2f * PI.toFloat())
+                            // Target position in the AnchorNode's local frame — identical
+                            // to the ModelNode `position` computed in the content block.
+                            val local = Position(
+                                x = cos(targetAngle) * ORBIT_RADIUS,
+                                y = target.height,
+                                z = sin(targetAngle) * ORBIT_RADIUS,
+                            )
+                            // Lift the local point into ARCore world space through the
+                            // anchor pose, then project + frustum-test it.
+                            val worldPoint = anchor.pose.transform *
+                                Float4(local, w = 1.0f)
+                            computeOffscreenTarget(
+                                frame,
+                                Position(worldPoint.x, worldPoint.y, worldPoint.z),
+                            )
+                        }.getOrNull()
+                    } else {
+                        null
                     }
                 }
             ) {
@@ -386,6 +509,19 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                 }
             }
 
+            // Off-screen target indicator (#1482) — an edge arrow that points toward
+            // the chase target whenever it is outside the camera frustum, so the user
+            // knows which way to turn. Drawn below the status pill so the pill text
+            // always stays readable.
+            val target = offscreenTarget
+            if (target != null && viewportSize != IntSize.Zero) {
+                OffscreenTargetArrow(
+                    angleRad = target.angleRad,
+                    viewportSize = viewportSize,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
             // Status pill — top-center, mirrors the ARPlacement / ARInstantPlacement style.
             Surface(
                 modifier = Modifier
@@ -406,6 +542,72 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                     style = MaterialTheme.typography.labelLarge
                 )
             }
+        }
+    }
+}
+
+/**
+ * Full-screen [Canvas] overlay that draws a single directional arrow on the viewport
+ * edge, pointing toward the off-screen chase target (issue #1482).
+ *
+ * The arrow is placed by casting a ray from the screen centre in direction [angleRad]
+ * (Compose screen space: 0 = right, π/2 = down) and clamping the hit point to a
+ * rounded-rectangle inset from the viewport edge. The glyph is a filled triangle plus
+ * a short stalk, rotated so it visually points along the same direction.
+ *
+ * @param angleRad direction from screen centre toward the target, in radians.
+ * @param viewportSize current AR surface size in pixels.
+ * @param color arrow fill colour — the demo passes the Material primary colour.
+ */
+@Composable
+private fun OffscreenTargetArrow(
+    angleRad: Float,
+    viewportSize: IntSize,
+    color: Color,
+) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+        if (width <= 0f || height <= 0f) return@Canvas
+
+        val centerX = width / 2f
+        val centerY = height / 2f
+        val dirX = cos(angleRad)
+        val dirY = sin(angleRad)
+
+        // Keep the arrow fully inside the viewport: inset the clamp rectangle by enough
+        // to fit the glyph + a small margin, and never let the inset collapse past the
+        // centre on a very small surface.
+        val margin = 48.dp.toPx()
+        val halfW = max(1f, centerX - margin)
+        val halfH = max(1f, centerY - margin)
+
+        // Distance along (dirX, dirY) until the ray first crosses the inset rectangle.
+        // Guard the divide for axis-aligned directions (dirX or dirY == 0).
+        val tX = if (dirX != 0f) halfW / kotlin.math.abs(dirX) else Float.MAX_VALUE
+        val tY = if (dirY != 0f) halfH / kotlin.math.abs(dirY) else Float.MAX_VALUE
+        val t = min(tX, tY)
+
+        val arrowX = centerX + dirX * t
+        val arrowY = centerY + dirY * t
+
+        // Triangle pointing along +X before rotation; rotateRad spins it to angleRad.
+        val tip = 22.dp.toPx()
+        val halfBase = 15.dp.toPx()
+        rotateRad(radians = angleRad, pivot = Offset(arrowX, arrowY)) {
+            // Soft drop shadow for contrast against bright camera frames.
+            val arrowPath = Path().apply {
+                moveTo(arrowX + tip, arrowY)
+                lineTo(arrowX - tip * 0.4f, arrowY - halfBase)
+                lineTo(arrowX - tip * 0.4f, arrowY + halfBase)
+                close()
+            }
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.35f),
+                radius = tip * 1.15f,
+                center = Offset(arrowX, arrowY),
+            )
+            drawPath(path = arrowPath, color = color)
         }
     }
 }
