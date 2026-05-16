@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- expanded the web-demo playwright suite into full per-tab / per-demo qa coverage — exercises every models, geometry, physics and settings demo with camera interaction, canvas render assertions and console-error checks, and emits a machine-readable `web-qa-summary.json` for the device-qa orchestrator (#1564)
+
 ## v4.9.0 — Cross-platform demo catalogs, web auto-center parity & teardown safety (2026-05-16)
 
 ### Added
