@@ -225,6 +225,17 @@ Every file below MUST be updated when bumping the version. Use `/version-bump` o
 | | `sceneview/Module.md` | version ref |
 | **Swift** | `SceneViewSwift/` uses git tag `vX.Y.Z` | not a file version |
 
+> ⚠️ **Do NOT bump the Flutter/RN plugins' *consumed* SceneView dependency.**
+> The `io.github.sceneview:(ar)sceneview:X.Y.Z` lines in
+> `flutter/.../android/build.gradle` and
+> `react-native/.../android/build.gradle.kts` are dependencies on the
+> **published** Maven Central artifact — they must lag to the **last released**
+> version and cannot point at the in-flight release (it isn't on Maven Central
+> yet; pointing at it breaks the `Build flutter-demo APK` CI check). Only the
+> plugins' OWN package versions (`version 'X.Y.Z'`, `pubspec.yaml`, podspec,
+> `package.json`) bump to the release version. `sync-versions.sh` reports these
+> consumed-dep coordinates WARN-only and never auto-bumps them (issue #1494).
+
 **Automation:**
 - `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations
 - `bash .claude/scripts/sync-versions.sh --fix` — auto-fixes mismatches
