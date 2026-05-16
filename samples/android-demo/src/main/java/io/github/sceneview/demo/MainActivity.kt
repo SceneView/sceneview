@@ -45,6 +45,7 @@ import io.github.sceneview.demo.demos.PhysicsDemo
 import io.github.sceneview.demo.demos.PostProcessingDemo
 import io.github.sceneview.demo.demos.CustomMeshDemo
 import io.github.sceneview.demo.demos.ShapeDemo
+import io.github.sceneview.demo.demos.TextureStreamingDemo
 import io.github.sceneview.demo.demos.ReflectionProbesDemo
 import io.github.sceneview.demo.demos.SecondaryCameraDemo
 import io.github.sceneview.demo.demos.DebugOverlayDemo
@@ -300,6 +301,7 @@ fun DemoRouter(id: String, onBack: () -> Unit) {
         "double-pendulum" -> DoublePendulumDemo(onBack)
         "post-processing" -> PostProcessingDemo(onBack)
         "custom-mesh" -> CustomMeshDemo(onBack)
+        "texture-streaming" -> TextureStreamingDemo(onBack)
         "shape" -> ShapeDemo(onBack)
         "reflection-probes" -> ReflectionProbesDemo(onBack)
         "secondary-camera" -> SecondaryCameraDemo(onBack)

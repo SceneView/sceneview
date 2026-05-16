@@ -160,6 +160,7 @@ val ALL_DEMOS = listOf(
     DemoEntry("double-pendulum", R.string.demo_double_pendulum_title, R.string.demo_double_pendulum_subtitle, DemoCategory.ADVANCED, Icons.Filled.Vibration),
     DemoEntry("post-processing", R.string.demo_post_processing_title, R.string.demo_post_processing_subtitle, DemoCategory.ADVANCED, Icons.Filled.Tune),
     DemoEntry("custom-mesh", R.string.demo_custom_mesh_title, R.string.demo_custom_mesh_subtitle, DemoCategory.ADVANCED, Icons.Filled.Hexagon),
+    DemoEntry("texture-streaming", R.string.demo_texture_streaming_title, R.string.demo_texture_streaming_subtitle, DemoCategory.ADVANCED, Icons.Filled.Texture),
     DemoEntry("shape", R.string.demo_shape_title, R.string.demo_shape_subtitle, DemoCategory.ADVANCED, Icons.Filled.Pentagon),
     DemoEntry("reflection-probes", R.string.demo_reflection_probes_title, R.string.demo_reflection_probes_subtitle, DemoCategory.ADVANCED, Icons.Filled.BlurOn),
     DemoEntry("secondary-camera", R.string.demo_secondary_camera_title, R.string.demo_secondary_camera_subtitle, DemoCategory.ADVANCED, Icons.Filled.PictureInPicture),
