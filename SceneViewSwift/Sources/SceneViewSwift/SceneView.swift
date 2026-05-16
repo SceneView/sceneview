@@ -448,6 +448,15 @@ private struct SceneViewRepresentation: View {
         stableHoldSeconds: SceneViewRepresentation.framingStableHoldSeconds
     )
 
+    /// World-space centroid of the content union AABB, as last computed by
+    /// ``refreshContentCentering()``. The auto-framing pass points the orbit
+    /// pivot (`camera.target`) here instead of translating `contentRoot`,
+    /// which is what avoids the `AnchorEntity` re-pin feedback loop (#1391).
+    /// Cached so a `recentersTargetOnOrbit` re-entry can snap the pivot back
+    /// to the content centroid — the content is no longer assumed to sit at
+    /// the world origin. `.zero` until the first valid framing pass.
+    @State private var contentWorldCenter: SIMD3<Float> = .zero
+
     /// Monotonic counter bumped by the content-framing driver task while
     /// ``didCenterContent`` is still `false`. Reading it inside the
     /// `RealityView` body forces SwiftUI to re-evaluate the view — and
@@ -927,22 +936,39 @@ private struct SceneViewRepresentation: View {
     private static let framingStableHoldSeconds: Double = 2.5
 
     /// Computes the union axis-aligned bounding box of every content
-    /// entity, expressed in `entities.contentRoot`-local space.
+    /// entity, expressed in **`entities.root`-local** space.
     ///
     /// Walks the whole `contentRoot` sub-tree and unions each entity's
-    /// `visualBounds(relativeTo: contentRoot)`. This is the multi-model fix
-    /// (#1391): `contentRoot.visualBounds(...)` on its own can under-report
-    /// when models live under an `AnchorEntity` whose transform RealityKit's
-    /// anchoring system has not resolved yet, and #1385 only ever framed a
-    /// single entity. Unioning every descendant box is robust to both: a
-    /// scene of four streamed park models frames the *combined* extent.
+    /// `visualBounds(relativeTo: entities.root)`. Two reasons this is the
+    /// `entities.root` frame and not the `contentRoot` frame (#1391, retry):
     ///
-    /// Querying relative to `contentRoot` keeps the result invariant of
-    /// `entities.root`'s per-frame rotation + pinch scale (the same reason
-    /// the single-entity path used `relativeTo: contentRoot`).
+    /// 1. **It must not feed back into the framing pass.** #1514 measured
+    ///    relative to `contentRoot` and then translated `contentRoot` to
+    ///    centre the content. When a demo nests its models under an
+    ///    `AnchorEntity` (e.g. `Multi-Model Park`), RealityKit's anchoring
+    ///    system continuously re-pins that anchor to its world target —
+    ///    so the moment `contentRoot` is translated, the anchor's local
+    ///    transform shifts the opposite way to compensate, the next
+    ///    measurement relative to `contentRoot` reports a *different*
+    ///    centre, `contentRoot` is translated again, and the centre runs
+    ///    away to infinity frame after frame. The viewport ends up framed
+    ///    on empty space (the reopened #1391 black screen).
+    /// 2. `entities.root` carries identity transform in every camera mode
+    ///    on iOS / macOS (see `applyCamera()` — orbit / pan / firstPerson
+    ///    all reset `root` to `position .zero`, `scale 1`, identity
+    ///    orientation and move the *camera* instead). So the `root` frame
+    ///    is world space, and a box measured in it is stable regardless of
+    ///    any `AnchorEntity` drift underneath.
     ///
-    /// - Returns: The union AABB, or `nil` if no descendant has finite,
-    ///   non-empty bounds yet (async loads still in flight).
+    /// Unioning every descendant box (rather than reading one entity's
+    /// `visualBounds`) is the part of the #1514 fix that stays: it frames
+    /// the *combined* extent of all streamed models, and is robust to a
+    /// model whose own bounds are momentarily empty while a sibling's are
+    /// valid.
+    ///
+    /// - Returns: The union AABB in `entities.root`-local (world) space, or
+    ///   `nil` if no descendant has finite, non-empty bounds yet (async
+    ///   loads still in flight).
     @MainActor
     private func contentUnionBounds() -> BoundingBox? {
         var boxes: [BoundingBox] = []
@@ -951,12 +977,13 @@ private struct SceneViewRepresentation: View {
         var stack: [Entity] = Array(entities.contentRoot.children)
         while let entity = stack.popLast() {
             stack.append(contentsOf: entity.children)
-            // `relativeTo: contentRoot` gives every box in the same frame
-            // of reference so the union is meaningful. `visualBounds`
+            // `relativeTo: entities.root` gives every box in the stable
+            // world frame so the union is meaningful AND immune to the
+            // `AnchorEntity` re-pin feedback described above. `visualBounds`
             // already includes the entity's own descendants, but unioning
             // per-entity is harmless (idempotent) and lets a child whose
             // parent reports empty still contribute.
-            let box = entity.visualBounds(relativeTo: entities.contentRoot)
+            let box = entity.visualBounds(relativeTo: entities.root)
             boxes.append(box)
         }
         return ContentBounds.union(of: boxes)
@@ -965,17 +992,21 @@ private struct SceneViewRepresentation: View {
     @MainActor
     private func refreshContentCentering() {
         guard !didCenterContent else { return }
-        // Union AABB of every content entity, in contentRoot-local space —
-        // see `contentUnionBounds()`. Sampling relative to `contentRoot`
-        // (not `entities.root`) keeps the extents invariant of the per-frame
-        // rotation + pinch-zoom scale, avoiding a race where an early pinch
-        // flips the `minVisualExtent` gate between frames.
+        // Union AABB of every content entity, in `entities.root`-local
+        // (world) space — see `contentUnionBounds()`. Sampling in the
+        // stable `root` frame (rather than `contentRoot`) is what makes
+        // this immune to the `AnchorEntity` re-pin feedback loop that the
+        // #1514 attempt fell into (the reopened #1391 black screen).
         guard let bounds = contentUnionBounds() else { return }
         let extents = bounds.extents
         // Skip empty / degenerate bounds — async loads not done yet.
         guard extents.x.isFinite, extents.y.isFinite, extents.z.isFinite else { return }
         let extentMax = max(extents.x, extents.y, extents.z)
         guard extentMax > Self.minVisualExtent else { return }
+        // The union centre must be finite too — a half-loaded scene can
+        // briefly produce a finite extent around a non-finite centre.
+        let center = bounds.center
+        guard center.x.isFinite, center.y.isFinite, center.z.isFinite else { return }
 
         // Re-frame whenever the union changed (a streamed model just
         // landed). The diagonal is the single scalar that captures "size
@@ -990,8 +1021,18 @@ private struct SceneViewRepresentation: View {
             now: CFAbsoluteTimeGetCurrent()
         )
 
-        // 1. Centre the union centroid on the orbit pivot (world origin).
-        entities.contentRoot.position = -bounds.center
+        // 1. Orbit the camera around the content's world-space centroid.
+        //    #1514 instead translated `entities.contentRoot` so the
+        //    centroid landed at the world origin — but when content is
+        //    nested under an `AnchorEntity` (the `Multi-Model Park`
+        //    layout) RealityKit re-pins the anchor every frame and the
+        //    translation runs away to infinity (see `contentUnionBounds()`).
+        //    Pointing the orbit pivot at wherever the content actually is
+        //    moves no scene node, so there is no feedback loop. Cache the
+        //    centroid so a `recentersTargetOnOrbit` re-entry can snap back
+        //    to it (the content is no longer assumed to sit at the origin).
+        contentWorldCenter = center
+        camera.target = center
         // 2. Adapt the zoom-radius limits to the content size BEFORE
         //    computing the fit, so `fitRadius`'s internal clamp does not
         //    fight the fit. The fixed `minRadius = 1.0` / `maxRadius = 50`
@@ -1118,10 +1159,12 @@ private struct SceneViewRepresentation: View {
             }
             // Opt-in pivot recentre on (re-)entering orbit so repeated
             // pan→orbit cycles don't drift the centroid out of frame
-            // (#1236 limitation 2). The content centroid is the world
-            // origin under `.autoCenterContent(true)` (#1026).
+            // (#1236 limitation 2). The auto-framing pass orbits the
+            // content's world-space centroid (`contentWorldCenter`, #1391)
+            // rather than translating content to the origin, so snap the
+            // pivot back to that cached centroid — not the world origin.
             if camera.mode == .orbit && recentersTargetOnOrbit {
-                camera.recenterTarget()
+                camera.recenterTarget(contentWorldCenter)
             }
         }
 
