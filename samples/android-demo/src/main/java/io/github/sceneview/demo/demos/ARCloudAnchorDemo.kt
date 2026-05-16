@@ -39,6 +39,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.CloudAnchorNode as CloudAnchorNodeImpl
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -263,7 +264,11 @@ fun ARCloudAnchorDemo(onBack: () -> Unit) {
                             ModelNode(
                                 modelInstance = instance,
                                 scaleToUnits = 0.3f,
-                                centerOrigin = Position(0f, 0f, 0f)
+                                centerOrigin = Position(0f, 0f, 0f),
+                                // The bundled DamagedHelmet GLB carries a residual +90° X
+                                // root rotation that lands it face-down on the plane —
+                                // correct it at placement time. See #1477.
+                                rotation = DemoMath.placementRotationFor(DemoMath.HELMET_ASSET)
                             )
                         }
                     }

@@ -42,6 +42,7 @@ import io.github.sceneview.ar.createARCameraStream
 import io.github.sceneview.ar.rememberARCameraStream
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -269,7 +270,11 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
                                 ModelNode(
                                     modelInstance = instance,
                                     scaleToUnits = 0.3f,
-                                    centerOrigin = Position(0.0f, 0.0f, 0.0f)
+                                    centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    // The bundled DamagedHelmet GLB carries a residual +90° X
+                                    // root rotation that lands it face-down on the plane —
+                                    // correct it at placement time. See #1477.
+                                    rotation = DemoMath.placementRotationFor(DemoMath.HELMET_ASSET)
                                 )
                             }
                         }

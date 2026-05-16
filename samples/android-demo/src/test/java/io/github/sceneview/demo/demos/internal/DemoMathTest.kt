@@ -169,4 +169,42 @@ class DemoMathTest {
         assertEquals(pos.first, neg.first, eps)
         assertEquals(-pos.second, neg.second, eps)
     }
+
+    // ── placementRotationFor (#1477) ────────────────────────────────────────
+
+    @Test
+    fun `placementRotationFor corrects the bundled helmet by minus 90 degrees X`() {
+        // The DamagedHelmet GLB ships a residual +90° X root rotation that lands it
+        // face-down on an AR plane — the placement demos undo it with -90° X.
+        val rotation = DemoMath.placementRotationFor(DemoMath.HELMET_ASSET)
+        assertEquals(-90f, rotation.x, eps)
+        assertEquals(0f, rotation.y, eps)
+        assertEquals(0f, rotation.z, eps)
+    }
+
+    @Test
+    fun `placementRotationFor returns identity for other bundled models`() {
+        // Fox, lantern, toy car, shiba are authored upright — no correction.
+        for (path in listOf(
+            "models/khronos_fox.glb",
+            "models/khronos_lantern.glb",
+            "models/khronos_toy_car.glb",
+            "models/shiba.glb",
+        )) {
+            val rotation = DemoMath.placementRotationFor(path)
+            assertEquals("$path x", 0f, rotation.x, eps)
+            assertEquals("$path y", 0f, rotation.y, eps)
+            assertEquals("$path z", 0f, rotation.z, eps)
+        }
+    }
+
+    @Test
+    fun `placementRotationFor returns identity for streamed file URIs`() {
+        // ARPlacementDemo can place streamed Sketchfab models whose assetLocation is a
+        // `file://` URI — those must never be hit by the helmet-specific correction.
+        val rotation = DemoMath.placementRotationFor("file:///data/user/0/app/cache/streamed.glb")
+        assertEquals(0f, rotation.x, eps)
+        assertEquals(0f, rotation.y, eps)
+        assertEquals(0f, rotation.z, eps)
+    }
 }
