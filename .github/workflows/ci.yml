@@ -110,7 +110,6 @@ jobs:
               - 'sceneview-core/**'
               - 'sceneview-web/**'
               - 'samples/web-demo/**'
-              - 'samples/desktop-demo/**'
             flutter:
               - *shared
               - 'flutter/**'
@@ -279,8 +278,11 @@ jobs:
           if-no-files-found: warn
 
   # ── Web & Desktop modules (Kotlin/JS + Compose Desktop) ──────────────────
+  # Job id kept as `web-desktop` for check-run history continuity; it now
+  # builds the web targets only (the desktop-demo placeholder step was
+  # dropped in #1396).
   web-desktop:
-    name: Build web & desktop
+    name: Build web targets
     needs: changes
     if: inputs.force-all || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
@@ -311,12 +313,11 @@ jobs:
       - name: web-demo production webpack
         run: ./gradlew :samples:web-demo:jsBrowserProductionWebpack --stacktrace
 
-      - name: Build desktop targets
-        # continue-on-error: desktop is a Compose Canvas placeholder, not a
-        # real Filament target. This non-blocking compile check is tracked
-        # for a drop-or-make-blocking decision in #1396.
-        continue-on-error: true
-        run: ./gradlew :samples:desktop-demo:compileKotlinDesktop --stacktrace
+      # samples/desktop-demo is a deliberate Compose Canvas wireframe
+      # placeholder (Filament JNI is not available on desktop) — it does not
+      # use SceneView or Filament. A compile check that can never fail
+      # (`continue-on-error: true`) only burned runner minutes, so it was
+      # dropped per the drop-or-make-blocking decision in #1396.
 
       - name: JS tests (informational)
         continue-on-error: true
