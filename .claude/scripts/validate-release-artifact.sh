@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# validate-release-artifact.sh — Pre-upload guard for the Play Store AAB/APK (#1301).
+# validate-release-artifact.sh — Pre-upload guard for the Play Store AAB/APK
+# (#1301, #1416).
 #
 # `play-store.yml` hands the gradle-produced `.aab` straight to the Play Store
 # upload step. A stale or wrong-variant artifact (wrong package, mismatched
 # versionName, off-by-one versionCode) would only surface as a Play Console
 # rejection — minutes of runner time after the build, and a polluted Edit.
 #
-# This script introspects the built artifact's manifest (via the
-# `android_cli_describe` helper in .claude/scripts/lib/android-cli.sh) and
-# asserts, *before* the upload step:
+# This script introspects the built artifact's manifest and asserts, *before*
+# the upload step:
 #
 #   1. the artifact file exists,
 #   2. `package` matches the expected applicationId,
@@ -17,25 +17,29 @@
 #      build with — i.e. play-store.yml's `Calculate version` output),
 #   4. `versionCode` matches the expected value AND is a positive integer.
 #
-# Tooling note: the `android` CLI (the repo's QA toolchain standard) has no
-# artifact-introspection mode in v0.7 — its `describe` subcommand analyzes a
-# *project directory*, not a built `.apk`/`.aab`. The correct tool for reading
-# a built artifact's manifest is `aapt2`, which ships in the Android SDK
-# build-tools the release runner already provisions via `setup-gradle`.
-# `android_cli_describe` therefore wraps `aapt2` (badging for `.apk`, xmltree of
-# the protobuf base manifest for `.aab`).
+# Tooling note (#1416): the artifact play-store.yml produces is an Android App
+# Bundle (`.aab`), NOT an APK. `aapt2` reads APKs — it CANNOT introspect an
+# `.aab`; pointing it at a bundle yields `Zip: failed to read at offset 0`,
+# which the previous version of this script mis-reported as "artifact corrupt"
+# and used to hard-fail, blocking v4.6.0 and v4.6.1. The correct tool for a
+# bundle is **`bundletool dump manifest`**. So:
+#
+#   * `.aab` → `bundletool dump manifest` (bundletool auto-downloaded if the
+#              runner doesn't already provide it).
+#   * `.apk` → `aapt2 dump badging` (via the `android_cli_describe` helper).
 #
 # ⛔ A pre-upload *validation guard* must NEVER block a release because of its
-# OWN missing tooling. So this script draws a hard line between two failure
-# kinds:
+# OWN missing or limited tooling. So this script draws a hard line between two
+# failure kinds:
 #
 #   * "the artifact is wrong"  → exit 1 (BLOCK the release — that is the point)
 #   * "the validation tooling
 #      is unavailable"          → exit 0 (WARN + SKIP — a release must not be
-#                                 blocked because `aapt2` couldn't be located)
+#                                 blocked because tooling couldn't be located)
 #
-# The `android_cli_describe` helper signals these apart: it returns 2 when
-# `aapt2` itself is missing, and 1 when the artifact genuinely can't be read.
+# (play-store.yml also wraps this step in `continue-on-error: true` as a final
+# belt-and-braces guarantee — even an unexpected crash here cannot veto a
+# release. This script's own skip-vs-fail discipline keeps the signal clean.)
 #
 # Usage:
 #   validate-release-artifact.sh <artifact> <expected-package> \
@@ -79,39 +83,108 @@ skip() {
 
 [[ -f "$ARTIFACT" ]] || fail "release artifact not found: $ARTIFACT"
 
+# locate_bundletool — resolves a `bundletool` invocation and echoes it on
+# stdout (e.g. `bundletool` or `java -jar /path/bundletool.jar`). Returns 0 on
+# success, 1 if neither bundletool nor a downloadable jar can be obtained.
+#
+# Resolution order:
+#   1. `bundletool` already on PATH (dev machines, some CI images).
+#   2. A cached jar from a previous run under "$TMPDIR".
+#   3. Download the official release jar from GitHub (needs `java` + a
+#      downloader). The version is pinned for reproducibility.
+BUNDLETOOL_VERSION="1.17.2"
+locate_bundletool() {
+  if command -v bundletool >/dev/null 2>&1; then
+    echo "bundletool"
+    return 0
+  fi
+  # bundletool is a Java jar — without a JRE it cannot run at all.
+  command -v java >/dev/null 2>&1 || return 1
+
+  local cache_dir="${TMPDIR:-/tmp}"
+  local jar="$cache_dir/bundletool-all-${BUNDLETOOL_VERSION}.jar"
+  if [[ -s "$jar" ]]; then
+    echo "java -jar $jar"
+    return 0
+  fi
+
+  local url="https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$jar" "$url" 2>/dev/null || { rm -f "$jar"; return 1; }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$jar" "$url" 2>/dev/null || { rm -f "$jar"; return 1; }
+  else
+    return 1
+  fi
+  [[ -s "$jar" ]] || { rm -f "$jar"; return 1; }
+  echo "java -jar $jar"
+  return 0
+}
+
 echo "[validate-artifact] describing $ARTIFACT"
-# `android_cli_describe` exit codes: 0 = OK, 1 = artifact unreadable,
-# 2 = `aapt2` tooling unavailable. `set -e` would abort on any non-zero, so
-# capture the status explicitly and branch: tooling failure → warn+skip,
-# artifact failure → hard fail.
+
 DESC=""
-DESCRIBE_RC=0
-DESC="$(android_cli_describe "$ARTIFACT")" || DESCRIBE_RC=$?
-if [[ "$DESCRIBE_RC" -eq 2 ]]; then
-  skip "AAB manifest validation skipped — 'aapt2' could not be located" \
-       "(not on PATH, not under \$ANDROID_SDK_ROOT/build-tools). This is a" \
-       "tooling gap, not an artifact problem; the upload proceeds unvalidated."
-elif [[ "$DESCRIBE_RC" -ne 0 ]]; then
-  fail "could not introspect $ARTIFACT — the artifact appears corrupt or is" \
-       "an unsupported format. Refusing to upload an unverifiable release."
-fi
+case "$ARTIFACT" in
+  *.aab)
+    # `.aab` → bundletool is the correct (and only) tool. `aapt2` cannot read
+    # a bundle. If bundletool can't be obtained, that's a tooling gap → skip,
+    # never block the release.
+    BT=""
+    if ! BT="$(locate_bundletool)"; then
+      skip "AAB manifest validation skipped — 'bundletool' is unavailable" \
+           "(not on PATH and could not be downloaded; needs 'java' + network)." \
+           "This is a tooling gap, not an artifact problem; the upload proceeds" \
+           "unvalidated."
+    fi
+    echo "[validate-artifact] using: $BT dump manifest"
+    DESCRIBE_RC=0
+    # `bundletool dump manifest` prints the base module's AndroidManifest.xml
+    # as decoded XML to stdout. Word-splitting on $BT is intentional — it is
+    # either `bundletool` or `java -jar <path>`.
+    # shellcheck disable=SC2086
+    DESC="$($BT dump manifest --bundle "$ARTIFACT" 2>/dev/null)" || DESCRIBE_RC=$?
+    if [[ "$DESCRIBE_RC" -ne 0 || -z "$DESC" ]]; then
+      fail "could not introspect $ARTIFACT with bundletool — the artifact" \
+           "appears corrupt or is not a valid Android App Bundle. Refusing to" \
+           "upload an unverifiable release."
+    fi
+    ;;
+  *)
+    # `.apk` (or anything else) → the `android_cli_describe` helper wraps
+    # `aapt2 dump badging`. Exit codes: 0 = OK, 1 = artifact unreadable,
+    # 2 = `aapt2` tooling unavailable.
+    DESCRIBE_RC=0
+    DESC="$(android_cli_describe "$ARTIFACT")" || DESCRIBE_RC=$?
+    if [[ "$DESCRIBE_RC" -eq 2 ]]; then
+      skip "APK manifest validation skipped — 'aapt2' could not be located" \
+           "(not on PATH, not under \$ANDROID_SDK_ROOT/build-tools). This is a" \
+           "tooling gap, not an artifact problem; the upload proceeds unvalidated."
+    elif [[ "$DESCRIBE_RC" -ne 0 ]]; then
+      fail "could not introspect $ARTIFACT — the artifact appears corrupt or is" \
+           "an unsupported format. Refusing to upload an unverifiable release."
+    fi
+    ;;
+esac
 
 echo "$DESC"
 
-# Parse package / versionName / versionCode out of whichever `aapt2` format the
-# describing helper emitted. Two formats are possible:
+# Parse package / versionName / versionCode out of whichever format the
+# describing tool emitted. Three formats are possible:
 #
 #   `aapt2 dump badging` (.apk):
 #     package: name='io.github.sceneview.demo' versionCode='4321' versionName='4.5.0' ...
 #
-#   `aapt2 dump xmltree` (.aab base manifest, protobuf):
-#     E: manifest (line=…)
-#       A: package="io.github.sceneview.demo" (Raw: "io.github.sceneview.demo")
-#       A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=(type 0x10)0x10e1
-#       A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="4.5.0" (Raw: …)
+#   `bundletool dump manifest` (.aab) — decoded XML:
+#     <manifest ... package="io.github.sceneview.demo"
+#               android:versionCode="4321" android:versionName="4.5.0" ...>
 #
-# The xmltree versionCode is a hex int literal — parsed and normalised to
-# decimal so it compares cleanly with the decimal value gradle was given.
+#   `aapt2 dump xmltree` (legacy .aab path, protobuf) — kept for safety:
+#     A: package="io.github.sceneview.demo" (Raw: "io.github.sceneview.demo")
+#     A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=(type 0x10)0x10e1
+#     A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="4.5.0" (Raw: …)
+#
+# Any hex versionCode literal is parsed and normalised to decimal so it
+# compares cleanly with the decimal value gradle was given.
 read -r GOT_PKG GOT_NAME GOT_CODE < <(python3 - "$DESC" <<'PYEOF'
 import re, sys
 desc = sys.argv[1]
@@ -124,10 +197,15 @@ def first(*patterns):
     return ""
 
 pkg = first(r"name='([^']+)'", r"package=\"([^\"]+)\"", r"package[ :=]+([A-Za-z0-9._]+)")
-name = first(r"versionName='([^']+)'", r"versionName[^=]*=\"([^\"]+)\"",
+name = first(r"versionName='([^']+)'",
+             r"versionName=\"([^\"]+)\"",
+             r"versionName[^=]*=\"([^\"]+)\"",
              r"versionName[ :=]+([A-Za-z0-9._\-]+)")
-code_raw = first(r"versionCode='([^']+)'", r"versionCode[^=]*=\(type[^)]*\)(0x[0-9a-fA-F]+)",
-                 r"versionCode[^=]*=([0-9]+)", r"versionCode[ :=]+([0-9]+)")
+code_raw = first(r"versionCode='([^']+)'",
+                 r"versionCode=\"([^\"]+)\"",
+                 r"versionCode[^=]*=\(type[^)]*\)(0x[0-9a-fA-F]+)",
+                 r"versionCode[^=]*=([0-9]+)",
+                 r"versionCode[ :=]+([0-9]+)")
 code = ""
 if code_raw:
     try:

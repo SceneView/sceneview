@@ -224,6 +224,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Cross-workflow serialisation (#1417). Both this job and release.yml's
+    # `publish-api-docs` job push to the external `sceneview/sceneview.github.io`
+    # repo. On a release tag both workflows fire at once and the second push is
+    # rejected (non-fast-forward) → `failed to push some refs`. A job-level
+    # `concurrency` group is shared ACROSS workflows when the group name
+    # matches, so naming both deploy jobs identically forces them to run one at
+    # a time. `cancel-in-progress: false` — never cancel an in-flight site
+    # deploy; queue behind it.
+    concurrency:
+      group: sceneview-github-io-deploy
+      cancel-in-progress: false
     steps:
       - name: Download assembled site artifact
         uses: actions/download-artifact@v8

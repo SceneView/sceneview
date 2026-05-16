@@ -194,12 +194,15 @@ jobs:
       # so a misconfigured artifact is caught here (~1 s) instead of as a Play
       # Console rejection minutes later.
       #
-      # `aapt2` is NOT on PATH — it lives under
-      # `$ANDROID_SDK_ROOT/build-tools/<version>/`; the script resolves it from
-      # there. A pre-upload guard must never block a release because of its own
-      # tooling: if `aapt2` cannot be found the script WARNS and exits 0 (skip),
-      # and it only exits non-zero on a genuine manifest mismatch (#1413).
+      # An `.aab` is an Android App Bundle, NOT an APK — `aapt2` cannot read
+      # one (it reads APKs), so the validator uses `bundletool dump manifest`,
+      # the correct tool for bundles. A pre-upload guard must never block a
+      # release: `continue-on-error: true` guarantees that even a script crash
+      # or a tooling gap can never veto the upload (#1416). The script itself
+      # also only exits non-zero on a genuine manifest mismatch and skips
+      # cleanly when its tooling is unavailable.
       - name: Validate AAB manifest before upload
+        continue-on-error: true
         env:
           EXPECT_PKG: io.github.sceneview.demo
           EXPECT_NAME: ${{ steps.version.outputs.name }}

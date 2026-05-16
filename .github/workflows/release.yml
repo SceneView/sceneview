@@ -74,6 +74,16 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+    # Cross-workflow serialisation (#1417). This job and docs.yml's `deploy`
+    # job both push to the external `sceneview/sceneview.github.io` repo. On a
+    # release tag both workflows fire concurrently and the second push is
+    # rejected (non-fast-forward). A job-level `concurrency` group is shared
+    # ACROSS workflows when the group name matches, so this MUST stay identical
+    # to the group in docs.yml's `deploy` job. `cancel-in-progress: false` —
+    # the API-docs deploy must always complete, never be cancelled mid-push.
+    concurrency:
+      group: sceneview-github-io-deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
 

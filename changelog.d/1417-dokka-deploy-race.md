@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- **API-docs deploy no longer races the website deploy on a release tag ([#1417](https://github.com/sceneview/sceneview/issues/1417)).** `release.yml`'s Dokka deploy and `docs.yml`'s site deploy both push to the external `sceneview.github.io` repo; on a release tag they ran concurrently and the second push failed non-fast-forward. A shared cross-workflow `concurrency` group now serialises the two pushes so a release reliably publishes both the API docs and the site.
