@@ -13,7 +13,10 @@ name: Deploy iOS App to App Store
 
 on:
   push:
-    tags: ['v*']
+    # Strict semver glob, matching release.yml / play-store.yml. A broader
+    # `v*` would let a pre-release (`v4.8.0-rc1`) or stray (`vtest`) tag
+    # trigger an App Store / TestFlight deploy with no matching release run.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       submit_for_review:
