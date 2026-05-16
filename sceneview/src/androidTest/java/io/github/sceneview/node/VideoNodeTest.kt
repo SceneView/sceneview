@@ -16,17 +16,21 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Regression coverage for #1497.
+ * Regression coverage for #1497 and #1539.
  *
- * Before the fix, [VideoNode.destroy] destroyed the [com.google.android.filament.MaterialInstance]
- * and then immediately freed the external [com.google.android.filament.Texture] / [Stream] — the
- * exact ordering that triggers a native SIGABRT
- * (`Invalid texture still bound to MaterialInstance`), because MaterialInstance reclamation is
- * coupled to the render loop, not to the `destroy()` call site.
+ * Before the #1497 fix, [VideoNode.destroy] destroyed the
+ * [com.google.android.filament.MaterialInstance] and then immediately freed the external
+ * [com.google.android.filament.Texture] / [Stream] — the exact ordering that triggers a native
+ * SIGABRT (`Invalid texture still bound to MaterialInstance`), because MaterialInstance
+ * reclamation is coupled to the render loop, not to the `destroy()` call site. The fix drains
+ * the frame pipeline between destroying the MaterialInstance and freeing the external
+ * texture/stream, so the MI is fully reclaimed first.
  *
- * The fix drains the frame pipeline between destroying the MaterialInstance and freeing the
- * external texture/stream, so the MI is fully reclaimed first. These tests pin that ordering by
- * exercising the real teardown path against a live Filament [com.google.android.filament.Engine].
+ * #1539 extends the same guarantee to the [VideoNode.materialInstance] runtime setter, which
+ * previously freed the superseded MaterialInstance with no drain in between.
+ *
+ * These tests pin that ordering by exercising the real teardown path against a live Filament
+ * [com.google.android.filament.Engine].
  */
 @RunWith(AndroidJUnit4::class)
 class VideoNodeTest {
@@ -114,6 +118,43 @@ class VideoNodeTest {
                 player = player,
                 chromaKeyColor = 0xFF00FF00.toInt()
             )
+            node.destroy()
+            player.release()
+        }
+    }
+
+    /**
+     * Reassigning [VideoNode.materialInstance] must drain the frame pipeline before freeing the
+     * old MaterialInstance — the external [com.google.android.filament.Texture] stays bound to
+     * the old MI until the next frame, so freeing it eagerly is the same
+     * `Invalid texture still bound to MaterialInstance` SIGABRT #1497 fixed for `destroy()`
+     * (#1539). The node must still tear down cleanly afterwards.
+     */
+    @Test
+    fun materialInstanceReassign_doesNotCrash() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val player = MediaPlayer()
+            val node = VideoNode(materialLoader = materialLoader, player = player)
+            // Swap in a fresh MaterialInstance built against the same external texture — the old
+            // MI must be drained-then-destroyed, not freed while the texture is still bound.
+            node.materialInstance = materialLoader.createVideoInstance(node.texture)
+            node.destroy() // must not SIGABRT and must not double-free the old MI
+            player.release()
+        }
+    }
+
+    /**
+     * Rapid [VideoNode.materialInstance] churn must stay crash-free — each reassignment routes
+     * the superseded MaterialInstance through drain-then-destroy exactly once (#1539).
+     */
+    @Test
+    fun materialInstanceReassign_rapidCycle_doesNotCrash() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val player = MediaPlayer()
+            val node = VideoNode(materialLoader = materialLoader, player = player)
+            repeat(20) {
+                node.materialInstance = materialLoader.createVideoInstance(node.texture)
+            }
             node.destroy()
             player.release()
         }

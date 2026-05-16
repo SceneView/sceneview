@@ -102,9 +102,16 @@ open class VideoNode(
         materialLoader.createVideoInstance(texture, chromaKeyColor)
             .also { setMaterialInstanceAt(0, it) }
         set(value) {
+            if (value === field) return
             val old = field
             field = value
             setMaterialInstanceAt(0, value)
+            // The external [texture] stays bound to [old] until the next frame: destroying [old]
+            // immediately would free a MaterialInstance still GPU-referenced by [texture], the
+            // exact `Invalid texture still bound to MaterialInstance` SIGABRT #1497 fixed for
+            // [destroy]. Drain the frame pipeline first so [old] is fully reclaimed before it is
+            // freed. Runs on the main thread — all Filament JNI calls do.
+            materialLoader.engine.drainFramePipeline()
             materialLoader.destroyMaterialInstance(old)  // also removes from MaterialLoader tracking
         }
 
