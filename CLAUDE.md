@@ -30,7 +30,7 @@ the documentation until it can.
 - NEVER deploy to stores without verifying the bundle builds locally first
 - When an agent modifies code, ALWAYS verify compilation before committing
 - If a review finds blockers, fix them ALL before pushing — no exceptions
-- If you bump `gradle/libs.versions.toml` → `filament = "X.Y.Z"`, you MUST recompile every `.filamat` blob in the same PR with the matching `matc` toolchain — see [CONTRIBUTING.md "Filament runtime ↔ .filamat ABI invariant"](CONTRIBUTING.md#filament-runtime--filamat-abi-invariant). v4.1.0 shipped split halves and crashed 10 demos at runtime.
+- If you bump `gradle/libs.versions.toml` → `filament = "X.Y.Z"`, you MUST recompile every `.filamat` blob in the same PR with the matching `matc` toolchain — see [CONTRIBUTING.md "Filament runtime ↔ .filamat ABI invariant"](CONTRIBUTING.md#filament-runtime---filamat-abi-invariant). v4.1.0 shipped split halves and crashed 10 demos at runtime.
 
 ### Quality plan: `.claude/plans/v4.0-quality-plan.md`
 
@@ -253,9 +253,9 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Latest release: v4.4.0
+### Latest release: see `gradle.properties`
 
-**Current source-of-truth version is `4.4.0`** (`gradle.properties:VERSION_NAME`). Any AI bootstrapping from this file should treat `4.4.0` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `v4.4.0`, web CDN). The dated session logs below are historical context only — do not infer the latest version from them.
+**The source-of-truth version is always `VERSION_NAME` in the root `gradle.properties`** — read that file, never hardcode a version here. Any AI bootstrapping from this file should treat the `gradle.properties` `VERSION_NAME` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `vX.Y.Z`, web CDN). At the time of writing this is `4.8.0`, but `gradle.properties` is authoritative if they ever disagree. The dated session logs below are historical context only — do not infer the latest version from them.
 
 ### Historical state (last updated: 2026-05-14 night, session upbeat-kare-a31ed4 — v4.2.0 SHIPPED end-to-end + handoff for new session)
 

@@ -411,12 +411,14 @@ for spm_file in "${SPM_FILES[@]}"; do
     F="$REPO_ROOT/$spm_file"
     [ -f "$F" ] || continue
     # Looser match: any line mentioning the canonical SPM URL (sceneview/sceneview
-    # monorepo OR sceneview/sceneview-swift legacy mirror) AND `from: "X.Y.Z"`.
-    # Covers `.package(url: "…/sceneview", from: "X.Y.Z")` AND
-    # `.package(url: "…/sceneview-swift", from: "X.Y.Z")` AND comment-style
-    # `// SPM: …/sceneview-swift.git from: "X.Y.Z"`.
+    # monorepo OR sceneview/sceneview-swift legacy mirror) AND a `from` version.
+    # Covers the canonical quoted form `.package(url: "…/sceneview", from: "X.Y.Z")`
+    # AND the comment-style `// SPM: …/sceneview-swift.git from: "X.Y.Z"` AND the
+    # prose form in README.md — `(from: X.Y.Z)` / `(SPM, from X.Y.Z)` — which has
+    # NO quotes and an optional colon, so the strict `from: "…"` regex missed it
+    # entirely (issue #1544: README SPM snippets sat 4 minors stale).
     V=$(grep -E 'sceneview/sceneview(-swift)?' "$F" 2>/dev/null \
-        | grep -oE 'from: "[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' \
+        | grep -oE 'from:? "?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"?' \
         | head -1 \
         | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || true)
     if [ -n "$V" ]; then
@@ -744,11 +746,14 @@ with open('$RN_DEMO_PKG', 'w') as f:
         F="$REPO_ROOT/$spm_file"
         [ -f "$F" ] || continue
         # Use perl (not sed) for the in-line substitution: BSD sed is awkward
-        # at constraining the replacement to lines matching a pattern.
-        if grep -qE 'sceneview/sceneview(-swift)?.*from: "[0-9]+\.[0-9]+\.[0-9]+' "$F" 2>/dev/null; then
-            BEFORE=$(grep -E 'sceneview/sceneview(-swift)?.*from:' "$F" | grep -oE 'from: "[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | sort -u)
-            perl -i -pe 'if (m{sceneview/sceneview(-swift)?}) { s/(from: ")[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(")/${1}'"$SOURCE_VERSION"'${3}/g }' "$F"
-            AFTER=$(grep -E 'sceneview/sceneview(-swift)?.*from:' "$F" | grep -oE 'from: "[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"' | sort -u)
+        # at constraining the replacement to lines matching a pattern. The
+        # regex matches BOTH the quoted Package.swift form `from: "X.Y.Z"` and
+        # the unquoted README prose form `from: X.Y.Z` / `from X.Y.Z` (#1544),
+        # preserving whatever colon/quotes the original line used.
+        if grep -qE 'sceneview/sceneview(-swift)?.*from:? "?[0-9]+\.[0-9]+\.[0-9]+' "$F" 2>/dev/null; then
+            BEFORE=$(grep -E 'sceneview/sceneview(-swift)?.*from' "$F" | grep -oE 'from:? "?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"?' | sort -u)
+            perl -i -pe 'if (m{sceneview/sceneview(-swift)?}) { s/(from:? "?)[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?("?)/${1}'"$SOURCE_VERSION"'${3}/g }' "$F"
+            AFTER=$(grep -E 'sceneview/sceneview(-swift)?.*from' "$F" | grep -oE 'from:? "?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?"?' | sort -u)
             if [ "$BEFORE" != "$AFTER" ]; then
                 echo -e "  Fixed: $spm_file (SPM from: -> $SOURCE_VERSION)"
             fi
