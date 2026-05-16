@@ -67,16 +67,18 @@ fun TextDemo(onBack: () -> Unit) {
             materialLoader = materialLoader,
             onFrame = firstFrame.onFrame,
             // Dolly the camera closer — 3 stacked 0.18 m-tall labels at the origin read
-            // cramped at the default z = 4. z = 1.2 fills the portrait viewport.
+            // cramped at the default z = 4. z = 1.5 fills the portrait viewport while
+            // keeping enough vertical room for the top label (#1470: z = 1.2 framed the
+            // top 'Hello SceneView' card past the top viewport edge at rest).
             cameraManipulator = rememberCameraManipulator(
-                orbitHomePosition = Position(0f, 0f, 1.2f),
+                orbitHomePosition = Position(0f, 0f, 1.5f),
                 targetPosition = Position(0f, 0f, 0f),
             ),
         ) {
             // Three labels stacked vertically at x=0 so all three fit inside the default
             // camera framing on a phone portrait viewport. y=±0.22 keeps the top and
-            // bottom labels fully inside the viewport (y=±0.32 still cropped the top
-            // label on the portrait FOV).
+            // bottom labels' card edges (y reaching ±0.31 with the 0.18 m height) fully
+            // inside the viewport at the pulled-back z = 1.5 framing — see #1470.
             //
             // Each label's quad material is marked double-sided: TextNode does not face
             // the camera on its own (no cameraPositionProvider is wired here), so when
