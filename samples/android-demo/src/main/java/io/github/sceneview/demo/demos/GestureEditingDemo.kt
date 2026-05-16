@@ -47,6 +47,19 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
+ * Render scale of the helmet, in metres, passed to [ModelNode.scaleToUnits].
+ * The model's bounding box reaches roughly `±MODEL_SCALE_UNITS / 2` from the origin.
+ */
+private const val MODEL_SCALE_UNITS = 0.3f
+
+/**
+ * Axis-gizmo length expressed as a multiple of [MODEL_SCALE_UNITS]. 1.5× keeps each
+ * axis just longer than the helmet's bounding box so the gizmo stays a clear,
+ * bounded reference instead of a screen-spanning line (#1471).
+ */
+private const val AXIS_TO_MODEL_RATIO = 1.5f
+
+/**
  * Demonstrates gesture-based editing of a 3D model.
  *
  * Center stage is a damaged helmet [ModelNode]; a Blender-style 3D axes gizmo
@@ -276,13 +289,17 @@ fun GestureEditingDemo(onBack: () -> Unit) {
             // SceneScope root (sibling of the ModelNode below, NOT a child) so it
             // stays world-fixed when the helmet moves/rotates.
             //
-            // Length 1 m (each side reaches ±0.5 m from the origin) so the axes
-            // visually extend past the helmet's bounding box even at 0.3 m scale —
-            // makes the (0, 0, 0) reference unambiguous when the helmet is dragged.
+            // Length is scaled to the model: the helmet is rendered at
+            // scaleToUnits = 0.3 m, so its bounding box reaches ~±0.15 m from the
+            // origin. A 0.45 m axis (±0.225 m per side) extends just past that box
+            // — a clear, bounded reference. The previous 1 m length made each axis
+            // over 3× the helmet, so with the camera framed on the small helmet
+            // the axis tips ran off all four viewport edges and looked like
+            // infinite debug lines (#1471).
             Axes3DNode(
                 materialLoader = materialLoader,
-                length = 1f,
-                thickness = 0.008f,
+                length = MODEL_SCALE_UNITS * AXIS_TO_MODEL_RATIO,
+                thickness = 0.005f,
             )
 
             // The key(resetKey) block ensures the node is recreated from scratch on reset.
@@ -290,7 +307,7 @@ fun GestureEditingDemo(onBack: () -> Unit) {
                 modelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        scaleToUnits = 0.3f,
+                        scaleToUnits = MODEL_SCALE_UNITS,
                         centerOrigin = Position(x = 0f, y = 0f, z = 0f),
                         isEditable = editable,
                         // The `apply` runs once on creation — push the per-axis
