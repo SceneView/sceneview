@@ -50,9 +50,9 @@ fun ImageDemo(onBack: () -> Unit) {
     // Three distinct photographic-style bitmaps generated once. Procedural
     // rather than bundled JPEGs so the demo ships no extra binary assets and
     // still reads as real photos (sky gradient, sun, layered hills).
-    val sunsetPhoto = remember { createScenePhoto(Scene.SUNSET) }
-    val noonPhoto = remember { createScenePhoto(Scene.NOON) }
-    val nightPhoto = remember { createScenePhoto(Scene.NIGHT) }
+    val sunsetPhoto = remember { createScenePhoto(ImageScene.SUNSET) }
+    val noonPhoto = remember { createScenePhoto(ImageScene.NOON) }
+    val nightPhoto = remember { createScenePhoto(ImageScene.NIGHT) }
 
     val firstFrame = rememberFirstFrameState()
 
@@ -106,7 +106,7 @@ fun ImageDemo(onBack: () -> Unit) {
 }
 
 /** Time-of-day variants for the generated photo. */
-private enum class Scene(
+private enum class ImageScene(
     val skyTop: Int,
     val skyBottom: Int,
     val sun: Int,
@@ -124,7 +124,7 @@ private enum class Scene(
  * two layered hill silhouettes) inside a neutral photo frame, so an
  * [ImageNode] reads as a hung picture rather than an icon.
  */
-private fun createScenePhoto(scene: Scene): Bitmap {
+private fun createScenePhoto(scene: ImageScene): Bitmap {
     val w = 512
     val h = 384
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
