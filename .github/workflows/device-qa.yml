@@ -167,7 +167,10 @@ jobs:
           api-level: 30
           target: google_apis
           arch: x86_64
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          # -memory 4096: the SceneView Filament 3D demo is GPU/RAM-heavy; the
+          # default emulator RAM let the device go offline mid-Maestro-flow on
+          # the software-GPU CI runner (#1643).
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
           disable-animations: true
           script: |
             export PATH="$HOME/.maestro/bin:$PATH"
@@ -223,7 +226,10 @@ jobs:
           api-level: 30
           target: google_apis
           arch: x86_64
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          # -memory 4096: the SceneView Filament 3D demo is GPU/RAM-heavy; the
+          # default emulator RAM let the device go offline mid-Maestro-flow on
+          # the software-GPU CI runner (#1643).
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
           disable-animations: true
           # NOTE: ReactiveCircus/android-emulator-runner runs each LINE of this
           # `script:` as a separate `sh -c` invocation — env vars do NOT persist

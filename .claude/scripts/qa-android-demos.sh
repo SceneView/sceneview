@@ -104,6 +104,21 @@ echo "[qa] running Maestro flow: $FLOW_FILE"
 MAESTRO_RC=0
 maestro_run "$FLOW_FILE" || MAESTRO_RC=$?
 
+# One-shot retry on an emulator-transport drop ("device offline" — the CI
+# emulator going unstable mid-flow, #1643). A transport drop is intermittent;
+# one retry rescues a flaky run without masking a genuine demo failure (a real
+# crash fails again the same way). Only retried for offline/transport errors.
+if [[ "$MAESTRO_RC" -ne 0 ]]; then
+  if adb get-state >/dev/null 2>&1; then
+    echo "[qa] device still online — Maestro failure is genuine, not retrying." >&2
+  else
+    echo "[qa] device offline after flow — emulator transport dropped; one retry..." >&2
+    adb wait-for-device 2>/dev/null || true
+    MAESTRO_RC=0
+    maestro_run "$FLOW_FILE" || MAESTRO_RC=$?
+  fi
+fi
+
 # --- FATAL / ANR logcat sweep ---------------------------------------------
 # Maestro's per-demo "Navigate back" assertion already fails on a hard crash,
 # but a backgrounded native crash or an ANR can leave the process technically
