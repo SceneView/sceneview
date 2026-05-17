@@ -76,16 +76,38 @@ known limitations (no pinch gesture → 3D zoom is driven via deep-link param).
 ### Release-checkpoint mandate
 
 **A full device-QA pass runs at every release checkpoint, before tagging.**
-No release ships without a green `device-qa-report.json`. The gate is enforced
-in two places — keep both honest:
+No release ships with a red *blocking* leg in `device-qa-report.json`. The
+gate is enforced in two places — keep both honest:
 
-- `release-checklist.sh` **section 14** fails the checklist if
-  `device-qa-report.json` is missing or reports a failed platform.
+- `release-checklist.sh` **section 14** reads the report's graded
+  `releaseGate.verdict` and fails the checklist on a `blocked` verdict (or a
+  missing report).
 - The `/release` skill (**Step 6.5**) runs `device-qa.sh --platform=all`
   before the tag step.
 
-A red device-QA pass means a demo crashes for a real user — fix it before
-tagging, no exceptions.
+#### Release-gate policy for `continue-on-error` legs (#1651)
+
+The legs are **graded**, because they are not equally reliable:
+
+| Leg | CI behaviour | Release gate |
+|---|---|---|
+| `web` | NOT `continue-on-error` — a red leg fails the workflow | **BLOCKING** — a red web leg is a release `FAIL` |
+| `android`, `ar` | `continue-on-error: true` (flaky SwiftShader emulator, #1643) | **ADVISORY** — a red leg is a `WARN`, never a silent pass, never a hard block |
+
+`device-qa.sh` tags each leg `advisory: true|false` (default advisory set:
+`android,ar`, override with `--advisory=<csv>`) and pre-computes
+`releaseGate.verdict` in `device-qa-report.json`:
+
+- `clear` — every leg passed → checklist `PASS`.
+- `warn` — an advisory leg (android/ar) did not pass → checklist `WARN`
+  ("advisory leg(s) did not pass: … — review before tagging"). A human sees
+  it, but it does not block the release.
+- `blocked` — a blocking leg (web) failed → checklist `FAIL`, hard block.
+
+Advisory legs stay non-blocking until #1643/#1645 make the emulator reliably
+green; then promote them to blocking by shrinking the `--advisory=` set. A red
+*blocking* leg means a demo crashes for a real user — fix it before tagging,
+no exceptions.
 
 ## About
 

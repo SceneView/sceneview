@@ -39,6 +39,15 @@
 #                    rarely has every runtime, and a partial pass is useful.
 #   --out <dir>      Directory for the aggregated report + per-platform
 #                    artifacts. Default: repo-root (`device-qa-report.json`).
+#   --advisory=<csv> Comma-separated platforms whose result is ADVISORY for the
+#                    release gate — a failure on an advisory leg surfaces as a
+#                    WARN (not a hard block) in release-checklist.sh section 14
+#                    (#1651). Default: `android,ar` — these legs run on the
+#                    chronically flaky SwiftShader emulator (#1643) and are
+#                    `continue-on-error: true` in device-qa.yml, so the release
+#                    gate must not be hard-blocked by them. The `web` leg is
+#                    intentionally NOT advisory: it is reliable and BLOCKING.
+#                    Pass `--advisory=` (empty) to make every leg blocking.
 #   -h | --help      Show this help.
 #
 # Exit status:
@@ -69,6 +78,11 @@ PLATFORM="all"
 FAST=false
 CI_MODE=false
 OUT_DIR="$REPO_ROOT"
+# Advisory legs (#1651): a failure here is a release-gate WARN, not a block.
+# `android,ar` ride the flaky SwiftShader emulator and are continue-on-error
+# in device-qa.yml; `web` is reliable and stays BLOCKING.
+ADVISORY="android,ar"
+ADVISORY_SET=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -78,13 +92,24 @@ while [[ $# -gt 0 ]]; do
     --ci)         CI_MODE=true; shift ;;
     --out=*)      OUT_DIR="${1#--out=}"; shift ;;
     --out)        OUT_DIR="${2:?--out needs a directory}"; shift 2 ;;
+    --advisory=*) ADVISORY="${1#--advisory=}"; ADVISORY_SET=true; shift ;;
+    --advisory)   ADVISORY="${2-}"; ADVISORY_SET=true; shift 2 ;;
     -h|--help)
-      sed -n '2,52p' "$SCRIPT_DIR/device-qa.sh" | sed 's/^# \{0,1\}//'
+      sed -n '2,62p' "$SCRIPT_DIR/device-qa.sh" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "[device-qa] unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+: "$ADVISORY_SET"  # silence unused-var warnings; reserved for future strictness
+
+# Is platform $1 in the advisory CSV?
+is_advisory() {
+  case ",$ADVISORY," in
+    *",$1,"*) return 0 ;;
+    *)        return 1 ;;
+  esac
+}
 
 case "$PLATFORM" in
   android|ios|web|ar|all) ;;
@@ -386,12 +411,18 @@ fi
 # The per-platform records are exported as DQ_* environment variables — far
 # more robust across shells than argv quoting for arbitrary reason strings.
 export DQ_N="${#RESULT_PLATFORMS[@]}"
+export DQ_ADVISORY="$ADVISORY"
 for i in "${!RESULT_PLATFORMS[@]}"; do
   export "DQ_PLATFORM_$i=${RESULT_PLATFORMS[$i]}"
   export "DQ_STATUS_$i=${RESULT_STATUSES[$i]}"
   export "DQ_REASON_$i=${RESULT_REASONS[$i]}"
   export "DQ_SUMMARY_$i=${RESULT_SUMMARIES[$i]}"
   export "DQ_DURATION_$i=${RESULT_DURATIONS[$i]}"
+  if is_advisory "${RESULT_PLATFORMS[$i]}"; then
+    export "DQ_ADVISORY_$i=true"
+  else
+    export "DQ_ADVISORY_$i=false"
+  fi
 done
 
 python3 - "$REPORT" "$RUN_STARTED" "$PLATFORM" "$FAST" "$CI_MODE" "$OVERALL" \
@@ -402,6 +433,9 @@ import json, sys, os
  passed, failed, skipped) = sys.argv[1:10]
 
 n = int(os.environ["DQ_N"])
+advisory_csv = os.environ.get("DQ_ADVISORY", "")
+advisory_set = {p for p in advisory_csv.split(",") if p}
+
 platforms = []
 for i in range(n):
     summary_path = os.environ.get(f"DQ_SUMMARY_{i}", "")
@@ -415,19 +449,47 @@ for i in range(n):
     platforms.append({
         "platform": os.environ[f"DQ_PLATFORM_{i}"],
         "status":   os.environ[f"DQ_STATUS_{i}"],
+        # advisory=true → a failure on this leg is a release-gate WARN, not a
+        # hard block (#1651). Mirrors `continue-on-error` in device-qa.yml.
+        "advisory": os.environ.get(f"DQ_ADVISORY_{i}", "false") == "true",
         "reason":   os.environ.get(f"DQ_REASON_{i}", ""),
         "durationSec": int(os.environ.get(f"DQ_DURATION_{i}", "0") or 0),
         "summary":  embedded,
     })
 
+# --- Release-gate verdict (#1651) ------------------------------------------
+# The aggregated `status` above answers "did every leg pass". The release gate
+# needs a finer signal: a failed ADVISORY leg (android/ar) is only a WARN,
+# while a failed BLOCKING leg (web) hard-blocks. Pre-compute that split so
+# release-checklist.sh section 14 reads an explicit field instead of
+# re-deriving the policy.
+blocking_failed = [p["platform"] for p in platforms
+                   if p["status"] == "failed" and not p["advisory"]]
+advisory_failed = [p["platform"] for p in platforms
+                   if p["status"] == "failed" and p["advisory"]]
+if blocking_failed:
+    gate = "blocked"
+elif advisory_failed:
+    gate = "warn"
+else:
+    gate = "clear"
+
 report = {
     "harness": "device-qa",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "startedAt": started,
     "platformSelection": platform,
     "fast": fast == "true",
     "ci": ci == "true",
     "status": overall,
+    "advisoryPlatforms": sorted(advisory_set),
+    # releaseGate: "clear" (tag freely) | "warn" (advisory leg red — human
+    # should see it before tagging) | "blocked" (a blocking leg is red).
+    "releaseGate": {
+        "verdict": gate,
+        "blockingFailed": blocking_failed,
+        "advisoryFailed": advisory_failed,
+    },
     "totals": {
         "passed": int(passed),
         "failed": int(failed),
@@ -449,14 +511,23 @@ echo "  selection : $PLATFORM   fast=$FAST   ci=$CI_MODE"
 echo "  report    : $REPORT"
 echo "───────────────────────────────────────────────────────"
 for i in "${!RESULT_PLATFORMS[@]}"; do
-  printf "  %-9s %-8s %4ss  %s\n" \
+  tag=""
+  if is_advisory "${RESULT_PLATFORMS[$i]}"; then
+    tag="[advisory]"
+    # A failed advisory leg is a release-gate WARN, not a block — flag it so
+    # it is never silent (#1651).
+    [[ "${RESULT_STATUSES[$i]}" == "failed" ]] && tag="[advisory — WARN, not a release blocker]"
+  fi
+  printf "  %-9s %-8s %4ss  %s %s\n" \
     "${RESULT_PLATFORMS[$i]}" \
     "${RESULT_STATUSES[$i]}" \
     "${RESULT_DURATIONS[$i]}" \
+    "$tag" \
     "${RESULT_REASONS[$i]}"
 done
 echo "───────────────────────────────────────────────────────"
 echo "  passed=$PASSED  failed=$FAILED  skipped=$SKIPPED  ->  $OVERALL"
+echo "  advisory legs: ${ADVISORY:-(none)}  (a red advisory leg is a release WARN, not a block — #1651)"
 echo "═══════════════════════════════════════════════════════"
 
 if [[ "$OVERALL" == "passed" ]]; then

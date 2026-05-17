@@ -31,6 +31,38 @@ name: Device QA
 # `device-qa-report.json` is uploaded as an artifact for the release
 # checkpoint (`release-checklist.sh` reads its `status`).
 #
+# PREBUILT ANDROID APK — BUILD/EMULATOR SPLIT (#1652)
+# ---------------------------------------------------
+# The `android` and `ar` emulator jobs do NOT build the demo APK themselves.
+# A cold `:samples:android-demo:assembleDebug` on a 2-core runner is slow
+# (~20-30 min) AND competes with the running emulator for CPU — a major cause
+# of the Android leg's slowness and instability (#1642 silent hang, #1643
+# emulator offline). Instead, a dedicated `build-android-apk` job (no emulator,
+# Gradle build-cache) compiles the APK once and uploads it as an artifact; the
+# emulator jobs `download-artifact` it into the path `qa-android-demos.sh`
+# expects (`samples/android-demo/build/outputs/apk/debug/`). That script
+# already skips its own build when the APK is present (`if [[ ! -f "$APK" ]]`),
+# so the emulator jobs become install + Maestro only — faster, and the build
+# no longer fights the emulator for cores.
+#
+# RELEASE-GATE POLICY FOR continue-on-error LEGS (#1651)
+# ------------------------------------------------------
+# The `android` and `ar` jobs are `continue-on-error: true` — a red leg does
+# NOT fail this workflow (the SwiftShader emulator is chronically flaky, #1643,
+# and this is not a required PR check). The `web` job is NOT continue-on-error:
+# it is cheap and reliable, so a red web leg DOES fail the workflow.
+#
+# This split has a release-gate consequence. `release-checklist.sh` section 14
+# reads the aggregated `device-qa-report.json`. The policy is:
+#   - web        — BLOCKING. A failed web leg hard-blocks the release.
+#   - android/ar — ADVISORY. A failed android/ar leg surfaces as a WARN in the
+#                  release checklist ("android leg: WARN — did not pass"), so a
+#                  human sees it before tagging, but it does NOT hard-block.
+# Advisory legs stay non-blocking until #1643/#1645 make the emulator reliably
+# green; at that point promote them to blocking. `device-qa.sh` tags each leg's
+# record with `advisory: true|false` so the gate's behaviour is intentional,
+# not accidental — see `device-qa.sh` and `release-checklist.sh` section 14.
+#
 # FOUR-LEG SPLIT — PER-PUSH vs NIGHTLY-ONLY (#1601)
 # -------------------------------------------------
 # `device-qa.sh` orchestrates FOUR platform legs: web / android / ios / ar.
@@ -113,29 +145,70 @@ jobs:
             device-qa-artifacts/
           if-no-files-found: ignore
 
+  # ── Build leg — compile the android-demo APK once, in a cached job ────────
+  # No emulator here: this is a pure Gradle build that produces the demo APK
+  # as a workflow artifact for the `android` and `ar` emulator jobs (#1652).
+  # Splitting the build out keeps the cold compile off the 2-core emulator
+  # runners, where it competed with the booted emulator for CPU. The
+  # setup-gradle composite action wires the Gradle build cache, so a warm run
+  # is fast. NOT continue-on-error: if the APK fails to compile there is
+  # nothing for the emulator jobs to install — the failure must be visible.
+  build-android-apk:
+    name: Device QA — build android-demo APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gradle
+
+      - name: Build android-demo debug APK
+        run: ./gradlew :samples:android-demo:assembleDebug --console=plain
+
+      - name: Upload android-demo APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-demo-debug-apk
+          # qa-android-demos.sh expects the APK at this exact path and skips
+          # its own build when it is present — the emulator jobs restore the
+          # artifact into this directory before invoking device-qa.sh.
+          path: samples/android-demo/build/outputs/apk/debug/android-demo-debug.apk
+          if-no-files-found: error
+
   # ── Android leg — Maestro on the KVM-accelerated emulator ─────────────────
   # The orchestrator's own emulator boot (setup-ar-emulator.sh) targets a
   # local AVD; on GitHub-hosted runners the ReactiveCircus action provides the
   # emulator, so device-qa.sh detects the already-booted device and skips its
   # own boot. Non-blocking: SwiftShader emulator + Maestro timing is flaky and
   # this workflow is not a required PR check.
+  #
+  # This job does NOT build the APK — it downloads the artifact produced by
+  # `build-android-apk` into the path qa-android-demos.sh expects, so the
+  # emulator job is install + Maestro only (#1652). The release-gate treats a
+  # red leg here as ADVISORY (WARN, not a hard block) — see the header block.
   android:
     name: Device QA — android (Maestro)
     runs-on: ubuntu-latest
-    # 60 min: a cold `:samples:android-demo:assembleDebug` on a 2-core runner
-    # plus emulator boot plus the Maestro flow needs headroom. The per-step
-    # `timeout` guards inside qa-android-demos.sh / maestro.sh still abort a
-    # genuine hang fast (build 30 min, Maestro 15 min) — see #1560.
-    timeout-minutes: 60
+    needs: build-android-apk
+    # 35 min: with the APK prebuilt the heavy work is emulator boot + the
+    # Maestro flow. The per-step `timeout` inside maestro.sh still aborts a
+    # genuine hang fast (Maestro 15 min) — see #1560.
+    timeout-minutes: 35
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
-      - uses: ./.github/actions/setup-gradle
-
       - uses: actions/setup-node@v6
         with:
           node-version: 20
+
+      - name: Download prebuilt android-demo APK
+        uses: actions/download-artifact@v7
+        with:
+          name: android-demo-debug-apk
+          # qa-android-demos.sh / device-qa.sh look for the APK here and skip
+          # the cold Gradle build when it exists (#1652).
+          path: samples/android-demo/build/outputs/apk/debug
 
       - name: Enable KVM
         run: |
@@ -207,12 +280,21 @@ jobs:
   ar:
     name: Device QA — ar (ARCore replay)
     runs-on: ubuntu-latest
+    needs: build-android-apk
     timeout-minutes: 45
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-gradle
+
+      - name: Download prebuilt android-demo APK
+        uses: actions/download-artifact@v7
+        with:
+          name: android-demo-debug-apk
+          # The AR replay leg reuses the same demo APK — restore it into the
+          # path qa-android-demos.sh expects so device-qa.sh skips the build.
+          path: samples/android-demo/build/outputs/apk/debug
 
       - name: Enable KVM
         run: |
