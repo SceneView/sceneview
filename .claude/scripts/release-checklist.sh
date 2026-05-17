@@ -234,33 +234,64 @@ echo ""
 
 # ─── 14. Device-QA gate ─────────────────────────────────────────────────
 # The autonomous cross-platform device-QA harness (umbrella #1560, slice
-# #1566) must have produced a `device-qa-report.json` before a release is
-# tagged — a red device-QA pass means a demo crashes on a real device.
+# #1566) informs the release — but it must NEVER be able to block it
+# indefinitely.
 #
-# RELEASE-GATE POLICY FOR continue-on-error LEGS (#1651)
-# ------------------------------------------------------
-# Not every leg is equal. device-qa.yml runs the `android` and `ar` legs as
-# `continue-on-error: true` on a chronically flaky SwiftShader emulator
-# (#1643); the `web` leg is reliable. So the gate is graded:
-#   - web        — BLOCKING. A red web leg is a release FAIL (hard block).
-#   - android/ar — ADVISORY. A red android/ar leg is a WARN: a human must see
-#                  "android leg: WARN — did not pass" before tagging, but it
-#                  does NOT hard-block (#1643/#1645 must make it reliably
-#                  green first — then promote it to blocking).
-# device-qa.sh tags each leg `advisory: true|false` and pre-computes a
-# `releaseGate.verdict` (clear|warn|blocked); this check reads that field so
-# the policy is explicit, not an accident of which legs happened to be red.
+# RELEASE-GATE POLICY (#1683 — deterministic, non-blocking)
+# ---------------------------------------------------------
+# History: the gate used to HARD-block on a pre-existing green
+# `device-qa-report.json`. In practice that froze the release for 58+
+# commits — a push-triggered Device QA run on `main` is killed by
+# `cancel-in-progress` concurrency before the long android Maestro leg
+# finishes, so no verdict was ever produced, and the orchestrator waited
+# forever. The android leg is `continue-on-error` / advisory and should
+# never have been able to block anything.
 #
-# To satisfy this check, run before tagging:
-#   bash .claude/scripts/device-qa.sh --platform=all
-# That produces `device-qa-report.json` at the repo root; `DEVICE_QA_REPORT=
-# <path>` overrides the location (e.g. a CI artifact downloaded into the
-# workspace). An older report without `releaseGate` (schemaVersion 1) falls
-# back to the legacy all-or-nothing `status` reading.
+# The gate is therefore DETERMINISTIC and NON-BLOCKING:
+#   - It triggers its OWN Device QA run via `gh workflow run "Device QA"`.
+#     A `workflow_dispatch` run is isolated from push-concurrency
+#     cancellation (#1665/#1667) — it cannot be killed by a later push.
+#   - It polls THAT specific run id with a BOUNDED loop and a HARD TIMEOUT
+#     (RELEASE_QA_TIMEOUT_MIN, default 60 min). No unbounded poll.
+#   - REQUIRED legs = web (Playwright) + ar (ARCore replay): a genuine FAIL
+#     on either => release-gate FAIL (the ONLY blocking outcome).
+#   - ADVISORY leg  = android (Maestro emulator): a failure/cancel/skip is a
+#     WARN line only, never a block — matches device-qa.yml's
+#     `continue-on-error: true` on the android job (#1670/#1676).
+#   - TIMEOUT FALLBACK: if the run does not complete within the timeout the
+#     gate emits `device-qa: TIMEOUT (advisory) — proceeding` and returns
+#     SUCCESS. A flaky / stuck / cancelled harness can NEVER freeze a
+#     release. The release always proceeds; Device QA INFORMS it.
+#
+# The full logic lives in `.claude/scripts/release-device-qa-gate.sh`.
+# Env overrides: RELEASE_QA_TIMEOUT_MIN, RELEASE_QA_POLL_SEC,
+# RELEASE_QA_REQUIRED, RELEASE_QA_ADVISORY, RELEASE_QA_REF.
+#
+# Two modes:
+#   - If a `device-qa-report.json` is already present (e.g. a CI artifact
+#     downloaded into the workspace, or a fresh local `device-qa.sh` run),
+#     this section reads it directly — the fast path, no dispatch.
+#     `DEVICE_QA_REPORT=<path>` overrides the location. A schemaVersion-1
+#     report without `releaseGate` falls back to the legacy `status`.
+#   - Otherwise it delegates to `release-device-qa-gate.sh`, which
+#     dispatches + waits + grades, and can never block on a stuck harness.
 echo -e "${CYAN}--- Device-QA Gate ---${NC}"
 
 DQ_REPORT="${DEVICE_QA_REPORT:-device-qa-report.json}"
-if [ -f "$DQ_REPORT" ]; then
+GATE_SCRIPT="$REPO_ROOT/.claude/scripts/release-device-qa-gate.sh"
+if [ ! -f "$DQ_REPORT" ] && [ -x "$GATE_SCRIPT" ]; then
+    # No local report — run the deterministic, non-blocking gate. It
+    # dispatches its own uncancellable Device QA run, waits with a hard
+    # timeout, and grades web+ar as required / android as advisory. It
+    # exits 1 ONLY on a genuine required-leg FAIL; timeout / advisory red /
+    # dispatch failure all proceed-with-warning.
+    echo -e "  No local device-qa-report.json — invoking release-device-qa-gate.sh"
+    if bash "$GATE_SCRIPT"; then
+        check "device-qa gate" "PASS" "deterministic gate passed (required legs green or proceed-with-warning)"
+    else
+        check "device-qa gate" "FAIL" "a required device-QA leg (web/ar) failed — fix before tagging"
+    fi
+elif [ -f "$DQ_REPORT" ]; then
     DQ_STATUS=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('status','?'))" 2>/dev/null || echo "?")
     DQ_FAILED=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('totals',{}).get('failed','?'))" 2>/dev/null || echo "?")
     DQ_SKIPPED=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('totals',{}).get('skipped','?'))" 2>/dev/null || echo "?")
@@ -309,7 +340,10 @@ if [ -f "$DQ_REPORT" ]; then
         esac
     fi
 else
-    check "device-qa-report.json" "FAIL" "missing — run: bash .claude/scripts/device-qa.sh --platform=all"
+    # No local report AND release-device-qa-gate.sh is not available — the
+    # deterministic gate path is unreachable. Surface a WARN, not a hard
+    # block: a missing harness must never freeze the release (#1683).
+    check "device-qa gate" "WARN" "no report and release-device-qa-gate.sh missing — run: bash .claude/scripts/device-qa.sh --platform=all"
 fi
 echo ""
 
