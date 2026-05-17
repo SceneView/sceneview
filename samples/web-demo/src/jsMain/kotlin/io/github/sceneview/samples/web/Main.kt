@@ -21,7 +21,7 @@ import org.w3c.dom.HTMLInputElement
  * - Sketchfab search bar (fetch API) replaces hardcoded model list
  * - Geometry showcase: cube, sphere, cylinder, plane with color pickers
  * - WebXR AR/VR toggle buttons
- * - Tab-based navigation (Model Viewer / Geometry)
+ * - Tab-based navigation (Models / Geometry / Physics / Settings)
  * - Responsive dark theme
  * - SDK version 4.3.1 badge
  *
@@ -35,7 +35,7 @@ import org.w3c.dom.HTMLInputElement
  * `.claude/scripts/sync-versions.sh`.
  */
 
-private const val SDK_VERSION = "4.6.2"
+private const val SDK_VERSION = "4.9.0"
 
 /** Sketchfab public API endpoint for searching downloadable models. */
 private const val SKETCHFAB_API =
@@ -43,7 +43,6 @@ private const val SKETCHFAB_API =
 
 private var currentSceneView: SceneView? = null
 private var autoRotateEnabled = true
-private var currentTab = "viewer"
 
 /** Counter for geometry placement offset so shapes don't overlap. */
 private var geometryCount = 0
@@ -61,8 +60,9 @@ fun main() {
     // Initialize the 3D scene with a default model
     initSceneView(canvas, "https://sceneview.github.io/models/platforms/DamagedHelmet.glb")
 
-    // Wire up tabs
-    setupTabs()
+    // Tab navigation is owned exclusively by the inline JS in `index.html`
+    // (the shipped runtime — see issue #1541). No Kotlin tab wiring here, so
+    // each `.tab-btn` click fires a single `switchTab` handler.
 
     // Wire up Sketchfab search
     setupSearch()
@@ -158,46 +158,6 @@ private fun loadModelIntoScene(url: String, name: String) {
             setupAutoRotateToggle(sceneView)
         }
     )
-}
-
-// ---- Tab navigation ----
-
-private fun setupTabs() {
-    val tabButtons = document.querySelectorAll(".tab-btn")
-    for (i in 0 until tabButtons.length) {
-        val btn = tabButtons.item(i) as? HTMLElement ?: continue
-        btn.addEventListener("click", {
-            val tab = btn.getAttribute("data-tab") ?: return@addEventListener
-            switchTab(tab)
-        })
-    }
-}
-
-private fun switchTab(tab: String) {
-    currentTab = tab
-
-    // Update tab button states
-    val tabButtons = document.querySelectorAll(".tab-btn")
-    for (i in 0 until tabButtons.length) {
-        val btn = tabButtons.item(i) as? HTMLElement ?: continue
-        val btnTab = btn.getAttribute("data-tab")
-        btn.className = if (btnTab == tab) "tab-btn active" else "tab-btn"
-    }
-
-    // Show/hide panels
-    val panels = arrayOf("viewer", "geometry")
-    panels.forEach { panelName ->
-        val panel = document.getElementById("panel-$panelName") as? HTMLElement
-        panel?.className = if (panelName == tab) {
-            panel.className.replace(" active", "") + " active"
-        } else {
-            panel.className.replace(" active", "")
-        }
-    }
-
-    // Move controls info out of the way when side panel is active
-    val controlsInfo = document.getElementById("controls-info") as? HTMLElement
-    controlsInfo?.style?.left = if (tab == "viewer" || tab == "geometry") "360px" else "20px"
 }
 
 // ---- Sketchfab search ----

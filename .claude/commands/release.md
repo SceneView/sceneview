@@ -109,6 +109,20 @@ ALL checks must pass. If any mismatch, fix before proceeding.
 bash .claude/scripts/quality-gate.sh --quick
 ```
 
+## Step 6.5: Run the device-QA harness (BLOCKER)
+
+The autonomous cross-platform device-QA harness (umbrella #1560) must pass on
+every platform before a release is tagged. A red pass means a demo crashes on
+a real device / emulator / browser.
+
+```bash
+bash .claude/scripts/device-qa.sh --platform=all
+```
+
+This produces `device-qa-report.json` at the repo root. `release-checklist.sh`
+(Step 7's gate) reads its `status` field and **FAILS the release** if it is not
+`passed`. Do not tag without a green report.
+
 ## Step 7: Commit and tag
 
 ```bash

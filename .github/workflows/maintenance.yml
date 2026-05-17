@@ -121,7 +121,8 @@ jobs:
   # ── 3. SceneView agent skill drift ────────────────────────────────────────
   # Catches the case where a library API was renamed/removed between releases
   # without updating `agents/sceneview/` (the published agent skill). Daily
-  # cadence is enough — the same check also runs on every PR via pr-check.yml.
+  # cadence is enough — the same check also runs on every PR via ci.yml's
+  # `repo-hygiene` job.
   skill-drift:
     name: SceneView agent skill drift
     runs-on: ubuntu-latest
@@ -197,7 +198,60 @@ jobs:
             echo "CI health OK ($FAILURES/7 failures)"
           fi
 
-  # ── 5. Stale claude/* branch cleanup ──────────────────────────────────────
+  # ── 5. Structured maintenance digest (report-only /maintain mirror) ───────
+  # Reproduces the *observable* signals of the `/maintain` Claude Code skill
+  # (CI health, open issues/PRs, dependency drift, version sync, quality
+  # signals, release decision) as a single structured report. It is strictly
+  # READ-ONLY — the skill itself takes actions (commits, labels, AVD rebuilds)
+  # which are unsafe to run unattended in CI, so this job only observes.
+  # Output goes to the step-summary AND a single auto-updated tracking issue
+  # so the digest is browsable day to day. Non-blocking: the report script
+  # always exits 0, and the issue post is best-effort.
+  maintenance-report:
+    name: Daily maintenance digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write       # post/update the digest tracking issue
+      pull-requests: read # the script counts open PRs
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0    # release decision needs the full tag history
+
+      - name: Generate maintenance digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash .claude/scripts/maintenance-report.sh -o maintenance-report.md
+
+      - name: Post or update tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DIGEST_TITLE="Daily maintenance digest"
+          BODY="$(cat maintenance-report.md)"
+          # Find an existing open digest issue (best-effort).
+          EXISTING=$(gh issue list --state open --search "$DIGEST_TITLE in:title" \
+            --label maintenance --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -z "$EXISTING" ]; then
+            gh issue create \
+              --title "$DIGEST_TITLE" \
+              --body "$BODY" \
+              --label "maintenance,ci" \
+              || echo "::warning::Could not create maintenance digest issue"
+          else
+            # Overwrite the body so the issue always shows the latest digest,
+            # and add a short dated comment so the history stays visible.
+            gh issue edit "$EXISTING" --body "$BODY" \
+              || echo "::warning::Could not update digest issue #$EXISTING"
+            gh issue comment "$EXISTING" \
+              --body "Digest refreshed — $(date -u +%Y-%m-%d). See the issue body for the latest table." \
+              || echo "::warning::Could not comment on digest issue #$EXISTING"
+          fi
+
+  # ── 6. Stale claude/* branch cleanup ──────────────────────────────────────
   # An orchestrator marathon leaves dozens of merged `claude/*` branches on
   # `origin`. This job deletes the ones that are provably dead — fully merged
   # into origin/main (ahead=0) OR carrying a MERGED PR (squash-merge case) —

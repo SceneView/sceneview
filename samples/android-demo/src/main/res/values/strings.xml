@@ -224,6 +224,15 @@
     <string name="demo_post_processing_subtitle">SSAO, anti-aliasing, and tone mapping</string>
     <string name="demo_custom_mesh_title">Custom Mesh</string>
     <string name="demo_custom_mesh_subtitle">Custom vertex and index buffers</string>
+    <string name="demo_texture_streaming_title">Material Streaming</string>
+    <string name="demo_texture_streaming_subtitle">Swap textures and materials on a model at runtime</string>
+    <string name="demo_texture_streaming_picker_label">Material set</string>
+    <string name="demo_texture_streaming_variant_detail">metallic %1$.2f · roughness %2$.2f</string>
+    <string name="demo_texture_streaming_variant_steel">Polished Steel</string>
+    <string name="demo_texture_streaming_variant_gold">Brushed Gold</string>
+    <string name="demo_texture_streaming_variant_copper">Copper</string>
+    <string name="demo_texture_streaming_variant_plastic">Matte Plastic</string>
+    <string name="demo_texture_streaming_variant_ceramic">Glazed Ceramic</string>
     <string name="demo_shape_title">Shape Extrude</string>
     <string name="demo_shape_subtitle">Extrude 2D polygons into 3D meshes</string>
     <string name="demo_reflection_probes_title">Reflection Probes</string>
@@ -354,6 +363,13 @@
     <string name="demo_chip_streamed">Streamed (cached)</string>
     <string name="demo_chip_streaming">Streaming…</string>
     <string name="demo_chip_bundled">Bundled fallback</string>
+
+    <!-- DemoScaffold v2 bottom-sheet settings (#1154) -->
+    <string name="demo_settings_title">Settings</string>
+    <string name="demo_settings_open">Open demo settings</string>
+    <string name="demo_settings_fab_cd">Demo settings</string>
+    <string name="demo_settings_reset">Reset</string>
+    <string name="demo_settings_reset_cd">Reset demo settings to defaults</string>
     <string name="about_star_on_github">Star on GitHub</string>
     <string name="about_made_with">Made with</string>
     <string name="about_made_by"> by Thomas Gorisse</string>

@@ -45,15 +45,6 @@ import org.junit.runner.RunWith
  * Requires an Android device or emulator with GPU support (SwiftShader OK).
  */
 @RunWith(AndroidJUnit4::class)
-@Ignore(
-    "RenderTestHarness.capturePixels() relies on Filament's async readPixels callback, " +
-            "which never fires on the Apple Silicon emulator (gfxstream OpenGL ES → Metal " +
-            "translator) — same root cause as DemoParametersRenderTest. Tracked in #803. " +
-            "Coverage on emulator is provided by samples/android-demo's UiAutomator " +
-            "DemoRenderingScreenshotTest (capture via device.takeScreenshot which works on " +
-            "any backend). Re-enable on a hardware-accelerated GPU runner or once Filament " +
-            "ships a translator-compatible readback path."
-)
 class GeometryRenderTest {
 
     companion object {
@@ -82,6 +73,9 @@ class GeometryRenderTest {
 
     @Before
     fun setup() {
+        // Run on a hardware-GPU runner; cleanly skip on the SwiftShader / Apple-Silicon
+        // emulator where Filament's async readPixels callback never fires (#803, #912).
+        RenderTestCapabilities.assumeGpuReadbackAvailable()
         harness.resetScene()
         harness.runOnMain {
             val l = LightNode(

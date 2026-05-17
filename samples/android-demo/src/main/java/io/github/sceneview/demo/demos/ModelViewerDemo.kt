@@ -21,6 +21,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
+import io.github.sceneview.fitDistanceForBounds
+import io.github.sceneview.model.model
+import io.github.sceneview.toAabb
+import io.github.sceneview.verticalFovDegreesForFocalLength
 import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
@@ -83,12 +87,17 @@ fun ModelViewerDemo(onBack: () -> Unit) {
     val resolver = remember(context) { SketchfabAssetResolver.getInstance(context) }
     val hasSketchfabKey = remember { SketchfabConfig.apiKey != null }
 
-    // The streamed model is loaded via the URL overload — null `streamedFileUrl`
-    // skips this branch (Kotlin elvis returns null which keeps the bundled
-    // helmet below as the displayed instance).
-    val streamedModelInstance = streamedFileUrl?.let { url ->
-        rememberModelInstance(modelLoader, url)
-    }
+    // The streamed model is loaded via the URL overload. This MUST be called
+    // unconditionally — wrapping a @Composable in `streamedFileUrl?.let { }`
+    // makes the composer group appear/disappear with `streamedFileUrl`, so the
+    // `produceState` inside `rememberModelInstance` lands in an unstable slot.
+    // The State it returns then fails to invalidate the scope that reads
+    // `streamedModelInstance` when the load completes, leaving `assetSource`
+    // pinned at `Streaming` for the whole session even though the model is
+    // loaded and interactive (#1464). `rememberStreamedModelInstance` keeps the
+    // call site stable and simply returns null while no stream is active.
+    val streamedModelInstance =
+        rememberStreamedModelInstance(modelLoader, streamedFileUrl)
     // The bundled hero — assets/models/khronos_damaged_helmet.glb. Loaded
     // eagerly so the first frame after launch shows the hero shot.
     val bundledModelInstance =
@@ -99,11 +108,42 @@ fun ModelViewerDemo(onBack: () -> Unit) {
     // streamed load still in flight, or streamed load failed).
     val activeModelInstance = streamedModelInstance ?: bundledModelInstance
 
-    // Camera orbits; model stays fixed. Radius 1.4 m keeps the 0.3 m helmet
-    // framed comfortably at portrait aspect without clipping the near plane.
+    // Auto-fit camera framing (#1439): instead of a per-demo hand-tuned orbit
+    // radius, compute the distance at which the *current* model's bounding
+    // sphere exactly fills the viewport. A 5 cm bee and a 5 m crate both end
+    // up comfortably framed without touching `scaleToUnits` — the camera
+    // adapts to the model, not the other way round.
+    //
+    // The framing uses the library helper `fitDistanceForBounds`, fed with the
+    // model's intrinsic glTF bounds (`model.boundingBox`). The portrait phone
+    // aspect (~0.5) and the default 28 mm lens FOV match the stock SceneView
+    // camera the hero orbit drives. We also read the bounds' centre so the
+    // ModelNode can be translated to put that centre on the world origin the
+    // hero orbit pivots around — many glTF models have an off-origin pivot.
+    val framing = remember(activeModelInstance) {
+        val instance = activeModelInstance ?: return@remember null
+        val bounds = runCatching { instance.model.boundingBox.toAabb() }.getOrNull()
+        if (bounds == null || bounds.isEmpty) {
+            null
+        } else {
+            ModelFraming(
+                radius = fitDistanceForBounds(
+                    bounds = bounds,
+                    verticalFovDegrees = verticalFovDegreesForFocalLength(28.0),
+                    aspect = 0.5,
+                ).coerceIn(0.2f, 50f),
+                center = bounds.center,
+            )
+        }
+    }
+
+    // Camera orbits; model stays fixed. The orbit radius is auto-fit to the
+    // model's intrinsic size (see `framing` above) so every model — bundled
+    // helmet or streamed Sketchfab pick — is framed identically. Falls back to
+    // 1.4 m while the model bounds are not yet measurable.
     val cameraManipulator = rememberHeroOrbitCameraManipulator(
         trigger = activeModelInstance != null,
-        radius = 1.4f,
+        radius = framing?.radius ?: 1.4f,
         yHeight = 0f,
         durationMillis = 20_000,
     )
@@ -139,15 +179,18 @@ fun ModelViewerDemo(onBack: () -> Unit) {
                 activeModelInstance?.let { instance ->
                     ModelNode(
                         modelInstance = instance,
-                        // Scale streamed content to a comfortable 0.4 m so a
-                        // 5 m crate or a 5 cm bee both read as "in the orbit
-                        // sweet spot". For the bundled helmet we keep the
-                        // historical 0.3 m for byte-identical screenshots.
-                        scaleToUnits = if (streamedFileUrl == null) 0.3f else 0.4f,
-                        // centerOrigin lets SceneView re-centre the model's
-                        // bounding box on world origin — see QA finding
-                        // 2026-05-11 PM in the original file.
-                        centerOrigin = io.github.sceneview.math.Position(0f, 0f, 0f),
+                        // No `scaleToUnits` — the model renders at its true
+                        // glTF size. Auto-fit framing (#1439) adapts the orbit
+                        // radius to that intrinsic size instead, so a 5 m crate
+                        // and a 5 cm bee are both framed identically without
+                        // squashing every model to a fixed unit cube.
+                        //
+                        // Translate the model so its bounding-box centre lands
+                        // on the world origin the hero orbit pivots around —
+                        // glTF pivots are often off-centre. `framing.center` is
+                        // the bounds centre the same auto-fit pass measured.
+                        position = framing?.let { -it.center }
+                            ?: io.github.sceneview.math.Position(0f, 0f, 0f),
                     )
                 }
             }
@@ -197,6 +240,51 @@ fun ModelViewerDemo(onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Auto-fit framing parameters for the currently displayed model (#1439).
+ *
+ * @property radius Orbit distance, in metres, at which the model's bounding sphere fills the
+ *   viewport — computed by `io.github.sceneview.fitDistanceForBounds` from the model's intrinsic
+ *   glTF bounds.
+ * @property center Bounding-box centre of the model in its own local space. The `ModelNode` is
+ *   translated by `-center` so the centre lands on the world origin the hero orbit pivots around.
+ */
+private data class ModelFraming(
+    val radius: Float,
+    val center: io.github.sceneview.math.Position,
+)
+
+/**
+ * Loads the streamed Sketchfab model for [streamedFileUrl], or returns `null`
+ * when no stream is active (`streamedFileUrl == null`).
+ *
+ * Why a dedicated helper instead of `streamedFileUrl?.let { rememberModelInstance(...) }`:
+ * a `@Composable` invoked inside `?.let` is a **conditional** call — the
+ * composer group for `rememberModelInstance`'s internal `produceState` only
+ * exists while `streamedFileUrl` is non-null. When the load finishes and
+ * `produceState` emits the loaded instance, the snapshot State sits in that
+ * conditionally-present group and does not reliably invalidate the caller that
+ * reads the result. The `assetSource` chip therefore stayed stuck on
+ * `Streaming` even after the model was fully loaded and interactive (#1464).
+ *
+ * Calling `rememberModelInstance` unconditionally here keeps its group in a
+ * fixed slot, so the State invalidates the caller correctly and the chip
+ * transitions `Streaming → Streamed` the moment the model is ready. The empty
+ * sentinel path returns `null` without ever touching the loader.
+ */
+@Composable
+private fun rememberStreamedModelInstance(
+    modelLoader: io.github.sceneview.loaders.ModelLoader,
+    streamedFileUrl: String?,
+): io.github.sceneview.model.ModelInstance? {
+    // rememberModelInstance is called on every recomposition, in a stable slot.
+    // When there is no active stream we feed it an empty path: the URL overload
+    // sees a scheme-less location, the asset reader fails fast, and it returns
+    // null — no model is loaded and the bundled helmet keeps rendering.
+    val instance = rememberModelInstance(modelLoader, streamedFileUrl ?: "")
+    return if (streamedFileUrl == null) null else instance
 }
 
 /**

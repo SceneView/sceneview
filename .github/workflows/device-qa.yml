@@ -1,0 +1,134 @@
+name: Device QA
+
+# Autonomous cross-platform device-QA harness (umbrella #1560, slice #1566).
+#
+# WHY THIS EXISTS
+# ---------------
+# The four platform harnesses (Maestro Android #1562, Maestro iOS #1563,
+# Playwright web #1564, AR replay #1565) are tied together by the
+# `.claude/scripts/device-qa.sh` orchestrator. This workflow runs that
+# orchestrator for the platforms feasible on GitHub-hosted runners so a demo
+# regression that crashes on a real emulator / browser surfaces in CI.
+#
+# COST CONTROL
+# ------------
+# Device-QA boots emulators and a browser — it is expensive. It is therefore
+# NOT in the per-PR `CI Gate`. It runs only when:
+#   - a harness script, Maestro flow, or demo app actually changes (push to
+#     main, path-gated), OR
+#   - manually via workflow_dispatch (vet a feature branch / pre-tag), OR
+#   - reused via workflow_call (nightly-ci.yml safety net).
+#
+# Each leg invokes `device-qa.sh --platform=<p> --ci`: in `--ci` mode a
+# skipped platform (missing toolchain) is a FAILURE, so a silently-degraded
+# runner cannot produce a falsely-green report. The aggregated
+# `device-qa-report.json` is uploaded as an artifact for the release
+# checkpoint (`release-checklist.sh` reads its `status`).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.claude/scripts/device-qa.sh'
+      - '.claude/scripts/qa-android-demos.sh'
+      - '.claude/scripts/ios-device-qa.sh'
+      - '.claude/scripts/ar-replay-qa.sh'
+      - '.claude/scripts/setup-ar-emulator.sh'
+      - '.claude/scripts/lib/maestro.sh'
+      - '.claude/scripts/lib/android-cli.sh'
+      - '.maestro/**'
+      - 'samples/android-demo/**'
+      - 'samples/web-demo/**'
+  workflow_dispatch:
+  # Reused by nightly-ci.yml so the scheduled full-validation run exercises
+  # the device-QA legs too — see #1324.
+  workflow_call:
+
+concurrency:
+  group: device-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Web leg — Playwright (cheap, always feasible on ubuntu) ───────────────
+  web:
+    name: Device QA — web (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Run device-qa.sh (web leg)
+        run: bash .claude/scripts/device-qa.sh --platform=web --ci
+
+      - name: Upload web device-QA report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-qa-report-web
+          path: |
+            device-qa-report.json
+            device-qa-artifacts/
+          if-no-files-found: ignore
+
+  # ── Android leg — Maestro on the KVM-accelerated emulator ─────────────────
+  # The orchestrator's own emulator boot (setup-ar-emulator.sh) targets a
+  # local AVD; on GitHub-hosted runners the ReactiveCircus action provides the
+  # emulator, so device-qa.sh detects the already-booted device and skips its
+  # own boot. Non-blocking: SwiftShader emulator + Maestro timing is flaky and
+  # this workflow is not a required PR check.
+  android:
+    name: Device QA — android (Maestro)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gradle
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run device-qa.sh (android leg) on emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            export PATH="$HOME/.maestro/bin:$PATH"
+            adb wait-for-device
+            attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
+            # --fast: one representative category, keeps the emulator job lean.
+            bash .claude/scripts/device-qa.sh --platform=android --fast --ci
+
+      - name: Upload android device-QA report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-qa-report-android
+          path: |
+            device-qa-report.json
+            device-qa-artifacts/
+          if-no-files-found: ignore

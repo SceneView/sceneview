@@ -1,15 +1,30 @@
 package io.github.sceneview.demo.demos
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,14 +32,17 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.utils.Manipulator
 import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
-import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.R
 import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.gesture.CameraGestureDetector
 import io.github.sceneview.gesture.orbitHomePosition
@@ -41,6 +59,17 @@ import io.github.sceneview.rememberModelLoader
  * Demonstrates camera manipulation modes: orbit, free-flight, and map-style navigation.
  *
  * Users can toggle between [Manipulator.Mode] presets and reset the camera to its home position.
+ *
+ * ### Touch usability (issue #1428)
+ * Filament's [Manipulator] has three modes but only ORBIT and MAP are fully driveable with touch
+ * drag gestures. FREE_FLIGHT integrates a velocity from held WASD-style keys — a touch device
+ * has no keyboard, so without on-screen controls the camera simply can't move. Worse, FREE_FLIGHT
+ * starts at `flightStartPosition` (default `0,0,0`) which is *inside* the helmet model, so the
+ * viewport renders black. This demo therefore:
+ *  - sets `flightStartPosition` to the same home position as ORBIT/MAP so FREE_FLIGHT opens on a
+ *    framed model instead of a black screen, and
+ *  - shows an on-screen movement pad (forward / back / strafe / up / down) while FREE_FLIGHT is
+ *    selected, wired to [Manipulator.keyDown] / [Manipulator.keyUp].
  */
 @Composable
 fun CameraControlsDemo(onBack: () -> Unit) {
@@ -75,6 +104,8 @@ fun CameraControlsDemo(onBack: () -> Unit) {
     // only covers the genuine cold start, not every camera-mode swap.
     val firstFrame = rememberFirstFrameState()
 
+    val isFreeFlight = selectedMode.second == Manipulator.Mode.FREE_FLIGHT
+
     DemoScaffold(
         title = stringResource(R.string.demo_camera_controls_title),
         onBack = onBack,
@@ -97,6 +128,18 @@ fun CameraControlsDemo(onBack: () -> Unit) {
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = when (selectedMode.second) {
+                    Manipulator.Mode.ORBIT ->
+                        "Drag to orbit, two-finger drag to pan, pinch to zoom."
+                    Manipulator.Mode.MAP ->
+                        "Drag to pan across the model, pinch to zoom."
+                    Manipulator.Mode.FREE_FLIGHT ->
+                        "Drag to look around, use the on-screen pad to fly."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = { resetKey++ }) {
                 Text("Reset Camera")
@@ -109,18 +152,27 @@ fun CameraControlsDemo(onBack: () -> Unit) {
         // to swap Manipulator.Mode mid-session since Manipulator itself has no setMode API.
         Box(modifier = Modifier.fillMaxSize()) {
             androidx.compose.runtime.key(selectedMode, resetKey) {
+                // Build the underlying Manipulator here and keep our own reference so the
+                // FREE_FLIGHT movement pad can drive it through keyDown/keyUp. ORBIT and MAP
+                // ignore the flight* builder values; FREE_FLIGHT needs flightStartPosition set
+                // away from the origin, otherwise the camera spawns inside the helmet (#1428).
+                val manipulator = remember(selectedMode, resetKey) {
+                    Manipulator.Builder()
+                        .orbitHomePosition(homePosition)
+                        .targetPosition(target)
+                        .flightStartPosition(homePosition.x, homePosition.y, homePosition.z)
+                        // Look down -Z toward the model from the flight start position.
+                        .flightStartOrientation(0.0f, 0.0f)
+                        .flightMaxMoveSpeed(2.0f)
+                        .orbitSpeed(0.005f, 0.005f)
+                        .zoomSpeed(0.05f)
+                        .build(selectedMode.second)
+                }
                 val cameraManipulator = rememberCameraManipulator(
                     orbitHomePosition = homePosition,
                     targetPosition = target,
                     creator = {
-                        CameraGestureDetector.DefaultCameraManipulator(
-                            Manipulator.Builder()
-                                .orbitHomePosition(homePosition)
-                                .targetPosition(target)
-                                .orbitSpeed(0.005f, 0.005f)
-                                .zoomSpeed(0.05f)
-                                .build(selectedMode.second)
-                        )
+                        CameraGestureDetector.DefaultCameraManipulator(manipulator)
                     }
                 )
                 SceneView(
@@ -140,8 +192,136 @@ fun CameraControlsDemo(onBack: () -> Unit) {
                         )
                     }
                 }
+                // FREE_FLIGHT has no touch translation gesture — Filament drives flight
+                // movement from held keys. Surface an on-screen pad so the mode is usable
+                // on a touch device (#1428).
+                if (isFreeFlight) {
+                    FreeFlightMovementPad(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp),
+                        onKeyDown = { manipulator.keyDown(it) },
+                        onKeyUp = { manipulator.keyUp(it) }
+                    )
+                }
             }
             LoadingScrim(loading = modelInstance == null, label = "Loading helmet…")
         }
+    }
+}
+
+/**
+ * On-screen movement pad for FREE_FLIGHT mode. Each button presses the matching
+ * [Manipulator.Key] on touch-down and releases it on touch-up, mirroring how a desktop
+ * keyboard would drive Filament's free-flight camera.
+ */
+@Composable
+private fun FreeFlightMovementPad(
+    modifier: Modifier = Modifier,
+    onKeyDown: (Manipulator.Key) -> Unit,
+    onKeyUp: (Manipulator.Key) -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        tonalElevation = 3.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Horizontal movement cluster: forward / back / strafe left-right.
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                HoldKeyButton(
+                    icon = Icons.Default.KeyboardArrowUp,
+                    contentDescription = "Move forward",
+                    key = Manipulator.Key.FORWARD,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HoldKeyButton(
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "Strafe left",
+                        key = Manipulator.Key.LEFT,
+                        onKeyDown = onKeyDown,
+                        onKeyUp = onKeyUp
+                    )
+                    HoldKeyButton(
+                        icon = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Move backward",
+                        key = Manipulator.Key.BACKWARD,
+                        onKeyDown = onKeyDown,
+                        onKeyUp = onKeyUp
+                    )
+                    HoldKeyButton(
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Strafe right",
+                        key = Manipulator.Key.RIGHT,
+                        onKeyDown = onKeyDown,
+                        onKeyUp = onKeyUp
+                    )
+                }
+            }
+            // Vertical movement cluster: up / down.
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                HoldKeyButton(
+                    icon = Icons.Default.ArrowUpward,
+                    contentDescription = "Move up",
+                    key = Manipulator.Key.UP,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
+                )
+                HoldKeyButton(
+                    icon = Icons.Default.ArrowDownward,
+                    contentDescription = "Move down",
+                    key = Manipulator.Key.DOWN,
+                    onKeyDown = onKeyDown,
+                    onKeyUp = onKeyUp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A round icon button that holds a [Manipulator.Key] pressed for as long as the finger is
+ * down. Uses a raw pointer-input loop (not [Button.onClick]) so the key is released exactly
+ * on finger-up — and on gesture cancel — instead of firing a single discrete tap.
+ */
+@Composable
+private fun HoldKeyButton(
+    icon: ImageVector,
+    contentDescription: String,
+    key: Manipulator.Key,
+    onKeyDown: (Manipulator.Key) -> Unit,
+    onKeyUp: (Manipulator.Key) -> Unit
+) {
+    FilledIconButton(
+        onClick = {},
+        shape = CircleShape,
+        modifier = Modifier
+            .size(48.dp)
+            .pointerInput(key) {
+                detectTapGestures(
+                    onPress = {
+                        onKeyDown(key)
+                        // Suspends until finger-up or cancel, then always releases the key
+                        // so a lifted finger or interrupted gesture can't strand a held key.
+                        try {
+                            awaitRelease()
+                        } finally {
+                            onKeyUp(key)
+                        }
+                    }
+                )
+            }
+    ) {
+        Icon(imageVector = icon, contentDescription = contentDescription)
     }
 }

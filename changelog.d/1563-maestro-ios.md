@@ -1,0 +1,2 @@
+<!-- category: Added -->
+- device-qa: added the maestro iOS leg — `.maestro/ios/` flows drive every iOS demo reachable via the `sceneview://demo/<id>` deep link in `samples/ios-demo` like a real user (custom-scheme launch, camera-orbit drag, tap, one screenshot per demo, crash assertion), with per-category subflows and launch-only smoke for AR demos (RealityKit AR cannot run on the simulator); `ios-device-qa.sh` is the maestro wrapper that boots a simulator, builds + installs the demo and sweeps the simulator log for crashes (#1563).

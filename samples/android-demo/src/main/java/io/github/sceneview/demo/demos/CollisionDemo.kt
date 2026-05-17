@@ -121,6 +121,16 @@ fun CollisionDemo(onBack: () -> Unit) {
             environmentLoader = environmentLoader,
             view = view,
             collisionSystem = collisionSystem,
+            // This demo hand-authors five shapes in a row at z = -2 and a camera
+            // manipulator whose orbit pivot is fixed on that row. With the default
+            // autoCenterContent the union bounding box of the five shapes is recentred
+            // to the scene origin — which shifts them off the camera's (0, 0.15, -2)
+            // pivot. The camera then orbits empty space (feels unresponsive) and the
+            // visible shapes no longer line up with where taps are expected to land,
+            // so hit-tests appear to fire outside the objects (#1430, same root cause
+            // as the LightingDemo #1421 fix). Disable it so each shape keeps its
+            // authored world position and collision matches what is rendered.
+            autoCenterContent = false,
             // Dolly closer — shapes span 1.2 m at z = -2, default camera z = 4 put them
             // at 6 m which made the tap targets tiny on phone screens.
             cameraManipulator = rememberCameraManipulator(

@@ -31,10 +31,19 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
 
-  /* Reporter */
+  /* Reporter
+   *
+   * - `html`     — local debugging report
+   * - `list`     — console output
+   * - `json`     — raw Playwright result, kept for tooling
+   * - custom QA  — flat `test-results/web-qa-summary.json` consumed by the
+   *                autonomous device-QA orchestrator runner (issue #1566).
+   */
   reporter: [
     ['html', { outputFolder: './playwright-report', open: 'never' }],
     ['list'],
+    ['json', { outputFile: './test-results/playwright-results.json' }],
+    ['./tests/qa-summary-reporter.ts'],
   ],
 
   /* Shared settings for all projects */

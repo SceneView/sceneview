@@ -1061,6 +1061,205 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' stroke='%23c9d1d9' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M2 3.5l3 3 3-3'/%3E%3C/svg%3E");
     }
 
+    /* --- Thumbnail model picker --- */
+    .pg__model-picker {
+      position: relative;
+    }
+
+    .pg__model-trigger {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 190px;
+      background: var(--color-surface-container, #ecedf6);
+      color: var(--color-on-surface, #2e333a);
+      border: none;
+      border-radius: var(--pg-radius-sm);
+      padding: 3px 6px 3px 4px;
+      font-family: var(--font-body, 'Inter', sans-serif);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: box-shadow var(--pg-transition), background var(--pg-transition);
+    }
+
+    .pg__model-trigger:hover {
+      background: var(--color-surface-container-high, #e3e4ee);
+    }
+
+    .pg__model-trigger:focus-visible,
+    .pg__model-trigger[aria-expanded="true"] {
+      box-shadow: 0 0 0 2px rgba(0, 91, 193, 0.2);
+    }
+
+    .pg__model-trigger-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: var(--color-surface-container-low, #f2f3fa);
+      flex-shrink: 0;
+    }
+
+    .pg__model-trigger-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pg__model-trigger-caret {
+      font-size: 16px;
+      color: var(--color-outline, #777b84);
+      flex-shrink: 0;
+    }
+
+    [data-theme="dark"] .pg__model-trigger {
+      background: #21262d;
+      color: #c9d1d9;
+    }
+
+    [data-theme="dark"] .pg__model-trigger:hover {
+      background: #2a3138;
+    }
+
+    [data-theme="dark"] .pg__model-trigger-thumb {
+      background: #161b22;
+    }
+
+    .pg__model-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 40;
+      width: 340px;
+      max-width: 86vw;
+      max-height: 380px;
+      overflow-y: auto;
+      padding: var(--space-md, 16px);
+      background: var(--color-surface-container, #ffffff);
+      border: 1px solid var(--color-outline, #d6dae0);
+      border-radius: var(--pg-radius-md, 16px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+      animation: pg-model-panel-in 0.16s ease-spring, var(--pg-transition);
+    }
+
+    @keyframes pg-model-panel-in {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    [data-theme="dark"] .pg__model-panel {
+      background: #161c2c;
+      border-color: #2a3346;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .pg__model-panel-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-sm, 8px);
+    }
+
+    .pg__model-group-label {
+      grid-column: 1 / -1;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-outline, #777b84);
+      margin: 6px 2px 0;
+    }
+
+    .pg__model-group-label:first-child {
+      margin-top: 0;
+    }
+
+    .pg__model-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+      padding: 4px;
+      background: var(--color-surface-container-low, #f2f3fa);
+      border: 1.5px solid transparent;
+      border-radius: var(--pg-radius-sm, 12px);
+      cursor: pointer;
+      font-family: var(--font-body, 'Inter', sans-serif);
+      transition: border-color var(--pg-transition),
+                  background var(--pg-transition),
+                  transform var(--pg-transition);
+    }
+
+    .pg__model-tile:hover {
+      transform: translateY(-2px);
+      background: var(--color-surface-container-high, #e3e4ee);
+    }
+
+    .pg__model-tile:focus-visible {
+      outline: none;
+      border-color: var(--color-primary, #005bc1);
+    }
+
+    .pg__model-tile[aria-current="true"] {
+      border-color: var(--color-primary, #005bc1);
+      background: rgba(0, 91, 193, 0.08);
+    }
+
+    .pg__model-tile-thumb {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--color-surface, #ffffff);
+      display: block;
+    }
+
+    .pg__model-tile-name {
+      font-size: 0.68rem;
+      font-weight: 500;
+      line-height: 1.2;
+      text-align: center;
+      color: var(--color-on-surface, #2e333a);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    [data-theme="dark"] .pg__model-tile {
+      background: #1c2330;
+    }
+
+    [data-theme="dark"] .pg__model-tile:hover {
+      background: #232c3c;
+    }
+
+    [data-theme="dark"] .pg__model-tile[aria-current="true"] {
+      border-color: #79c0ff;
+      background: rgba(121, 192, 255, 0.12);
+    }
+
+    [data-theme="dark"] .pg__model-tile-thumb {
+      background: #0d1117;
+    }
+
+    [data-theme="dark"] .pg__model-tile-name {
+      color: #c9d1d9;
+    }
+
+    [data-theme="dark"] .pg__model-tile:focus-visible {
+      border-color: #79c0ff;
+    }
+
+    @media (max-width: 640px) {
+      .pg__model-panel {
+        width: 280px;
+      }
+      .pg__model-panel-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
     .pg__canvas-wrap {
       flex: 1;
       position: relative;
@@ -1602,15 +1801,15 @@
           <div class="pg__ai-dropdown" id="aiDropdown">
             <a class="pg__ai-option" id="aiCursor" href="#" target="_blank" rel="noopener">
               <span class="material-symbols-outlined" style="font-size:16px">terminal</span>
-              Open in Cursor
+              Open Cursor
             </a>
             <a class="pg__ai-option" id="aiWindsurf" href="#" target="_blank" rel="noopener">
               <span class="material-symbols-outlined" style="font-size:16px">air</span>
-              Open in Windsurf
+              Open Windsurf
             </a>
             <a class="pg__ai-option" id="aiCopilot" href="#" target="_blank" rel="noopener">
               <span class="material-symbols-outlined" style="font-size:16px">smart_toy</span>
-              Open in GitHub Copilot
+              Open GitHub Copilot
             </a>
           </div>
         </div>
@@ -1679,7 +1878,25 @@
                 <span class="pg__preview-label">Preview</span>
                 <span class="pg__renderer-pill">SceneView</span>
               </div>
-              <select class="pg__model-select" id="modelSelect">
+              <!-- Thumbnail model picker. The native <select> below is kept
+                   hidden as the accessible source of truth — all preview JS
+                   reads/writes #modelSelect, the picker just mirrors it. -->
+              <div class="pg__model-picker">
+                <button type="button" class="pg__model-trigger" id="modelTrigger"
+                        aria-haspopup="dialog" aria-expanded="false"
+                        aria-label="Choose a 3D model">
+                  <img class="pg__model-trigger-thumb" id="modelTriggerThumb"
+                       src="" alt="" width="22" height="22" loading="lazy" />
+                  <span class="pg__model-trigger-label" id="modelTriggerLabel">Model</span>
+                  <span class="material-symbols-outlined pg__model-trigger-caret"
+                        aria-hidden="true">expand_more</span>
+                </button>
+                <div class="pg__model-panel" id="modelPanel" role="dialog"
+                     aria-label="3D model gallery" hidden>
+                  <div class="pg__model-panel-grid" id="modelPanelGrid"></div>
+                </div>
+              </div>
+              <select class="pg__model-select" id="modelSelect" hidden tabindex="-1" aria-hidden="true">
                 <optgroup label="Hero (new)">
                   <option value="rolex_watch">Rolex Watch</option>
                   <option value="dji_mavic_3">DJI Mavic 3</option>
@@ -2873,10 +3090,138 @@
 
     modelSelect.addEventListener('change', function() {
       initSceneView(getModelUrl(this.value));
+      syncModelPicker();
     });
 
     // Note: initial initSceneView() call is handled by the URL state
     // restore block below, which calls loadExample() -> initSceneView().
+
+    // ====================================================================
+    //  THUMBNAIL MODEL PICKER
+    // ====================================================================
+    // A visual gallery layered over the (now hidden) native <select>.
+    // #modelSelect stays the single source of truth — the picker reads its
+    // <option>/<optgroup> tree to build tiles and writes back on selection.
+    var modelTrigger = $('modelTrigger');
+    var modelTriggerThumb = $('modelTriggerThumb');
+    var modelTriggerLabel = $('modelTriggerLabel');
+    var modelPanel = $('modelPanel');
+    var modelPanelGrid = $('modelPanelGrid');
+    var THUMB_BASE = MODEL_BASE + '/thumbnails';
+
+    function modelThumbUrl(value) {
+      return THUMB_BASE + '/' + value + '.webp';
+    }
+
+    // Build the tile grid from the <select> option tree, in document order
+    // so each group label precedes its tiles.
+    (function buildModelPicker() {
+      Array.prototype.forEach.call(modelSelect.children, function(node) {
+        var opts;
+        if (node.tagName === 'OPTGROUP') {
+          var label = document.createElement('div');
+          label.className = 'pg__model-group-label';
+          label.textContent = node.label;
+          modelPanelGrid.appendChild(label);
+          opts = node.children;
+        } else if (node.tagName === 'OPTION') {
+          opts = [node];
+        } else {
+          return;
+        }
+        Array.prototype.forEach.call(opts, function(opt) {
+          var tile = document.createElement('button');
+          tile.type = 'button';
+          tile.className = 'pg__model-tile';
+          tile.setAttribute('role', 'option');
+          tile.dataset.value = opt.value;
+
+          var img = document.createElement('img');
+          img.className = 'pg__model-tile-thumb';
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          img.width = 96;
+          img.height = 96;
+          img.alt = opt.textContent;
+          img.src = modelThumbUrl(opt.value);
+          img.addEventListener('error', function() {
+            img.style.visibility = 'hidden';
+          });
+
+          var name = document.createElement('span');
+          name.className = 'pg__model-tile-name';
+          name.textContent = opt.textContent;
+          name.title = opt.textContent;
+
+          tile.appendChild(img);
+          tile.appendChild(name);
+          tile.addEventListener('click', function() {
+            if (modelSelect.value !== opt.value) {
+              modelSelect.value = opt.value;
+              initSceneView(getModelUrl(opt.value));
+            }
+            syncModelPicker();
+            closeModelPanel();
+            modelTrigger.focus();
+          });
+          modelPanelGrid.appendChild(tile);
+        });
+      });
+    })();
+
+    // Reflect the current #modelSelect value into the trigger + active tile.
+    function syncModelPicker() {
+      var value = modelSelect.value;
+      var opt = modelSelect.querySelector('option[value="' + value + '"]');
+      var label = opt ? opt.textContent : 'Model';
+      modelTriggerLabel.textContent = label;
+      modelTriggerThumb.alt = label;
+      modelTriggerThumb.src = modelThumbUrl(value);
+      modelTriggerThumb.style.visibility = '';
+      Array.prototype.forEach.call(
+        modelPanelGrid.querySelectorAll('.pg__model-tile'),
+        function(tile) {
+          tile.setAttribute('aria-current',
+            tile.dataset.value === value ? 'true' : 'false');
+        });
+    }
+    modelTriggerThumb.addEventListener('error', function() {
+      modelTriggerThumb.style.visibility = 'hidden';
+    });
+
+    function openModelPanel() {
+      modelPanel.hidden = false;
+      modelTrigger.setAttribute('aria-expanded', 'true');
+      var active = modelPanelGrid.querySelector('[aria-current="true"]');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+    function closeModelPanel() {
+      modelPanel.hidden = true;
+      modelTrigger.setAttribute('aria-expanded', 'false');
+    }
+    function toggleModelPanel() {
+      if (modelPanel.hidden) openModelPanel();
+      else closeModelPanel();
+    }
+
+    modelTrigger.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleModelPanel();
+    });
+    modelPanel.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+    document.addEventListener('click', function() {
+      if (!modelPanel.hidden) closeModelPanel();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && !modelPanel.hidden) {
+        closeModelPanel();
+        modelTrigger.focus();
+      }
+    });
+
+    syncModelPicker();
 
     // Orbit hint — fade after 4s
     setTimeout(function() {
@@ -3045,18 +3390,19 @@
       var platData = ex[currentPlatform] || generateFallback(currentPlatform, ex);
       var code = platData.code;
       var prompt = encodeURIComponent('Help me build a SceneView ' + currentPlatform + ' app. Here is the code:\n\n' + code);
-      // Cursor uses cursor://
+      // Cursor / Windsurf / Copilot have no prompt deep-link protocol — these
+      // links just open the product. Labels say "Open <tool>" (not "Open in")
+      // so the playground does not imply the prompt is transmitted. Only the
+      // Claude and ChatGPT links actually carry the prompt via a query param.
       var cursorEl = $('aiCursor');
       cursorEl.href = 'https://cursor.com';
-      cursorEl.title = 'Copy code and open in Cursor';
-      // Windsurf
+      cursorEl.title = 'Open Cursor (prompt not transmitted)';
       var windsurfEl = $('aiWindsurf');
-      windsurfEl.href = 'https://codeium.com/windsurf';
-      windsurfEl.title = 'Copy code and open in Windsurf';
-      // Copilot
+      windsurfEl.href = 'https://windsurf.com';
+      windsurfEl.title = 'Open Windsurf (prompt not transmitted)';
       var copilotEl = $('aiCopilot');
       copilotEl.href = 'https://github.com/features/copilot';
-      copilotEl.title = 'Copy code and open in GitHub Copilot';
+      copilotEl.title = 'Open GitHub Copilot (prompt not transmitted)';
     }
 
     // ====================================================================
@@ -3152,8 +3498,8 @@
 
         var prompt = 'Build me a SceneView ' + platLabel + ' app:\n\n' + userDesc + '\n\n';
         prompt += '--- SceneView Quick Reference ---\n';
-        prompt += 'SDK: io.github.sceneview:sceneview:4.6.2 (3D) / arsceneview:4.3.1 (AR)\n';
-        prompt += 'iOS: SPM https://github.com/sceneview/sceneview.git (from: "4.6.2")\n';
+        prompt += 'SDK: io.github.sceneview:sceneview:4.9.0 (3D) / arsceneview:4.3.1 (AR)\n';
+        prompt += 'iOS: SPM https://github.com/sceneview/sceneview.git (from: "4.9.0")\n';
         prompt += 'Web: npm install sceneview-web@4.3.1\n\n';
 
         if (plat === 'android' || plat === 'flutter' || plat === 'reactnative' || plat === 'desktop') {

@@ -6,16 +6,17 @@ name: CI Gate
 # ----------------------
 # `main` is merged fire-and-forget (`gh pr merge --squash --auto`). For
 # auto-merge to actually gate on CI, branch protection must require a
-# status check. But the repo's real CI workflows (ci.yml, pr-check.yml,
-# quality-gate.yml, ios.yml, telemetry-ci.yml) all use workflow-level
-# `paths`/`paths-ignore` filters — so a docs-only or scripts-only PR runs
-# ZERO of their jobs. Requiring any of those checks directly would leave
-# such a PR stuck on "Expected — waiting for status" forever.
+# status check. But the repo's real CI workflows (ci.yml, ios.yml,
+# telemetry-ci.yml) all use workflow-level `paths`/`paths-ignore` filters
+# — and ci.yml additionally per-job `if:`-gates jobs on a path filter — so
+# a docs-only or scripts-only PR runs ZERO (or `skipped`) jobs. Requiring
+# any of those checks directly would leave such a PR stuck on
+# "Expected — waiting for status" forever.
 #
 # DESIGN CHOICE
 # -------------
 # A GitHub job can only `needs:` jobs in its OWN workflow, and the repo
-# has FIVE PR-triggered workflows with different path filters — a single
+# has several PR-triggered workflows with different path filters — a single
 # `needs:`-based gate cannot see across them. A `workflow_run`-triggered
 # gate is unreliable as a required check (its check run attaches to the
 # branch, not the PR head SHA, so the PR merge box never sees it).
@@ -29,6 +30,39 @@ name: CI Gate
 # A path-filtered-out workflow simply produces no check runs for that SHA
 # (or its `if:`-skipped jobs report `skipped`) — either way the gate is
 # green, so docs/scripts/CI-only PRs merge without jamming.
+#
+# `action_required` is treated as PENDING, not failure (#1543): a fork PR's
+# checks sit in `action_required` until a maintainer approves the run. That
+# is not a defect — flipping `CI Gate` red would block a legitimate fork PR
+# that is merely awaiting approval. The gate keeps waiting for those checks
+# to be approved-then-completed (until the deadline), exactly as it would
+# for any other in-progress check.
+#
+# CORE-CHECK GUARD (#1543)
+# ------------------------
+# Without a lower bound on the checks observed, the gate can pass green if a
+# slow, non-path-gated workflow has not yet registered ANY check run by the
+# time every *already-registered* `others` check has completed. To close
+# that race the gate refuses to exit green until every check in
+# `REQUIRED_CHECKS` (below) has been observed for this SHA — UNLESS none of
+# `ci.yml`'s checks appear at all, which is the legitimate signature of a
+# docs-only PR (ci.yml is workflow-level `paths-ignore`-filtered). This is a
+# name-based "wait for these IF expected" guard, so it never false-negatives
+# a genuinely light docs-only PR while still catching a core check that is
+# simply slow to register.
+#
+# DEVICE QA EXCLUSION (#1588)
+# ---------------------------
+# `Device QA — *` check runs are deliberately excluded from the aggregation.
+# `device-qa.yml` is intentionally NOT a per-PR gate — it has no
+# `pull_request` trigger and runs only on push-to-main / `workflow_dispatch`
+# / nightly schedule (see its header comment "NOT in the per-PR CI Gate").
+# But when an agent manually `workflow_dispatch`-es `Device QA` on a branch
+# head SHA to validate it, the resulting `Device QA — web (Playwright)` /
+# `Device QA — android (Maestro)` check runs attach to that SHA, and the
+# corresponding PR's `CI Gate` would otherwise pick them up. Any check run
+# whose name starts with `Device QA` is therefore filtered out of the
+# `others` set — the same treatment as the gate's own `SELF_CHECK`.
 #
 # Branch protection on `main` requires ONLY this `CI Gate` check.
 
@@ -52,12 +86,16 @@ jobs:
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
-    # The internal poll loop self-terminates at a 25-min deadline (+30s
-    # warm-up sleep). The job timeout sits comfortably above that so the
-    # loop's own "::error:: timed out waiting for …" message is what
-    # surfaces — a hard runner kill would give no diagnostic. 35 min keeps
-    # a ~9-min cushion above the internal ~25.5-min worst case (#1360).
-    timeout-minutes: 35
+    # The internal poll loop self-terminates at a 50-min deadline (+30s
+    # warm-up sleep). It must comfortably exceed the slowest required job's
+    # own timeout — `Unit tests + coverage` is `timeout-minutes: 45` (#1554)
+    # — so a slow-but-succeeding unit-test job is still seen as completing,
+    # not as a gate timeout. The job timeout sits comfortably above the
+    # internal deadline so the loop's own "::error:: timed out waiting
+    # for …" message is what surfaces — a hard runner kill would give no
+    # diagnostic. 60 min keeps a ~9-min cushion above the internal
+    # ~50.5-min worst case (#1360, #1554).
+    timeout-minutes: 60
     steps:
       - name: Aggregate all PR check conclusions
         env:
@@ -67,6 +105,17 @@ jobs:
           # This job's own check run name — excluded from the aggregation
           # so the gate never waits on itself.
           SELF_CHECK: CI Gate
+          # Core checks that `ci.yml` ALWAYS produces on a non-docs PR — the
+          # `changes`, `repo-hygiene` and `quality-gate` jobs have no per-job
+          # `if:` path gate, so when `ci.yml` runs at all, all three appear.
+          # The gate refuses to exit green until every one of these has been
+          # observed for the head SHA (see CORE-CHECK GUARD note above), so a
+          # slow-to-register core workflow can't be missed. Newline-separated.
+          # Keep in sync with the un-`if:`-gated job `name:`s in ci.yml.
+          REQUIRED_CHECKS: |
+            Detect changed paths
+            Repo hygiene checks
+            Quality gate (full)
         shell: bash
         run: |
           set -euo pipefail
@@ -83,8 +132,22 @@ jobs:
           # GitHub registers a workflow's check runs within a few seconds
           # of the PR event, so we wait briefly before the first read to
           # avoid a false "all green" on an empty list.
-          deadline=$(( $(date +%s) + 25 * 60 ))
+          #
+          # The fixed warm-up sleep alone is not enough: if another
+          # workflow's check runs register *after* the sleep, the first
+          # loop iteration sees an empty `others` set and would pass the
+          # gate prematurely. So we additionally refuse to exit green
+          # until at least one non-self check run has been observed AND
+          # every expected core check (see REQUIRED_CHECKS) has registered.
+          # 50-min internal deadline: must comfortably exceed the slowest
+          # required job's own timeout (`Unit tests + coverage` is 45 min,
+          # #1554) so a slow-but-succeeding job is seen as completing.
+          deadline=$(( $(date +%s) + 50 * 60 ))
           sleep 30
+          seen_any_other=false
+
+          # Normalise REQUIRED_CHECKS into a clean, non-empty list.
+          required_checks=$(echo "${REQUIRED_CHECKS:-}" | sed '/^[[:space:]]*$/d')
 
           while :; do
             # All check runs for the head commit (handles >100 via paging).
@@ -92,26 +155,86 @@ jobs:
               "repos/$REPO/commits/$HEAD_SHA/check-runs" \
               --jq '.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}')
 
-            # Drop this gate's own check run from consideration.
-            others=$(echo "$runs" | jq -c --arg self "$SELF_CHECK" 'select(.name != $self)')
+            # Drop this gate's own check run from consideration, plus every
+            # `Device QA — *` run: Device QA is deliberately NOT a per-PR gate
+            # (see header comment + device-qa.yml), so a manually-dispatched
+            # Device QA run on a branch SHA must never count here (#1588).
+            others=$(echo "$runs" | jq -c --arg self "$SELF_CHECK" \
+              'select((.name != $self) and (.name | startswith("Device QA") | not))')
 
             if [ -z "$others" ]; then
-              echo "No other check runs reported for this SHA yet."
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "::error::Timed out — no other CI check runs ever registered for this SHA."
+                exit 1
+              fi
+              echo "No other check runs reported for this SHA yet — waiting for at least one to register."
+              sleep 20
+              continue
             fi
 
-            pending=$(echo "$others" | jq -r 'select(.status != "completed") | .name')
-            if [ -z "$pending" ]; then
+            seen_any_other=true
+
+            # All check-run names observed for this SHA (completed or not).
+            observed_names=$(echo "$others" | jq -r '.name' | sort -u)
+
+            # CORE-CHECK GUARD (#1543): if ANY core check has appeared then
+            # ci.yml is running for this PR (it is not a docs-only PR), so
+            # ALL core checks are expected — keep waiting until every one of
+            # them has registered. If NONE have appeared the PR is docs-only
+            # (ci.yml is paths-ignore-filtered out) and the guard is a no-op,
+            # so a legitimately light docs PR is never blocked.
+            missing_core=""
+            any_core_seen=false
+            if [ -n "$required_checks" ]; then
+              while IFS= read -r rc; do
+                [ -z "$rc" ] && continue
+                if echo "$observed_names" | grep -qxF "$rc"; then
+                  any_core_seen=true
+                else
+                  missing_core="${missing_core}${rc}"$'\n'
+                fi
+              done <<< "$required_checks"
+            fi
+            # Only enforce the guard once ci.yml has shown its hand.
+            if [ "$any_core_seen" != true ]; then
+              missing_core=""
+            fi
+
+            # `action_required` (#1543) is a fork-PR awaiting-maintainer-
+            # approval state. GitHub reports it with `status: completed,
+            # conclusion: action_required`, so it slips past the bare
+            # `status != "completed"` filter. Treat it as PENDING-equivalent:
+            # keep waiting (a maintainer may approve it) rather than letting
+            # the loop break and the `failed` set flip the gate red.
+            pending=$(echo "$others" | jq -r \
+              'select(.status != "completed" or .conclusion == "action_required") | .name')
+            if [ -z "$pending" ] && [ -z "$missing_core" ] && [ "$seen_any_other" = true ]; then
               break
             fi
 
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::Timed out waiting for CI checks to complete:"
-              echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+              echo "::error::Timed out waiting for CI checks to complete."
+              if [ -n "$pending" ]; then
+                echo "  Still running / awaiting approval:"
+                echo "$pending" | sort -u | while IFS= read -r n; do echo "    - $n"; done
+              fi
+              if [ -n "$missing_core" ]; then
+                echo "  Expected core checks that never registered:"
+                echo "$missing_core" | sed '/^[[:space:]]*$/d' | sort -u \
+                  | while IFS= read -r n; do echo "    - $n"; done
+              fi
               exit 1
             fi
 
-            echo "Waiting for checks to finish:"
-            echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+            if [ -n "$pending" ]; then
+              echo "Waiting for checks to finish (running, or fork PR awaiting approval):"
+              echo "$pending" | sort -u | while IFS= read -r n; do echo "  - $n"; done
+            fi
+            if [ -n "$missing_core" ]; then
+              echo "Waiting for expected core checks to register:"
+              echo "$missing_core" | sed '/^[[:space:]]*$/d' | sort -u \
+                | while IFS= read -r n; do echo "  - $n"; done
+            fi
             sleep 20
           done
 
@@ -121,12 +244,23 @@ jobs:
 
           # A real failure flips the gate red. `skipped`/`neutral`/`success`
           # all pass — path-filtered-out jobs report `skipped`.
+          #
+          # `stale` is NOT treated as a failure: GitHub marks a check run
+          # `stale` when a newer commit (or `cancel-in-progress`) supersedes
+          # its run. The current head SHA always gets a fresh run, so a
+          # `stale` conclusion on this SHA's checks is noise, not a defect —
+          # treating it as red would flip `CI Gate` red on an otherwise
+          # green PR.
+          #
+          # `action_required` is NOT treated as a failure (#1543): it is the
+          # fork-PR awaiting-maintainer-approval state, handled as pending in
+          # the wait loop above. The loop only breaks once no check is in
+          # `action_required` any more, so it cannot reach this set — but it
+          # is excluded here too for defence in depth.
           failed=$(echo "$others" \
             | jq -r 'select(.conclusion == "failure"
                           or .conclusion == "cancelled"
-                          or .conclusion == "timed_out"
-                          or .conclusion == "action_required"
-                          or .conclusion == "stale") | .name')
+                          or .conclusion == "timed_out") | .name')
 
           if [ -n "$failed" ]; then
             echo ""

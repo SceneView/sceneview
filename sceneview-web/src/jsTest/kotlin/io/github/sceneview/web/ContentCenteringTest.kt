@@ -43,6 +43,44 @@ class ContentCenteringTest {
     }
 
     @Test
+    fun extentsIsPerAxisSize() {
+        val box = aabb(doubleArrayOf(0.0, 0.0, -4.0), doubleArrayOf(2.0, 6.0, 0.0))
+        val e = ContentCentering.extents(box)
+        assertEquals(2.0, e[0]); assertEquals(6.0, e[1]); assertEquals(4.0, e[2])
+    }
+
+    @Test
+    fun diagonalIsSpaceDiagonalLength() {
+        // A 3-4-12 box has a space diagonal of 13.
+        val box = aabb(doubleArrayOf(0.0, 0.0, 0.0), doubleArrayOf(3.0, 4.0, 12.0))
+        assertEquals(13.0, ContentCentering.diagonal(box), 1e-9)
+    }
+
+    @Test
+    fun diagonalOfNullIsZero() {
+        assertEquals(0.0, ContentCentering.diagonal(null), "no content -> zero diagonal")
+    }
+
+    /**
+     * #1540: a 2nd async model that grows the union must produce a strictly
+     * larger diagonal — that growth is what re-arms the auto-center pass.
+     */
+    @Test
+    fun unionDiagonalGrowsWhenASecondModelLands() {
+        val first = aabb(doubleArrayOf(-0.5, -0.5, -0.5), doubleArrayOf(0.5, 0.5, 0.5))
+        val firstDiagonal = ContentCentering.diagonal(ContentCentering.union(listOf(first)))
+
+        val second = aabb(doubleArrayOf(3.0, -0.5, -0.5), doubleArrayOf(4.0, 0.5, 0.5))
+        val unionDiagonal =
+            ContentCentering.diagonal(ContentCentering.union(listOf(first, second)))
+
+        assertTrue(
+            unionDiagonal > firstDiagonal,
+            "#1540: a 2nd model off to +x must grow the union diagonal so the pass re-frames",
+        )
+    }
+
+    @Test
     fun isStableRejectsZeroExtentBox() {
         // Degenerate placeholder before resources finish loading.
         val box = aabb(doubleArrayOf(0.0, 0.0, 0.0), doubleArrayOf(0.0, 0.0, 0.0))

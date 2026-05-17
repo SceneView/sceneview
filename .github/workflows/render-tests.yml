@@ -23,6 +23,13 @@ on:
       - 'samples/**'
       - 'SceneViewSwift/**'
       - 'gradle/**'
+      # Build-script changes can alter a rendered frame (dependency bumps,
+      # renderer-affecting module config) just as much as `src/**` does.
+      - 'build.gradle*'
+      - '**/build.gradle*'
+      - 'settings.gradle*'
+      - 'gradle.properties'
+      - '**/gradle.properties'
   workflow_dispatch:
   # Invoked by nightly-ci.yml so the scheduled full-validation run reuses
   # this render-test definition rather than duplicating it. See #1324.
@@ -48,12 +55,14 @@ jobs:
     continue-on-error: true
 
     # The 3-shard emulator matrix (#1119, PR #1145) was REVERTED to a single
-    # job: all 5 render-test classes are class-level `@Ignore`'d on
-    # SwiftShader CI (Filament `readPixels` crash, tracked in #803), so
-    # sharding boots 3 emulators to run 0 tests — strictly more CI cost for
-    # the same 0 coverage. Re-apply the matrix scaffold (DemoParameters
-    # alone; Visual+Geometry paired; Smoke+Lighting paired) once #803 lifts
-    # the `@Ignore`s and real per-class wall-clocks justify the parallelism.
+    # job: the 5 render-test classes cleanly `assumeTrue`-skip on SwiftShader
+    # CI (Filament `readPixels` crash, tracked in #803 — gated by the
+    # `gpuReadback` flag, see #912), so sharding boots 3 emulators to run 0
+    # tests — strictly more CI cost for the same 0 coverage. This SwiftShader
+    # leg deliberately does NOT pass `gpuReadback=true`. Re-apply the matrix
+    # scaffold (DemoParameters alone; Visual+Geometry paired; Smoke+Lighting
+    # paired) once #803 lands a hardware-GPU runner that opts in and real
+    # per-class wall-clocks justify the parallelism.
 
     steps:
       - uses: actions/checkout@v6
@@ -79,8 +88,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            # Run the whole render-test suite in one emulator. Every target
-            # class is currently `@Ignore`'d (#803), so this completes fast.
+            # Run the whole render-test suite in one emulator. The render-test
+            # classes `assumeTrue`-skip on SwiftShader (#803, #912) because this
+            # leg does NOT pass `gpuReadback=true`, so they report as SKIPPED
+            # (not orphan, not failed) and this completes fast. A hardware-GPU
+            # runner can opt in with
+            # `-Pandroid.testInstrumentationRunnerArguments.gpuReadback=true`.
             ./gradlew :sceneview:connectedDebugAndroidTest --stacktrace
 
             # Pull rendered screenshots from device for visual inspection

@@ -8,6 +8,7 @@ import com.google.android.filament.RenderableManager
 import com.google.android.filament.Stream
 import com.google.android.filament.Texture
 import dev.romainguy.kotlin.math.normalize
+import io.github.sceneview.drainFramePipeline
 import io.github.sceneview.geometries.Plane
 import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.math.Direction
@@ -101,9 +102,16 @@ open class VideoNode(
         materialLoader.createVideoInstance(texture, chromaKeyColor)
             .also { setMaterialInstanceAt(0, it) }
         set(value) {
+            if (value === field) return
             val old = field
             field = value
             setMaterialInstanceAt(0, value)
+            // The external [texture] stays bound to [old] until the next frame: destroying [old]
+            // immediately would free a MaterialInstance still GPU-referenced by [texture], the
+            // exact `Invalid texture still bound to MaterialInstance` SIGABRT #1497 fixed for
+            // [destroy]. Drain the frame pipeline first so [old] is fully reclaimed before it is
+            // freed. Runs on the main thread — all Filament JNI calls do.
+            materialLoader.engine.drainFramePipeline()
             materialLoader.destroyMaterialInstance(old)  // also removes from MaterialLoader tracking
         }
 
@@ -139,12 +147,34 @@ open class VideoNode(
         this.player = player
     }
 
+    /**
+     * Tears the node down in an order that is safe for Filament's external-stream pipeline.
+     *
+     * The [texture] is an external [Texture] bound to [materialInstance]; destroying it while
+     * the MaterialInstance is still GPU-bound triggers a native SIGABRT
+     * (`Invalid texture still bound to MaterialInstance`) — MaterialInstance reclamation is
+     * coupled to the render loop, not to this call (see the sibling [ImageNode] for the same
+     * hazard). Unlike [ImageNode], a [VideoNode] also owns native [Stream]/[SurfaceTexture]
+     * resources that must be released, so the texture cannot simply be leaked.
+     *
+     * The sequence below therefore:
+     * 1. destroys the [MaterialInstance] first (un-references the texture),
+     * 2. calls [Engine.drainFramePipeline] so any in-flight frame still holding the
+     *    MaterialInstance is flushed and the MI is actually reclaimed,
+     * 3. only then destroys the external [Texture] and [Stream].
+     *
+     * Must run on the main thread — all Filament JNI calls do.
+     */
     override fun destroy() {
         val mi = materialInstance
         super.destroy()
         player.setOnVideoSizeChangedListener(null)
         surface.release()
         materialLoader.destroyMaterialInstance(mi)
+        // Flush the render pipeline so the just-destroyed MaterialInstance is reclaimed before
+        // its external texture is freed — otherwise Filament SIGABRTs ("Invalid texture still
+        // bound to MaterialInstance"). See KDoc above.
+        materialLoader.engine.drainFramePipeline()
         materialLoader.engine.safeDestroyTexture(texture)
         materialLoader.engine.safeDestroyStream(stream)
         surfaceTexture.release()

@@ -99,7 +99,7 @@ struct ContentView: View {
                 .accessibilityLabel("About This App")
         }
         .tint(SceneViewTheme.primary)
-        .onChange(of: pendingDeepLinkDemo) { newId in
+        .onChange(of: pendingDeepLinkDemo) { _, newId in
             guard let id = newId else { return }
             // Switch to the Samples tab so the deep-link surface feels
             // contextual; then present the demo above it as a modal so we

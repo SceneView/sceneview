@@ -199,7 +199,7 @@ fun LightingDemo(onBack: () -> Unit) {
                 // adds its directional / point / spot contribution on top.
                 mainLightNode = null,
                 // This demo intentionally composes three nodes off-centre: the helmet at
-                // origin, a 3 × 2.4 m backdrop wall behind it, and a light-source marker
+                // origin, a backdrop wall behind it, and a light-source marker
                 // up-and-forward. With the default autoCenterContent the union bounding
                 // box of those three is centred — which shifts the helmet far off the
                 // HeroOrbit camera's fixed (0,0,0) pivot, leaving the viewport black
@@ -215,15 +215,18 @@ fun LightingDemo(onBack: () -> Unit) {
                     )
                 }
 
-                // Backdrop wall — see [backdropMaterial] for the rationale. Sized 3 ×
-                // 2.4 m so the helmet appears against a continuous surface from any
-                // orbit angle the hero camera reaches; offset back so it never clips
-                // into the model.
+                // Backdrop wall — see [backdropMaterial] for the rationale. Sized
+                // 1.6 × 1.2 m: large enough to fill the backdrop behind the
+                // 0.5 m helmet from every hero-orbit angle, small enough that it
+                // never crams the helmet into a corner (#1466 — the old 3 × 2.4 m
+                // quad filled ~⅔ of the viewport with a hard diagonal top edge).
+                // Centred on the helmet (y = 0) and pushed back so it never clips
+                // into the model while staying inside the orbit radius.
                 PlaneNode(
                     materialInstance = backdropMaterial,
-                    size = Float3(3f, 2.4f, 0f),
+                    size = Float3(1.6f, 1.2f, 0f),
                     normal = Direction(z = 1f),
-                    position = Position(0f, 0.4f, -1.3f),
+                    position = Position(0f, 0f, -0.9f),
                 )
 
                 // Tiny ball at the light source position — only for Point/Spot since
@@ -253,7 +256,7 @@ fun LightingDemo(onBack: () -> Unit) {
                 apply = {
                     // Spot: very narrow cone (≈11° outer) so the disc on the wall
                     // reads as a sharp circle, not a wide wash. Falloff 4 m keeps
-                    // the cone visible against the 1.3 m-deep wall.
+                    // the cone visible all the way to the backdrop wall.
                     // Point: aggressive 2 m falloff so the wall shows the radial
                     // gradient (helmet front bright, wall corners dark).
                     if (selectedType.type == LightManager.Type.FOCUSED_SPOT) {

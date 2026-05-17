@@ -44,6 +44,9 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.AssetSourceState
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.demos.internal.ArPlacement
+import io.github.sceneview.demo.demos.internal.DemoMath
+import io.github.sceneview.demo.demos.internal.rememberTexturesSettled
 import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SampleAssets
@@ -339,13 +342,28 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                 // can only live in one transform at a time, so we cannot share them).
                 placedModels.forEach { placed ->
                     key(placed.id) {
-                        AnchorNode(anchor = placed.anchor) {
+                        // visibleTrackingStates includes PAUSED so a placed model survives
+                        // transient plane loss — it holds its last known pose instead of
+                        // vanishing when ARCore briefly stops tracking the anchor (#1435).
+                        AnchorNode(
+                            anchor = placed.anchor,
+                            visibleTrackingStates = ArPlacement.ANCHORED_VISIBLE_STATES
+                        ) {
                             val instance = rememberModelInstance(modelLoader, placed.assetLocation)
+                            // Gate visibility until Filament finishes uploading the model's
+                            // textures, so it doesn't flash black on placement (#1435).
+                            val textured = rememberTexturesSettled(ready = instance != null)
                             instance?.let {
                                 ModelNode(
                                     modelInstance = it,
                                     scaleToUnits = 0.3f,
                                     centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    // The bundled DamagedHelmet GLB carries a residual +90° X
+                                    // root rotation that lands it face-down on the plane.
+                                    // Keyed to the placed asset path so only the helmet is
+                                    // corrected; the other cycle models stay upright. See #1477.
+                                    rotation = DemoMath.placementRotationFor(placed.assetLocation),
+                                    isVisible = textured,
                                     isEditable = true
                                 )
                             }

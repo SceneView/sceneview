@@ -37,7 +37,15 @@ interface SketchfabResult {
   user: { displayName: string };
 }
 
-type TabId = 'search' | 'geometry' | 'lights' | 'physics' | 'ar';
+type TabId =
+  | 'search'
+  | 'geometry'
+  | 'materials'
+  | 'lights'
+  | 'animation'
+  | 'environment'
+  | 'physics'
+  | 'ar';
 
 interface PlaygroundShape {
   id: string;
@@ -51,16 +59,48 @@ interface PlaygroundShape {
 // Constants
 // ---------------------------------------------------------------------------
 
-const VERSION = '4.6.2';
+const VERSION = '4.9.0';
 
 const ENVIRONMENT = 'environments/studio_small.hdr';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'search', label: 'Search', icon: 'Q' },
   { id: 'geometry', label: 'Geometry', icon: 'G' },
+  { id: 'materials', label: 'Materials', icon: 'M' },
   { id: 'lights', label: 'Lights', icon: 'L' },
+  { id: 'animation', label: 'Animation', icon: '▶' },
+  { id: 'environment', label: 'Environ.', icon: 'E' },
   { id: 'physics', label: 'Physics', icon: 'P' },
   { id: 'ar', label: 'AR', icon: 'A' },
+];
+
+/**
+ * Animated glTF sample models (Khronos sample assets). The RN native bridge
+ * auto-plays a loaded model's animation clip, so any model that ships one
+ * will animate without extra wiring.
+ */
+const ANIMATED_MODELS: { label: string; src: string; scale: number }[] = [
+  {
+    label: 'Fox (run)',
+    src: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb',
+    scale: 0.03,
+  },
+  {
+    label: 'Box Animated',
+    src: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/BoxAnimated/glTF-Binary/BoxAnimated.glb',
+    scale: 0.6,
+  },
+  {
+    label: 'BrainStem',
+    src: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/BrainStem/glTF-Binary/BrainStem.glb',
+    scale: 0.7,
+  },
+];
+
+/** HDR environments available to the Environment demo. */
+const ENVIRONMENTS: { label: string; path: string | null }[] = [
+  { label: 'Studio (small)', path: 'environments/studio_small.hdr' },
+  { label: 'None (neutral)', path: null },
 ];
 
 const SHAPE_TYPES: GeometryNode['type'][] = ['cube', 'sphere', 'cylinder', 'plane'];
@@ -678,6 +718,242 @@ function ARTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Tab: Materials (lit PBR vs unlit)
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates the `GeometryNode.unlit` material flag — the only material
+ * control the RN bridge currently exposes. A lit PBR sphere reacts to scene
+ * lighting (shading, IBL); an unlit sphere renders its flat colour straight
+ * to the framebuffer. Both rows share the same colour so the difference is
+ * purely the shading model.
+ */
+function MaterialsTab() {
+  const [unlit, setUnlit] = useState(false);
+  const [color, setColor] = useState('#1E88E5');
+
+  // A single row of three primitives, re-rendered lit or unlit on toggle.
+  const geometryNodes: GeometryNode[] = [
+    { type: 'sphere', color, position: [-1.4, 0, -2.5], size: [0.9, 0.9, 0.9], unlit },
+    { type: 'cube', color, position: [0, 0, -2.5], size: [0.8, 0.8, 0.8], unlit },
+    { type: 'cylinder', color, position: [1.4, 0, -2.5], size: [0.7, 1.1, 0.7], unlit },
+  ];
+
+  // A directional light makes the lit/unlit contrast obvious.
+  const lightNodes: LightNode[] = [
+    { type: 'directional', intensity: 100000, color: '#FFFFFF', direction: [-1, -1, -1] },
+  ];
+
+  return (
+    <View style={styles.tabContent}>
+      <View style={styles.viewerContainer}>
+        <SceneView
+          style={styles.scene}
+          environment={ENVIRONMENT}
+          geometryNodes={geometryNodes}
+          lightNodes={lightNodes}
+          cameraOrbit
+        />
+        <View style={styles.lightInfoBadge}>
+          <Text style={styles.lightInfoText}>{unlit ? 'Unlit' : 'Lit PBR'}</Text>
+        </View>
+      </View>
+
+      <ScrollView style={styles.controls} contentContainerStyle={styles.controlsContent}>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Unlit material</Text>
+          <Switch
+            value={unlit}
+            onValueChange={setUnlit}
+            trackColor={{ false: '#3A3F4B', true: '#1E88E5' }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <Text style={[styles.controlLabel, { marginTop: 16 }]}>Color</Text>
+        <View style={styles.colorGrid}>
+          {PRESET_COLORS.map((c) => (
+            <TouchableOpacity
+              key={c}
+              style={[
+                styles.colorSwatch,
+                { backgroundColor: c },
+                color === c && styles.colorSwatchSelected,
+              ]}
+              onPress={() => setColor(c)}
+              activeOpacity={0.7}
+            />
+          ))}
+        </View>
+
+        <View style={styles.arInfoCard}>
+          <Text style={styles.arInfoTitle}>Material Modes</Text>
+          <Text style={styles.arInfoBody}>
+            {'•'} Lit PBR — reacts to lights, IBL and shadows{'\n'}
+            {'•'} Unlit — flat colour, ignores all lighting{'\n'}
+            {'\n'}Toggle the switch and watch the same shapes go from shaded to
+            flat. Unlit is ideal for HUD overlays, gizmos and AR face meshes.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab: Animation (animated glTF models)
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates auto-playing glTF animation clips. The native bridge
+ * auto-animates a loaded model whose glTF ships an animation clip, so picking
+ * an animated model shows it moving with no extra wiring.
+ */
+function AnimationTab() {
+  const [modelIndex, setModelIndex] = useState(0);
+
+  const model = ANIMATED_MODELS[modelIndex];
+  const modelNode: ModelNode = {
+    src: model.src,
+    scale: model.scale,
+    position: [0, -0.5, -2.5],
+  };
+
+  return (
+    <View style={styles.tabContent}>
+      <View style={styles.viewerContainer}>
+        <SceneView
+          style={styles.scene}
+          environment={ENVIRONMENT}
+          modelNodes={[modelNode]}
+          cameraOrbit
+        />
+        <View style={styles.lightInfoBadge}>
+          <Text style={styles.lightInfoText}>{model.label}</Text>
+        </View>
+      </View>
+
+      <ScrollView style={styles.controls} contentContainerStyle={styles.controlsContent}>
+        <Text style={styles.controlLabel}>Animated Model</Text>
+        <View style={styles.chipRow}>
+          {ANIMATED_MODELS.map((m, index) => (
+            <TouchableOpacity
+              key={m.label}
+              style={[styles.typeChip, modelIndex === index && styles.typeChipSelected]}
+              onPress={() => setModelIndex(index)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.typeChipText,
+                  modelIndex === index && styles.typeChipTextSelected,
+                ]}
+              >
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.arInfoCard}>
+          <Text style={styles.arInfoTitle}>Model Animation</Text>
+          <Text style={styles.arInfoBody}>
+            glTF models that ship an animation clip (Fox, BoxAnimated,
+            BrainStem) auto-play it on the native renderer. Selecting a
+            specific clip by name, or pausing playback, needs new bridge
+            surface — tracked as a bridge-gap follow-up under issue #1362.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab: Environment (HDR image-based lighting + auto-center)
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates the `environment` (HDR IBL) and `autoCenterContent` props.
+ * Switching the environment changes the skybox and image-based lighting on a
+ * fixed model; the auto-center toggle frames the content on the first stable
+ * frame (iOS-first, see #1051 for the Android side).
+ */
+function EnvironmentTab() {
+  const [envIndex, setEnvIndex] = useState(0);
+  const [autoCenter, setAutoCenter] = useState(true);
+
+  const env = ENVIRONMENTS[envIndex];
+
+  // A neutral model so the environment lighting is what reads visually.
+  const modelNode: ModelNode = {
+    src: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
+    scale: 1.0,
+    position: [0, 0, -2.5],
+  };
+
+  return (
+    <View style={styles.tabContent}>
+      <View style={styles.viewerContainer}>
+        <SceneView
+          style={styles.scene}
+          environment={env.path ?? undefined}
+          modelNodes={[modelNode]}
+          autoCenterContent={autoCenter}
+          cameraOrbit
+        />
+        <View style={styles.lightInfoBadge}>
+          <Text style={styles.lightInfoText}>{env.label}</Text>
+        </View>
+      </View>
+
+      <ScrollView style={styles.controls} contentContainerStyle={styles.controlsContent}>
+        <Text style={styles.controlLabel}>HDR Environment</Text>
+        <View style={styles.chipRow}>
+          {ENVIRONMENTS.map((e, index) => (
+            <TouchableOpacity
+              key={e.label}
+              style={[styles.typeChip, envIndex === index && styles.typeChipSelected]}
+              onPress={() => setEnvIndex(index)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.typeChipText,
+                  envIndex === index && styles.typeChipTextSelected,
+                ]}
+              >
+                {e.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Auto-center content</Text>
+          <Switch
+            value={autoCenter}
+            onValueChange={setAutoCenter}
+            trackColor={{ false: '#3A3F4B', true: '#1E88E5' }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <View style={styles.arInfoCard}>
+          <Text style={styles.arInfoTitle}>Image-Based Lighting</Text>
+          <Text style={styles.arInfoBody}>
+            The `environment` prop loads an HDR file for image-based lighting
+            and the skybox. `autoCenterContent` frames the model on the first
+            stable frame — an iOS-first v4.3.0 feature; the Android side is
+            tracked in issue #1051.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
 
@@ -688,7 +964,10 @@ export default function App() {
     switch (activeTab) {
       case 'search': return <SearchTab />;
       case 'geometry': return <GeometryTab />;
+      case 'materials': return <MaterialsTab />;
       case 'lights': return <LightsTab />;
+      case 'animation': return <AnimationTab />;
+      case 'environment': return <EnvironmentTab />;
       case 'physics': return <DoublePendulumTab />;
       case 'ar': return <ARTab />;
     }
@@ -714,25 +993,32 @@ export default function App() {
         {renderTab()}
       </View>
 
-      {/* Bottom tab bar */}
+      {/* Bottom tab bar — horizontally scrollable so the catalog can grow
+          past the ~5 tabs that fit a phone width without cramping. */}
       <View style={styles.tabBar}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tabItem, activeTab === tab.id && styles.tabItemActive]}
-            onPress={() => setActiveTab(tab.id)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.tabIconContainer, activeTab === tab.id && styles.tabIconContainerActive]}>
-              <Text style={[styles.tabIcon, activeTab === tab.id && styles.tabIconActive]}>
-                {tab.icon}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBarContent}
+        >
+          {TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tabItem, activeTab === tab.id && styles.tabItemActive]}
+              onPress={() => setActiveTab(tab.id)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.tabIconContainer, activeTab === tab.id && styles.tabIconContainerActive]}>
+                <Text style={[styles.tabIcon, activeTab === tab.id && styles.tabIconActive]}>
+                  {tab.icon}
+                </Text>
+              </View>
+              <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
+                {tab.label}
               </Text>
-            </View>
-            <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Auto-update banner — overlays the top of the screen when a newer
@@ -791,18 +1077,22 @@ const styles = StyleSheet.create({
 
   // Tab bar
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: '#0F1218',
     borderTopWidth: 1,
     borderTopColor: '#1E2430',
     paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     paddingTop: 8,
   },
+  tabBarContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+  },
   tabItem: {
-    flex: 1,
+    minWidth: 72,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
+    paddingHorizontal: 4,
   },
   tabItemActive: {},
   tabIconContainer: {

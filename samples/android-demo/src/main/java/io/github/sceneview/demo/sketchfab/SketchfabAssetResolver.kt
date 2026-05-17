@@ -195,20 +195,48 @@ class SketchfabAssetResolver private constructor(
      *
      * The copy is performed once per uid; subsequent calls touch the
      * `lastModified` timestamp to keep the file from being evicted as cold.
+     *
+     * **Concurrency.** Demos call `resolve` from both [prefetchAll] *and* a
+     * per-slug `produceState` at the same time, so two coroutines routinely
+     * stage the same uid concurrently. The copy therefore writes to a
+     * per-call unique temp file and then **atomically renames** it onto the
+     * shared `target` path. Without this, two coroutines opened two output
+     * streams on the same `target`, interleaved their writes, and left a
+     * truncated GLB on disk — which then poisoned the cache permanently
+     * (`target.exists()` short-circuits every later call), so the streamed
+     * demos (#1422 / #1423 / #1433) hung forever on their loading spinner.
      */
     @VisibleForTesting
     internal fun fallbackBundle(slug: SketchfabSlug): File {
         val cacheRoot = service.cacheRoot()
         val fallbackDir = File(cacheRoot, "fallback").also { it.mkdirs() }
         val target = File(fallbackDir, "${slug.uid}.glb")
-        if (target.exists() && target.length() > 0L) {
+        // Trust the cached copy only if it is a *complete* GLB. A truncated
+        // file left behind by an older racy write (pre-#1423 fix) would
+        // otherwise be served forever — `hasGlbMagic` re-stages it instead.
+        if (target.exists() && target.length() > 0L && hasGlbMagic(target)) {
             target.setLastModified(System.currentTimeMillis())
             return target
         }
+        // Stage into a per-call unique temp file so concurrent callers never
+        // share an output stream; the atomic rename below installs a complete
+        // file or nothing at all.
+        val temp = File.createTempFile("${slug.uid}-", ".glb.tmp", fallbackDir)
         try {
             context.assets.open(slug.fallbackBundledPath).use { input ->
-                target.outputStream().use { output ->
+                temp.outputStream().use { output ->
                     input.copyTo(output)
+                }
+            }
+            // renameTo is atomic within the same filesystem. If a racing
+            // coroutine already installed the target, our equivalent copy is
+            // simply discarded — both produce a byte-identical bundled asset.
+            if (!temp.renameTo(target)) {
+                if (target.exists() && target.length() > 0L) {
+                    temp.delete()
+                } else {
+                    temp.copyTo(target, overwrite = true)
+                    temp.delete()
                 }
             }
         } catch (io: IOException) {
@@ -216,7 +244,8 @@ class SketchfabAssetResolver private constructor(
             // pruned from the APK by Stage 3). This is the one error demos
             // must handle — surface it so the UI can show a friendly "asset
             // unavailable" state instead of a half-cooked fallback.
-            target.delete()
+            temp.delete()
+            if (target.length() == 0L) target.delete()
             throw FallbackUnavailable(slug.uid, slug.fallbackBundledPath, io)
         }
         return target
@@ -244,16 +273,7 @@ class SketchfabAssetResolver private constructor(
     internal fun boundsAreSane(file: File, slug: SketchfabSlug): Boolean {
         if (!file.exists()) return false
         if (file.length() < MIN_GLB_SIZE_BYTES) return false
-        return file.inputStream().use { stream ->
-            val header = ByteArray(4)
-            val read = stream.read(header)
-            // `glTF` little-endian magic — see https://docs.fileformat.com/3d/glb/.
-            read == 4 &&
-                header[0] == 'g'.code.toByte() &&
-                header[1] == 'l'.code.toByte() &&
-                header[2] == 'T'.code.toByte() &&
-                header[3] == 'F'.code.toByte()
-        }.also { ok ->
+        return hasGlbMagic(file).also { ok ->
             if (!ok) {
                 // Track unhelpful slug suggestions so Stage 1's bounds
                 // sanity-check rejection becomes a real registry signal.
@@ -269,6 +289,27 @@ class SketchfabAssetResolver private constructor(
             @Suppress("UNUSED_EXPRESSION") slug.hasBakedAnimation
         }
     }
+
+    /**
+     * `true` when [file] starts with the binary glTF (`glTF`) magic header.
+     *
+     * Used both to validate fresh network downloads and to detect a cached
+     * fallback that an older racy write left truncated — a partial GLB has
+     * the right size but a clobbered/missing header, so this check re-stages
+     * it instead of trusting it forever.
+     */
+    private fun hasGlbMagic(file: File): Boolean = runCatching {
+        file.inputStream().use { stream ->
+            val header = ByteArray(4)
+            val read = stream.read(header)
+            // `glTF` little-endian magic — see https://docs.fileformat.com/3d/glb/.
+            read == 4 &&
+                header[0] == 'g'.code.toByte() &&
+                header[1] == 'l'.code.toByte() &&
+                header[2] == 'T'.code.toByte() &&
+                header[3] == 'F'.code.toByte()
+        }
+    }.getOrDefault(false)
 
     /**
      * Trim the shared on-disk cache to [CACHE_MAX_BYTES]. The underlying

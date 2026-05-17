@@ -198,9 +198,11 @@ fun AnimationDemo(onBack: () -> Unit) {
     // dramatic intro and pairs naturally with a walking subject.
     var cameraMode by remember { mutableStateOf(CameraMode.REVEAL) }
     // IBL intensity — exposed as a slider so users can dial atmospheric vs neutral.
-    // Default 5_000 lux balances the rooftop_night HDR's warm tint without bleeding
-    // into the model's albedo. Range 0–10_000 covers pitch-black to over-exposed.
-    var iblIntensity by remember { mutableFloatStateOf(5_000f) }
+    // Default 10_000 lux matches SceneView's balanced IBL default (#1075). The
+    // rooftop_night skybox renders at full HDR luminance, so a lower IBL left the
+    // model reading as a black silhouette against the bright sky (#1468). Range
+    // 0–10_000 still lets users dial down to a darker, atmospheric look.
+    var iblIntensity by remember { mutableFloatStateOf(10_000f) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -253,11 +255,11 @@ fun AnimationDemo(onBack: () -> Unit) {
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
-    // The rooftop_night HDR is over-bright and saturates the soldier's albedo with the
-    // dusk's warm/violet tint. The default ~30k lux from cmgen is far too hot — we
-    // expose the IBL intensity as a slider so users can dial atmospheric (low values)
-    // vs neutral (high values). Re-runs whenever the active environment OR the slider
-    // value change, so dragging the slider updates the lighting in real time.
+    // Pin the IBL intensity to the slider value. The rooftop_night skybox renders at
+    // full HDR luminance, so the IBL must stay near SceneView's balanced 10k default
+    // to keep the soldier lit in step with the bright sky behind it (#1468) — a lower
+    // value left the model looking like an unlit black silhouette. Re-runs whenever the
+    // active environment OR the slider value change, so dragging it updates in real time.
     LaunchedEffect(activeEnvironment, iblIntensity) {
         activeEnvironment.indirectLight?.intensity = iblIntensity
     }

@@ -4,12 +4,23 @@ import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -45,8 +57,9 @@ import io.github.sceneview.rememberModelLoader
  * When ARCore detects the image in the camera feed, an [AugmentedImageNode] is placed
  * at the image location with a 3D model attached.
  *
- * To test: print or display the image "augmented_images/qrcode.png" from the assets folder
- * and point the camera at it.
+ * An in-app "what to scan" card shows the actual reference image so the user knows exactly
+ * which target to point the camera at — no need to dig through the assets folder. The card
+ * collapses to a chip once an image is recognised.
  */
 @Composable
 fun ARImageDemo(onBack: () -> Unit) {
@@ -59,6 +72,9 @@ fun ARImageDemo(onBack: () -> Unit) {
     var isTracking by remember { mutableStateOf(false) }
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var imageCount by remember { mutableStateOf(0) }
+    // "What to scan" card is expanded by default so a first-time user immediately sees the
+    // reference image to point the camera at; it collapses to a chip once detection succeeds.
+    var showScanGuide by remember { mutableStateOf(true) }
 
     val modelInstance = rememberModelInstance(modelLoader, "models/khronos_damaged_helmet.glb")
 
@@ -105,6 +121,11 @@ fun ARImageDemo(onBack: () -> Unit) {
                     // Drop stopped images so stale AugmentedImageNodes don't linger in the scene.
                     detectedImages.removeAll { it.trackingState == TrackingState.STOPPED }
                     imageCount = detectedImages.size
+                    // Once an image is recognised the user no longer needs the full guide —
+                    // collapse it to a chip so it stops covering the AR content.
+                    if (imageCount > 0) {
+                        showScanGuide = false
+                    }
                 },
                 onTrackingFailureChanged = { reason ->
                     trackingFailureReason = reason
@@ -122,6 +143,70 @@ fun ARImageDemo(onBack: () -> Unit) {
                                 centerOrigin = Position(0f, 0f, 0f)
                             )
                         }
+                    }
+                }
+            }
+
+            // "What to scan" guide — shows the actual reference target so the user knows
+            // exactly which image to point the camera at. Tap to expand/collapse.
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(16.dp)
+                    .clickable { showScanGuide = !showScanGuide },
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                shape = RoundedCornerShape(20.dp),
+                tonalElevation = 4.dp,
+                shadowElevation = 4.dp
+            ) {
+                if (showScanGuide) {
+                    Column(
+                        modifier = Modifier
+                            .width(220.dp)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Point your camera at this image",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Image(
+                            bitmap = referenceBitmap.asImageBitmap(),
+                            contentDescription = "Reference image to scan",
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .size(160.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(8.dp)
+                        )
+                        Text(
+                            text = "Display it on another screen or print it, " +
+                                "then aim the camera at it. Tap to hide.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.QrCode2,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Show target image",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
                     }
                 }
             }

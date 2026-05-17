@@ -66,8 +66,10 @@ import kotlin.math.sin
  * - **PBR Damaged Helmet** — same glb shipped with [LightingDemo]. Has crisp
  *   metallic edges and matte fabric, both of which respond visibly to a
  *   moving light source.
- * - **Yellow unlit marker** — a tiny sphere with `createUnlitColorInstance`
- *   so it always reads as a glow regardless of where the actual light is.
+ * - **Yellow unlit marker** — a small sphere with `createUnlitColorInstance`
+ *   so it always reads as a glow regardless of where the actual light is. Its
+ *   orbit radius is kept tight enough that it stays inside the (fixed) camera
+ *   frustum for the whole azimuth/elevation sweep — see `orbitRadius` (#1467).
  * - **Default `mainLightNode` is kept disabled** (set to `null`) so the only
  *   light affecting the helmet is the user-controlled one — otherwise the
  *   helmet stays bright and the drag effect is invisible.
@@ -82,12 +84,21 @@ fun MovableLightDemo(onBack: () -> Unit) {
     var intensity by remember { mutableFloatStateOf(30_000f) }
     var showLightSource by remember { mutableStateOf(true) }
 
-    // Fixed orbit radius — see iOS file for the same reasoning. 1.5 m sits the
-    // light close enough that highlights are sharp without clipping into the model.
-    val orbitRadius = 1.5f
-    // Clamp elevation to ±85° to avoid pole gimbal-lock and floor-clipping.
-    val minElevation = -((PI / 2 - 0.087).toFloat())
-    val maxElevation = (PI / 2 - 0.087).toFloat()
+    // Fixed orbit radius. Kept deliberately small (#1467): the helmet is fit to
+    // a 0.6 m bounding cube (≈ 0.35 m diagonal half-extent) and the default
+    // camera (`DefaultCameraNode`) sits at z = 2.75 m with a 28 mm lens — its
+    // frame was tuned in #1427 to show a 0.6 m origin-placed model with only
+    // modest headroom. The old 1.5 m orbit swung the yellow handle far outside
+    // the camera frustum for most of the azimuth/elevation sweep, so the user
+    // was dragging an invisible target. 0.75 m clears the helmet (no clipping
+    // into the model) yet keeps the handle on-screen for the whole orbit, while
+    // the moving highlight on the metal stays sharp.
+    val orbitRadius = 0.75f
+    // Clamp elevation to ±50° so the handle never climbs/drops out of the camera
+    // frustum vertically (#1467). At 0.75 m orbit, sin(50°)·0.75 ≈ 0.57 m, well
+    // within the vertical FOV. This also keeps the light off the gimbal poles.
+    val minElevation = -((PI / 180) * 50).toFloat()
+    val maxElevation = ((PI / 180) * 50).toFloat()
     // Drag sensitivity in radians-per-pixel. 0.005 rad/px gives ≈ a half-turn
     // per full screen-width swipe on a typical 1080p phone — feels responsive
     // without being twitchy.
@@ -224,18 +235,22 @@ fun MovableLightDemo(onBack: () -> Unit) {
                     position = lightPos,
                     color = colorOf(r = 1.0f, g = 0.95f, b = 0.8f),
                     apply = {
-                        // 6 m attenuation radius — beyond this the light has
-                        // no effect. Comfortably larger than orbitRadius so
-                        // the light always reaches the helmet.
-                        falloff(6f)
+                        // 4 m attenuation radius — beyond this the light has
+                        // no effect. Comfortably larger than orbitRadius (0.75 m)
+                        // so the light always reaches the helmet.
+                        falloff(4f)
                     },
                 )
 
-                // Yellow marker sphere — only rendered when the toggle is on.
+                // Yellow marker sphere — the draggable light handle. Only
+                // rendered when the toggle is on. Radius 0.09 m (#1467): the
+                // old 0.05 m disc was a barely-visible speck at the camera's
+                // ≈ 2 m working distance; 0.09 m reads as a clear glowing
+                // handle the user can confidently aim a drag at.
                 if (showLightSource) {
                     SphereNode(
                         materialInstance = markerMaterial,
-                        radius = 0.05f,
+                        radius = 0.09f,
                         position = lightPos,
                     )
                 }

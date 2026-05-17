@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CenterFocusStrong
@@ -15,7 +16,6 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FormatShapes
 import androidx.compose.material.icons.filled.Hexagon
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Layers
@@ -160,6 +160,7 @@ val ALL_DEMOS = listOf(
     DemoEntry("double-pendulum", R.string.demo_double_pendulum_title, R.string.demo_double_pendulum_subtitle, DemoCategory.ADVANCED, Icons.Filled.Vibration),
     DemoEntry("post-processing", R.string.demo_post_processing_title, R.string.demo_post_processing_subtitle, DemoCategory.ADVANCED, Icons.Filled.Tune),
     DemoEntry("custom-mesh", R.string.demo_custom_mesh_title, R.string.demo_custom_mesh_subtitle, DemoCategory.ADVANCED, Icons.Filled.Hexagon),
+    DemoEntry("texture-streaming", R.string.demo_texture_streaming_title, R.string.demo_texture_streaming_subtitle, DemoCategory.ADVANCED, Icons.Filled.Texture),
     DemoEntry("shape", R.string.demo_shape_title, R.string.demo_shape_subtitle, DemoCategory.ADVANCED, Icons.Filled.Pentagon),
     DemoEntry("reflection-probes", R.string.demo_reflection_probes_title, R.string.demo_reflection_probes_subtitle, DemoCategory.ADVANCED, Icons.Filled.BlurOn),
     DemoEntry("secondary-camera", R.string.demo_secondary_camera_title, R.string.demo_secondary_camera_subtitle, DemoCategory.ADVANCED, Icons.Filled.PictureInPicture),
@@ -168,15 +169,15 @@ val ALL_DEMOS = listOf(
     DemoEntry("ar-placement", R.string.demo_ar_placement_title, R.string.demo_ar_placement_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.TouchApp),
     DemoEntry("ar-image", R.string.demo_ar_image_title, R.string.demo_ar_image_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Image),
     DemoEntry("ar-face", R.string.demo_ar_face_title, R.string.demo_ar_face_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Face),
-    DemoEntry("ar-cloud-anchor", R.string.demo_ar_cloud_anchor_title, R.string.demo_ar_cloud_anchor_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.CloudCircle),
-    DemoEntry("ar-streetscape", R.string.demo_ar_streetscape_title, R.string.demo_ar_streetscape_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.LocationCity),
+    DemoEntry("ar-cloud-anchor", R.string.demo_ar_cloud_anchor_title, R.string.demo_ar_cloud_anchor_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.CloudCircle, DemoStatus.KnownIssue),
+    DemoEntry("ar-streetscape", R.string.demo_ar_streetscape_title, R.string.demo_ar_streetscape_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.LocationCity, DemoStatus.KnownIssue),
     DemoEntry("ar-pose", R.string.demo_ar_pose_title, R.string.demo_ar_pose_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.MyLocation),
     DemoEntry("ar-rerun", R.string.demo_ar_rerun_title, R.string.demo_ar_rerun_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.BugReport),
     DemoEntry("ar-record-playback", R.string.demo_ar_record_playback_title, R.string.demo_ar_record_playback_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Replay),
     DemoEntry("ar-depth-occlusion", R.string.demo_ar_depth_occlusion_title, R.string.demo_ar_depth_occlusion_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.FilterCenterFocus),
-    DemoEntry("ar-instant-placement", R.string.demo_ar_instant_placement_title, R.string.demo_ar_instant_placement_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.HourglassEmpty),
-    DemoEntry("ar-terrain", R.string.demo_ar_terrain_title, R.string.demo_ar_terrain_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Landscape),
-    DemoEntry("ar-rooftop", R.string.demo_ar_rooftop_title, R.string.demo_ar_rooftop_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Roofing),
+    DemoEntry("ar-instant-placement", R.string.demo_ar_instant_placement_title, R.string.demo_ar_instant_placement_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Bolt),
+    DemoEntry("ar-terrain", R.string.demo_ar_terrain_title, R.string.demo_ar_terrain_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Landscape, DemoStatus.KnownIssue),
+    DemoEntry("ar-rooftop", R.string.demo_ar_rooftop_title, R.string.demo_ar_rooftop_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Roofing, DemoStatus.KnownIssue),
     DemoEntry("ar-image-stabilization", R.string.demo_ar_image_stabilization_title, R.string.demo_ar_image_stabilization_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Texture),
     DemoEntry("ar-orbital", R.string.demo_ar_orbital_title, R.string.demo_ar_orbital_subtitle, DemoCategory.AUGMENTED_REALITY, Icons.Filled.Public),
 )

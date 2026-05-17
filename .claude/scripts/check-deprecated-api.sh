@@ -45,7 +45,7 @@ is_whitelisted() {
     MIGRATION.md | CHANGELOG.md | ROADMAP.md) return 0 ;;
     docs/docs/migration.md | docs/docs/migration-v4.md) return 0 ;;
     docs/docs/changelog.md | docs/docs/comparison.md) return 0 ;;
-    docs/v3.6.0-roadmap.md | docs/ios-swift-package-design.md) return 0 ;;
+    docs/archive/v3.6.0-roadmap.md | docs/ios-swift-package-design.md) return 0 ;;
     # SceneView agent skill migration guide — same role as the public
     # docs/docs/migration.md: necessarily quotes the deprecated names.
     agents/sceneview/references/migration.md) return 0 ;;
@@ -90,13 +90,12 @@ is_whitelisted() {
     .claude/plans/*.md) return 0 ;;
 
     # The detector script documents the patterns it matches; the
-    # quality-gate workflow file has an explanatory header comment
-    # that necessarily contains "Scene{}/ARScene{}" as prose. Same
-    # for pr-check.yml which runs the standalone "Check deprecated"
-    # job and its header documents the role.
+    # consolidated ci.yml workflow file has explanatory header comments
+    # that may contain "Scene{}/ARScene{}" as prose — since #1370 it
+    # carries the repo-hygiene job that runs this detector, formerly
+    # split across quality-gate.yml and pr-check.yml.
     .claude/scripts/check-deprecated-api.sh) return 0 ;;
-    .github/workflows/quality-gate.yml) return 0 ;;
-    .github/workflows/pr-check.yml) return 0 ;;
+    .github/workflows/ci.yml) return 0 ;;
 
     # Marketing drafts — intentionally reference third-party APIs (ArFragment etc.)
     marketing/*.md | marketing/**/*.md) return 0 ;;

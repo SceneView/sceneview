@@ -123,6 +123,28 @@ for full API context in any chat:
 
 Contributions to any part of the project are welcome — Android (`sceneview/`, `arsceneview/`), iOS (`SceneViewSwift/`), shared KMP core (`sceneview-core/`), samples, documentation, or the MCP server.
 
+### Device-QA flows when adding a demo
+
+The demo apps are exercised on real emulators/simulators by the **autonomous
+device-QA harness** (`bash .claude/scripts/device-qa.sh`). When you **add or
+change a demo**, update its device-QA coverage in the same PR — an untested
+demo is invisible to the release-checkpoint gate:
+
+- **Android** — add the demo to its category flow under `.maestro/android/`
+  (`3d-basics.yaml`, `lighting.yaml`, `content.yaml`, `interaction.yaml`,
+  `advanced.yaml`, or `ar.yaml`) and to the master `catalog.yaml`. Each entry
+  reuses `flows/demo.yaml` with the demo's `DEMO_ID` / `DEMO_NAME`.
+- **iOS** — add the matching entry under `.maestro/ios/` (same category files
+  + `catalog.yaml`). A deep-linkable demo must also be registered in
+  `DemoDeepLinkRegistry.allowedIds` so the `sceneview://demo/<id>` ingress can
+  reach it; otherwise add a `placeholders.yaml` entry.
+- **Web** — extend the Playwright `catalog.spec.ts` coverage in
+  `samples/web-demo/tests/` so the new demo/tab is walked and asserted.
+
+See [`.maestro/README.md`](.maestro/README.md) for the flow layout and the
+known no-pinch / deep-link-zoom limitation. Run `device-qa.sh` for the affected
+platform before requesting review.
+
 ### Changelog entries
 
 **Do not edit `CHANGELOG.md` directly.** Changelog entries go in `changelog.d/`
@@ -152,19 +174,24 @@ behaviour, so spending 10-20 min of emulator time to re-build and re-render
 is pure noise. You will see fewer green checks than on a code PR; this is
 correct. Specifically:
 
-- **`quality-gate.yml`** and **`pr-check.yml`** carry a `paths-ignore` filter
-  for those paths, so neither triggers on a docs-only PR.
-- **`ci.yml`** carries an equivalent `paths-ignore` filter (it also ignores
-  `mcp*/**`, which `quality-gate.yml` deliberately does not).
+- **`ci.yml`** — the single consolidated PR workflow (`build`, `lint`,
+  `unit-test`, `web-desktop`, `flutter-demo`, `compile-kmp`, `repo-hygiene`,
+  `quality-gate`) — carries a `paths-ignore` filter for those paths, so it
+  does not trigger on a docs-only PR. (Before #1370 this was three separate
+  workflows — `ci.yml`, `pr-check.yml`, `quality-gate.yml` — each with its
+  own `changes` job; they are now one workflow with one path-detection job.)
 - **`render-tests.yml`** never runs on *any* pull request — it is push-to-main
   + `workflow_dispatch` only — so docs-only PRs skip it for that reason rather
   than via a path filter.
+- The **`CI Gate`** aggregator (`ci-gate.yml`) still runs on every PR and
+  resolves green when the path-filtered jobs are skipped — that is how a
+  docs-only PR stays mergeable.
 
 If your docs PR needs to force a full CI run (for example, you suspect a
 markdown change has accidentally invalidated an example referenced from
 runtime code), trigger the gates manually from the Actions tab —
-`Run workflow` on `quality-gate.yml` / `ci.yml` / `render-tests.yml`
-accepts your PR's branch as input.
+`Run workflow` on `ci.yml` / `render-tests.yml` accepts your PR's branch as
+input.
 
 ### Code style
 

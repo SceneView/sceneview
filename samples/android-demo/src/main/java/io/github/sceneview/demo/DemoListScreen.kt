@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.sceneview.demo.ui.ParticleBackground
 
 /**
  * The Samples tab — a 2-column M3 Expressive grid of demos grouped by
@@ -82,8 +84,19 @@ fun DemoListScreen(
     }
     val dark = isSystemInDarkTheme()
 
-    Scaffold(
-        topBar = {
+    // Animated 3D particle backdrop (#1488) — a SceneView scene drawn as the
+    // bottom layer of this Box, behind the demo grid. It only exists while the
+    // Samples tab is selected (RootScreen swaps tab content), so the SceneView
+    // and its frame loop leave composition — and stop — on tab switch.
+    Box(modifier = Modifier.fillMaxSize()) {
+        ParticleBackground(modifier = Modifier.fillMaxSize())
+
+        Scaffold(
+            // Transparent so the ParticleBackground shows through; the demo
+            // cards keep their own opaque `surfaceContainer` so they stay
+            // readable on top of the scene.
+            containerColor = Color.Transparent,
+            topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.samples_title)) },
                 actions = {
@@ -95,13 +108,27 @@ fun DemoListScreen(
                     }
                 },
                 scrollBehavior = scrollBehavior,
+                // This Scaffold is nested inside RootScreen's Scaffold, which
+                // already consumes the status-bar inset as top content padding.
+                // Letting LargeTopAppBar apply its default status-bar inset too
+                // double-counts it — that was the large empty gap above the
+                // "Samples" header (#1425). Zero the bar's own insets so the
+                // header sits flush below the status bar.
+                windowInsets = WindowInsets(0, 0, 0, 0),
+                // Semi-transparent so the particle backdrop (#1488) drifts
+                // behind the header instead of being clipped by an opaque bar;
+                // the slight surface tint keeps the title legible.
                 colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor =
+                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f),
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
         },
+        // The inherited status-bar inset arrives via the outer RootScreen
+        // Scaffold; consuming it again here would re-introduce the #1425 gap.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
     ) { padding ->
         LazyVerticalGrid(
@@ -173,6 +200,7 @@ fun DemoListScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                    }
                 }
             }
         }
@@ -199,6 +227,15 @@ private fun DemoCard(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 1.dp,
+        // Hairline outline so the card boundary stays visible. In dark mode
+        // `surfaceContainer` sits only a few luminance steps above the near-black
+        // ParticleBackground, so without a stroke the cards bled into the page
+        // and the grid looked like floating text (#1443). `outlineVariant` is the
+        // M3 token for exactly this low-emphasis container divider.
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
