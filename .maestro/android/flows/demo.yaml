@@ -8,11 +8,17 @@
 #   DEMO_NAME  Human label, used only for screenshot file naming / readable logs.
 #
 # Strategy:
-#   - launchApp with the public `sceneview://demo/<id>` deep link so we jump
-#     straight to the demo screen — no tab navigation, no list scrolling. This
-#     is the same ingress the deep-link router validates (DeepLinkRouter.parse).
-#   - `qa_mode` extra freezes auto-rotation / orbit / animations so the single
-#     screenshot is deterministic frame-to-frame.
+#   - launchApp with the `demo` + `qa_mode` intent extras so we jump straight
+#     to the demo screen — no tab navigation, no list scrolling. Maestro's
+#     `launchApp` has no `deepLink` property (that key is silently unparsed and
+#     aborts the flow on Maestro 1.39); instead `arguments:` are delivered as
+#     intent extras on the launch intent — strings via `--es`, booleans via
+#     `--ez`. `MainActivity` reads `--es demo <id>` (the QA ingress channel,
+#     `DeepLinkRouter.validate`) before any URL deep link, so this routes
+#     through the very same closed-registry allow-list the public
+#     `sceneview://demo/<id>` scheme uses (DeepLinkRouter.parse / .validate).
+#   - the `qa_mode` boolean extra freezes auto-rotation / orbit / animations so
+#     the single screenshot is deterministic frame-to-frame.
 #   - Exercise REAL interaction: drag to orbit the camera, swipe to pan, tap
 #     the centre of the viewport (hits demo controls / picks nodes). 3D zoom
 #     has no Maestro pinch gesture — see the catalog header note; zoom is a
@@ -24,14 +30,18 @@
 #     flow. A FATAL/ANR sweep of logcat is done once, globally, by catalog.yaml.
 appId: io.github.sceneview.demo
 ---
-# Cold-launch straight into the demo via the validated deep link.
+# Cold-launch straight into the demo. `arguments:` become intent extras on the
+# launch intent — `demo` (string, `--es`) drives MainActivity's QA ingress
+# channel (DeepLinkRouter.validate against ALL_DEMOS), `qa_mode` (boolean,
+# `--ez`) freezes animation for a deterministic screenshot. `stopApp: true`
+# guarantees a cold start so the new extras are read in onCreate.
 - launchApp:
     appId: io.github.sceneview.demo
     clearState: false
     stopApp: true
     arguments:
+      demo: ${DEMO_ID}
       qa_mode: true
-    deepLink: "sceneview://demo/${DEMO_ID}"
 
 # Let the first frame render. The demo scaffold shows a scrim for up to 12 s
 # while the engine warms up; 6 s is plenty for the deep-linked demo to be
