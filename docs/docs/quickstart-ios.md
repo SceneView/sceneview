@@ -161,7 +161,7 @@ Point the camera at a flat surface, wait for plane detection, then tap to place 
 |---|---|---|
 | iOS | 18.0 | RealityKit + ARKit |
 | macOS | 15.0 | RealityKit |
-| visionOS | 1.0 | RealityKit |
+| visionOS | 2.0 | RealityKit |
 
 !!! tip "AR is iOS-only"
     `ARSceneView` uses `ARView` from ARKit, which is only available on iOS. `SceneView` (3D without AR) works on all three platforms.

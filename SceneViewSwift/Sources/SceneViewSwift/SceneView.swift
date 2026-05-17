@@ -662,6 +662,30 @@ private struct SceneViewRepresentation: View {
     #if os(iOS) || os(visionOS) || os(macOS)
     @ViewBuilder
     private var realityView: some View {
+        // `RealityView(make:update:)` with an `inout RealityViewCameraContent`
+        // is `@available(visionOS, unavailable)` — visionOS renders through the
+        // headset's spatial compositor and has no virtual-camera content type.
+        // Use the cross-platform `RealityViewContent` initializer on visionOS
+        // and the camera-content one on iOS / macOS (where `.camera = .virtual`
+        // is required to avoid the simulator black screen).
+        #if os(visionOS)
+        RealityView { content in
+            setupScene(&content)
+        } update: { content in
+            applyCamera()
+            refreshLightSlot(.main, slot: mainLightSlot)
+            refreshLightSlot(.fill, slot: fillLightSlot)
+            if autoCenterContentEnabled {
+                refreshContentCentering()
+            }
+            // visionOS immersive-space skybox. `RealityViewContent.environment`
+            // is unavailable on visionOS, so a fully immersive consumer that
+            // opted in via `.immersiveSpace()` gets the HDR rendered as an
+            // inverted-sphere skybox under a `WorldComponent` root instead.
+            // Closes #1235.
+            refreshImmersiveSkybox()
+        }
+        #else
         RealityView { realityContent in
             setupScene(&realityContent)
         } update: { content in
@@ -692,7 +716,6 @@ private struct SceneViewRepresentation: View {
             // bump + descriptor re-validation per frame (`content.environment`
             // is not a free no-op — internally re-wraps the resource
             // even when assigned an equal value).
-            #if os(iOS) || os(macOS)
             if loadedSkyboxResource !== appliedSkyboxResource {
                 if let resource = loadedSkyboxResource {
                     content.environment = .skybox(resource)
@@ -701,25 +724,30 @@ private struct SceneViewRepresentation: View {
                 }
                 appliedSkyboxResource = loadedSkyboxResource
             }
-            #endif
-
-            // visionOS immersive-space skybox. `RealityViewContent.environment`
-            // is unavailable on visionOS, so a fully immersive consumer that
-            // opted in via `.immersiveSpace()` gets the HDR rendered as an
-            // inverted-sphere skybox under a `WorldComponent` root instead.
-            // Diff-write keyed on the HDR resource name — same discipline as
-            // the iOS / macOS branch above. Closes #1235.
-            #if os(visionOS)
-            refreshImmersiveSkybox()
-            #endif
         }
+        #endif
     }
     #endif
 
     // MARK: - Scene Setup
 
+    #if os(visionOS)
+    /// The RealityView content type for the current platform.
+    ///
+    /// visionOS renders through the headset's spatial compositor and has no
+    /// virtual-camera content type — `RealityViewCameraContent` is
+    /// `@available(visionOS, unavailable)`. The cross-platform
+    /// `RealityViewContent` is used instead.
+    private typealias RealitySceneContent = RealityViewContent
+    #else
+    private typealias RealitySceneContent = RealityViewCameraContent
+    #endif
+
     #if os(iOS) || os(visionOS) || os(macOS)
-    private func setupScene(_ realityContent: inout RealityViewCameraContent) {
+    /// Populates the RealityView content tree. The content type resolves to
+    /// `RealityViewCameraContent` on iOS / macOS and `RealityViewContent` on
+    /// visionOS (see ``RealitySceneContent``).
+    private func setupScene(_ realityContent: inout RealitySceneContent) {
         // Use virtual camera (fixed perspective) instead of AR spatial tracking.
         // Without this, RealityKit defaults to .spatialTracking which requires a
         // physical device camera — causing a black screen in the simulator.
