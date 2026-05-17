@@ -1184,12 +1184,21 @@ cameraNode.fitDistanceForContent(modelNode)     // just the distance, no reposit
 val bounds = modelInstance.model.boundingBox.toAabb()
 val vfov = verticalFovDegreesForFocalLength(28.0)   // ≈ 46.4°
 
-// One-shot guard for a SceneView frame loop (analogue of SceneAutoCenterState):
+// Easiest path — let SceneView drive it. `autoFitContent` moves the camera so the
+// content fills the viewport; re-frames when an async model grows the union bounds
+// and latches once they settle. Applies only when there is no camera manipulator
+// (an active orbit manipulator owns the camera transform every frame).
+SceneView(autoFitContent = true, cameraManipulator = null) {
+    ModelNode(modelInstance = rememberModelInstance(modelLoader, "models/bee.glb"))
+}
+
+// Manual guard for a custom frame loop (diagonal-stability gated — #1596):
 val fitState = remember { SceneAutoFitState() }
 SceneView(onFrame = { fitState.maybeFit(cameraNode, contentRoot) }) { … }
 ```
 
-Android-only; iOS already auto-frames from `visualBounds` (#1026 / #1391).
+`autoFitContent` defaults to `false` (callers that position the camera explicitly keep
+control). iOS already auto-frames from `visualBounds` (#1026 / #1391).
 
 ---
 
