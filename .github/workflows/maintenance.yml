@@ -2,7 +2,15 @@ name: Daily Maintenance
 
 on:
   schedule:
-    - cron: '0 7 * * *'   # 07:00 UTC every day
+    # 07:11 UTC daily. Deliberately OFF the top-of-hour: GitHub queues all
+    # `0 * * * *` crons in one burst and drops the overflow on busy
+    # infrastructure, so `0 7 * * *` runs were silently skipped (#1646).
+    # Editing this `schedule:` block also re-registers the cron under the
+    # committing account — the original registration was bound to an account
+    # that is no longer active, which is why this workflow had never fired
+    # on schedule despite being marked active. Keep it distinct from
+    # nightly-ci.yml (04:00 UTC).
+    - cron: '11 7 * * *'
   workflow_dispatch:
 
 permissions:
