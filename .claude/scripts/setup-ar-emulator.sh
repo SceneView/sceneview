@@ -11,12 +11,14 @@
 #   2. Patches its config.ini for ARCore: 4 GB RAM, virtualscene back camera,
 #      emulated front camera (front cam is needed for Augmented Faces demos),
 #      host GPU mode.
-#   3. Boots the emulator headless — RAM-budgeted adaptive pool (#1647 → #1654):
-#      leases a free already-running emulator, or — if the live RAM-budgeted
-#      pool cap has room and free RAM clears the hard safety gate — boots a new
-#      one on a distinct `-port`, or waits (bounded) for a lease to free. Guest
-#      `-memory` is scaled to RAM headroom. The pool never exceeds what live
-#      host RAM safely allows; the floor is always 1.
+#   3. Boots the emulator headless by default — RAM-budgeted adaptive pool
+#      (#1647 → #1654): leases a free already-running emulator, or — if the live
+#      RAM-budgeted pool cap has room and free RAM clears the hard safety gate —
+#      boots a new one on a distinct `-port`, or waits (bounded) for a lease to
+#      free. Guest `-memory` is scaled to RAM headroom. The pool never exceeds
+#      what live host RAM safely allows; the floor is always 1. Pass `--window`
+#      (or set `EMU_VISIBLE=1`) to boot it VISIBLE for a local glance — opt-in,
+#      local only; CI always stays headless.
 #   4. Waits for `sys.boot_completed`.
 #   5. Verifies Google Play Services for AR (com.google.ar.core) is installed;
 #      if not, opens the Play Store to the listing (one-time manual click).
@@ -27,6 +29,12 @@
 #             active leases). No mutation.
 #   --clean   Wipe the AVD's userdata and recreate config from scratch.
 #   --no-boot Skip the emulator boot (useful in CI where boot is deferred).
+#   --window  Boot the emulator VISIBLE (windowed) so a developer can glance at
+#             it. OPT-IN, local only. Default is headless (-no-window), which is
+#             marginally lighter on the host (skips the skin-window draw +
+#             window-server compositing). Equivalent to EMU_VISIBLE=1. The guest
+#             VM cost is identical either way — only the host window draw differs.
+#             CI never sets this; the device-QA workflow stays headless.
 #   -h|--help Show this help.
 #
 # Idempotent: re-running with no flag will skip work that's already done. Leases a
@@ -77,6 +85,7 @@ while [[ $# -gt 0 ]]; do
     --clean)   CLEAN=true; shift ;;
     --no-boot) NO_BOOT=true; shift ;;
     --stop)    STOP_AFTER=true; shift ;;
+    --window)  EMU_VISIBLE=1; shift ;;
     -h|--help)
       # Print the leading comment block (lines starting with #), stop at `set -`.
       # Skip the shebang (line 1).
@@ -224,19 +233,32 @@ trap 'emu_lease_release_all' EXIT
 
 # boot_new_emulator <port> — boot a fresh emulator on a distinct console port so
 # it coexists with pool peers. Echoes nothing; the serial is `emulator-<port>`.
+#
+# Headless by default (-no-window): skips the emulator skin-window draw and the
+# host window-server compositing — marginally lighter on the host. Opt in to a
+# VISIBLE (windowed) emulator with `--window` or `EMU_VISIBLE=1` for a local
+# glance; the guest VM cost is identical, only the host window draw differs.
 boot_new_emulator() {
   local port="$1"
   local mem; mem="$(emu_recommended_memory_mb)"
-  log "booting a new pool emulator $AVD_NAME on -port ${port} (headless, no snapshot, -memory ${mem} MB)"
+  # Window mode: headless unless EMU_VISIBLE is truthy (set by --window).
+  local window_arg="-no-window" window_desc="headless"
+  if [[ "${EMU_VISIBLE:-0}" == "1" || "${EMU_VISIBLE:-}" == "true" ]]; then
+    window_arg=""
+    window_desc="windowed (EMU_VISIBLE)"
+  fi
+  log "booting a new pool emulator $AVD_NAME on -port ${port} (${window_desc}, no snapshot, -memory ${mem} MB)"
   # `-read-only` lets multiple emulators share the one AVD's disk images without
   # clobbering each other's userdata; `-port` gives each a distinct serial.
   # nohup + & so the emulator survives this script; per-port log for debugging.
   local emu_log="/tmp/sceneview-emulator-${AVD_NAME}-${port}.log"
+  # shellcheck disable=SC2086 # window_arg is intentionally word-split (empty = visible)
   nohup "$EMULATOR_BIN" -avd "$AVD_NAME" \
     -port "$port" \
     -read-only \
     -gpu host \
     -memory "$mem" \
+    $window_arg \
     -no-snapshot-load \
     -no-audio \
     -no-boot-anim \
