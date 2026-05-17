@@ -17,8 +17,6 @@ import io.github.sceneview.utils.intervalSeconds
  *   +Y is up, gravity pulls in the -Y direction.
  *
  * @param node         The node whose [Node.position] is driven by the simulation.
- * @param mass         Mass in kg. Currently unused in Euler integration but reserved for
- *                     future impulse/force API.
  * @param restitution  Coefficient of restitution in [0, 1]. 0 = fully inelastic,
  *                     1 = perfectly elastic. Applied on each floor bounce.
  * @param floorY       World-space Y coordinate of the floor plane. Default 0.0 (scene origin).
@@ -29,12 +27,46 @@ import io.github.sceneview.utils.intervalSeconds
  */
 class PhysicsBody(
     val node: Node,
-    val mass: Float = 1f,
     val restitution: Float = 0.6f,
     val floorY: Float = 0f,
     val radius: Float = 0f,
     initialVelocity: Position = Position(0f, 0f, 0f)
 ) {
+    /**
+     * Mass in kg.
+     *
+     * The current Euler integration only applies gravity, which is an acceleration and is
+     * therefore mass-independent (all bodies fall at the same rate). `mass` only becomes
+     * meaningful once a force/impulse API exists (`acceleration = force / mass`). Until
+     * then this property is a no-op and is kept solely so callers can read back the value
+     * they configured.
+     */
+    @Deprecated(
+        "Mass is currently a no-op: the Euler integration applies only gravity, which is " +
+            "mass-independent. It will gain an effect once a force/impulse API lands.",
+        level = DeprecationLevel.WARNING
+    )
+    var mass: Float = 1f
+        private set
+
+    @Deprecated(
+        "The 'mass' parameter is currently a no-op (the Euler integration applies only " +
+            "gravity, which is mass-independent). Use the constructor without 'mass'.",
+        ReplaceWith("PhysicsBody(node, restitution, floorY, radius, initialVelocity)"),
+        DeprecationLevel.WARNING
+    )
+    constructor(
+        node: Node,
+        mass: Float,
+        restitution: Float = 0.6f,
+        floorY: Float = 0f,
+        radius: Float = 0f,
+        initialVelocity: Position = Position(0f, 0f, 0f)
+    ) : this(node, restitution, floorY, radius, initialVelocity) {
+        @Suppress("DEPRECATION")
+        this.mass = mass
+    }
+
     companion object {
         const val GRAVITY = -9.8f   // m/s² downward (-Y)
 
@@ -111,7 +143,6 @@ class PhysicsBody(
  *     val sphereNode = remember(engine) { SphereNode(engine, radius = 0.15f) }
  *     PhysicsNode(
  *         node = sphereNode,
- *         mass = 1f,
  *         restitution = 0.7f,
  *         linearVelocity = Position(x = 0.5f, y = 2f, z = 0f)
  *     )
@@ -119,7 +150,6 @@ class PhysicsBody(
  * ```
  *
  * @param node           The [Node] to animate. Must already be added to the scene by the caller.
- * @param mass           Object mass in kg (reserved; not yet used in force calculations).
  * @param restitution    Bounciness in [0, 1].
  * @param linearVelocity Initial velocity in m/s.
  * @param floorY         World Y of the floor plane (default 0).
@@ -129,7 +159,6 @@ class PhysicsBody(
 @Composable
 fun PhysicsNode(
     node: Node,
-    mass: Float = 1f,
     restitution: Float = 0.6f,
     linearVelocity: Position = Position(0f, 0f, 0f),
     floorY: Float = 0f,
@@ -138,7 +167,6 @@ fun PhysicsNode(
     val body = remember(node) {
         PhysicsBody(
             node = node,
-            mass = mass,
             restitution = restitution,
             floorY = floorY,
             radius = radius,
@@ -157,3 +185,32 @@ fun PhysicsNode(
         }
     }
 }
+
+/**
+ * Deprecated overload kept for source compatibility — the `mass` parameter is a no-op.
+ *
+ * The Euler integration applies only gravity, which is an acceleration and therefore
+ * mass-independent. `mass` will gain an effect once a force/impulse API lands. Until then,
+ * use the [PhysicsNode] overload without `mass`.
+ */
+@Deprecated(
+    "The 'mass' parameter is currently a no-op (the Euler integration applies only gravity, " +
+        "which is mass-independent). Use the PhysicsNode overload without 'mass'.",
+    ReplaceWith("PhysicsNode(node, restitution, linearVelocity, floorY, radius)"),
+    DeprecationLevel.WARNING
+)
+@Composable
+fun PhysicsNode(
+    node: Node,
+    @Suppress("UNUSED_PARAMETER") mass: Float,
+    restitution: Float = 0.6f,
+    linearVelocity: Position = Position(0f, 0f, 0f),
+    floorY: Float = 0f,
+    radius: Float = 0f
+) = PhysicsNode(
+    node = node,
+    restitution = restitution,
+    linearVelocity = linearVelocity,
+    floorY = floorY,
+    radius = radius
+)
