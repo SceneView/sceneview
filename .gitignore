@@ -130,11 +130,13 @@ docs/docs/*-contribution.md
 
 # ── Platform demo assets (copied via .claude/scripts/sync-assets.sh) ──
 # Note: android-demo-assets is NOT ignored (Play Asset Delivery, must be in git)
+# Note: samples/web-demo/src/jsMain/resources/models/ is NOT ignored — its
+# curated GLB catalog is committed so the demo self-hosts its models instead
+# of depending on a third-party CDN (#1573); they ride into jsBrowserDistribution.
 samples/android-tv-demo/src/main/assets/
 samples/flutter-demo/models/
 samples/react-native-demo/assets/models/
 samples/react-native-demo/ios/Models/
-samples/web-demo/src/jsMain/resources/models/
 samples/web-demo/src/jsMain/resources/environments/
 
 # ── Playwright web-demo QA artifacts ──

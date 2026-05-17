@@ -44,21 +44,20 @@ export function captureDiagnostics(page: Page): PageDiagnostics {
 }
 
 /**
- * CDN / third-party failures are not demo regressions. Sketchfab download
- * endpoints return 401 without auth (the demo handles that path), and
- * jsDelivr can rate-limit. Filter those so the suite stays deterministic.
+ * Third-party failures are not demo regressions: the Sketchfab Search source
+ * hits `api.sketchfab.com`, whose download/search endpoints return 401 without
+ * auth (the demo handles that path gracefully). Filter only Sketchfab-domain
+ * noise so the suite stays deterministic.
+ *
+ * NOTE: the catalog models are now self-hosted under `models/` (issue #1573),
+ * so a model HTTP 403/404 is a REAL demo regression and must NOT be filtered —
+ * that is precisely the failure mode #1573 was about. Only genuinely
+ * external (Sketchfab) errors are treated as ignorable noise.
  */
 function isIgnorableNoise(text: string): boolean {
   const t = text.toLowerCase();
-  return (
-    t.includes('sketchfab') ||
-    t.includes('401') ||
-    t.includes('403') ||
-    t.includes('429') ||
-    t.includes('net::err_') ||
-    t.includes('failed to load resource') ||
-    t.includes('the server responded with a status')
-  );
+  // Only suppress errors that originate from the Sketchfab third-party API.
+  return t.includes('sketchfab');
 }
 
 /** Assert no real console errors / unhandled rejections were collected. */

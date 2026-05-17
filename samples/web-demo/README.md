@@ -6,9 +6,11 @@ Browser-based 3D viewer using SceneView.js (Filament.js WASM engine).
 
 The demo has four tabs in the top tab bar:
 
-- **Models** — browse 40 curated CDN models across 5 categories (Showcase,
+- **Models** — browse 15 curated models across 5 categories (Showcase,
   Vehicles, Animated, Characters, Objects), or switch the source toggle to
-  **Sketchfab Search** to search downloadable 3D models from Sketchfab.
+  **Sketchfab Search** to search downloadable 3D models from Sketchfab. The
+  curated GLBs are self-hosted (bundled in the demo distribution), not loaded
+  from a third-party CDN.
 - **Geometry** — create cubes, spheres, cylinders, and planes with color
   pickers, size sliders, and a per-shape `KHR_materials_unlit` toggle.
 - **Physics** — a chaotic **Double Pendulum** simulation whose integrator math
@@ -44,7 +46,10 @@ Open `src/jsMain/resources/index.html` directly in a browser, or:
   `setQuality()`, `setBloom()`, `setBackgroundColor()`, etc.).
 - Filament.js WASM engine loaded from CDN.
 - Sketchfab API: `GET /v3/search?type=models&downloadable=true&q={query}`.
-- CDN models: `https://cdn.jsdelivr.net/gh/sceneview/sceneview@main/assets/models/glb/`.
+- Curated models: self-hosted GLBs under `src/jsMain/resources/models/`, loaded
+  from the relative `models/` path. They are copied verbatim into the
+  `jsBrowserDistribution` output and deployed alongside `index.html`, so the
+  demo never depends on a third-party CDN for its assets (issue #1573).
 - `src/jsMain/kotlin/.../web/Main.kt` is an alternative Kotlin/JS entry point
   built against the `sceneview-web` module; the shipped page uses the inline JS.
 
