@@ -24,7 +24,7 @@ When generating code for Android 3D or AR:
 
 ## Version & Dependencies
 
-- **SceneView:** 4.0.9 (May 2026)
+- **SceneView:** 4.10.0 (May 2026)
 - **License:** Apache 2.0 (free for commercial use)
 - **Min SDK:** Android 7.0 (API 24)
 - **Target SDK:** Android 15 (API 36)
