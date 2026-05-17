@@ -58,6 +58,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# RAM-aware single-emulator selection helpers (#1647). The android and ar legs
+# share ONE emulator: whichever leg runs first boots it (RAM-gated, lock-guarded
+# inside setup-ar-emulator.sh) and the next leg reuses it.
+# shellcheck source=lib/emulator-select.sh
+source "$SCRIPT_DIR/lib/emulator-select.sh"
+
 # --- Flags -----------------------------------------------------------------
 PLATFORM="all"
 FAST=false
@@ -152,6 +158,7 @@ record() {
 # --- Android leg -----------------------------------------------------------
 run_android() {
   local started; started=$(date +%s)
+  local reused_serial=""
   log "=== Android leg ==="
 
   if ! command -v adb >/dev/null 2>&1; then
@@ -159,12 +166,16 @@ run_android() {
     return 0
   fi
 
-  # Boot an emulator if none is connected. setup-ar-emulator.sh is idempotent
-  # and reuses an already-booted device.
-  if ! adb get-state >/dev/null 2>&1; then
-    log "no Android device — booting emulator via setup-ar-emulator.sh"
+  # Single shared emulator (#1647). If one is already up (this session, a peer
+  # session, or the previous leg), REUSE it — never boot a second. Otherwise
+  # setup-ar-emulator.sh boots one: it is RAM-gated and lock-guarded, so a
+  # RAM-starved host or a racing peer is handled cleanly inside that script.
+  if reused_serial="$(emu_running_serial adb)"; then
+    log "reusing already-running emulator: $reused_serial (no boot)"
+  else
+    log "no Android device — booting emulator via setup-ar-emulator.sh (RAM-aware, lock-guarded)"
     if ! bash "$SCRIPT_DIR/setup-ar-emulator.sh" >/dev/null 2>&1; then
-      record android skipped "could not boot an Android emulator" "" "$(( $(date +%s) - started ))"
+      record android skipped "could not boot an Android emulator (RAM too tight or lock contention)" "" "$(( $(date +%s) - started ))"
       return 0
     fi
   fi
@@ -281,6 +292,7 @@ run_web() {
 # --- AR leg ----------------------------------------------------------------
 run_ar() {
   local started; started=$(date +%s)
+  local reused_serial=""
   log "=== AR leg ==="
 
   if ! command -v adb >/dev/null 2>&1; then
@@ -288,12 +300,16 @@ run_ar() {
     return 0
   fi
 
-  # The AR replay harness needs an ARCore-capable emulator. setup-ar-emulator.sh
-  # both boots one and sideloads Google Play Services for AR.
-  if ! adb get-state >/dev/null 2>&1; then
-    log "no Android device — booting ARCore emulator via setup-ar-emulator.sh"
+  # The AR replay harness needs an ARCore-capable emulator. The android leg
+  # usually ran first and left one warm — REUSE it (#1647), never boot a second.
+  # If none is up, setup-ar-emulator.sh boots one (RAM-gated, lock-guarded) and
+  # sideloads Google Play Services for AR.
+  if reused_serial="$(emu_running_serial adb)"; then
+    log "reusing already-running emulator: $reused_serial (no boot)"
+  elif ! adb get-state >/dev/null 2>&1; then
+    log "no Android device — booting ARCore emulator via setup-ar-emulator.sh (RAM-aware, lock-guarded)"
     if ! bash "$SCRIPT_DIR/setup-ar-emulator.sh" >/dev/null 2>&1; then
-      record ar skipped "could not boot an ARCore emulator" "" "$(( $(date +%s) - started ))"
+      record ar skipped "could not boot an ARCore emulator (RAM too tight or lock contention)" "" "$(( $(date +%s) - started ))"
       return 0
     fi
   fi

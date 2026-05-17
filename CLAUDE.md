@@ -195,6 +195,23 @@ and AR UI/state QA. AR features that need real world tracking (Cloud Anchor,
 Streetscape/VPS, face mesh against a live face) still need a physical-device
 AR Record — request one rather than driving someone's personal phone over USB.
 
+**One shared emulator — RAM-aware, parallel-session-safe (#1647).** The harness
+keeps a **single** shared emulator; it never spins up a multi-emulator pool. Before
+any fresh boot, `setup-ar-emulator.sh` (via `lib/emulator-select.sh`):
+- **reuses a running emulator** — if an `emulator-*` device is already up (this
+  session, a parallel agent, or a previous device-QA leg), it is reused, no boot;
+- **gates on host RAM** — refuses to boot when free RAM is under the threshold
+  (`EMU_MIN_FREE_RAM_MB`, default 3072 MB) instead of crashing mid-boot;
+- **right-sizes `-memory`** — scales the guest memory flag to RAM headroom,
+  clamped to `[EMU_MEMORY_FLOOR_MB, EMU_MEMORY_CEILING_MB]` (2048–4096 MB);
+- **takes an advisory lock** (`${TMPDIR:-/tmp}/sceneview-device-qa-emulator.lock`)
+  so two concurrent sessions cooperate: the first boots, the rest reuse — never
+  two emulators at once. Stale locks (owner gone, no emulator alive) self-reclaim.
+
+`--check` now also reports host free RAM and whether a running emulator would be
+reused. This is why parallel Claude Code sessions running device-QA on the same
+RAM-constrained Mac no longer contend for emulator resources.
+
 ## Samples
 
 One unified showcase app per platform — all features integrated into tabs.
@@ -612,7 +629,8 @@ Hooks trigger automatically on specific Claude Code actions:
 | `cross-platform-check.sh` | Compare Android vs iOS vs Web API surface, report gaps |
 | `release-checklist.sh` | Pre-release validation (versions, changelog, tests, etc.) |
 | `lib/android-cli.sh` | Shared helpers for Google's `android` CLI (screenshot, layout, install+launch) with `adb` fallback |
-| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only), `--clean` (wipe+recreate). **Use this for routine QA — never QA on a personal device.** |
+| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only), `--clean` (wipe+recreate). RAM-aware single-emulator selection (#1647): reuses a running emulator, gates fresh boots on free host RAM, scales `-memory` to headroom, advisory-locks against parallel sessions. **Use this for routine QA — never QA on a personal device.** |
+| `lib/emulator-select.sh` | Sourced helper for `setup-ar-emulator.sh` / `device-qa.sh` — RAM monitoring (`vm_stat`/`/proc/meminfo`), running-emulator reuse detection, RAM-scaled `-memory`, and a mkdir-based advisory lock so concurrent sessions share ONE emulator (#1647). |
 | `qa-android-demos.sh` | QA loop over every demo — uses `android layout`/`screen capture` for the UI dump and screenshots |
 | `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |

@@ -36,6 +36,10 @@ cd "$REPO_ROOT"
 source "$SCRIPT_DIR/lib/maestro.sh"
 # shellcheck source=lib/android-cli.sh
 source "$SCRIPT_DIR/lib/android-cli.sh"
+# RAM-aware single-emulator selection helpers (#1647) — used to detect and
+# report a reusable running emulator rather than implying a second boot.
+# shellcheck source=lib/emulator-select.sh
+source "$SCRIPT_DIR/lib/emulator-select.sh"
 
 PACKAGE="io.github.sceneview.demo"
 ACTIVITY=".MainActivity"
@@ -64,8 +68,13 @@ if [[ ! -f "$FLOW_FILE" ]]; then
 fi
 
 # --- Emulator check --------------------------------------------------------
-if ! adb get-state >/dev/null 2>&1; then
-  echo "[qa] ERROR: no Android device. Boot one first:" >&2
+# Single shared emulator (#1647): if one is already running we reuse it; this
+# script never boots its own. Booting (RAM-gated, parallel-session-safe via an
+# advisory lock) is delegated to setup-ar-emulator.sh.
+if reuse_serial="$(emu_running_serial adb)"; then
+  echo "[qa] reusing already-running emulator: $reuse_serial"
+elif ! adb get-state >/dev/null 2>&1; then
+  echo "[qa] ERROR: no Android device. Boot one first (RAM-aware, lock-guarded):" >&2
   echo "[qa]   bash .claude/scripts/setup-ar-emulator.sh" >&2
   exit 1
 fi

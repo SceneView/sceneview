@@ -11,13 +11,17 @@
 #   2. Patches its config.ini for ARCore: 4 GB RAM, virtualscene back camera,
 #      emulated front camera (front cam is needed for Augmented Faces demos),
 #      host GPU mode.
-#   3. Boots the emulator headless.
+#   3. Boots the emulator headless — RAM-aware and parallel-session-safe (#1647):
+#      reuses an already-running emulator, checks free host RAM before a fresh
+#      boot, scales the `-memory` flag to RAM headroom, and cooperates with
+#      concurrent sessions via an advisory lock so only ONE emulator ever runs.
 #   4. Waits for `sys.boot_completed`.
 #   5. Verifies Google Play Services for AR (com.google.ar.core) is installed;
 #      if not, opens the Play Store to the listing (one-time manual click).
 #
 # Flags:
-#   --check   Read-only inspection: prints current AVD config + ARCore state. No mutation.
+#   --check   Read-only inspection: prints current AVD config + ARCore state +
+#             host RAM / running-emulator status. No mutation.
 #   --clean   Wipe the AVD's userdata and recreate config from scratch.
 #   --no-boot Skip the emulator boot (useful in CI where boot is deferred).
 #   -h|--help Show this help.
@@ -25,8 +29,18 @@
 # Idempotent: re-running with no flag will skip work that's already done. Re-uses an
 # already-booted emulator on the standard adb port. Stops nothing — caller closes the
 # emulator (or it stays warm for follow-up scripts).
+#
+# Single-emulator guarantee (#1647): this script never boots a second emulator
+# when one is already up, and two concurrent sessions cooperate via the advisory
+# lock in lib/emulator-select.sh — the first boots, the rest reuse.
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# RAM-aware single-emulator selection helpers (#1647): RAM monitoring, running-
+# emulator reuse detection, RAM-scaled `-memory`, advisory parallel-session lock.
+# shellcheck source=lib/emulator-select.sh
+source "$SCRIPT_DIR/lib/emulator-select.sh"
 
 SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
 EMULATOR_BIN="$SDK_ROOT/emulator/emulator"
@@ -154,29 +168,92 @@ show_config() {
   grep -E "^(PlayStore|hw\.camera|hw\.gpu|hw\.ramSize|vm\.heapSize|hw\.gps|image\.sysdir)" "$AVD_CONFIG" | sed 's/^/  /'
 }
 
+# Report host RAM + running-emulator state (#1647). Used by --check and before
+# every boot decision.
+show_ram_and_emulator_status() {
+  local total free running
+  total="$(emu_host_total_ram_mb)"
+  free="$(emu_host_free_ram_mb)"
+  log "host RAM: ${free} MB free / ${total} MB total (boot threshold ${EMU_MIN_FREE_RAM_MB} MB)"
+  if running="$(emu_running_serial "$ADB_BIN")"; then
+    log "running emulator detected: $running — would REUSE it (no second boot)"
+  else
+    log "no emulator currently running"
+    if emu_ram_allows_boot >/dev/null 2>&1; then
+      log "RAM OK for a fresh boot — would launch with -memory $(emu_recommended_memory_mb) MB"
+    else
+      log "RAM too tight — a fresh boot would be REFUSED"
+    fi
+  fi
+}
+
 if $CHECK_ONLY; then
   show_config
+  show_ram_and_emulator_status
 else
   apply_ar_config
   show_config
 fi
 
 # --- step 5: boot the emulator ------------------------------------------------
+# RAM-aware, single-emulator, parallel-session-safe (#1647). The decision flow:
+#   1. Already an emulator running?  -> REUSE it, no boot, no lock needed.
+#   2. Otherwise acquire the advisory lock so two sessions cooperate.
+#   3. Re-check inside the lock (a peer may have booted while we waited) -> REUSE.
+#   4. Gate on free host RAM; refuse a fresh boot on a RAM-starved host.
+#   5. Boot with a `-memory` value scaled to current RAM headroom.
+
 emulator_is_running() {
-  "$ADB_BIN" devices 2>/dev/null | awk 'NR>1 && /emulator-/ && $2=="device" {found=1} END {exit !found}'
+  emu_running_serial "$ADB_BIN" >/dev/null 2>&1
 }
 
+# Release the advisory lock on exit no matter how the script ends. emu_lock_release
+# is a no-op unless THIS process owns the lock, so it is safe even when we reused.
+trap 'emu_lock_release' EXIT
+
 boot_emulator() {
+  # Step 1: reuse a running emulator outright — never boot a second one.
   if emulator_is_running; then
-    log "emulator already running — re-using"
+    log "emulator already running ($(emu_running_serial "$ADB_BIN")) — re-using, no boot"
     return 0
   fi
-  log "starting emulator $AVD_NAME (headless, no snapshot)"
+
+  # Step 2: cooperate with concurrent sessions. The first to acquire the lock
+  # boots; peers wait, then find the running emulator in step 3 and reuse it.
+  if ! emu_lock_acquire "${EMU_LOCK_TIMEOUT:-300}"; then
+    # Lock wait timed out — last-chance reuse check before giving up.
+    if emulator_is_running; then
+      log "lock timed out but an emulator is up — re-using $(emu_running_serial "$ADB_BIN")"
+      return 0
+    fi
+    log "could not acquire the emulator lock and no emulator is running — aborting boot"
+    return 1
+  fi
+
+  # Step 3: re-check under the lock — a peer may have booted while we waited.
+  if emulator_is_running; then
+    log "another session booted the emulator ($(emu_running_serial "$ADB_BIN")) — re-using"
+    return 0
+  fi
+
+  # Step 4: RAM gate. Booting into a RAM-starved host is what causes the boot
+  # failures this fix targets (#1647), so refuse rather than crash mid-boot.
+  if ! emu_ram_allows_boot; then
+    log "ABORT: insufficient free host RAM to boot a fresh emulator safely"
+    log "       reuse a running emulator, close other apps, or lower EMU_MIN_FREE_RAM_MB"
+    return 1
+  fi
+
+  # Step 5: boot with a RAM-scaled `-memory`. The AVD config pins hw.ramSize,
+  # but `-memory` at launch wins and lets us right-size to the live host.
+  local mem; mem="$(emu_recommended_memory_mb)"
+  log "starting emulator $AVD_NAME (headless, no snapshot, -memory ${mem} MB)"
   # Use nohup + & so the emulator survives this script. Redirect to a log so we
   # can debug a failed boot without spinning up an interactive console.
   local emu_log="/tmp/sceneview-emulator-$AVD_NAME.log"
   nohup "$EMULATOR_BIN" -avd "$AVD_NAME" \
     -gpu host \
+    -memory "$mem" \
     -no-snapshot-load \
     -no-audio \
     -no-boot-anim \
@@ -214,8 +291,16 @@ wait_for_boot() {
 }
 
 if ! $CHECK_ONLY && ! $NO_BOOT; then
-  boot_emulator
-  wait_for_boot
+  # boot_emulator returns non-zero when it reused nothing AND refused a fresh
+  # boot (RAM too tight, or the lock could not be acquired). In that case there
+  # is no emulator to wait for — fail fast with a clear exit so the device-QA
+  # orchestrator records a `skipped`/`failed` leg instead of hanging.
+  if boot_emulator; then
+    wait_for_boot
+  else
+    log "emulator boot was refused — see the reason above"
+    exit 1
+  fi
 fi
 
 # --- step 6: verify / install ARCore (Google Play Services for AR) ------------
