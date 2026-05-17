@@ -139,8 +139,21 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Install Maestro
+        # `curl … | bash`: the curl exit status is masked by the pipe — `bash`
+        # on the right side exits 0 even when curl wrote nothing — so a DNS /
+        # network failure here would silently "succeed". The qa-android-demos.sh
+        # step would then fail much later with the opaque
+        # `rc=1 (flow=3d-basics)` because maestro.sh found no `maestro` binary
+        # (it never auto-installs in CI). `set -o pipefail` makes the curl
+        # failure abort THIS step where the error is obvious, and the explicit
+        # `test -x` catches an installer that ran but produced no binary.
+        # The canonical installer host is `get.maestro.mobile.dev` —
+        # `get.maestro.dev` does not resolve (run 25979438767: `curl: (6)
+        # Could not resolve host: get.maestro.dev`).
         run: |
-          curl -fsSL "https://get.maestro.dev" | bash
+          set -euo pipefail
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          test -x "$HOME/.maestro/bin/maestro"
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Run device-qa.sh (android leg) on emulator

@@ -89,7 +89,11 @@ maestro_ensure() {
   if ! command -v java >/dev/null 2>&1; then
     echo "[maestro] WARNING: a JDK is required to run Maestro — install one before maestro_run" >&2
   fi
-  if ! MAESTRO_VERSION="$MAESTRO_VERSION" curl -fsSL "https://get.maestro.dev" | bash >&2; then
+  # The canonical installer host is `get.maestro.mobile.dev` (308-redirects to
+  # the GCS-hosted install.sh). `get.maestro.dev` does NOT resolve — it broke
+  # the Device QA CI Maestro install (run 25979438767). `set -o pipefail` at
+  # the top of this file makes a curl DNS failure propagate through the pipe.
+  if ! MAESTRO_VERSION="$MAESTRO_VERSION" curl -fsSL "https://get.maestro.mobile.dev" | bash >&2; then
     echo "[maestro] install failed (offline or unsupported host?)" >&2
     return 1
   fi
