@@ -52,13 +52,16 @@ Open `src/jsMain/resources/index.html` directly in a browser, or:
 ## Architecture
 
 - `index.html` — self-contained single-file app (HTML + CSS + inline JS). This
-  is the shipped demo; it loads `SceneView.js` from the CDN.
-- Uses `SceneView.js` from CDN (`SceneView.modelViewer()`, `createBox()`,
-  `setQuality()`, `setBloom()`, `setBackgroundColor()`, `addLight()`,
-  `removeNode()`, `playAnimation()`, `stopAnimation()`, `createText()`,
-  `setEnvironmentSH()`, etc.).
-- Filament.js WASM engine loaded from CDN.
-- Sketchfab API: `GET /v3/search?type=models&downloadable=true&q={query}`.
+  is the shipped demo; it loads a self-hosted `sceneview.js`.
+- Uses `SceneView.js` (`SceneView.create()`, `SceneView.modelViewer()`,
+  `createBox()`, `setQuality()`, `setBloom()`, `setBackgroundColor()`,
+  `addLight()`, `removeNode()`, `playAnimation()`, `stopAnimation()`,
+  `createText()`, `setEnvironmentSH()`, etc.).
+- Engine: `filament.js`, `filament.wasm`, and `sceneview.js` are self-hosted
+  under `src/jsMain/resources/js/` and referenced by relative path, so the
+  demo never depends on a third-party CDN for its engine (issue #1586).
+- Sketchfab API: `GET /v3/search?type=models&downloadable=true&q={query}` —
+  the only remaining external network call (third-party model search).
 - Curated models: self-hosted GLBs under `src/jsMain/resources/models/`, loaded
   from the relative `models/` path. They are copied verbatim into the
   `jsBrowserDistribution` output and deployed alongside `index.html`, so the

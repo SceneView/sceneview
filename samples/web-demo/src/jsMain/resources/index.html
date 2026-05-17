@@ -818,10 +818,7 @@
                 <label style="width:100%">Model
                     <select id="anim-model-select" class="quality-select" style="margin-top:4px">
                         <option value="animated_trex.glb">Animated T-Rex</option>
-                        <option value="animated_astronaut.glb">Animated Astronaut</option>
-                        <option value="animated_butterfly.glb">Animated Butterfly</option>
-                        <option value="animated_dog.glb">Animated Dog</option>
-                        <option value="phoenix_bird.glb">Phoenix Bird</option>
+                        <option value="animated_elephant.glb">Animated Elephant</option>
                     </select>
                 </label>
             </div>
@@ -1153,10 +1150,10 @@
             hideChip();
             showChip('Failed to load model');
             setTimeout(hideChip, 3000);
-            // A miss on the remote model gallery is a recoverable, transient
-            // condition (CDN rate-limit, offline, model removed) — not a demo
-            // bug. Log at warn level so it does not read as a hard script
-            // error; the viewer stays fully usable (issue #1586).
+            // Catalog models are self-hosted (issue #1573), so a miss here is
+            // surfaced non-fatally — the viewer stays usable (geometry/physics
+            // tabs, model gallery) and engine init is never bricked by it
+            // (issue #1586). Logged at warn level, not as a hard script error.
             console.warn('Load error:', err);
           });
       }
@@ -1586,7 +1583,7 @@
           var file = modelSelect.value;
           var loop = document.getElementById('anim-loop').checked;
           status.textContent = 'Loading ' + modelSelect.options[modelSelect.selectedIndex].text + '...';
-          sceneViewInstance.loadModel(CDN_BASE + file)
+          sceneViewInstance.loadModel(MODEL_BASE + file)
             .then(function() {
               sceneViewInstance.playAnimation(0, loop);
               status.textContent = 'Playing — clip 0' + (loop ? ' (looping)' : '');
