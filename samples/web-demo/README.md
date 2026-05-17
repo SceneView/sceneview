@@ -66,6 +66,10 @@ Open `src/jsMain/resources/index.html` directly in a browser, or:
   from the relative `models/` path. They are copied verbatim into the
   `jsBrowserDistribution` output and deployed alongside `index.html`, so the
   demo never depends on a third-party CDN for its assets (issue #1573).
+- IBL environment: `src/jsMain/resources/environments/neutral_ibl.ktx`,
+  self-hosted so `sceneview.js` finds it at `/environments/neutral_ibl.ktx`
+  with no 404 (issue #1586). `setEnvironmentSH()` provides a synthetic
+  spherical-harmonic fallback if it is ever missing.
 - `src/jsMain/kotlin/.../web/Main.kt` is an alternative Kotlin/JS entry point
   built against the `sceneview-web` module; the shipped page uses the inline JS.
 
