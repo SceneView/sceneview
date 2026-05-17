@@ -691,7 +691,7 @@
     <!-- Models panel -->
     <div id="panel-models" class="panel search-panel active">
         <div class="source-toggle">
-            <button class="source-btn active" data-source="cdn">SceneView CDN</button>
+            <button class="source-btn active" data-source="cdn">SceneView Models</button>
             <button class="source-btn" data-source="sketchfab">Sketchfab Search</button>
         </div>
         <div id="search-box" class="search-box" style="display:none">
@@ -843,49 +843,39 @@
       'use strict';
 
       // ---- Configuration ----
-      var CDN_BASE = 'https://cdn.jsdelivr.net/gh/sceneview/sceneview@main/assets/models/glb/';
+      //
+      // Catalog models are SELF-HOSTED next to this page — SceneView policy is
+      // to never depend on a third-party CDN for demo assets. The GLB blobs in
+      // `models/` are committed under `src/jsMain/resources/models/`, served
+      // verbatim by the Playwright dev server and copied into the Kotlin/JS
+      // `jsBrowserDistribution` output, so a relative `models/` path resolves
+      // identically for local runs, the deployed site, and the device-QA suite.
+      //
+      // Previously this pointed at jsDelivr's gh-proxy
+      // (`cdn.jsdelivr.net/gh/sceneview/sceneview@main/assets/models/glb/`),
+      // which returns HTTP 403 for the large GLB blobs under `assets/`. The
+      // initial-scene model never loaded, `initSceneView()` rejected, and the
+      // demo stayed stuck on its loading overlay — the deployed viewer and the
+      // whole Playwright device-QA suite were red (#1573, #1586).
+      var MODEL_BASE = 'models/';
       var SKETCHFAB_API = 'https://api.sketchfab.com/v3/search?type=models&downloadable=true';
 
-      // Curated CDN model catalog — categories with model file names
+      // Curated, self-hosted model catalog. Every `file` MUST exist under
+      // `src/jsMain/resources/models/` — `validate-demo-assets.sh` enforces
+      // this. Kept lean (12 GLBs, ~60 MB) so the demo distribution stays
+      // small; the Sketchfab Search source toggle covers the wider catalog.
       var CDN_MODELS = [
         { name: 'Damaged Helmet', file: 'khronos_damaged_helmet.glb', category: 'Showcase' },
-        { name: 'Sheen Chair', file: 'khronos_sheen_chair.glb', category: 'Showcase' },
-        { name: 'Iridescent Dish', file: 'khronos_iridescent_dish.glb', category: 'Showcase' },
-        { name: 'Dragon Attenuation', file: 'khronos_dragon_attenuation.glb', category: 'Showcase' },
-        { name: 'Sunglasses', file: 'khronos_sunglasses.glb', category: 'Showcase' },
-        { name: 'Material Variants Shoe', file: 'khronos_materials_variants_shoe.glb', category: 'Showcase' },
-        { name: 'Antique Camera', file: 'khronos_antique_camera.glb', category: 'Showcase' },
-        { name: 'Chronograph Watch', file: 'khronos_chronograph_watch.glb', category: 'Showcase' },
+        { name: 'Sheen Chair', file: 'sheen_chair.glb', category: 'Showcase' },
+        { name: 'Chronograph Watch', file: 'chronograph_watch.glb', category: 'Showcase' },
         { name: 'Ferrari F40', file: 'ferrari_f40.glb', category: 'Vehicles' },
-        { name: 'Porsche 911', file: 'porsche_911.glb', category: 'Vehicles' },
-        { name: 'Lamborghini Countach', file: 'lamborghini_countach.glb', category: 'Vehicles' },
-        { name: 'Tesla Cybertruck', file: 'tesla_cybertruck.glb', category: 'Vehicles' },
         { name: 'BMW M3 E30', file: 'bmw_m3_e30.glb', category: 'Vehicles' },
-        { name: 'Cyberpunk Car', file: 'cyberpunk_car.glb', category: 'Vehicles' },
-        { name: 'Shelby Cobra', file: 'shelby_cobra.glb', category: 'Vehicles' },
-        { name: 'Speeder Bike', file: 'speeder_bike.glb', category: 'Vehicles' },
-        { name: 'Animated T-Rex', file: 'animated_trex.glb', category: 'Animated' },
-        { name: 'Animated Astronaut', file: 'animated_astronaut.glb', category: 'Animated' },
         { name: 'Animated Butterfly', file: 'animated_butterfly.glb', category: 'Animated' },
-        { name: 'Animated Dog', file: 'animated_dog.glb', category: 'Animated' },
-        { name: 'Animated Cat', file: 'animated_cat.glb', category: 'Animated' },
-        { name: 'Animated Shark', file: 'animated_shark.glb', category: 'Animated' },
+        { name: 'Animated Dragon', file: 'animated_dragon.glb', category: 'Animated' },
         { name: 'Phoenix Bird', file: 'phoenix_bird.glb', category: 'Animated' },
-        { name: 'Khronos Fox', file: 'khronos_fox.glb', category: 'Characters' },
-        { name: 'Shiba', file: 'shiba.glb', category: 'Characters' },
-        { name: 'Koi Fish', file: 'koi_fish.glb', category: 'Characters' },
-        { name: 'Wall-E', file: 'wall_e.glb', category: 'Characters' },
         { name: 'Cyberpunk Character', file: 'cyberpunk_character.glb', category: 'Characters' },
-        { name: 'Robo Bun', file: 'robo_bun.glb', category: 'Characters' },
-        { name: 'Realistic Wolf', file: 'realistic_wolf.glb', category: 'Characters' },
-        { name: 'Coffee Cart', file: 'coffee_cart.glb', category: 'Objects' },
-        { name: 'Casio Keyboard', file: 'casio_keyboard.glb', category: 'Objects' },
-        { name: 'Nike Air Jordan', file: 'nike_air_jordan.glb', category: 'Objects' },
-        { name: 'PS5 DualSense', file: 'ps5_dualsense.glb', category: 'Objects' },
         { name: 'Game Boy Classic', file: 'game_boy_classic.glb', category: 'Objects' },
         { name: 'Nintendo Switch', file: 'nintendo_switch.glb', category: 'Objects' },
-        { name: 'Fantasy Book', file: 'fantasy_book.glb', category: 'Objects' },
-        { name: 'Trumpet', file: 'trumpet.glb', category: 'Objects' },
         { name: 'Retro Piano', file: 'retro_piano.glb', category: 'Objects' }
       ];
 
@@ -964,7 +954,7 @@
       function initSceneView(modelFile, modelName) {
         loadingModelName.textContent = modelName || modelFile;
 
-        var modelUrl = CDN_BASE + modelFile;
+        var modelUrl = MODEL_BASE + modelFile;
         SceneView.modelViewer('scene-canvas', modelUrl)
           .then(function(instance) {
             sceneViewInstance = instance;
@@ -1109,11 +1099,11 @@
             card.className = 'result-card';
             card.innerHTML = '<div class="result-info">' +
               '<div class="result-name">' + escapeHtml(m.name) + '</div>' +
-              '<div class="result-badge">CDN ' + m.file.split('.').pop().toUpperCase() + '</div>' +
+              '<div class="result-badge">' + m.file.split('.').pop().toUpperCase() + '</div>' +
               '</div>';
             card.addEventListener('click', function() {
               highlightCard(card);
-              loadModel(CDN_BASE + m.file, m.name);
+              loadModel(MODEL_BASE + m.file, m.name);
             });
             modelResults.appendChild(card);
           });
@@ -1561,7 +1551,7 @@
           sceneViewInstance.clearScene();
           geometryCount = 0;
           // Restore the default model so leaving the tab isn't a black screen.
-          loadModel(CDN_BASE + 'khronos_damaged_helmet.glb', 'Damaged Helmet');
+          loadModel(MODEL_BASE + 'khronos_damaged_helmet.glb', 'Damaged Helmet');
         }
       }
 

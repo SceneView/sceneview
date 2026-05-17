@@ -150,6 +150,16 @@ extract_refs() {
         grep -oE "\"[^\"\$\\\\<]*\.($ext_pattern)\"" "$file" 2>/dev/null |
             awk -v f="$file" '{ gsub(/"/, "", $0); printf "%s|%s\n", $0, f }' || true
 
+        # 1b. Single-quoted literals — JS/HTML commonly quote with `'…'`
+        #     (e.g. the web demo's `file: 'khronos_damaged_helmet.glb'`
+        #     catalog). Only .html/.js/.jsx so we don't mis-parse other langs.
+        case "$file" in
+            *.html|*.js|*.jsx)
+                grep -oE "'[^'\$\\\\<]*\.($ext_pattern)'" "$file" 2>/dev/null |
+                    awk -v f="$file" '{ gsub(/'"'"'/, "", $0); printf "%s|%s\n", $0, f }' || true
+                ;;
+        esac
+
         # 2. iOS Swift pattern — `asset: "name"` without extension. We emit the
         #    name with an implicit .usdz suffix so check_bundled_ref can find
         #    it in Models/. Only applied to .swift files to avoid false matches.
@@ -289,11 +299,17 @@ if [ "$platforms" = "all" ] || [ "$platforms" = "ios" ]; then
 fi
 
 if [ "$platforms" = "all" ] || [ "$platforms" = "web" ]; then
+    # The web demo self-hosts its curated GLB catalog + IBL under
+    # src/jsMain/resources/{models,environments}/ — that directory is both the
+    # Playwright dev-server root (playwright.config.ts: `http-server
+    # src/jsMain/resources`) and what Kotlin/JS copies into
+    # jsBrowserDistribution. check_bundled_ref also probes the models/ and
+    # environments/ sub-roots, so a bare `khronos_damaged_helmet.glb` resolves.
     process_platform_refs \
         "web-demo" \
         "samples/web-demo/src" \
-        "samples/web-demo/public" \
-        "glb|gltf|hdr"
+        "samples/web-demo/src/jsMain/resources" \
+        "glb|gltf|hdr|ktx"
 fi
 
 if [ "$platforms" = "all" ] || [ "$platforms" = "flutter" ]; then

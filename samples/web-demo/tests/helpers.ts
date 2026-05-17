@@ -80,45 +80,84 @@ export async function waitForEngineReady(page: Page): Promise<void> {
 }
 
 /**
- * Sample a 10x10 block of WebGL pixels at the centre of the scene canvas and
- * report whether any pixel is non-black.
+ * Sample the rendered scene canvas and report whether it shows real content.
  *
- * Headless WebGL on a software rasteriser (SwiftShader / ANGLE) can fail to
- * produce a readable framebuffer. `headlessGpuOk` distinguishes "canvas is
- * genuinely blank" from "this headless GPU cannot read pixels at all" so the
- * caller can soft-skip the assertion on unsupported runners instead of
- * reporting a false failure.
+ * IMPORTANT — why this screenshots instead of `gl.readPixels`:
+ * Filament.js creates its WebGL context with `preserveDrawingBuffer: false`
+ * (the default). Once a frame is presented to the compositor the default
+ * framebuffer is undefined, so a later `gl.readPixels` on that context
+ * returns all-zero pixels EVEN WHEN the canvas is visibly rendering. That
+ * produced false "Canvas appears blank" failures across the catalog suite
+ * while the demo was rendering perfectly (#1586). The browser compositor, on
+ * the other hand, captures the buffer at the correct point — so a Playwright
+ * element screenshot is the reliable signal.
+ *
+ * `headlessGpuOk` stays in the return shape for callers that soft-skip on
+ * GPU-less runners; it is `false` only when the canvas itself is missing /
+ * zero-sized (a genuine "cannot sample" state), `true` otherwise.
  */
 export async function sampleCanvas(
   page: Page,
 ): Promise<{ hasContent: boolean; headlessGpuOk: boolean }> {
-  return page.evaluate(() => {
-    const canvas = document.getElementById('scene-canvas') as HTMLCanvasElement | null;
-    if (!canvas || canvas.width === 0 || canvas.height === 0) {
-      return { hasContent: false, headlessGpuOk: false };
-    }
-    const gl =
-      (canvas.getContext('webgl2') as WebGL2RenderingContext | null) ||
-      (canvas.getContext('webgl') as WebGLRenderingContext | null);
-    if (!gl) {
-      return { hasContent: false, headlessGpuOk: false };
-    }
-    const pixels = new Uint8Array(4 * 100);
-    gl.readPixels(
-      Math.max(0, Math.floor(canvas.width / 2) - 5),
-      Math.max(0, Math.floor(canvas.height / 2) - 5),
-      10,
-      10,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      pixels,
-    );
-    let nonZero = 0;
-    for (let i = 0; i < pixels.length; i += 4) {
-      if (pixels[i] > 5 || pixels[i + 1] > 5 || pixels[i + 2] > 5) nonZero++;
-    }
-    return { hasContent: nonZero > 0, headlessGpuOk: true };
+  const canvas = page.locator('#scene-canvas');
+  if ((await canvas.count()) === 0) {
+    return { hasContent: false, headlessGpuOk: false };
+  }
+  const box = await canvas.boundingBox();
+  if (!box || box.width === 0 || box.height === 0) {
+    return { hasContent: false, headlessGpuOk: false };
+  }
+
+  // Screenshot a block at the centre of the canvas — that is where the framed
+  // model / pendulum / geometry sits — as a lossless PNG, then decode it back
+  // to pixels inside the browser (an <img> + 2D canvas natively decodes PNG;
+  // this never touches the WebGL context so the `preserveDrawingBuffer`
+  // problem above does not apply).
+  const side = 200;
+  const png = await page.screenshot({
+    type: 'png',
+    clip: {
+      x: box.x + box.width / 2 - side / 2,
+      y: box.y + box.height / 2 - side / 2,
+      width: side,
+      height: side,
+    },
   });
+  const dataUri = 'data:image/png;base64,' + png.toString('base64');
+
+  // A blank / uniform region has near-zero luminance variance; a rendered
+  // scene (model shading, the pendulum links, geometry edges) shows a wide
+  // spread of luminance values. Variance is robust to the demo's dark theme.
+  return page.evaluate(async (uri: string) => {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('decode failed'));
+      img.src = uri;
+    });
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext('2d');
+    if (!ctx) return { hasContent: false, headlessGpuOk: false };
+    ctx.drawImage(img, 0, 0);
+    const { data } = ctx.getImageData(0, 0, c.width, c.height);
+    let sum = 0;
+    let sumSq = 0;
+    let n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      // Rec. 601 luma.
+      const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      sum += y;
+      sumSq += y * y;
+      n++;
+    }
+    const mean = sum / n;
+    const variance = sumSq / n - mean * mean;
+    // A flat dark block has variance < ~20; a rendered model is in the
+    // hundreds-to-thousands. 64 is a wide safety margin either side.
+    return { hasContent: variance > 64, headlessGpuOk: true };
+  }, dataUri);
 }
 
 /**
