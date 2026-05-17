@@ -2058,7 +2058,7 @@
     scene.addEntity(back);
 
     // --- IBL: load real KTX if available, fallback to synthetic SH ---
-    var iblUrl = options.iblUrl || '/environments/neutral_ibl.ktx';
+    var iblUrl = options.iblUrl || 'environments/neutral_ibl.ktx';
     fetch(iblUrl)
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);

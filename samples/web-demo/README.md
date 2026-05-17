@@ -68,8 +68,9 @@ Open `src/jsMain/resources/index.html` directly in a browser, or:
   gh-proxy returns HTTP 403 for large GLB blobs under `assets/`, which is why
   the catalog is self-hosted (issue #1573).
 - IBL environment: `src/jsMain/resources/environments/neutral_ibl.ktx`,
-  self-hosted so `SceneView.js` finds it via the `/environments/` path with no
-  404 (issue #1586).
+  self-hosted so `SceneView.js` finds it via the relative `environments/` path
+  with no 404 — works on both domain-root and subpath deploys (issues #1586,
+  #1631).
 - `src/jsMain/kotlin/.../web/Main.kt` is an alternative Kotlin/JS entry point
   built against the `sceneview-web` module; the shipped page uses the inline JS.
 
