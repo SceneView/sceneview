@@ -117,6 +117,35 @@ log() { echo "[setup-ar] $*"; }
 [[ -x "$ADB_BIN" ]] || { log "missing adb at $ADB_BIN"; exit 1; }
 [[ -x "$AVDMANAGER_BIN" ]] || { log "missing avdmanager at $AVDMANAGER_BIN"; exit 1; }
 
+# --- step 1b: emulator-version guard ------------------------------------------
+# Android Emulator 36.x REGRESSED `adb shell screenrecord`: it no longer
+# captures host-GPU-composited frames, so a Filament 3D scene records as a
+# near-empty ~0.5 fps mp4 (verified: 36.5.11 -> 23 frames / 48 s; 35.6.11 ->
+# 2541 frames). That silently breaks every QA screen recording while leaving
+# the demo itself running fine — the worst kind of regression. 35.6.11 is the
+# last version where screenrecord captures GPU content correctly, so the
+# SceneView QA emulator is pinned there. If `sdkmanager` has since pulled a
+# 36+ emulator, warn loudly with the one-shot re-pin recipe.
+KNOWN_GOOD_EMULATOR_BUILD=13610412   # emulator 35.6.11
+check_emulator_version() {
+  local ver major
+  ver="$("$EMULATOR_BIN" -version 2>/dev/null | sed -nE 's/.*version ([0-9]+)\..*/\1/p' | head -1)"
+  major="${ver:-0}"
+  if [[ "$major" -ge 36 ]]; then
+    log "WARNING ────────────────────────────────────────────────────────────"
+    log "  Emulator major version $major detected. Emulator 36.x breaks"
+    log "  'adb shell screenrecord' capture of host-GPU content — SceneView QA"
+    log "  recordings will be near-empty. Re-pin to 35.6.11 (build"
+    log "  $KNOWN_GOOD_EMULATOR_BUILD), after killing any running emulator:"
+    log "    curl -fsSL -o /tmp/emu.zip \\"
+    log "      https://dl.google.com/android/repository/emulator-darwin_aarch64-${KNOWN_GOOD_EMULATOR_BUILD}.zip"
+    log "    rm -rf '$SDK_ROOT/emulator' && unzip -q /tmp/emu.zip -d '$SDK_ROOT'"
+    log "  (use emulator-linux_x64-${KNOWN_GOOD_EMULATOR_BUILD}.zip on Linux.)"
+    log "─────────────────────────────────────────────────────────────────────"
+  fi
+}
+check_emulator_version
+
 # --- step 2: verify system image is installed ---------------------------------
 SYS_IMAGE_DIR="$SDK_ROOT/system-images/android-36/google_apis_playstore/$IMG_ARCH"
 if [[ ! -d "$SYS_IMAGE_DIR" ]]; then
