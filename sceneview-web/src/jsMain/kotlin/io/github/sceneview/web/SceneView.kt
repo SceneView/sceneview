@@ -137,6 +137,20 @@ class SceneView private constructor(
          * Filament.js represents a mat4 as a flat 16-element `number[]`.
          */
         var baseTransform: dynamic = null
+
+        /**
+         * `true` once this model's [asset] has been destroyed — either
+         * replaced by a 2nd `loadModel` of the same URL, or torn down by
+         * [destroy]. Set the instant the asset is freed so the still-pending
+         * `loadResources(onDone=...)` callback can detect it: a stale `onDone`
+         * for a superseded model must become a safe no-op and never touch the
+         * freed `FilamentAsset` (`releaseSourceData()`), never flip [loaded],
+         * and never re-arm the auto-center gate. Without this guard a quick
+         * `loadModel(url)` → `loadModel(url)` (or `destroy()`) before the
+         * first load's resources finish is a use-after-free on the WASM
+         * heap (#1597 Tier-2 review).
+         */
+        var superseded: Boolean = false
     }
 
     /** Orbit camera controller -- initialized when cameraControls is enabled. */
@@ -340,8 +354,15 @@ class SceneView private constructor(
                 // tracker's destroyer also removes the old entities from the
                 // scene. Drop the stale LoadedModel from `models` here too so
                 // the render loop / auto-center pass never touch a freed asset.
+                //
+                // #1597 (Tier-2): the prior model's `loadResources` may still
+                // be in flight — flag it `superseded` so its pending `onDone`
+                // becomes a no-op instead of touching the asset we destroy
+                // below via `replaceWith` (use-after-free on the WASM heap).
                 loadedAssets.current(url)?.let { prior ->
-                    models.removeAll { it.asset == prior }
+                    models.removeAll { stale ->
+                        (stale.asset == prior).also { if (it) stale.superseded = true }
+                    }
                 }
 
                 // Add all entities to the scene so they become visible
@@ -371,6 +392,20 @@ class SceneView private constructor(
                 // This is REQUIRED for models to render with correct materials.
                 asset.loadResources(
                     onDone = {
+                        // #1597 (Tier-2): if a 2nd loadModel of this URL — or
+                        // destroy() — replaced/freed `asset` before its
+                        // resources finished, this callback is stale. Bail out
+                        // before touching the freed FilamentAsset: no
+                        // releaseSourceData() on a dead handle, no `loaded`
+                        // flip, no gate reset, no onLoaded for a model that is
+                        // no longer in the scene.
+                        if (loadedModel.superseded) {
+                            console.log(
+                                "SceneView: dropped stale loadResources for $url " +
+                                    "(asset superseded before resources finished)",
+                            )
+                            return@loadResources
+                        }
                         // Release the source glTF data now that resources are loaded
                         asset.releaseSourceData()
                         // #1597: only now is getBoundingBox() readable — mark the
@@ -521,6 +556,12 @@ class SceneView private constructor(
                 // Even for self-contained GLBs (no external resources), this step is required.
                 asset.loadResources(
                     onDone = {
+                        // #1597 (Tier-2): destroy() can free this geometry
+                        // asset before its buffers finish uploading — guard
+                        // the stale callback so it never touches a dead
+                        // FilamentAsset. (Geometry has a unique key so it is
+                        // never replaced, but teardown still races it.)
+                        if (loadedModel.superseded) return@loadResources
                         asset.releaseSourceData()
                         // #1597: getBoundingBox() is only readable post-load —
                         // mark loaded so the auto-center pass includes it.
@@ -722,6 +763,12 @@ class SceneView private constructor(
     fun destroy() {
         stopRendering()
         cameraController?.dispose()
+
+        // #1597 (Tier-2): mark every model superseded BEFORE releasing its
+        // asset so any in-flight loadResources callback that fires after
+        // teardown is a no-op instead of a use-after-free on a freed
+        // FilamentAsset.
+        models.forEach { it.superseded = true }
 
         // Destroy every loaded gltfio asset (#1597). The tracker is the single
         // owner of all live FilamentAssets — URL models and geometry alike —
