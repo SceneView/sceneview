@@ -11,34 +11,40 @@
 #   2. Patches its config.ini for ARCore: 4 GB RAM, virtualscene back camera,
 #      emulated front camera (front cam is needed for Augmented Faces demos),
 #      host GPU mode.
-#   3. Boots the emulator headless — RAM-aware and parallel-session-safe (#1647):
-#      reuses an already-running emulator, checks free host RAM before a fresh
-#      boot, scales the `-memory` flag to RAM headroom, and cooperates with
-#      concurrent sessions via an advisory lock so only ONE emulator ever runs.
+#   3. Boots the emulator headless — RAM-budgeted adaptive pool (#1647 → #1654):
+#      leases a free already-running emulator, or — if the live RAM-budgeted
+#      pool cap has room and free RAM clears the hard safety gate — boots a new
+#      one on a distinct `-port`, or waits (bounded) for a lease to free. Guest
+#      `-memory` is scaled to RAM headroom. The pool never exceeds what live
+#      host RAM safely allows; the floor is always 1.
 #   4. Waits for `sys.boot_completed`.
 #   5. Verifies Google Play Services for AR (com.google.ar.core) is installed;
 #      if not, opens the Play Store to the listing (one-time manual click).
 #
 # Flags:
 #   --check   Read-only inspection: prints current AVD config + ARCore state +
-#             host RAM / running-emulator status. No mutation.
+#             pool state (running emulator count, RAM-budgeted cap, free RAM,
+#             active leases). No mutation.
 #   --clean   Wipe the AVD's userdata and recreate config from scratch.
 #   --no-boot Skip the emulator boot (useful in CI where boot is deferred).
 #   -h|--help Show this help.
 #
-# Idempotent: re-running with no flag will skip work that's already done. Re-uses an
-# already-booted emulator on the standard adb port. Stops nothing — caller closes the
+# Idempotent: re-running with no flag will skip work that's already done. Leases a
+# free already-running emulator when one exists. Stops nothing — caller closes the
 # emulator (or it stays warm for follow-up scripts).
 #
-# Single-emulator guarantee (#1647): this script never boots a second emulator
-# when one is already up, and two concurrent sessions cooperate via the advisory
-# lock in lib/emulator-select.sh — the first boots, the rest reuse.
+# Adaptive pool (#1647 → #1654): this script does NOT enforce a single emulator.
+# It leases a free running emulator if one exists; otherwise, only when the live
+# RAM-budgeted pool cap has room AND free RAM clears the hard safety gate, it
+# boots a new emulator on a distinct `-port`; otherwise it waits for a lease to
+# free. The pool never exceeds what host RAM safely allows; the floor is 1.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# RAM-aware single-emulator selection helpers (#1647): RAM monitoring, running-
-# emulator reuse detection, RAM-scaled `-memory`, advisory parallel-session lock.
+# RAM-budgeted adaptive emulator pool (#1647 → #1654): RAM monitoring, pool-cap
+# computation, per-emulator lease registry, RAM-scaled `-memory`, multi-port
+# boot, stale-lease reclaim.
 # shellcheck source=lib/emulator-select.sh
 source "$SCRIPT_DIR/lib/emulator-select.sh"
 
@@ -168,22 +174,25 @@ show_config() {
   grep -E "^(PlayStore|hw\.camera|hw\.gpu|hw\.ramSize|vm\.heapSize|hw\.gps|image\.sysdir)" "$AVD_CONFIG" | sed 's/^/  /'
 }
 
-# Report host RAM + running-emulator state (#1647). Used by --check and before
-# every boot decision.
+# Report pool state (#1654). Used by --check and before every boot decision:
+# running emulator count, the live RAM-budgeted cap, free RAM, active leases.
 show_ram_and_emulator_status() {
-  local total free running
-  total="$(emu_host_total_ram_mb)"
-  free="$(emu_host_free_ram_mb)"
-  log "host RAM: ${free} MB free / ${total} MB total (boot threshold ${EMU_MIN_FREE_RAM_MB} MB)"
-  if running="$(emu_running_serial "$ADB_BIN")"; then
-    log "running emulator detected: $running — would REUSE it (no second boot)"
+  emu_pool_reclaim_stale "$ADB_BIN"
+  emu_pool_status "$ADB_BIN"
+  local running cap
+  running="$(emu_count_running "$ADB_BIN")"
+  cap="$(emu_pool_cap)"
+  local free_serial
+  if free_serial="$(emu_lease_free_serial "$ADB_BIN")"; then
+    log "an unleased running emulator is available ($free_serial) — would LEASE it (no boot)"
+  elif [[ "$running" -ge "$cap" ]]; then
+    log "pool is at its RAM-budgeted cap (running ${running} >= cap ${cap}) — would WAIT for a lease to free"
+  elif emu_ram_allows_boot >/dev/null 2>&1; then
+    log "pool has room (running ${running} < cap ${cap}) and free RAM clears the boot gate"
+    log "would boot a new emulator on -port $(emu_next_free_port "$ADB_BIN") with -memory $(emu_recommended_memory_mb) MB"
   else
-    log "no emulator currently running"
-    if emu_ram_allows_boot >/dev/null 2>&1; then
-      log "RAM OK for a fresh boot — would launch with -memory $(emu_recommended_memory_mb) MB"
-    else
-      log "RAM too tight — a fresh boot would be REFUSED"
-    fi
+    log "pool has a free slot (running ${running} < cap ${cap}) but live free RAM is below the ${EMU_MIN_FREE_RAM_MB} MB gate"
+    log "memory safety wins — would WAIT for a running emulator's lease to free instead of booting"
   fi
 }
 
@@ -195,63 +204,37 @@ else
   show_config
 fi
 
-# --- step 5: boot the emulator ------------------------------------------------
-# RAM-aware, single-emulator, parallel-session-safe (#1647). The decision flow:
-#   1. Already an emulator running?  -> REUSE it, no boot, no lock needed.
-#   2. Otherwise acquire the advisory lock so two sessions cooperate.
-#   3. Re-check inside the lock (a peer may have booted while we waited) -> REUSE.
-#   4. Gate on free host RAM; refuse a fresh boot on a RAM-starved host.
-#   5. Boot with a `-memory` value scaled to current RAM headroom.
+# --- step 5: lease or boot a pool emulator ------------------------------------
+# RAM-budgeted adaptive pool (#1647 → #1654). The decision flow:
+#   1. An unleased running emulator?  -> LEASE it, no boot.
+#   2. Pool cap has room AND free RAM clears the hard gate?  -> boot a new
+#      emulator on a distinct `-port` and lease it.
+#   3. Otherwise the pool is at its RAM-budgeted cap  -> WAIT (bounded) for a
+#      lease to free, then lease that emulator.
+# The leased serial is exported as EMU_SERIAL for the rest of the script and
+# any downstream QA caller.
 
-emulator_is_running() {
-  emu_running_serial "$ADB_BIN" >/dev/null 2>&1
-}
+# EMU_SERIAL holds the serial this run is responsible for. Lease bookkeeping is
+# keyed by pid inside emulator-select.sh, so there is no separate state to track.
+EMU_SERIAL=""
 
-# Release the advisory lock on exit no matter how the script ends. emu_lock_release
-# is a no-op unless THIS process owns the lock, so it is safe even when we reused.
-trap 'emu_lock_release' EXIT
+# Release every lease this process owns on exit, no matter how the script ends.
+# emu_lease_release_all is a no-op for serials owned by other sessions.
+trap 'emu_lease_release_all' EXIT
 
-boot_emulator() {
-  # Step 1: reuse a running emulator outright — never boot a second one.
-  if emulator_is_running; then
-    log "emulator already running ($(emu_running_serial "$ADB_BIN")) — re-using, no boot"
-    return 0
-  fi
-
-  # Step 2: cooperate with concurrent sessions. The first to acquire the lock
-  # boots; peers wait, then find the running emulator in step 3 and reuse it.
-  if ! emu_lock_acquire "${EMU_LOCK_TIMEOUT:-300}"; then
-    # Lock wait timed out — last-chance reuse check before giving up.
-    if emulator_is_running; then
-      log "lock timed out but an emulator is up — re-using $(emu_running_serial "$ADB_BIN")"
-      return 0
-    fi
-    log "could not acquire the emulator lock and no emulator is running — aborting boot"
-    return 1
-  fi
-
-  # Step 3: re-check under the lock — a peer may have booted while we waited.
-  if emulator_is_running; then
-    log "another session booted the emulator ($(emu_running_serial "$ADB_BIN")) — re-using"
-    return 0
-  fi
-
-  # Step 4: RAM gate. Booting into a RAM-starved host is what causes the boot
-  # failures this fix targets (#1647), so refuse rather than crash mid-boot.
-  if ! emu_ram_allows_boot; then
-    log "ABORT: insufficient free host RAM to boot a fresh emulator safely"
-    log "       reuse a running emulator, close other apps, or lower EMU_MIN_FREE_RAM_MB"
-    return 1
-  fi
-
-  # Step 5: boot with a RAM-scaled `-memory`. The AVD config pins hw.ramSize,
-  # but `-memory` at launch wins and lets us right-size to the live host.
+# boot_new_emulator <port> — boot a fresh emulator on a distinct console port so
+# it coexists with pool peers. Echoes nothing; the serial is `emulator-<port>`.
+boot_new_emulator() {
+  local port="$1"
   local mem; mem="$(emu_recommended_memory_mb)"
-  log "starting emulator $AVD_NAME (headless, no snapshot, -memory ${mem} MB)"
-  # Use nohup + & so the emulator survives this script. Redirect to a log so we
-  # can debug a failed boot without spinning up an interactive console.
-  local emu_log="/tmp/sceneview-emulator-$AVD_NAME.log"
+  log "booting a new pool emulator $AVD_NAME on -port ${port} (headless, no snapshot, -memory ${mem} MB)"
+  # `-read-only` lets multiple emulators share the one AVD's disk images without
+  # clobbering each other's userdata; `-port` gives each a distinct serial.
+  # nohup + & so the emulator survives this script; per-port log for debugging.
+  local emu_log="/tmp/sceneview-emulator-${AVD_NAME}-${port}.log"
   nohup "$EMULATOR_BIN" -avd "$AVD_NAME" \
+    -port "$port" \
+    -read-only \
     -gpu host \
     -memory "$mem" \
     -no-snapshot-load \
@@ -259,21 +242,76 @@ boot_emulator() {
     -no-boot-anim \
     -netdelay none -netspeed full \
     >"$emu_log" 2>&1 &
-  log "emulator pid=$! log=$emu_log"
+  log "emulator pid=$! serial=emulator-${port} log=$emu_log"
+}
+
+select_or_boot_emulator() {
+  # Reclaim any leases left behind by crashed sessions before we decide.
+  emu_pool_reclaim_stale "$ADB_BIN"
+
+  # Step 1: lease a free already-running emulator if one exists.
+  local free_serial
+  if free_serial="$(emu_lease_free_serial "$ADB_BIN")"; then
+    if emu_lease_acquire "$free_serial"; then
+      log "leased already-running emulator $free_serial — no boot"
+      EMU_SERIAL="$free_serial"
+      return 0
+    fi
+    # Lost the lease race — fall through and re-evaluate.
+  fi
+
+  # Step 2: pool cap has room? Boot a new emulator on a distinct port.
+  local running cap
+  running="$(emu_count_running "$ADB_BIN")"
+  cap="$(emu_pool_cap)"
+  if [[ "$running" -lt "$cap" ]]; then
+    # HARD memory-safety re-gate: re-read free RAM immediately before booting.
+    # The cap is an estimate; this live check is the invariant that keeps the
+    # host off the OOM cliff. Refuse the boot if RAM is below the threshold.
+    if emu_ram_allows_boot; then
+      local port; port="$(emu_next_free_port "$ADB_BIN")"
+      local serial="emulator-${port}"
+      boot_new_emulator "$port"
+      # Lease the slot immediately so a racing peer counts us against the cap.
+      emu_lease_acquire "$serial" || true
+      EMU_SERIAL="$serial"
+      return 0
+    fi
+    log "pool cap has room (running ${running} < cap ${cap}) but live free RAM is below ${EMU_MIN_FREE_RAM_MB} MB"
+    log "memory safety wins — will WAIT for a running emulator's lease to free instead of booting"
+  else
+    log "pool is at its RAM-budgeted cap (running ${running}, cap ${cap}) — waiting for a lease to free"
+  fi
+
+  # Step 3: pool full (by cap or by the live RAM gate). Wait for a lease to free.
+  local waited_serial
+  if waited_serial="$(emu_lease_wait_for_free "$ADB_BIN" "${EMU_LEASE_WAIT_TIMEOUT:-300}")"; then
+    if emu_lease_acquire "$waited_serial"; then
+      log "leased emulator $waited_serial after waiting for the pool"
+      EMU_SERIAL="$waited_serial"
+      return 0
+    fi
+  fi
+  log "could not lease or boot a pool emulator — pool is full and no lease freed in time"
+  return 1
 }
 
 wait_for_boot() {
-  log "waiting for boot complete (up to 180s)"
-  local serial
-  # Poll for first emulator-* device showing up
-  for _ in $(seq 1 60); do
-    serial="$("$ADB_BIN" devices | awk '/^emulator-[0-9]+/ && $2=="device" {print $1; exit}')"
-    [[ -n "$serial" ]] && break
-    sleep 2
-  done
-  if [[ -z "$serial" ]]; then
-    log "no emulator-* device appeared after 120s — boot failed"
-    return 1
+  # When we leased an already-running emulator, EMU_SERIAL is already booted.
+  local serial="$EMU_SERIAL"
+  if [[ -n "$serial" ]] && emu_serial_alive "$serial" "$ADB_BIN"; then
+    log "leased emulator $serial already online"
+  else
+    log "waiting for $serial to come online (up to 180s)"
+    local i=0
+    while ! emu_serial_alive "$serial" "$ADB_BIN"; do
+      i=$((i+1))
+      if [[ $i -gt 90 ]]; then
+        log "$serial did not appear after 180s — boot failed"
+        return 1
+      fi
+      sleep 2
+    done
   fi
   log "device $serial online, waiting for sys.boot_completed"
   "$ADB_BIN" -s "$serial" wait-for-device
@@ -288,17 +326,24 @@ wait_for_boot() {
   done
   log "boot complete on $serial"
   export EMU_SERIAL="$serial"
+  # Publish the leased serial to a file as a fallback for a parent QA
+  # orchestrator. The primary channel is the `EMU_SERIAL=<serial>` stdout line
+  # emitted in step 8. This script's own lease is dropped by the EXIT trap; the
+  # parent re-acquires it for the QA run.
+  _emu_lease_dir_init
+  echo "$serial" > "$EMU_LEASE_DIR/last-booted.serial" 2>/dev/null || true
 }
 
 if ! $CHECK_ONLY && ! $NO_BOOT; then
-  # boot_emulator returns non-zero when it reused nothing AND refused a fresh
-  # boot (RAM too tight, or the lock could not be acquired). In that case there
-  # is no emulator to wait for — fail fast with a clear exit so the device-QA
-  # orchestrator records a `skipped`/`failed` leg instead of hanging.
-  if boot_emulator; then
+  # select_or_boot_emulator returns non-zero only when the pool is full AND no
+  # lease freed within the bounded wait (or RAM stayed too tight to boot). In
+  # that case there is no emulator to wait for — fail fast with a clear exit so
+  # the device-QA orchestrator records a `skipped`/`failed` leg instead of
+  # hanging. The leased serial is exported as EMU_SERIAL for downstream callers.
+  if select_or_boot_emulator; then
     wait_for_boot
   else
-    log "emulator boot was refused — see the reason above"
+    log "could not obtain a pool emulator — see the reason above"
     exit 1
   fi
 fi
@@ -341,6 +386,8 @@ else:
   }
 }
 
+# Target the leased serial (EMU_SERIAL) — never a hardcoded one. With an
+# adaptive pool several emulators may be up; we must verify ARCore on ours.
 serial="${EMU_SERIAL:-$("$ADB_BIN" devices | awk '/^emulator-[0-9]+/ && $2=="device" {print $1; exit}')}"
 if [[ -n "$serial" ]]; then
   if "$ADB_BIN" -s "$serial" shell pm list packages 2>/dev/null | grep -q "com.google.ar.core"; then
@@ -364,11 +411,18 @@ if $STOP_AFTER && ! $CHECK_ONLY && [[ -n "$serial" ]]; then
 fi
 
 # --- step 8: summary ----------------------------------------------------------
+# Emit the leased serial on stdout (machine-readable, last line) so a parent
+# orchestrator capturing this script's stdout gets the exact pool emulator it
+# obtained, without racing on the shared last-booted.serial file.
+if ! $CHECK_ONLY && [[ -n "${serial:-}" ]]; then
+  echo "EMU_SERIAL=${serial}"
+fi
 log "done."
 if $STOP_AFTER; then
   log "emulator stopped. Re-run without --stop to leave it warm for QA."
 else
-  log "emulator left running for QA. next steps:"
+  log "emulator left running for QA on serial ${serial:-emulator-5554}. next steps:"
+  log "  export ANDROID_SERIAL=${serial:-emulator-5554}   # pin QA to the leased emulator"
   log "  source .claude/scripts/lib/android-cli.sh && android_cli_ensure"
   log "  android run --apks <apk> --activity io.github.sceneview.demo/.MainActivity"
   log "  stop it with: $ADB_BIN -s ${serial:-emulator-5554} emu kill"

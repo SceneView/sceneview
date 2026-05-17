@@ -21,6 +21,11 @@
 #                    e.g. `--flow lighting` → .maestro/android/lighting.yaml.
 #                    Defaults to `catalog` (all 42 demos).
 #   -h | --help      Show this help.
+#
+# Pool-aware (#1654): with the RAM-budgeted adaptive emulator pool, several
+# emulators may be running. Set ANDROID_SERIAL to pin the QA run to a specific
+# leased emulator — device-qa.sh does this for its android leg. When unset, the
+# first running emulator is used and ANDROID_SERIAL is exported to pin it.
 
 set -euo pipefail
 
@@ -36,8 +41,8 @@ cd "$REPO_ROOT"
 source "$SCRIPT_DIR/lib/maestro.sh"
 # shellcheck source=lib/android-cli.sh
 source "$SCRIPT_DIR/lib/android-cli.sh"
-# RAM-aware single-emulator selection helpers (#1647) — used to detect and
-# report a reusable running emulator rather than implying a second boot.
+# RAM-budgeted adaptive emulator pool helpers (#1647 → #1654) — used to detect a
+# leasable running emulator and to target the leased serial via ANDROID_SERIAL.
 # shellcheck source=lib/emulator-select.sh
 source "$SCRIPT_DIR/lib/emulator-select.sh"
 
@@ -68,13 +73,27 @@ if [[ ! -f "$FLOW_FILE" ]]; then
 fi
 
 # --- Emulator check --------------------------------------------------------
-# Single shared emulator (#1647): if one is already running we reuse it; this
-# script never boots its own. Booting (RAM-gated, parallel-session-safe via an
-# advisory lock) is delegated to setup-ar-emulator.sh.
-if reuse_serial="$(emu_running_serial adb)"; then
-  echo "[qa] reusing already-running emulator: $reuse_serial"
+# Adaptive emulator pool (#1647 → #1654). This script never boots its own
+# emulator — leasing/booting a pool member (RAM-gated, multi-port) is delegated
+# to setup-ar-emulator.sh / the device-qa.sh orchestrator.
+#   - If ANDROID_SERIAL is set (device-qa.sh leased a pool emulator for us),
+#     target THAT serial — every adb / android-CLI / Maestro call below honours
+#     ANDROID_SERIAL, so the QA run stays pinned to the leased emulator even
+#     when several emulators are up in the pool.
+#   - Otherwise pick a single running emulator (standalone invocation).
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  if ! emu_serial_alive "$ANDROID_SERIAL" adb; then
+    echo "[qa] ERROR: ANDROID_SERIAL=$ANDROID_SERIAL is not a running emulator." >&2
+    exit 1
+  fi
+  echo "[qa] targeting leased pool emulator: $ANDROID_SERIAL"
+elif reuse_serial="$(emu_running_serial adb)"; then
+  echo "[qa] using running emulator: $reuse_serial"
+  # Pin downstream adb / android-CLI / Maestro to this serial so a peer pool
+  # emulator booting mid-run can never steal the QA target.
+  export ANDROID_SERIAL="$reuse_serial"
 elif ! adb get-state >/dev/null 2>&1; then
-  echo "[qa] ERROR: no Android device. Boot one first (RAM-aware, lock-guarded):" >&2
+  echo "[qa] ERROR: no Android device. Boot one first (RAM-budgeted pool):" >&2
   echo "[qa]   bash .claude/scripts/setup-ar-emulator.sh" >&2
   exit 1
 fi

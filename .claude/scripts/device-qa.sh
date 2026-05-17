@@ -67,11 +67,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
-# RAM-aware single-emulator selection helpers (#1647). The android and ar legs
-# share ONE emulator: whichever leg runs first boots it (RAM-gated, lock-guarded
-# inside setup-ar-emulator.sh) and the next leg reuses it.
+# RAM-budgeted adaptive emulator pool helpers (#1647 → #1654). The android and
+# ar legs lease an emulator from the pool: whichever leg runs first leases a
+# free running one (or boots a new pool member, RAM-gated, inside
+# setup-ar-emulator.sh) and the next leg leases its own — as many emulators as
+# live host RAM safely allows, floor 1.
 # shellcheck source=lib/emulator-select.sh
 source "$SCRIPT_DIR/lib/emulator-select.sh"
+
+# Release every emulator lease this orchestrator owns when it exits.
+trap 'emu_lease_release_all' EXIT
 
 # --- Flags -----------------------------------------------------------------
 PLATFORM="all"
@@ -180,10 +185,53 @@ record() {
   log "$1 -> $2 ${3:+($3)}"
 }
 
+# --- Pool emulator acquisition ---------------------------------------------
+# acquire_pool_emulator — lease an emulator from the RAM-budgeted adaptive pool
+# (#1654) for the android / ar legs. Strategy:
+#   1. Lease a free already-running emulator if one exists.
+#   2. Else delegate to setup-ar-emulator.sh, which leases or boots a new pool
+#      member (RAM-gated, multi-port) and publishes its serial; re-lease it
+#      here so the lease outlives that subprocess.
+# Echoes the leased serial on stdout; returns 1 if no emulator could be obtained.
+acquire_pool_emulator() {
+  emu_pool_reclaim_stale adb
+  local serial
+  # Step 1: lease a free running emulator outright.
+  if serial="$(emu_lease_free_serial adb)" && emu_lease_acquire "$serial"; then
+    echo "$serial"
+    return 0
+  fi
+  # Step 2: setup-ar-emulator.sh leases or boots a pool member, RAM-gated. It
+  # prints `EMU_SERIAL=<serial>` as its last stdout line — capture that to learn
+  # exactly which pool emulator it obtained (no race on a shared file). Its log
+  # lines are surfaced to our stderr so the run stays visible.
+  local setup_out setup_rc=0
+  setup_out="$(bash "$SCRIPT_DIR/setup-ar-emulator.sh" 2>&1)" || setup_rc=$?
+  printf '%s\n' "$setup_out" | grep -v '^EMU_SERIAL=' >&2 || true
+  if [[ "$setup_rc" -ne 0 ]]; then
+    return 1
+  fi
+  serial="$(printf '%s\n' "$setup_out" | sed -n 's/^EMU_SERIAL=//p' | tail -n1)"
+  # Fallbacks: the published-serial file, then the first running emulator.
+  if [[ -z "${serial:-}" ]] && [[ -f "$EMU_LEASE_DIR/last-booted.serial" ]]; then
+    serial="$(cat "$EMU_LEASE_DIR/last-booted.serial" 2>/dev/null || true)"
+  fi
+  if [[ -z "${serial:-}" ]] || ! emu_serial_alive "$serial" adb; then
+    serial="$(emu_running_serial adb || true)"
+  fi
+  [[ -n "${serial:-}" ]] || return 1
+  # Re-lease under this orchestrator's pid (setup-ar-emulator.sh dropped its own
+  # lease in its EXIT trap). Best-effort: even if a peer grabbed the lease, the
+  # emulator is up and we still target it via ANDROID_SERIAL.
+  emu_lease_acquire "$serial" || true
+  echo "$serial"
+  return 0
+}
+
 # --- Android leg -----------------------------------------------------------
 run_android() {
   local started; started=$(date +%s)
-  local reused_serial=""
+  local serial=""
   log "=== Android leg ==="
 
   if ! command -v adb >/dev/null 2>&1; then
@@ -191,21 +239,19 @@ run_android() {
     return 0
   fi
 
-  # Single shared emulator (#1647). If one is already up (this session, a peer
-  # session, or the previous leg), REUSE it — never boot a second. Otherwise
-  # setup-ar-emulator.sh boots one: it is RAM-gated and lock-guarded, so a
-  # RAM-starved host or a racing peer is handled cleanly inside that script.
-  if reused_serial="$(emu_running_serial adb)"; then
-    log "reusing already-running emulator: $reused_serial (no boot)"
-  else
-    log "no Android device — booting emulator via setup-ar-emulator.sh (RAM-aware, lock-guarded)"
-    if ! bash "$SCRIPT_DIR/setup-ar-emulator.sh" >/dev/null 2>&1; then
-      record android skipped "could not boot an Android emulator (RAM too tight or lock contention)" "" "$(( $(date +%s) - started ))"
-      return 0
-    fi
+  # Lease an emulator from the RAM-budgeted adaptive pool (#1654): a free
+  # running one, or a freshly-booted pool member if live RAM has room, or wait
+  # for a lease to free. All RAM-gating happens inside the pool helpers.
+  if ! serial="$(acquire_pool_emulator)"; then
+    record android skipped "could not lease/boot a pool emulator (RAM too tight or pool full)" "" "$(( $(date +%s) - started ))"
+    return 0
   fi
-  if ! adb get-state >/dev/null 2>&1; then
-    record android skipped "no Android device after emulator boot" "" "$(( $(date +%s) - started ))"
+  log "Android leg using pool emulator: $serial"
+  # Pin every downstream adb / android-CLI / Maestro call to the leased serial.
+  export ANDROID_SERIAL="$serial"
+
+  if ! adb -s "$serial" get-state >/dev/null 2>&1; then
+    record android skipped "leased emulator $serial not responding" "" "$(( $(date +%s) - started ))"
     return 0
   fi
 
@@ -217,7 +263,8 @@ run_android() {
   # leg silent in CI until the wrapper returned, so a slow APK build (or a
   # genuine hang) showed 40+ min of nothing before the job timed out and was
   # cancelled. `pipefail` (set above) makes `|| rc=$?` capture the wrapper's
-  # exit code, not tee's.
+  # exit code, not tee's. ANDROID_SERIAL (exported above) targets the leased
+  # emulator throughout the wrapper.
   bash "$SCRIPT_DIR/qa-android-demos.sh" --install --flow "$flow" 2>&1 \
     | tee "$ARTIFACTS/android-output.txt" || rc=$?
 
@@ -317,7 +364,7 @@ run_web() {
 # --- AR leg ----------------------------------------------------------------
 run_ar() {
   local started; started=$(date +%s)
-  local reused_serial=""
+  local serial=""
   log "=== AR leg ==="
 
   if ! command -v adb >/dev/null 2>&1; then
@@ -326,20 +373,23 @@ run_ar() {
   fi
 
   # The AR replay harness needs an ARCore-capable emulator. The android leg
-  # usually ran first and left one warm — REUSE it (#1647), never boot a second.
-  # If none is up, setup-ar-emulator.sh boots one (RAM-gated, lock-guarded) and
-  # sideloads Google Play Services for AR.
-  if reused_serial="$(emu_running_serial adb)"; then
-    log "reusing already-running emulator: $reused_serial (no boot)"
-  elif ! adb get-state >/dev/null 2>&1; then
-    log "no Android device — booting ARCore emulator via setup-ar-emulator.sh (RAM-aware, lock-guarded)"
-    if ! bash "$SCRIPT_DIR/setup-ar-emulator.sh" >/dev/null 2>&1; then
-      record ar skipped "could not boot an ARCore emulator (RAM too tight or lock contention)" "" "$(( $(date +%s) - started ))"
-      return 0
-    fi
+  # usually ran first in this same process and still holds a pool lease — reuse
+  # that emulator directly (no extra lease, no boot). Otherwise lease one from
+  # the RAM-budgeted pool (#1654): a free running emulator, or a fresh pool
+  # member if RAM has room. setup-ar-emulator.sh also sideloads ARCore.
+  if [[ -n "${ANDROID_SERIAL:-}" ]] && emu_serial_alive "$ANDROID_SERIAL" adb; then
+    serial="$ANDROID_SERIAL"
+    log "AR leg reusing the Android leg's pool emulator: $serial"
+  elif ! serial="$(acquire_pool_emulator)"; then
+    record ar skipped "could not lease/boot an ARCore pool emulator (RAM too tight or pool full)" "" "$(( $(date +%s) - started ))"
+    return 0
   fi
-  if ! adb get-state >/dev/null 2>&1; then
-    record ar skipped "no Android device after emulator boot" "" "$(( $(date +%s) - started ))"
+  log "AR leg using pool emulator: $serial"
+  # Pin every downstream adb / android-CLI call to the leased serial.
+  export ANDROID_SERIAL="$serial"
+
+  if ! adb -s "$serial" get-state >/dev/null 2>&1; then
+    record ar skipped "leased emulator $serial not responding" "" "$(( $(date +%s) - started ))"
     return 0
   fi
 
