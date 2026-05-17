@@ -706,7 +706,7 @@
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SceneViewDemo/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "3D & AR Explorer";
+				INFOPLIST_KEY_CFBundleDisplayName = "SceneView";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -739,7 +739,7 @@
 				DEVELOPMENT_TEAM = 5G3DZ3TH45;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SceneViewDemo/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "3D & AR Explorer";
+				INFOPLIST_KEY_CFBundleDisplayName = "SceneView";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
