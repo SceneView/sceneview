@@ -81,6 +81,24 @@ struct SamplesTab: View {
             .fullScreenCover(item: $fullScreenScene) { scene in
                 NavigationStack {
                     sheetDestination(for: scene)
+                        // A `.fullScreenCover` has no drag-to-dismiss handle
+                        // (unlike the `.sheet` path), so it needs an explicit
+                        // Close affordance or the user gets stuck inside the
+                        // demo with no way back to the Samples list — see
+                        // #1580. Matches the Close button the deep-link
+                        // placeholder already uses (DemoDeepLinkRegistry).
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button {
+                                    HapticManager.lightTap()
+                                    fullScreenScene = nil
+                                } label: {
+                                    Label("Close", systemImage: "xmark")
+                                }
+                                .accessibilityLabel("Close demo")
+                                .accessibilityIdentifier("demo-close")
+                            }
+                        }
                 }
             }
             #endif
