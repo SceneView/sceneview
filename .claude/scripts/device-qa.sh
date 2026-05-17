@@ -18,8 +18,9 @@
 # simulator each leg needs, builds + installs the demo app, delegates to the
 # platform script, and collects the per-platform result. The aggregated
 # verdict is written to `device-qa-report.json` and printed as a human
-# summary. Exit status is non-zero if ANY selected platform failed — this is
-# the gate the release checkpoint hangs on (#1566 "done means").
+# summary. Exit status is non-zero only when a REQUIRED (non-advisory) leg did
+# not pass — this is the gate the release checkpoint hangs on (#1566 "done
+# means"). A non-passing ADVISORY leg (#1651/#1670) is a WARN, exit 0.
 #
 # Usage:
 #   bash .claude/scripts/device-qa.sh [--platform=android|ios|web|ar|all]
@@ -33,10 +34,13 @@
 #                    catalog: each platform runs one representative category
 #                    flow (Android/iOS: `3d-basics`; web: a single spec; AR:
 #                    the replay harness is already the full minimal set).
-#   --ci             CI mode: a `skipped` platform (missing emulator /
+#   --ci             CI mode: a `skipped` REQUIRED platform (missing emulator /
 #                    simulator / toolchain) is treated as a FAILURE, not a
 #                    soft skip. Outside --ci a skip is non-fatal — a dev box
 #                    rarely has every runtime, and a partial pass is useful.
+#                    A skipped ADVISORY leg is a WARN even under --ci (#1670):
+#                    an honest #1645 skip on `ar` is expected on a CI emulator
+#                    and must never hard-block the release gate.
 #   --out <dir>      Directory for the aggregated report + per-platform
 #                    artifacts. Default: repo-root (`device-qa-report.json`).
 #   --advisory=<csv> Comma-separated platforms whose result is ADVISORY for the
@@ -51,8 +55,11 @@
 #   -h | --help      Show this help.
 #
 # Exit status:
-#   0  every SELECTED platform passed (or, outside --ci, was skipped)
-#   1  one or more selected platforms failed; under --ci a skip also fails
+#   0  every REQUIRED leg passed. Includes the WARN case where only advisory
+#      legs are non-passing (failed or skipped), and — outside --ci — the case
+#      where a required leg was skipped (soft partial pass).
+#   1  a REQUIRED (non-advisory) leg failed, or — under --ci — a required leg
+#      was skipped. A non-passing advisory leg alone never produces exit 1.
 #   2  bad invocation / disk gate tripped before any platform ran
 #
 # Disk hygiene:
@@ -443,21 +450,63 @@ for leg in "${LEGS[@]}"; do
 done
 
 # --- Aggregate the report --------------------------------------------------
+# A leg's weight in the verdict depends on whether it is ADVISORY (#1651/#1652).
+# An advisory leg (default: android, ar) that `failed` or `skipped` is only a
+# WARN — never a hard block. A REQUIRED leg (e.g. web) that did not `pass`
+# blocks the release gate. This split is what keeps an honest #1645 `skipped`
+# on the advisory `ar` leg from false-failing the gate (#1670).
 PASSED=0; FAILED=0; SKIPPED=0
-for s in "${RESULT_STATUSES[@]}"; do
+REQUIRED_FAILED=0    # failed legs that are NOT advisory  -> hard block
+REQUIRED_SKIPPED=0   # skipped legs that are NOT advisory -> block under --ci
+ADVISORY_FAILED=0    # failed/skipped advisory legs       -> WARN, never a block
+ADVISORY_NONPASS=0   # advisory legs that did not pass    -> WARN
+for i in "${!RESULT_STATUSES[@]}"; do
+  s="${RESULT_STATUSES[$i]}"
+  advisory=false
+  is_advisory "${RESULT_PLATFORMS[$i]}" && advisory=true
   case "$s" in
     passed)  PASSED=$((PASSED + 1)) ;;
-    failed)  FAILED=$((FAILED + 1)) ;;
-    skipped) SKIPPED=$((SKIPPED + 1)) ;;
+    failed)
+      FAILED=$((FAILED + 1))
+      if $advisory; then
+        ADVISORY_FAILED=$((ADVISORY_FAILED + 1))
+        ADVISORY_NONPASS=$((ADVISORY_NONPASS + 1))
+      else
+        REQUIRED_FAILED=$((REQUIRED_FAILED + 1))
+      fi
+      ;;
+    skipped)
+      SKIPPED=$((SKIPPED + 1))
+      if $advisory; then
+        ADVISORY_NONPASS=$((ADVISORY_NONPASS + 1))
+      else
+        REQUIRED_SKIPPED=$((REQUIRED_SKIPPED + 1))
+      fi
+      ;;
   esac
 done
 
-# Overall verdict. A skip is a failure under --ci, a soft pass otherwise.
+# Overall verdict.
+#   failed  -> exit 1: a REQUIRED leg failed, OR (under --ci) a REQUIRED leg
+#              was skipped. A real crash on ANY leg also counts as failed
+#              only when that leg is required; an advisory crash is a WARN.
+#   warn    -> exit 0: every required leg passed, but an advisory leg did not
+#              pass (failed or skipped) — surfaced loudly, never blocking.
+#   passed  -> exit 0: every selected leg passed.
+# An all-skipped run made entirely of advisory legs lands in `warn` (exit 0),
+# never `failed` — the #1670 fix.
 OVERALL="passed"
-if [[ $FAILED -gt 0 ]]; then
+if [[ $REQUIRED_FAILED -gt 0 ]]; then
   OVERALL="failed"
-elif [[ $SKIPPED -gt 0 ]]; then
-  if $CI_MODE; then OVERALL="failed"; else OVERALL="passed"; fi
+elif $CI_MODE && [[ $REQUIRED_SKIPPED -gt 0 ]]; then
+  # A required leg could not run in CI — that is a gate failure.
+  OVERALL="failed"
+elif [[ $ADVISORY_NONPASS -gt 0 ]]; then
+  # Only advisory legs are non-passing -> WARN, exit 0 (#1670).
+  OVERALL="warn"
+elif [[ $REQUIRED_SKIPPED -gt 0 ]]; then
+  # Outside --ci, a skipped required leg is a soft (partial) pass.
+  OVERALL="passed"
 fi
 
 # Emit device-qa-report.json. Built with python3 so per-platform summary
@@ -511,17 +560,28 @@ for i in range(n):
         "summary":  embedded,
     })
 
-# --- Release-gate verdict (#1651) ------------------------------------------
+# --- Release-gate verdict (#1651 / #1670) ----------------------------------
 # The aggregated `status` above answers "did every leg pass". The release gate
-# needs a finer signal: a failed ADVISORY leg (android/ar) is only a WARN,
-# while a failed BLOCKING leg (web) hard-blocks. Pre-compute that split so
+# needs a finer signal: a non-passing ADVISORY leg (android/ar) is only a WARN,
+# while a non-passing BLOCKING leg (web) hard-blocks. Pre-compute that split so
 # release-checklist.sh section 14 reads an explicit field instead of
 # re-deriving the policy.
+#
+# A `skipped` leg counts as "did not pass" too — an honest #1645 skip on the
+# advisory `ar` leg must surface as `warn`, never `blocked` (#1670). A skipped
+# REQUIRED leg blocks only under --ci (where every required leg is expected to
+# run); outside --ci a skipped required leg is a soft partial pass.
+def _nonpass(p):
+    return p["status"] != "passed"
+
 blocking_failed = [p["platform"] for p in platforms
                    if p["status"] == "failed" and not p["advisory"]]
+blocking_skipped = [p["platform"] for p in platforms
+                    if p["status"] == "skipped" and not p["advisory"]]
 advisory_failed = [p["platform"] for p in platforms
-                   if p["status"] == "failed" and p["advisory"]]
-if blocking_failed:
+                   if _nonpass(p) and p["advisory"]]
+ci_mode = ci == "true"
+if blocking_failed or (ci_mode and blocking_skipped):
     gate = "blocked"
 elif advisory_failed:
     gate = "warn"
@@ -542,6 +602,10 @@ report = {
     "releaseGate": {
         "verdict": gate,
         "blockingFailed": blocking_failed,
+        # Advisory legs that did not pass (failed OR skipped) — surfaced as a
+        # WARN, never a block (#1670). Kept under the legacy key for the
+        # release-checklist consumer; an honest skip belongs here just like a
+        # crash, because neither blocks the gate.
         "advisoryFailed": advisory_failed,
     },
     "totals": {
@@ -568,9 +632,11 @@ for i in "${!RESULT_PLATFORMS[@]}"; do
   tag=""
   if is_advisory "${RESULT_PLATFORMS[$i]}"; then
     tag="[advisory]"
-    # A failed advisory leg is a release-gate WARN, not a block — flag it so
-    # it is never silent (#1651).
-    [[ "${RESULT_STATUSES[$i]}" == "failed" ]] && tag="[advisory — WARN, not a release blocker]"
+    # A non-passing advisory leg (failed OR skipped) is a release-gate WARN,
+    # not a block — flag it so it is never silent (#1651 / #1670).
+    case "${RESULT_STATUSES[$i]}" in
+      failed|skipped) tag="[advisory — WARN, not a release blocker]" ;;
+    esac
   fi
   printf "  %-9s %-8s %4ss  %s %s\n" \
     "${RESULT_PLATFORMS[$i]}" \
@@ -587,6 +653,14 @@ echo "════════════════════════�
 if [[ "$OVERALL" == "passed" ]]; then
   [[ $SKIPPED -gt 0 ]] && warn "$SKIPPED platform(s) skipped — pass is partial (not a --ci pass)."
   log "device-QA PASSED."
+  exit 0
+elif [[ "$OVERALL" == "warn" ]]; then
+  # Every REQUIRED leg passed; only advisory legs are non-passing (failed or
+  # an honest #1645 skip). This is a WARN, not a release blocker (#1670) —
+  # exit 0 so the release gate is not falsely hard-blocked.
+  warn "device-QA WARN — $ADVISORY_NONPASS advisory leg(s) did not pass."
+  warn "advisory legs are non-blocking (#1651/#1670); a human should still review the report."
+  log "device-QA passed-with-warnings (advisory legs only) — release checkpoint may tag."
   exit 0
 else
   echo "[device-qa] device-QA FAILED — release checkpoint must NOT tag." >&2
