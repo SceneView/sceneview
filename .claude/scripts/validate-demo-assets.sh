@@ -142,14 +142,17 @@ extract_refs() {
         case "$file" in
             *Tests.swift|*+Tests.swift|*Test.swift) continue ;;
         esac
-        # Skip the vendored Filament/SceneView engine bundled under the web
-        # demo's resources/js/ — these are byte-identical copies of
-        # website-static/js/ (self-hosted per issue #1586), not demo asset
-        # references. sceneview.js carries a JSDoc usage example
-        # (`SceneView.modelViewer("canvas", "model.glb")`) that is not a real
-        # asset path.
+        # The vendored Filament/SceneView engine bundled under the web demo's
+        # resources/js/ (byte-identical copies of website-static/js/, self-hosted
+        # per issue #1586) carries exactly one false-positive: the JSDoc usage
+        # example `SceneView.modelViewer("canvas", "model.glb")` in sceneview.js,
+        # where `model.glb` is a placeholder, not a real asset path. We narrowly
+        # filter that single literal (issue #1631) instead of skipping the whole
+        # tree — a real broken asset literal in a vendored js file must still be
+        # caught. The filter is applied to the extracted refs below.
+        local skip_placeholder=""
         case "$file" in
-            */web-demo/src/jsMain/resources/js/*) continue ;;
+            */web-demo/src/jsMain/resources/js/*) skip_placeholder="model.glb" ;;
         esac
         # 1. Quoted literals with a known extension ("models/foo.glb", "bar.hdr")
         # Skip strings containing `$`, `\` (Swift `\(slug.uid).usdz`
@@ -157,7 +160,8 @@ extract_refs() {
         # those are runtime/template references, not static asset paths.
         # `|| true` so files with no match (grep exit 1) don't abort pipefail.
         grep -oE "\"[^\"\$\\\\<]*\.($ext_pattern)\"" "$file" 2>/dev/null |
-            awk -v f="$file" '{ gsub(/"/, "", $0); printf "%s|%s\n", $0, f }' || true
+            awk -v f="$file" -v skip="$skip_placeholder" \
+                '{ gsub(/"/, "", $0); if (skip != "" && $0 == skip) next; printf "%s|%s\n", $0, f }' || true
 
         # 1b. Single-quoted literals — JS/HTML commonly quote with `'…'`
         #     (e.g. the web demo's `file: 'khronos_damaged_helmet.glb'`
@@ -165,7 +169,8 @@ extract_refs() {
         case "$file" in
             *.html|*.js|*.jsx)
                 grep -oE "'[^'\$\\\\<]*\.($ext_pattern)'" "$file" 2>/dev/null |
-                    awk -v f="$file" '{ gsub(/'"'"'/, "", $0); printf "%s|%s\n", $0, f }' || true
+                    awk -v f="$file" -v skip="$skip_placeholder" \
+                        '{ gsub(/'"'"'/, "", $0); if (skip != "" && $0 == skip) next; printf "%s|%s\n", $0, f }' || true
                 ;;
         esac
 
