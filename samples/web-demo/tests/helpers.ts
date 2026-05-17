@@ -45,8 +45,14 @@ export function captureDiagnostics(page: Page): PageDiagnostics {
 
 /**
  * CDN / third-party failures are not demo regressions. Sketchfab download
- * endpoints return 401 without auth (the demo handles that path), and
- * jsDelivr can rate-limit. Filter those so the suite stays deterministic.
+ * endpoints return 401 without auth (the demo handles that path), and the
+ * remote model gallery CDN can rate-limit or be offline. Filter those — both
+ * the upstream network error AND its downstream glTF-parse symptom — so the
+ * suite stays deterministic.
+ *
+ * The engine itself (filament.js / sceneview.js / filament.wasm) is now
+ * self-hosted next to index.html (issue #1586), so a genuine engine-load
+ * failure is no longer environmental and is NOT filtered here.
  */
 function isIgnorableNoise(text: string): boolean {
   const t = text.toLowerCase();
@@ -57,7 +63,13 @@ function isIgnorableNoise(text: string): boolean {
     t.includes('429') ||
     t.includes('net::err_') ||
     t.includes('failed to load resource') ||
-    t.includes('the server responded with a status')
+    t.includes('the server responded with a status') ||
+    // Downstream symptom of a model-CDN miss: a 403/404 HTML body fed to the
+    // glTF loader. The remote model gallery is a best-effort feature (like
+    // Sketchfab search) — a miss must not fail the suite.
+    t.includes('unable to parse gltf') ||
+    t.includes('failed to parse model') ||
+    t.includes('load error:')
   );
 }
 

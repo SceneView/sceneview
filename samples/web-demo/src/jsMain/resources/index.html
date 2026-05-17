@@ -9,10 +9,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Filament.js WASM engine -->
-    <script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@main/website-static/js/filament/filament.js"></script>
-    <!-- SceneView.js -->
-    <script src="https://cdn.jsdelivr.net/gh/sceneview/sceneview@main/website-static/js/sceneview.js"></script>
+    <!-- Filament.js WASM engine — self-hosted (never an external CDN, see issue #1586).
+         filament.js resolves filament.wasm relative to its own directory (js/filament/). -->
+    <script src="js/filament/filament.js"></script>
+    <!-- SceneView.js — self-hosted alongside the engine. -->
+    <script src="js/sceneview.js"></script>
 
     <style>
         :root {
@@ -964,8 +965,15 @@
       function initSceneView(modelFile, modelName) {
         loadingModelName.textContent = modelName || modelFile;
 
-        var modelUrl = CDN_BASE + modelFile;
-        SceneView.modelViewer('scene-canvas', modelUrl)
+        // Engine init and first-model load are kept SEPARATE on purpose
+        // (issue #1586). `SceneView.modelViewer()` chains create()+loadModel()
+        // into a single promise, so a flaky model CDN miss would reject the
+        // whole chain and brick the loading overlay forever ("Failed to
+        // initialize"). The Filament engine itself has no network dependency
+        // once filament.js/sceneview.js are self-hosted — so init the engine
+        // first, clear the overlay, THEN load the default model as a
+        // non-fatal, best-effort step.
+        SceneView.create('scene-canvas')
           .then(function(instance) {
             sceneViewInstance = instance;
             instance.setAutoRotate(autoRotate);
@@ -978,6 +986,10 @@
             // Engine ready — honour a `#double-pendulum` deep link now that
             // the physics scene can actually be built.
             flushPendingDeepLink();
+            // Best-effort load of the default catalog model. A CDN miss is
+            // surfaced as a transient chip, never a fatal overlay — the
+            // viewer stays usable (geometry/physics tabs, model gallery).
+            loadModel(CDN_BASE + modelFile, modelName || modelFile);
           })
           .catch(function(err) {
             console.error('SceneView init failed:', err);
@@ -1005,7 +1017,11 @@
             hideChip();
             showChip('Failed to load model');
             setTimeout(hideChip, 3000);
-            console.error('Load error:', err);
+            // A miss on the remote model gallery is a recoverable, transient
+            // condition (CDN rate-limit, offline, model removed) — not a demo
+            // bug. Log at warn level so it does not read as a hard script
+            // error; the viewer stays fully usable (issue #1586).
+            console.warn('Load error:', err);
           });
       }
 
