@@ -14,9 +14,10 @@
 #      data partition, host-sized RAM (see below), virtualscene back camera,
 #      emulated front camera (front cam is needed for Augmented Faces demos),
 #      host GPU mode. An AVD still on the old 4-core / 4 GB spec is rebuilt.
-#   3. Boots the emulator headless.
-#   4. Waits for `sys.boot_completed`.
-#   5. Verifies Google Play Services for AR (com.google.ar.core) is installed;
+#   3. Boots it via `android emulator start` — Google's `android` CLI, which
+#      blocks until the device is fully booted (raw `emulator` binary + a poll
+#      loop as fallback when the CLI is absent).
+#   4. Verifies Google Play Services for AR (com.google.ar.core) is installed;
 #      if not, opens the Play Store to the listing (one-time manual click).
 #
 # Why the higher spec:
@@ -49,6 +50,11 @@ SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
 EMULATOR_BIN="$SDK_ROOT/emulator/emulator"
 ADB_BIN="$SDK_ROOT/platform-tools/adb"
 AVDMANAGER_BIN="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+# Google's `android` CLI — the AI-agent front-end for emulator/sdk/screen ops.
+# Used for the emulator lifecycle (start/stop) and SDK installs; the raw
+# emulator/adb/sdkmanager binaries are the fallback when it is not installed.
+ANDROID_CLI_BIN="$(command -v android 2>/dev/null || echo "$HOME/.local/bin/android")"
+ANDROID_CLI=(--no-metrics)   # global flags: never phone home from this repo
 AVD_NAME="Pixel_7a"
 AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 AVD_CONFIG="$AVD_HOME/$AVD_NAME.avd/config.ini"
@@ -83,7 +89,24 @@ detect_target_ram_mb() {
 TARGET_RAM_MB="$(detect_target_ram_mb)"
 TARGET_HEAP_MB=1024
 TARGET_NCORE=6
-TARGET_DATA_PARTITION="12G"
+# Data-partition size is bounded by FREE DISK: the emulator pre-allocates the
+# whole partition + ~2.5 GB of working images when it first boots a fresh AVD,
+# and refuses to start if that doesn't fit (`Not enough space to create
+# userdata partition`). A fixed 12 GB therefore makes a recreate fail outright
+# on a full disk. Size it to free space instead — reserve 5 GB for the
+# emulator's overhead + a margin, clamp to [4 GB, 8 GB]. 8 GB is ample for QA;
+# the storage-degradation issue (#... AVD fills after ~6 runs) is handled by the
+# periodic `--clean` rebuild, not by an oversized partition.
+detect_target_data_gb() {
+  local free_gb
+  free_gb="$(df -g "$AVD_HOME" 2>/dev/null | awk 'NR==2{print $4}')"
+  [[ "$free_gb" =~ ^[0-9]+$ ]] || { echo 6; return; }   # detection failed
+  local data=$(( free_gb - 5 ))
+  (( data < 4 )) && data=4
+  (( data > 8 )) && data=8
+  echo "$data"
+}
+TARGET_DATA_PARTITION="$(detect_target_data_gb)G"
 # Most-capable recent Pixel profile actually installed in the SDK. Pixel 9 ships
 # no `avdmanager` profile yet; pixel_8 has the same 1080x2400 @ 420dpi geometry
 # as pixel_7a (so the screenshot-crop math in capture-play-store-screenshots.sh
@@ -154,13 +177,30 @@ if [[ ! -d "$SYS_IMAGE_DIR" ]]; then
     exit 1
   fi
   log "installing system image: $SYSTEM_IMAGE"
-  yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "$SYSTEM_IMAGE" || {
-    log "sdkmanager failed; check ANDROID_SDK_ROOT and licenses"; exit 1
-  }
+  if [[ -x "$ANDROID_CLI_BIN" ]] && "$ANDROID_CLI_BIN" "${ANDROID_CLI[@]}" sdk install "$SYSTEM_IMAGE"; then
+    log "system image installed via android CLI"
+  else
+    log "android CLI unavailable/failed — falling back to sdkmanager"
+    yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "$SYSTEM_IMAGE" || {
+      log "sdkmanager failed; check ANDROID_SDK_ROOT and licenses"; exit 1
+    }
+  fi
 fi
 
 # --- step 3: create or recreate the AVD ---------------------------------------
 recreate_avd() {
+  # The emulator pre-allocates the data partition + ~2.5 GB of working images
+  # the first time it boots a fresh AVD. Warn early if the disk can't fit it,
+  # so the failure mode is a clear message here rather than a cryptic emulator
+  # error five minutes into the boot.
+  local free_gb need_gb
+  free_gb="$(df -g "$AVD_HOME" 2>/dev/null | awk 'NR==2{print $4}')"
+  need_gb=$(( ${TARGET_DATA_PARTITION%G} + 3 ))
+  if [[ "$free_gb" =~ ^[0-9]+$ ]] && (( free_gb < need_gb )); then
+    log "WARNING: only ${free_gb} GB free on the AVD volume; a fresh AVD needs"
+    log "  ~${need_gb} GB — the emulator may refuse to create the userdata"
+    log "  partition. Free disk space before this boot."
+  fi
   # Pick the most-capable device profile this SDK actually has installed.
   local avail device_arg=""
   avail="$("$AVDMANAGER_BIN" list device 2>/dev/null || true)"
@@ -261,64 +301,83 @@ else
 fi
 
 # --- step 5: boot the emulator ------------------------------------------------
+# `android emulator start` (Google's CLI) blocks until the device is fully
+# booted AND ready, so we don't hand-roll a boot-wait poll loop whose timeout
+# has to be guessed against cold-boot time. The raw `emulator` binary + a poll
+# loop stays as a fallback for hosts without the CLI. GPU mode (hw.gpu.mode)
+# and core count (hw.cpu.ncore) come from config.ini, so they apply either way.
 emulator_is_running() {
   "$ADB_BIN" devices 2>/dev/null | awk 'NR>1 && /emulator-/ && $2=="device" {found=1} END {exit !found}'
+}
+
+current_emulator_serial() {
+  "$ADB_BIN" devices | awk '/^emulator-[0-9]+/ && $2=="device" {print $1; exit}'
+}
+
+# We always cold-boot, so a saved snapshot is dead weight — drop it to keep the
+# disk lean (the QA AVD otherwise accretes snapshot images across runs).
+purge_snapshots() {
+  rm -rf "$AVD_HOME/$AVD_NAME.avd/snapshots" 2>/dev/null || true
+}
+
+# Fallback boot path: raw emulator binary + poll loop. Used only when the
+# `android` CLI is absent. A fresh-userdata cold boot of the heavier AVD takes
+# minutes — keep the window generous so we don't bail mid-boot.
+boot_emulator_raw() {
+  local emu_log="/tmp/sceneview-emulator-$AVD_NAME.log"
+  log "starting emulator $AVD_NAME via raw emulator binary; log=$emu_log"
+  nohup "$EMULATOR_BIN" -avd "$AVD_NAME" \
+    -gpu host -cores "$TARGET_NCORE" \
+    -no-snapshot-load -no-snapshot-save -no-audio -no-boot-anim \
+    -netdelay none -netspeed full \
+    >"$emu_log" 2>&1 &
+  log "emulator pid=$! — waiting for boot (can take 5+ min)"
+  local serial=""
+  for _ in $(seq 1 180); do
+    serial="$(current_emulator_serial)"
+    [[ -n "$serial" ]] && break
+    sleep 2
+  done
+  [[ -z "$serial" ]] && { log "no emulator-* device appeared after 360s — boot failed"; return 1; }
+  "$ADB_BIN" -s "$serial" wait-for-device
+  local i=0
+  while [[ "$("$ADB_BIN" -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ]]; do
+    i=$((i+1))
+    [[ $i -gt 150 ]] && { log "sys.boot_completed not set after 300s"; return 1; }
+    sleep 2
+  done
+  EMU_SERIAL="$serial"
 }
 
 boot_emulator() {
   if emulator_is_running; then
     log "emulator already running — re-using"
+    EMU_SERIAL="$(current_emulator_serial)"
+    export EMU_SERIAL
     return 0
   fi
-  log "starting emulator $AVD_NAME (headless, no snapshot)"
-  # Use nohup + & so the emulator survives this script. Redirect to a log so we
-  # can debug a failed boot without spinning up an interactive console.
-  local emu_log="/tmp/sceneview-emulator-$AVD_NAME.log"
-  nohup "$EMULATOR_BIN" -avd "$AVD_NAME" \
-    -gpu host \
-    -cores "$TARGET_NCORE" \
-    -no-snapshot-load \
-    -no-snapshot-save \
-    -no-audio \
-    -no-boot-anim \
-    -netdelay none -netspeed full \
-    >"$emu_log" 2>&1 &
-  log "emulator pid=$! log=$emu_log"
-}
-
-wait_for_boot() {
-  log "waiting for boot complete (a fresh cold boot of the recreated AVD can take 5+ min)"
-  local serial
-  # Poll for first emulator-* device showing up. A fresh-userdata cold boot of
-  # the heavier AVD genuinely takes minutes — keep this window generous so the
-  # script doesn't bail while the emulator is still legitimately booting.
-  for _ in $(seq 1 180); do
-    serial="$("$ADB_BIN" devices | awk '/^emulator-[0-9]+/ && $2=="device" {print $1; exit}')"
-    [[ -n "$serial" ]] && break
-    sleep 2
-  done
-  if [[ -z "$serial" ]]; then
-    log "no emulator-* device appeared after 360s — boot failed"
-    return 1
-  fi
-  log "device $serial online, waiting for sys.boot_completed"
-  "$ADB_BIN" -s "$serial" wait-for-device
-  local i=0
-  while [[ "$("$ADB_BIN" -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ]]; do
-    i=$((i+1))
-    if [[ $i -gt 150 ]]; then
-      log "sys.boot_completed not set after 300s"
-      return 1
+  purge_snapshots
+  if [[ -x "$ANDROID_CLI_BIN" ]]; then
+    log "starting emulator $AVD_NAME via android CLI ('emulator start --cold')"
+    if "$ANDROID_CLI_BIN" "${ANDROID_CLI[@]}" emulator start --cold "$AVD_NAME"; then
+      EMU_SERIAL="$(current_emulator_serial)"
+      if [[ -n "$EMU_SERIAL" ]]; then
+        export EMU_SERIAL
+        log "emulator ready: $EMU_SERIAL"
+        return 0
+      fi
+      log "android CLI returned but no emulator serial visible — falling back"
+    else
+      log "android CLI 'emulator start' failed — falling back to raw boot"
     fi
-    sleep 2
-  done
-  log "boot complete on $serial"
-  export EMU_SERIAL="$serial"
+  else
+    log "android CLI not found at $ANDROID_CLI_BIN — using raw emulator binary"
+  fi
+  boot_emulator_raw && export EMU_SERIAL
 }
 
 if ! $CHECK_ONLY && ! $NO_BOOT; then
   boot_emulator
-  wait_for_boot
 fi
 
 # --- step 6: verify / install ARCore (Google Play Services for AR) ------------
@@ -354,12 +413,36 @@ else:
   log "downloading $apk_url"
   curl -fsSL -o "$tmp_apk" "$apk_url" || { log "ARCore download failed"; return 1; }
   log "installing ARCore on $serial"
-  "$ADB_BIN" -s "$serial" install -r "$tmp_apk" >/dev/null 2>&1 || {
-    log "ARCore install failed"; return 1
-  }
+  # Retry: right after boot the package manager can still reject installs while
+  # it settles, so a single attempt is flaky.
+  local attempt err
+  for attempt in 1 2 3; do
+    err="$("$ADB_BIN" -s "$serial" install -r "$tmp_apk" 2>&1)" && return 0
+    log "ARCore install attempt $attempt/3 failed${err:+: ${err##*$'\n'}} — retrying in 3s"
+    sleep 3
+  done
+  log "ARCore install failed after 3 attempts"
+  return 1
+}
+
+# `android emulator start` hands back control at "ready", but the guest package
+# manager can still be settling — `pm list`/`pm install` race right after boot
+# (observed: ARCore install failed once, succeeded seconds later). Poll until pm
+# answers before touching packages.
+wait_for_pm() {
+  local serial="$1" _
+  for _ in $(seq 1 30); do
+    "$ADB_BIN" -s "$serial" shell pm path android >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  log "package manager not responding after 60s on $serial"
+  return 1
 }
 
 serial="${EMU_SERIAL:-$("$ADB_BIN" devices | awk '/^emulator-[0-9]+/ && $2=="device" {print $1; exit}')}"
+if [[ -n "$serial" ]] && ! $CHECK_ONLY && ! $NO_BOOT; then
+  wait_for_pm "$serial" || true
+fi
 if [[ -n "$serial" ]]; then
   if "$ADB_BIN" -s "$serial" shell pm list packages 2>/dev/null | grep -q "com.google.ar.core"; then
     log "ARCore (com.google.ar.core) is installed on $serial"
@@ -378,7 +461,12 @@ fi
 # --stop kills it for hygiene-conscious callers (CI, one-shot config runs).
 if $STOP_AFTER && ! $CHECK_ONLY && [[ -n "$serial" ]]; then
   log "stopping emulator $serial (--stop)"
-  "$ADB_BIN" -s "$serial" emu kill >/dev/null 2>&1 || true
+  if [[ -x "$ANDROID_CLI_BIN" ]]; then
+    "$ANDROID_CLI_BIN" "${ANDROID_CLI[@]}" emulator stop "$AVD_NAME" >/dev/null 2>&1 \
+      || "$ADB_BIN" -s "$serial" emu kill >/dev/null 2>&1 || true
+  else
+    "$ADB_BIN" -s "$serial" emu kill >/dev/null 2>&1 || true
+  fi
 fi
 
 # --- step 8: summary ----------------------------------------------------------
@@ -389,5 +477,5 @@ else
   log "emulator left running for QA. next steps:"
   log "  source .claude/scripts/lib/android-cli.sh && android_cli_ensure"
   log "  android run --apks <apk> --activity io.github.sceneview.demo/.MainActivity"
-  log "  stop it with: $ADB_BIN -s ${serial:-emulator-5554} emu kill"
+  log "  stop it with: android emulator stop $AVD_NAME"
 fi
