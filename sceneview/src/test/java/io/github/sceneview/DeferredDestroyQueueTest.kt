@@ -107,6 +107,33 @@ class DeferredDestroyQueueTest {
     }
 
     @Test
+    fun enqueueAfterDrainAllRunsImmediately() {
+        // sceneview/sceneview#1630: once the engine is torn down (drainAll) there is no render
+        // loop left to advance drain(), so a destroy arriving late must NOT be queued onto the
+        // dead engine — it must run immediately, or the resource leaks forever.
+        val queue = DeferredDestroyQueue(graceFrames = 3)
+        val log = mutableListOf<String>()
+
+        queue.drainAll() // engine teardown
+
+        queue.enqueue { log.add("late") }
+        assertEquals("late destroy must run immediately, not queue", listOf("late"), log)
+        assertEquals("nothing must stay pending on a torn-down queue", 0, queue.size)
+    }
+
+    @Test
+    fun enqueueAfterDrainAllNeverNeedsAFrameToRun() {
+        // A late enqueue must not depend on a drain() that will never come.
+        val queue = DeferredDestroyQueue(graceFrames = 3)
+        var destroyed = false
+        queue.drainAll()
+
+        queue.enqueue { destroyed = true }
+        // No drain() call here on purpose — the action must already have run.
+        assertTrue("queued action stranded after engine teardown", destroyed)
+    }
+
+    @Test
     fun negativeGraceFramesIsRejected() {
         assertThrows(IllegalArgumentException::class.java) {
             DeferredDestroyQueue(graceFrames = -1)
