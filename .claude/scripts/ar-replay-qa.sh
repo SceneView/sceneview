@@ -41,7 +41,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# This script lives in `.claude/scripts/`, so the repo root is two levels up.
+# Resolving it from BASH_SOURCE (not the caller's CWD) keeps every path below
+# — `./gradlew`, the demo module — correct no matter where this script is
+# invoked from (e.g. device-qa.sh runs it with a non-repo-root CWD, #1585).
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # shellcheck source=lib/android-cli.sh
@@ -55,7 +59,7 @@ while [[ $# -gt 0 ]]; do
     --no-install) INSTALL=0; shift ;;
     --out) OUT_DIR="${2:?--out needs a directory}"; shift 2 ;;
     -h|--help)
-      sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "[ar-replay-qa] unknown option: $1" >&2; exit 1 ;;
