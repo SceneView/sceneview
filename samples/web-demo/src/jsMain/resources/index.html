@@ -404,6 +404,19 @@
         }
         .quality-select option { background: var(--sv-dark-surface); color: var(--sv-text); }
 
+        /* Plain text field used inside Geometry-style cards (e.g. Text panel) */
+        .text-field {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--sv-border);
+            border-radius: var(--sv-radius-sm);
+            background: var(--sv-dark-surface);
+            color: var(--sv-text);
+            font-size: 13px; font-family: var(--sv-font);
+            outline: none;
+        }
+        .text-field:focus { border-color: var(--sv-blue); }
+
         .toggle-row {
             display: flex; align-items: center; justify-content: space-between;
         }
@@ -685,6 +698,10 @@
     <nav class="tab-bar">
         <button class="tab-btn active" data-tab="models">Models</button>
         <button class="tab-btn" data-tab="geometry">Geometry</button>
+        <button class="tab-btn" data-tab="lighting">Lighting</button>
+        <button class="tab-btn" data-tab="animation">Animation</button>
+        <button class="tab-btn" data-tab="text">Text</button>
+        <button class="tab-btn" data-tab="environment">Environment</button>
         <button class="tab-btn" data-tab="physics">Physics</button>
         <button class="tab-btn" data-tab="settings">Settings</button>
     </nav>
@@ -749,6 +766,132 @@
             </div>
         </div>
         <button id="geo-clear" class="geo-clear-btn">Clear All Geometry</button>
+    </div>
+
+    <!-- Lighting panel — addLight / removeNode -->
+    <div id="panel-lighting" class="panel geometry-panel">
+        <div class="geo-card">
+            <div class="geo-card-header">
+                <span class="geo-card-title">Directional Light</span>
+                <button class="geo-add-btn" data-light="directional">Add</button>
+            </div>
+            <div class="geo-controls">
+                <label>Color <input type="color" class="color-picker" data-light-color="directional" value="#fff4e0"></label>
+                <label>Intensity <input type="range" class="geo-slider" data-light-intensity="directional" min="10000" max="150000" step="5000" value="80000"> <span class="slider-value">80k</span></label>
+            </div>
+        </div>
+        <div class="geo-card">
+            <div class="geo-card-header">
+                <span class="geo-card-title">Point Light</span>
+                <button class="geo-add-btn" data-light="point">Add</button>
+            </div>
+            <div class="geo-controls">
+                <label>Color <input type="color" class="color-picker" data-light-color="point" value="#4488ff"></label>
+                <label>Intensity <input type="range" class="geo-slider" data-light-intensity="point" min="10000" max="150000" step="5000" value="60000"> <span class="slider-value">60k</span></label>
+            </div>
+        </div>
+        <div class="geo-card">
+            <div class="geo-card-header">
+                <span class="geo-card-title">Spot Light</span>
+                <button class="geo-add-btn" data-light="spot">Add</button>
+            </div>
+            <div class="geo-controls">
+                <label>Color <input type="color" class="color-picker" data-light-color="spot" value="#ff66aa"></label>
+                <label>Intensity <input type="range" class="geo-slider" data-light-intensity="spot" min="10000" max="150000" step="5000" value="70000"> <span class="slider-value">70k</span></label>
+            </div>
+        </div>
+        <button id="light-clear" class="geo-clear-btn">Remove Added Lights</button>
+        <p style="font-size:12px;color:var(--sv-text-dim);line-height:1.5;padding:0 4px">
+            Adds Filament lights via <code>addLight()</code> — directional, point, and spot.
+            Mirrors Android's <code>LightNode</code> demos. Each added light is tracked so
+            <code>removeNode()</code> can clear it.
+        </p>
+    </div>
+
+    <!-- Animation panel — playAnimation / stopAnimation -->
+    <div id="panel-animation" class="panel geometry-panel">
+        <div class="geo-card">
+            <div class="geo-card-header">
+                <span class="geo-card-title">Animated Model</span>
+            </div>
+            <div class="geo-controls">
+                <label style="width:100%">Model
+                    <select id="anim-model-select" class="quality-select" style="margin-top:4px">
+                        <option value="animated_trex.glb">Animated T-Rex</option>
+                        <option value="animated_astronaut.glb">Animated Astronaut</option>
+                        <option value="animated_butterfly.glb">Animated Butterfly</option>
+                        <option value="animated_dog.glb">Animated Dog</option>
+                        <option value="phoenix_bird.glb">Phoenix Bird</option>
+                    </select>
+                </label>
+            </div>
+            <div class="geo-controls">
+                <button id="anim-play" class="geo-add-btn">Play</button>
+                <button id="anim-stop" class="geo-add-btn" style="background:rgba(255,255,255,0.12)">Stop</button>
+                <label><input type="checkbox" id="anim-loop" checked> Loop</label>
+            </div>
+            <div id="anim-status" style="font-size:12px;color:var(--sv-text-faint)">Select a model and press Play.</div>
+        </div>
+        <p style="font-size:12px;color:var(--sv-text-dim);line-height:1.5;padding:0 4px">
+            Drives glTF keyframe &amp; skinning animation via <code>playAnimation()</code> /
+            <code>stopAnimation()</code> — the web counterpart of Android's Animation demos.
+        </p>
+    </div>
+
+    <!-- Text panel — createText -->
+    <div id="panel-text" class="panel geometry-panel">
+        <div class="geo-card">
+            <div class="geo-card-header">
+                <span class="geo-card-title">3D Text Node</span>
+                <button id="text-add" class="geo-add-btn">Add</button>
+            </div>
+            <div class="geo-controls">
+                <label style="width:100%">Text
+                    <input type="text" id="text-input" class="text-field" value="SceneView" style="margin-top:4px">
+                </label>
+            </div>
+            <div class="geo-controls">
+                <label>Color <input type="color" class="color-picker" id="text-color" value="#ffffff"></label>
+                <label>Size <input type="range" class="geo-slider" id="text-size" min="0.5" max="3" step="0.1" value="1.2"> <span class="slider-value">1.2</span></label>
+                <label><input type="checkbox" id="text-billboard" checked> Billboard</label>
+            </div>
+        </div>
+        <button id="text-clear" class="geo-clear-btn">Remove Added Text</button>
+        <p style="font-size:12px;color:var(--sv-text-dim);line-height:1.5;padding:0 4px">
+            Renders text as a textured quad via <code>createText()</code> — the web face of
+            Android's Text demo. Optionally billboards to always face the camera.
+        </p>
+    </div>
+
+    <!-- Environment panel — setEnvironmentSH / setBackgroundColor / setBloom -->
+    <div id="panel-environment" class="panel env-panel">
+        <div class="env-card">
+            <div class="env-card-title">IBL Environment</div>
+            <label style="font-size:12px;color:var(--sv-text-dim)">Lighting preset</label>
+            <select id="env-preset" class="quality-select">
+                <option value="warm">Warm Studio</option>
+                <option value="cool">Cool Daylight</option>
+                <option value="dramatic">Dramatic</option>
+            </select>
+            <label style="font-size:12px;color:var(--sv-text-dim)">Intensity</label>
+            <input type="range" id="env-intensity" class="geo-slider" style="width:100%" min="15000" max="80000" step="5000" value="45000">
+        </div>
+        <div class="env-card">
+            <div class="env-card-title">Background</div>
+            <div class="bg-color-row">
+                <label>Color</label>
+                <input type="color" id="env-bg-color" class="color-picker" value="#0D1117">
+            </div>
+        </div>
+        <div class="env-card">
+            <div class="env-card-title">Bloom</div>
+            <div class="toggle-row">
+                <span class="toggle-label">Enabled</span>
+                <div id="env-bloom-toggle" class="toggle-switch"></div>
+            </div>
+            <label style="font-size:12px;color:var(--sv-text-dim)">Strength</label>
+            <input type="range" id="env-bloom-strength" class="geo-slider" style="width:100%" min="0.05" max="0.6" step="0.05" value="0.15">
+        </div>
     </div>
 
     <!-- Physics panel — Double Pendulum -->
@@ -909,6 +1052,10 @@
         setupSourceToggle();
         setupSearch();
         setupGeometry();
+        setupLighting();
+        setupAnimation();
+        setupText();
+        setupEnvironment();
         setupPhysics();
         setupSettings();
         setupXR();
@@ -1036,7 +1183,7 @@
           var btn = buttons[i];
           btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
         }
-        var panels = ['models', 'geometry', 'physics', 'settings'];
+        var panels = ['models', 'geometry', 'lighting', 'animation', 'text', 'environment', 'physics', 'settings'];
         panels.forEach(function(p) {
           var panel = document.getElementById('panel-' + p);
           if (panel) {
@@ -1047,8 +1194,9 @@
             }
           }
         });
-        // Adjust controls-info position
-        var sidePanel = (tab === 'models' || tab === 'geometry' || tab === 'physics');
+        // Adjust controls-info position — left-anchored panels push it right.
+        var sidePanel = (tab === 'models' || tab === 'geometry' || tab === 'physics' ||
+                         tab === 'lighting' || tab === 'animation' || tab === 'text');
         controlsInfo.style.left = sidePanel ? '380px' : '20px';
         // The Double Pendulum runs its own physics scene; entering or leaving
         // the Physics tab swaps the scene in/out so it never lingers behind
@@ -1365,6 +1513,221 @@
         ];
       }
 
+      // ---- Lighting (issue #1362) — addLight / removeNode ---------------
+      //
+      // Web face of Android's LightNode demos. Each light added through
+      // sceneview.js `addLight()` returns a Filament entity handle; we track
+      // the handles so `removeNode()` can clear them on demand.
+
+      var addedLights = [];
+
+      function setupLighting() {
+        var addBtns = document.querySelectorAll('.geo-add-btn[data-light]');
+        for (var i = 0; i < addBtns.length; i++) {
+          (function(btn) {
+            btn.addEventListener('click', function() {
+              addSceneLight(btn.getAttribute('data-light'));
+            });
+          })(addBtns[i]);
+        }
+        // Intensity sliders show a compact "k" label.
+        var sliders = document.querySelectorAll('.geo-slider[data-light-intensity]');
+        for (var j = 0; j < sliders.length; j++) {
+          (function(slider) {
+            var display = slider.parentElement.querySelector('.slider-value');
+            slider.addEventListener('input', function() {
+              if (display) display.textContent = Math.round(slider.value / 1000) + 'k';
+            });
+          })(sliders[j]);
+        }
+        document.getElementById('light-clear').addEventListener('click', function() {
+          if (!sceneViewInstance) return;
+          addedLights.forEach(function(handle) {
+            try { sceneViewInstance.removeNode(handle); } catch (e) { /* ignore */ }
+          });
+          addedLights = [];
+        });
+      }
+
+      function addSceneLight(type) {
+        if (!sceneViewInstance) return;
+        var colorInput = document.querySelector('[data-light-color="' + type + '"]');
+        var intInput = document.querySelector('[data-light-intensity="' + type + '"]');
+        var rgb = hexToRgb(colorInput ? colorInput.value : '#ffffff');
+        var intensity = intInput ? parseFloat(intInput.value) : 80000;
+
+        var options = { type: type, color: rgb, intensity: intensity };
+        if (type === 'directional') {
+          options.direction = [-0.5, -1.0, -0.5];
+        } else if (type === 'point') {
+          options.position = [(Math.random() - 0.5) * 3, 1.5, (Math.random() - 0.5) * 3];
+          options.falloff = 8;
+        } else { // spot
+          options.position = [0, 3, 0];
+          options.direction = [0, -1, 0];
+          options.falloff = 12;
+        }
+        var handle = sceneViewInstance.addLight(options);
+        if (typeof handle === 'number') addedLights.push(handle);
+        showChip(type.charAt(0).toUpperCase() + type.slice(1) + ' light added');
+        setTimeout(hideChip, 1500);
+      }
+
+      // ---- Animation (issue #1362) — playAnimation / stopAnimation ------
+      //
+      // Web face of Android's Animation demos. Loads an animated glTF model
+      // and drives its keyframe/skinning animation through sceneview.js.
+
+      function setupAnimation() {
+        var modelSelect = document.getElementById('anim-model-select');
+        var status = document.getElementById('anim-status');
+
+        document.getElementById('anim-play').addEventListener('click', function() {
+          if (!sceneViewInstance) return;
+          var file = modelSelect.value;
+          var loop = document.getElementById('anim-loop').checked;
+          status.textContent = 'Loading ' + modelSelect.options[modelSelect.selectedIndex].text + '...';
+          sceneViewInstance.loadModel(CDN_BASE + file)
+            .then(function() {
+              sceneViewInstance.playAnimation(0, loop);
+              status.textContent = 'Playing — clip 0' + (loop ? ' (looping)' : '');
+            })
+            .catch(function(err) {
+              status.textContent = 'Failed to load model';
+              console.error('Animation load error:', err);
+            });
+        });
+
+        document.getElementById('anim-stop').addEventListener('click', function() {
+          if (!sceneViewInstance) return;
+          sceneViewInstance.stopAnimation();
+          status.textContent = 'Stopped — rest pose.';
+        });
+      }
+
+      // ---- Text (issue #1362) — createText ------------------------------
+      //
+      // Web face of Android's Text demo. Renders text as a textured quad
+      // through sceneview.js `createText()`; tracked handles allow removal.
+
+      var addedText = [];
+      var textCount = 0;
+
+      function setupText() {
+        var sizeSlider = document.getElementById('text-size');
+        var sizeDisplay = sizeSlider.parentElement.querySelector('.slider-value');
+        sizeSlider.addEventListener('input', function() {
+          sizeDisplay.textContent = parseFloat(sizeSlider.value).toFixed(1);
+        });
+
+        document.getElementById('text-add').addEventListener('click', function() {
+          if (!sceneViewInstance) return;
+          var text = (document.getElementById('text-input').value || 'SceneView').trim();
+          if (!text) return;
+          var color = document.getElementById('text-color').value;
+          var scale = parseFloat(document.getElementById('text-size').value);
+          var billboard = document.getElementById('text-billboard').checked;
+
+          // Stack successive text nodes vertically so they don't overlap.
+          var y = 0.6 + (textCount % 4) * 0.7;
+          textCount++;
+
+          sceneViewInstance.createText({
+            text: text,
+            color: color,
+            position: [0, y, 0],
+            billboard: billboard,
+            scale: scale
+          }).then(function(handle) {
+            if (typeof handle === 'number') addedText.push(handle);
+          }).catch(function(err) {
+            console.error('createText failed:', err);
+          });
+          showChip('Text node added');
+          setTimeout(hideChip, 1500);
+        });
+
+        document.getElementById('text-clear').addEventListener('click', function() {
+          if (!sceneViewInstance) return;
+          addedText.forEach(function(handle) {
+            try { sceneViewInstance.removeNode(handle); } catch (e) { /* ignore */ }
+          });
+          addedText = [];
+          textCount = 0;
+        });
+      }
+
+      // ---- Environment (issue #1362) — setEnvironmentSH / bloom ---------
+      //
+      // Web face of Android's Environment / Post-processing demos. Drives
+      // image-based lighting via spherical-harmonic presets (no asset
+      // download required), background color, and the bloom effect.
+
+      // SH lighting presets — 9 bands x RGB. Same coefficients used by the
+      // sceneview.github.io playground; proven valid for `setEnvironmentSH`.
+      var ENV_SH = {
+        warm: [
+           1.40,  1.20,  0.95,   0.35,  0.28,  0.18,   0.40,  0.35,  0.28,
+          -0.06, -0.04, -0.02,   0.12,  0.10,  0.06,   0.20,  0.16,  0.10,
+           0.02,  0.02,  0.01,  -0.03, -0.02, -0.01,   0.08,  0.06,  0.04
+        ],
+        cool: [
+           0.95,  1.05,  1.30,  -0.10, -0.05,  0.05,   0.30,  0.32,  0.38,
+           0.08,  0.10,  0.14,   0.06,  0.08,  0.14,   0.10,  0.12,  0.18,
+           0.02,  0.02,  0.03,  -0.04, -0.04, -0.05,   0.04,  0.05,  0.08
+        ],
+        dramatic: [
+           0.60,  0.55,  0.50,   0.50,  0.40,  0.30,   0.65,  0.55,  0.45,
+          -0.20, -0.18, -0.15,   0.15,  0.12,  0.08,   0.08,  0.06,  0.04,
+           0.04,  0.03,  0.02,  -0.10, -0.08, -0.06,   0.12,  0.10,  0.06
+        ]
+      };
+
+      function applyEnvironment() {
+        if (!sceneViewInstance) return;
+        var preset = document.getElementById('env-preset').value;
+        var intensity = parseFloat(document.getElementById('env-intensity').value);
+        if (ENV_SH[preset]) {
+          sceneViewInstance.setEnvironmentSH(ENV_SH[preset], intensity);
+        }
+      }
+
+      function setupEnvironment() {
+        document.getElementById('env-preset').addEventListener('change', applyEnvironment);
+        document.getElementById('env-intensity').addEventListener('input', applyEnvironment);
+
+        document.getElementById('env-bg-color').addEventListener('input', function() {
+          if (!sceneViewInstance) return;
+          var rgb = hexToRgb(document.getElementById('env-bg-color').value);
+          sceneViewInstance.setBackgroundColor(rgb[0], rgb[1], rgb[2], 1.0);
+          // Keep the Settings-tab background picker in sync.
+          var bgColor = document.getElementById('bg-color');
+          if (bgColor) bgColor.value = document.getElementById('env-bg-color').value;
+        });
+
+        var envBloomToggle = document.getElementById('env-bloom-toggle');
+        var envBloomStrength = document.getElementById('env-bloom-strength');
+        function applyBloom() {
+          if (!sceneViewInstance) return;
+          if (bloomEnabled) {
+            sceneViewInstance.setBloom({ strength: parseFloat(envBloomStrength.value) });
+          } else {
+            sceneViewInstance.setBloom(false);
+          }
+          // Keep the Settings-tab bloom toggle in sync.
+          var bloomToggle = document.getElementById('bloom-toggle');
+          if (bloomToggle) bloomToggle.classList.toggle('active', bloomEnabled);
+        }
+        envBloomToggle.addEventListener('click', function() {
+          bloomEnabled = !bloomEnabled;
+          envBloomToggle.classList.toggle('active', bloomEnabled);
+          applyBloom();
+        });
+        envBloomStrength.addEventListener('input', function() {
+          if (bloomEnabled) applyBloom();
+        });
+      }
+
       // ---- Physics: Double Pendulum (issue #1221) -----------------------
       //
       // Web face of the cross-platform Double Pendulum demo. The integrator
@@ -1619,6 +1982,9 @@
           if (sceneViewInstance) {
             sceneViewInstance.setBloom(bloomEnabled);
           }
+          // Keep the Environment-tab bloom toggle in sync.
+          var envBloomToggle = document.getElementById('env-bloom-toggle');
+          if (envBloomToggle) envBloomToggle.classList.toggle('active', bloomEnabled);
         });
 
         // Rotate toggle (settings panel)
@@ -1654,6 +2020,9 @@
             var rgb = hexToRgb(bgColor.value);
             sceneViewInstance.setBackgroundColor(rgb[0], rgb[1], rgb[2], 1.0);
           }
+          // Keep the Environment-tab background picker in sync.
+          var envBgColor = document.getElementById('env-bg-color');
+          if (envBgColor) envBgColor.value = bgColor.value;
         });
       }
 
