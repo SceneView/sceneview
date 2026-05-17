@@ -13,10 +13,13 @@
 #   2. For each reference, verifies the bundled file exists on disk
 #   3. For each CDN URL, sends a HEAD request to confirm it returns 200
 #   4. Reports MISSING bundled files and BROKEN CDN URLs
+#   5. Cross-checks every asset physically bundled under the demo asset roots
+#      against assets/catalog.json — fails if a bundled asset is undeclared
+#      (catalog drift, issue #1666). Runs only in the default all-platforms mode.
 #
 # Exit codes:
-#   0  all references resolve
-#   1  at least one broken reference found
+#   0  all references resolve and the catalog has no drift
+#   1  at least one broken reference, or a bundled asset missing from catalog.json
 #   2  invalid arguments
 
 set -euo pipefail
@@ -342,21 +345,123 @@ if [ "$platforms" = "all" ] || [ "$platforms" = "rn" ]; then
         "glb|gltf|usdz|hdr"
 fi
 
+# ---------- Catalog drift cross-check ----------
+# `assets/catalog.json` is the declared source of truth for every bundled demo
+# asset (issue #1666, follow-up from #1603). The checks above only verify that
+# *referenced* assets resolve on disk — they would not catch an asset that is
+# physically bundled but never declared in the catalog. This cross-check walks
+# every model/environment file actually bundled under the demo asset roots and
+# fails if its basename is not declared in catalog.json, making catalog drift a
+# CI failure instead of a manual discovery.
+#
+# Only runs in the default "all" mode — a single `--platform` invocation gives
+# a partial view of the bundled tree and would produce spurious "undeclared"
+# findings for assets that legitimately belong to other platforms.
+
+CATALOG="assets/catalog.json"
+catalog_undeclared=0
+catalog_undeclared_list=""
+
+# Assets that are intentionally NOT catalog content entries: engine/runtime
+# assets shipped with a demo (e.g. Filament's neutral indirect-light KTX) and
+# in-app UI textures/branding. These are not 3D content sourced from a model
+# provider, so they have no place in the model/environment catalog.
+catalog_allowlist_regex='(^|/)(neutral_ibl\.ktx)$'
+
+run_catalog_check() {
+    echo
+    echo -e "${BLUE}== catalog.json drift ==${NC}"
+
+    if [ ! -f "$CATALOG" ]; then
+        echo -e "  ${YELLOW}SKIP${NC}  $CATALOG not found"
+        return 0
+    fi
+
+    # Collect every "file" basename declared in catalog.json. Catalog format
+    # entries store paths like "models/glb/foo.glb" / "environments/hdr/bar.hdr";
+    # bundled trees use a flatter "models/foo.glb" layout — so we compare by
+    # basename, which is the stable identity across both.
+    local declared
+    declared=$(grep -oE '"file"[[:space:]]*:[[:space:]]*"[^"]+"' "$CATALOG" |
+        sed -E 's/.*"file"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' |
+        sed -E 's#.*/##' | sort -u)
+
+    if [ -z "$declared" ]; then
+        echo -e "  ${YELLOW}SKIP${NC}  no \"file\" entries parsed from $CATALOG"
+        return 0
+    fi
+
+    # Bundled asset roots, one per platform. Mirrors the process_platform_refs
+    # bundle roots above; iOS uses Models/ and the web demo uses jsMain resources.
+    local bundle_roots=(
+        "samples/android-demo/src/main/assets"
+        "samples/android-tv-demo/src/main/assets"
+        "samples/ios-demo/SceneViewDemo/Models"
+        "samples/web-demo/src/jsMain/resources"
+    )
+
+    local before=$catalog_undeclared
+    local asset
+    while IFS= read -r asset; do
+        [ -z "$asset" ] && continue
+        # Skip engine/runtime/UI assets that are not catalog content.
+        if printf '%s' "$asset" | grep -qE "$catalog_allowlist_regex"; then
+            continue
+        fi
+        local base
+        base="$(basename "$asset")"
+        if ! printf '%s\n' "$declared" | grep -qxF "$base"; then
+            catalog_undeclared=$((catalog_undeclared + 1))
+            catalog_undeclared_list="${catalog_undeclared_list}  ${RED}UNDECL${NC} ${asset}  ${GRAY}(not declared in ${CATALOG})${NC}"$'\n'
+            if [ "$strict" = true ]; then
+                echo -e "${RED}Strict mode: stopping on first error${NC}"
+                printf "%b\n" "$catalog_undeclared_list"
+                exit 1
+            fi
+        fi
+    done < <(
+        for root in "${bundle_roots[@]}"; do
+            [ -d "$root" ] || continue
+            find "$root" -type f \
+                \( -iname '*.glb' -o -iname '*.gltf' -o -iname '*.usdz' \
+                   -o -iname '*.reality' -o -iname '*.hdr' -o -iname '*.ktx' \) 2>/dev/null
+        done | sort -u
+    )
+
+    if [ "$catalog_undeclared" -eq "$before" ]; then
+        echo -e "  ${GREEN}OK${NC}  every bundled asset is declared in $CATALOG"
+    fi
+}
+
+if [ "$platforms" = "all" ]; then
+    run_catalog_check
+fi
+
 # ---------- Report ----------
 
 echo
 echo -e "${BLUE}== Summary ==${NC}"
 echo -e "  Bundled refs checked : ${total_bundled}"
 echo -e "  CDN refs checked     : ${total_cdn}"
-if [ $missing_bundled -eq 0 ] && [ $broken_cdn -eq 0 ]; then
+if [ "$platforms" = "all" ]; then
+    echo -e "  Catalog drift        : ${catalog_undeclared} undeclared"
+fi
+if [ $missing_bundled -eq 0 ] && [ $broken_cdn -eq 0 ] && [ $catalog_undeclared -eq 0 ]; then
     echo -e "  ${GREEN}All references resolve ✓${NC}"
     exit 0
 else
-    echo -e "  ${RED}Missing bundled: ${missing_bundled}${NC}"
-    echo -e "  ${RED}Broken CDN    : ${broken_cdn}${NC}"
+    [ $missing_bundled -ne 0 ] && echo -e "  ${RED}Missing bundled: ${missing_bundled}${NC}"
+    [ $broken_cdn -ne 0 ] && echo -e "  ${RED}Broken CDN    : ${broken_cdn}${NC}"
+    [ $catalog_undeclared -ne 0 ] && echo -e "  ${RED}Undeclared in catalog: ${catalog_undeclared}${NC}"
     echo
-    echo -e "${YELLOW}Broken references:${NC}"
-    # %b interprets the \033 color escapes embedded in the list
-    printf "%b\n" "$broken_refs_list"
+    if [ -n "$broken_refs_list" ]; then
+        echo -e "${YELLOW}Broken references:${NC}"
+        # %b interprets the \033 color escapes embedded in the list
+        printf "%b\n" "$broken_refs_list"
+    fi
+    if [ -n "$catalog_undeclared_list" ]; then
+        echo -e "${YELLOW}Assets bundled but undeclared in ${CATALOG}:${NC}"
+        printf "%b\n" "$catalog_undeclared_list"
+    fi
     exit 1
 fi
