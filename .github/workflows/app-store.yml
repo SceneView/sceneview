@@ -323,6 +323,34 @@ jobs:
                   print(f"Using matching version record: {version_id}")
                   break
           if not version_id:
+              # No record for our versionString. Apple allows only ONE
+              # version in an editable state at a time, so if a stale
+              # PREPARE_FOR_SUBMISSION draft exists (e.g. a release whose
+              # submission never completed), creating a second one would
+              # 409. Reuse that draft and retarget its versionString
+              # instead — this is the "fall back to the first editable
+              # one" behaviour, and it lets a release absorb an abandoned
+              # draft without a manual App Store Connect cleanup.
+              stale = next(
+                  (v for v in versions
+                   if v.get("attributes", {}).get("appStoreState") == "PREPARE_FOR_SUBMISSION"),
+                  None,
+              )
+              if stale:
+                  version_id = stale["id"]
+                  stale_vs = stale.get("attributes", {}).get("versionString")
+                  r = requests.patch(
+                      f"{BASE}/appStoreVersions/{version_id}",
+                      headers=headers,
+                      json={"data": {
+                          "type": "appStoreVersions",
+                          "id": version_id,
+                          "attributes": {"versionString": version_string},
+                      }},
+                  )
+                  r.raise_for_status()
+                  print(f"Reused editable draft {version_id}: retargeted {stale_vs} → {version_string}")
+          if not version_id:
               payload = {
                   "data": {
                       "type": "appStoreVersions",
