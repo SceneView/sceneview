@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- `ARRecorder` now converts the `Surface.ROTATION_*` constant passed as `recordingRotation` into degrees (`0`/`90`/`180`/`270`) before handing it to ARCore's `RecordingConfig.setRecordingRotation`, which expects degrees — not the ordinal (`0`/`1`/`2`/`3`). Previously a 90° capture was recorded as `1°`, leaving AR datasets stored sideways. New public `ARRecorder.surfaceRotationToDegrees(Int)` exposes the mapping. (#1648)
