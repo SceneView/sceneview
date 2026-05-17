@@ -253,10 +253,19 @@ jobs:
           disable-animations: true
           script: |
             export PATH="$HOME/.maestro/bin:$PATH"
-            adb wait-for-device
+            # Every wait below is `timeout`-bounded so a flaky CI emulator
+            # produces a clean step FAILURE — which continue-on-error absorbs —
+            # instead of letting the job run to `timeout-minutes`. A job killed
+            # by `timeout-minutes` ends `cancelled`, and continue-on-error does
+            # NOT neutralise a cancellation: the whole Device QA run conclusion
+            # then goes red even though web/ar/build passed (#1643). Bare
+            # `adb wait-for-device` in particular blocks forever if the emulator
+            # never comes online. Internal bounds (150s + 1500s + ~120s boot
+            # poll ≈ 29 min) always fire before `timeout-minutes: 35`.
+            timeout 150 adb wait-for-device || { echo "::warning::android leg — emulator never came online"; exit 1; }
             attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
             # --fast: one representative category, keeps the emulator job lean.
-            bash .claude/scripts/device-qa.sh --platform=android --fast --ci
+            timeout 1500 bash .claude/scripts/device-qa.sh --platform=android --fast --ci
 
       - name: Upload android device-QA report
         if: always()
@@ -325,10 +334,10 @@ jobs:
           # ("end of file unexpected"). Every step below must therefore be a
           # single self-contained logical line (matching the `android` job).
           script: |
-            adb wait-for-device
+            timeout 150 adb wait-for-device || { echo "::warning::ar leg — emulator never came online"; exit 1; }
             attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
             bash .claude/scripts/sideload-arcore.sh || echo "[ar-leg] ARCore sideload failed — harness will assumeTrue-skip"
-            bash .claude/scripts/device-qa.sh --platform=ar --ci
+            timeout 1800 bash .claude/scripts/device-qa.sh --platform=ar --ci
 
       - name: Upload ar device-QA report
         if: always()
