@@ -13,7 +13,7 @@ extension NSColor {
 }
 #endif
 
-/// SceneView Demo — Explore, visualize, and interact with 3D models.
+/// SceneView — Explore, visualize, and interact with 3D models.
 ///
 /// Browse a curated gallery of 3D models, view them in augmented reality,
 /// save favorites, and share screenshots with friends.

@@ -1,4 +1,4 @@
-# SceneView Demo
+# SceneView
 
 SwiftUI app for iOS and macOS — browse 3D models, view them in augmented reality, save favorites, and share screenshots.
 
