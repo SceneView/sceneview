@@ -123,16 +123,19 @@ test.describe('Web Demo — catalog coverage', () => {
     expectNoPageErrors(diag, 'Sketchfab source toggle');
   });
 
-  test('Geometry tab — every primitive adds, recolours and renders', async ({ page }) => {
-    // Heavy WebGL-interaction test: 4 primitives added + camera orbits, each
-    // Filament-rendered. Triple the budget for GPU-less CI runners (#1560).
-    test.slow();
-    const diag = captureDiagnostics(page);
-    await page.goto('/');
-    await waitForEngineReady(page);
-    await switchTab(page, 'geometry');
+  // One test per geometry primitive: each is a heavy WebGL-interaction pass
+  // (add + camera orbit + Filament render). On GPU-less CI runners software
+  // WebGL is ~4x slower, so four primitives in a single test body overran one
+  // `test.slow()` 180s budget (#1560). Splitting gives each primitive its own
+  // budget while still exercising every primitive.
+  for (const geo of ['cube', 'sphere', 'cylinder', 'plane']) {
+    test(`Geometry tab — ${geo} adds, recolours and renders`, async ({ page }) => {
+      test.slow();
+      const diag = captureDiagnostics(page);
+      await page.goto('/');
+      await waitForEngineReady(page);
+      await switchTab(page, 'geometry');
 
-    for (const geo of ['cube', 'sphere', 'cylinder', 'plane']) {
       // Tweak size + unlit toggle before adding.
       const sizeSlider = page.locator(`[data-geo-size="${geo}"]`);
       await sizeSlider.focus();
@@ -143,13 +146,25 @@ test.describe('Web Demo — catalog coverage', () => {
       await page.waitForTimeout(600);
       await dragCanvas(page);
       await assertRendered(page, `Geometry tab — ${geo}`);
-    }
 
-    // Clear All Geometry must not throw.
+      expectNoPageErrors(diag, `Geometry tab — ${geo}`);
+    });
+  }
+
+  test('Geometry tab — Clear All Geometry does not throw', async ({ page }) => {
+    test.slow();
+    const diag = captureDiagnostics(page);
+    await page.goto('/');
+    await waitForEngineReady(page);
+    await switchTab(page, 'geometry');
+
+    // Add one primitive so Clear has something to remove.
+    await page.locator('.geo-add-btn[data-geo="cube"]').click();
+    await page.waitForTimeout(600);
     await page.locator('#geo-clear').click();
     await page.waitForTimeout(500);
 
-    expectNoPageErrors(diag, 'Geometry tab');
+    expectNoPageErrors(diag, 'Geometry tab — clear');
   });
 
   test('Physics tab — Double Pendulum runs, sliders + reset work', async ({ page }) => {
