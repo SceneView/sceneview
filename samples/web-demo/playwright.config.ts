@@ -73,6 +73,13 @@ export default defineConfig({
             '--use-gl=angle',
             '--enable-features=Vulkan',
             '--ignore-gpu-blocklist',
+            // Chrome removed the automatic SwiftShader fallback for WebGL. On a
+            // GPU-less CI runner ANGLE has no hardware path and nothing to fall
+            // back to, so WebGL context creation fails outright — the demo
+            // never gets a context and the suite would go green-on-nothing.
+            // This flag re-enables the software rasteriser so the Filament.js
+            // viewer still gets a context on headless CI.
+            '--enable-unsafe-swiftshader',
           ],
         },
       },
