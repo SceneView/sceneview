@@ -67,6 +67,24 @@ jobs:
             -skipMacroValidation \
             | xcpretty --color 2>/dev/null || cat
 
+      # Build the visionOS target so a visionOS-only API breakage can't slip
+      # into main silently (#1366 — the xrOS target was broken on main for
+      # multiple releases because no CI job built it). `swift build` against
+      # the XROS SDK does not need the visionOS simulator runtime installed
+      # on the runner — only the SDK, which ships with Xcode — so this works
+      # on a stock `macos-15` image without a `Download visionOS platform`
+      # step. If the SDK is genuinely absent the step fails loudly rather
+      # than skipping (no `|| true`).
+      - name: Build Swift Package (visionOS)
+        working-directory: SceneViewSwift
+        run: |
+          set -o pipefail
+          XROS_SDK="$(xcrun --sdk xros --show-sdk-path)"
+          echo "visionOS SDK: $XROS_SDK"
+          swift build \
+            --sdk "$XROS_SDK" \
+            -Xswiftc -target -Xswiftc arm64-apple-xros2.0
+
       - name: Run tests
         working-directory: SceneViewSwift
         run: |
