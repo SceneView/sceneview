@@ -112,8 +112,14 @@ on:
   # the device-QA legs too — see #1324.
   workflow_call:
 
+# A Device QA run is ~50 min (emulator + Maestro). A `workflow_dispatch` run is
+# a deliberate release gate — keying its concurrency group on `github.run_id`
+# makes it unique so a later push to the same ref can never cancel it (#1665).
+# `push` (and the nightly `workflow_call`) runs share the `push` group, so a
+# stale push run is still auto-cancelled — desirable, no point burning a 50-min
+# emulator run on a superseded SHA.
 concurrency:
-  group: device-qa-${{ github.ref }}
+  group: device-qa-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'push' }}
   cancel-in-progress: true
 
 permissions:
