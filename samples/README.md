@@ -11,7 +11,6 @@ This directory contains sample apps demonstrating SceneView capabilities across 
 | Show a 3D model with orbit camera | `model-viewer` | `SceneView { ModelNode(modelInstance) }` |
 | Place a model in AR on a surface | `ar-model-viewer` | `ARSceneView { AnchorNode { ModelNode() } }` |
 | Control camera orbit/pan/zoom | `camera-manipulator` | `rememberCameraManipulator()` |
-| Use cameras from a glTF file | `gltf-camera` | `CameraNode(camera = gltfCamera)` |
 | Draw lines and curves | `line-path` | `LineNode(start, end)`, `PathNode(points)` |
 | Add text labels in 3D | `text-labels` | `TextNode(text = "Label")` |
 | Procedural sky + fog atmosphere | `dynamic-sky` | `DynamicSkyNode`, `FogNode` |
@@ -20,8 +19,7 @@ This directory contains sample apps demonstrating SceneView capabilities across 
 | Local reflections / IBL zones | `reflection-probe` | `ReflectionProbeNode` |
 | Detect real-world images in AR | `ar-augmented-image` | `AugmentedImageNode(image)` |
 | Share AR anchors across devices | `ar-cloud-anchor` | `CloudAnchorNode(anchor)` |
-| Visualize AR feature points | `ar-point-cloud` | ARCore point cloud rendering |
-| Build a full demo app | `android-demo` | 4-tab Material 3 app (3D, AR, Samples, About) |
+| Build a full demo app | `android-demo` | 4-tab Material 3 app (Explore, AR View, Samples, About) |
 
 ## Samples by category
 
@@ -31,14 +29,12 @@ This directory contains sample apps demonstrating SceneView capabilities across 
 |---|---|---|
 | `model-viewer` | Load a glTF/GLB model, HDR environment, orbit camera, animations | Beginner |
 | `camera-manipulator` | Orbit, pan, zoom camera with gesture and collision hit-testing | Beginner |
-| `gltf-camera` | Import and use camera nodes from glTF files | Intermediate |
 | `line-path` | LineNode, PathNode, procedural curves, animated sine waves | Intermediate |
 | `text-labels` | World-space text labels with face-to-camera constraints | Intermediate |
 | `dynamic-sky` | Procedural sky + fog atmosphere, real-time parameter sliders | Advanced |
 | `physics-demo` | Tap-to-spawn spheres with gravity, bounce, Euler integration | Advanced |
 | `post-processing` | Bloom, Depth of Field, SSAO, fog — all post-processing effects | Advanced |
 | `reflection-probe` | ReflectionProbeNode, zone-based IBL switching | Advanced |
-| `autopilot-demo` | Procedural geometry scene + HUD overlay — no model files needed | Showcase |
 
 ### Augmented Reality
 
@@ -47,13 +43,12 @@ This directory contains sample apps demonstrating SceneView capabilities across 
 | `ar-model-viewer` | Tap-to-place on planes, model picker, pinch/rotate | Beginner |
 | `ar-augmented-image` | Image detection, overlay 3D content on real images | Intermediate |
 | `ar-cloud-anchor` | Persistent cross-device anchors via Google Cloud | Advanced |
-| `ar-point-cloud` | ARCore feature point visualization | Intermediate |
 
 ### Showcase
 
 | Sample | Description |
 |---|---|
-| `android-demo` | Play Store demo app — 3D, AR, Samples, About tabs (37 demos: 24 3D + 13 AR, Material 3) |
+| `android-demo` | Play Store demo app — Explore, AR View, Samples, About tabs (42 demos: 28 non-AR + 14 AR, Material 3) |
 
 ## Common recipes (copy-paste ready)
 

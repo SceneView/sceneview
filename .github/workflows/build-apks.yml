@@ -1,11 +1,10 @@
 name: Build sample APKs
 
 on:
-  # PRs are NOT triggered here — ci.yml + pr-check.yml already build the
-  # same APKs via `:samples:android-demo:assembleDebug` (run twice on
-  # every PR before this slimming pass). This workflow now only produces
-  # the artifact-uploaded + release-attached APKs on main and tag pushes,
-  # which is the only unique value vs ci.yml's build.
+  # PRs are NOT triggered here — ci.yml's `build` job already builds the
+  # same APKs via `:samples:android-demo:assembleDebug` on every PR. This
+  # workflow now only produces the artifact-uploaded + release-attached APKs
+  # on main and tag pushes, which is the only unique value vs ci.yml's build.
   #
   # Strictly path-gated (#1311, #1321): SKIPPED on doc-only, CI-only
   # (`.github/**`), and `mcp/`-only merges — none of those change the

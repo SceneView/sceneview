@@ -17,7 +17,7 @@ android {
         minSdk 28
         targetSdk 36
         versionCode project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 350
-        versionName "4.5.0"
+        versionName "4.9.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -101,7 +101,27 @@ android {
         buildConfig = true
     }
     androidResources {
+        // `.filamat` and `.ktx` are already compressed payloads — re-zipping
+        // them in the APK only wastes CPU. `.glb` and `.hdr` stay compressible:
+        // the demo GLBs are Draco + WebP packed and the HDRs are RGBE, both of
+        // which the APK zip stage still shrinks meaningfully.
         noCompress 'filamat', 'ktx'
+    }
+    packaging {
+        resources {
+            // Drop duplicate transitive licence / metadata files that several
+            // AndroidX artifacts each ship — pure dead weight in the APK.
+            excludes += [
+                'META-INF/*.kotlin_module',
+                'META-INF/androidx/**',
+                'META-INF/{AL2.0,LGPL2.1}',
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE*',
+                'META-INF/NOTICE*',
+                'kotlin/**',
+                'DebugProbesKt.bin',
+            ]
+        }
     }
     testOptions {
         unitTests {

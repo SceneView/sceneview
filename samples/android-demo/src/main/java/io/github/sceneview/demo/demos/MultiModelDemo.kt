@@ -28,6 +28,7 @@ import io.github.sceneview.demo.R
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.demos.internal.DemoMath
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberHeroYaw
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -39,7 +40,6 @@ import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
-import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import java.io.File
 
@@ -102,8 +102,9 @@ fun MultiModelDemo(onBack: () -> Unit) {
 
     // Each `produceState` flips from `null` (download / fallback-copy still
     // running on IO) to a real `File` once the resolver returns. ModelInstance
-    // creation happens only after the file is on disk — `rememberModelInstance`
-    // dispatches via the `file://` URI overload which is async-safe.
+    // creation happens only after the file is on disk — `rememberFileModelInstance`
+    // loads the `file://` URI via `ModelLoader.loadModelInstance`, which is
+    // async-safe and keeps the Filament JNI work on the Main thread.
     val treeFile = rememberSlugFile(tree)
     val benchFile = rememberSlugFile(bench)
     val dogFile = rememberSlugFile(dog)
@@ -135,9 +136,12 @@ fun MultiModelDemo(onBack: () -> Unit) {
         trigger = allLoaded && spinScene, durationMillis = 30_000, staticYaw = 0f,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_multi_model_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text("Visibility", style = MaterialTheme.typography.labelLarge)
             Row(
@@ -185,6 +189,7 @@ fun MultiModelDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,
@@ -267,8 +272,19 @@ private fun rememberSlugFile(slug: SketchfabSlug?): File? {
 }
 
 /**
- * Convenience wrapper around `rememberModelInstance(modelLoader, "file://...")`
- * that accepts a nullable [File] and returns `null` until the file is ready.
+ * Load a [io.github.sceneview.model.ModelInstance] from a nullable local [File],
+ * returning `null` until the file is ready.
+ *
+ * The resolver always hands back a real on-disk [File] (streamed GLB or staged
+ * bundled fallback), so the model must be loaded through
+ * [io.github.sceneview.loaders.ModelLoader.loadModelInstance], which understands
+ * `file://` URIs. The two-argument `rememberModelInstance(modelLoader, String)`
+ * call is **not** usable here: Kotlin overload resolution binds it to the
+ * asset-path overload (the one without a defaulted `resourceResolver`), which
+ * feeds the `file://` string straight to `AssetManager.open` — that throws
+ * `FileNotFoundException`, the instance stays `null`, and the demo hangs forever
+ * on "Loading 4 models…" (#1422). Loading via `produceState` + `loadModelInstance`
+ * keeps the Filament JNI work on the loader's own Main-thread hop.
  */
 @Composable
 private fun rememberFileModelInstance(
@@ -276,5 +292,13 @@ private fun rememberFileModelInstance(
     file: File?,
 ): io.github.sceneview.model.ModelInstance? {
     if (file == null) return null
-    return rememberModelInstance(modelLoader, "file://${file.absolutePath}")
+    return produceState<io.github.sceneview.model.ModelInstance?>(
+        initialValue = null,
+        key1 = modelLoader,
+        key2 = file.absolutePath,
+    ) {
+        value = runCatching {
+            modelLoader.loadModelInstance("file://${file.absolutePath}")
+        }.getOrNull()
+    }.value
 }

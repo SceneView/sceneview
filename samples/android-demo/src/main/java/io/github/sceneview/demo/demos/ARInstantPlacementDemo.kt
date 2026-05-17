@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,9 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -47,6 +46,8 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.demos.internal.ArPlacement
+import io.github.sceneview.demo.demos.internal.rememberTexturesSettled
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -359,13 +360,23 @@ private fun InstantPlacementScene(
                     // doc (#1184). AnchorNode under a STOPPED anchor freezes the model
                     // at the last good pose, which looks broken to the user.
                     if (lostAnchors[placed.id] != true) {
-                        AnchorNode(anchor = placed.anchor) {
+                        // visibleTrackingStates includes PAUSED so a placed model rides out
+                        // transient plane loss at its last known pose instead of vanishing;
+                        // permanent loss is still handled above via lostAnchors (#1435).
+                        AnchorNode(
+                            anchor = placed.anchor,
+                            visibleTrackingStates = ArPlacement.ANCHORED_VISIBLE_STATES
+                        ) {
                             val instance = rememberModelInstance(modelLoader, placed.assetLocation)
+                            // Gate visibility until Filament finishes uploading the model's
+                            // textures, so it doesn't flash black on placement (#1435).
+                            val textured = rememberTexturesSettled(ready = instance != null)
                             instance?.let {
                                 ModelNode(
                                     modelInstance = it,
                                     scaleToUnits = 0.3f,
                                     centerOrigin = Position(0.0f, 0.0f, 0.0f),
+                                    isVisible = textured,
                                     isEditable = true
                                 )
                             }
@@ -414,44 +425,44 @@ private fun InstantPlacementScene(
             )
         }
 
-        // Per-model tracking badges, listed below the count pill. Hidden when instant placement
-        // is off — plane hits don't carry an InstantPlacementPoint trackable.
+        // Most-recent-model tracking badge, shown just below the count pill. The old
+        // per-model column (one chip per placed model, up to 4 stacked) overflowed the
+        // top third of the viewport and overlapped the placed models themselves
+        // (#1476). The aggregate "$count placed • $approximating approximating • …"
+        // pill above already reports the per-state tally, so a single badge for the
+        // latest placed model is enough to teach the approximate → full-tracking
+        // transition without the visual clutter.
         //
-        // #1184: iterate over `placedModels` (the source of truth) rather than `trackingMethods`
-        // so anchors that went `STOPPED` before their first `InstantPlacementPoint.trackingMethod`
-        // ever fired still surface as `Lost` (previously they had no entry in `trackingMethods`
-        // and silently disappeared from the badge list).
-        if (instantEnabled && placedModels.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 48.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                placedModels.take(4).forEach { placed ->
-                    val isLost = lostAnchors[placed.id] == true
-                    val method = trackingMethods[placed.id]
-                    val (label, color) = when {
-                        isLost -> "Lost — tap to re-place" to Color(0xFF8A0000)
-                        method == InstantPlacementPoint.TrackingMethod.FULL_TRACKING ->
-                            "Tracked" to Color(0xFF1B873B)
-                        method == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE ->
-                            "Approximating" to Color(0xFFE07B00)
-                        else -> "Initializing" to Color(0xFF555555)
-                    }
-                    Surface(
-                        color = color.copy(alpha = 0.85f),
-                        contentColor = Color.White,
-                        tonalElevation = 4.dp,
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.padding(top = 4.dp)
-                    ) {
-                        Text(
-                            text = "${placed.displayName}: $label",
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
+        // #1184: read from `placedModels` (the source of truth) so a model whose anchor
+        // went `STOPPED` before its first `InstantPlacementPoint.trackingMethod` ever
+        // fired still surfaces as `Lost`.
+        if (instantEnabled) {
+            val latest = placedModels.lastOrNull()
+            if (latest != null) {
+                val isLost = lostAnchors[latest.id] == true
+                val method = trackingMethods[latest.id]
+                val (label, color) = when {
+                    isLost -> "Lost — tap to re-place" to Color(0xFF8A0000)
+                    method == InstantPlacementPoint.TrackingMethod.FULL_TRACKING ->
+                        "Tracked" to Color(0xFF1B873B)
+                    method == InstantPlacementPoint.TrackingMethod.SCREENSPACE_WITH_APPROXIMATE_DISTANCE ->
+                        "Approximating" to Color(0xFFE07B00)
+                    else -> "Initializing" to Color(0xFF555555)
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 44.dp),
+                    color = color.copy(alpha = 0.9f),
+                    contentColor = Color.White,
+                    tonalElevation = 4.dp,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Latest — ${latest.displayName}: $label",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
         }
@@ -468,7 +479,11 @@ private fun InstantPlacementScene(
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
         ) {
-            OutlinedButton(
+            // Solid filled button (#1476). The previous OutlinedButton drew only a
+            // hairline border with a transparent fill, so over the live camera feed
+            // it was nearly invisible. A filled M3 Button gives an opaque surface
+            // with a guaranteed contrast pairing (container / onContainer).
+            Button(
                 onClick = {
                     placedModels.forEach { runCatching { it.anchor.detach() } }
                     placedModels.clear()

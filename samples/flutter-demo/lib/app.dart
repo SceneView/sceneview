@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'pages/viewer_page.dart';
 import 'pages/ar_page.dart';
+import 'pages/demos_page.dart';
 import 'pages/features_page.dart';
+import 'pages/double_pendulum_page.dart';
 import 'pages/about_page.dart';
 import 'services/update_checker.dart';
 
@@ -50,8 +52,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   static const _pages = <Widget>[
     ViewerPage(),
+    DemosPage(),
     ARPage(),
     FeaturesPage(),
+    DoublePendulumPage(),
     AboutPage(),
   ];
 
@@ -117,6 +121,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             label: '3D Viewer',
           ),
           NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view),
+            label: 'Demos',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.camera_outlined),
             selectedIcon: Icon(Icons.camera),
             label: 'AR',
@@ -125,6 +134,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
             label: 'Features',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.science_outlined),
+            selectedIcon: Icon(Icons.science),
+            label: 'Physics',
           ),
           NavigationDestination(
             icon: Icon(Icons.info_outlined),

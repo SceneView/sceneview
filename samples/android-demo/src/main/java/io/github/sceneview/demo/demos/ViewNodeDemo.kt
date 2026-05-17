@@ -70,11 +70,13 @@ fun ViewNodeDemo(onBack: () -> Unit) {
     // back card (at rotation+180°) reveals itself — makes the "Compose-in-3D" story
     // unmistakable instead of looking like a flat HUD sticker. `trigger = true`
     // because the ViewNode itself needs no asset load — the animation can run
-    // immediately. Pauses on first gesture so users can grab and inspect the cards.
+    // immediately. Pauses on gesture so users can grab and inspect the cards, then
+    // gently resumes the spin once they've been idle for 3 s (#1440).
     val (heroYaw, onHeroGesture) = rememberPausableHeroYaw(
         trigger = true,
         durationMillis = 14_000,
         staticYaw = 20f,
+        idleResumeMillis = 3_000L,
     )
 
     val gestureListener = rememberOnGestureListener(
@@ -90,6 +92,25 @@ fun ViewNodeDemo(onBack: () -> Unit) {
     )
 
     val firstFrame = rememberFirstFrameState()
+
+    // The first Filament frame of this SceneView is presented almost immediately —
+    // the quads themselves carry no asset to load. But a ViewNode renders its
+    // embedded Compose card to an off-screen window, draws it to a bitmap, and
+    // uploads that as a Filament texture; that pipeline only catches up a handful
+    // of frames later. Dismissing the scrim on frame #1 therefore reveals two
+    // black quads for several seconds before the card texture lands (#1472).
+    //
+    // Hold the scrim for a short warm-up window of frames so the embedded card
+    // texture is uploaded *before* the scrim cross-fades out. The scaffold's
+    // 12 s defensive timeout still dismisses the scrim if onFrame ever stalls.
+    var renderedFrames by remember { mutableIntStateOf(0) }
+    val onWarmedUpFrame: (Long) -> Unit = { frameTimeNanos ->
+        if (renderedFrames < VIEW_NODE_WARMUP_FRAMES) {
+            renderedFrames++
+        } else {
+            firstFrame.onFrame(frameTimeNanos)
+        }
+    }
 
     DemoScaffold(
         title = stringResource(R.string.demo_view_node_title),
@@ -117,7 +138,7 @@ fun ViewNodeDemo(onBack: () -> Unit) {
     ) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
-            onFrame = firstFrame.onFrame,
+            onFrame = onWarmedUpFrame,
             engine = engine,
             materialLoader = materialLoader,
             environmentLoader = environmentLoader,
@@ -195,6 +216,15 @@ private fun EmbeddedCard(tapCount: Int, onTap: () -> Unit) {
         }
     }
 }
+
+/**
+ * Number of presented Filament frames to keep the [DemoScaffold] loading scrim up
+ * before reporting "first frame" for the ViewNode demo. At ~60 fps this is roughly
+ * a third of a second — enough for the off-screen Compose card to be measured,
+ * drawn, and uploaded as a Filament texture so the scrim never reveals a black
+ * quad (#1472). Kept small so the warm-up is imperceptible on a healthy device.
+ */
+private const val VIEW_NODE_WARMUP_FRAMES = 18
 
 @Composable
 private fun BackCard(tapCount: Int) {

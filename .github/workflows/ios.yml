@@ -58,6 +58,9 @@ jobs:
       - name: Build Swift Package (iOS)
         working-directory: SceneViewSwift
         run: |
+          # `pipefail` so a failing xcodebuild is not masked by xcpretty's
+          # exit 0 (the `|| cat` fallback also exits 0) — see #1515.
+          set -o pipefail
           xcodebuild build \
             -scheme SceneViewSwift \
             -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
@@ -67,6 +70,10 @@ jobs:
       - name: Run tests
         working-directory: SceneViewSwift
         run: |
+          # `pipefail` so an iOS-simulator test-build failure actually fails
+          # CI — without it the AugmentedImageNodeTests breakage in #1515
+          # slipped past a "green" run.
+          set -o pipefail
           xcodebuild test \
             -scheme SceneViewSwift \
             -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
@@ -89,13 +96,15 @@ jobs:
         uses: actions/cache@v5
         with:
           path: samples/ios-demo/SourcePackages
-          # NOTE: the `hashFiles(...)` path mirrors the convention used in
-          # app-store.yml. The checked-in `Package.resolved` actually lives
-          # at `samples/ios-demo/Package.resolved`; the nested swiftpm path
-          # is where Xcode writes the workspace-scoped resolved file on
-          # `-resolvePackageDependencies`. First-run cache misses fall
-          # through to `restore-keys` so the build still completes.
-          key: spm-${{ runner.os }}-demo-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          # `hashFiles()` must point at a file that exists at checkout time
+          # (#1360). The previous key targeted the workspace-scoped
+          # `xcshareddata/swiftpm/Package.resolved`, which Xcode only writes
+          # *during* `-resolvePackageDependencies` — so on a clean runner
+          # the file is absent, `hashFiles()` returns an empty string, and
+          # the key is the constant `spm-<os>-demo-` for every run (no cache
+          # invalidation when dependencies change). The checked-in resolved
+          # file lives at `samples/ios-demo/Package.resolved`; hash that.
+          key: spm-${{ runner.os }}-demo-${{ hashFiles('samples/ios-demo/Package.resolved') }}
           restore-keys: |
             spm-${{ runner.os }}-demo-
 
@@ -125,6 +134,8 @@ jobs:
           SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         working-directory: samples/ios-demo
         run: |
+          # `pipefail` so a failing xcodebuild is not masked by xcpretty — #1515.
+          set -o pipefail
           xcodebuild test \
             -project SceneViewDemo.xcodeproj \
             -scheme SceneViewDemo \

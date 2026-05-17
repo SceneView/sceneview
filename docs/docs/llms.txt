@@ -2,12 +2,12 @@
 
 SceneView is a declarative 3D and AR SDK for Android (Jetpack Compose, Filament, ARCore) and Apple platforms — iOS, macOS, visionOS (SwiftUI, RealityKit, ARKit) — with shared core logic via Kotlin Multiplatform. Each platform uses its native renderer: Filament on Android, RealityKit on Apple.
 
-**Android — Maven artifacts (version 4.5.0):**
-- 3D only: `io.github.sceneview:sceneview:4.5.0`
-- AR + 3D: `io.github.sceneview:arsceneview:4.5.0`
+**Android — Maven artifacts (version 4.9.0):**
+- 3D only: `io.github.sceneview:sceneview:4.9.0`
+- AR + 3D: `io.github.sceneview:arsceneview:4.9.0`
 
 **Apple (iOS 17+ / macOS 14+ / visionOS 1+) — Swift Package:**
-- `https://github.com/sceneview/sceneview.git` (from: "4.5.0")
+- `https://github.com/sceneview/sceneview.git` (from: "4.9.0")
 
 **Min SDK:** 24 | **Target SDK:** 36 | **Kotlin:** 2.3.21 | **Compose BOM compatible**
 
@@ -23,8 +23,8 @@ is also archived under `/api/sceneview/<version>/`.
 ### build.gradle (app module)
 ```kotlin
 dependencies {
-    implementation("io.github.sceneview:sceneview:4.5.0")   // 3D only
-    implementation("io.github.sceneview:arsceneview:4.5.0") // AR (includes sceneview)
+    implementation("io.github.sceneview:sceneview:4.9.0")   // 3D only
+    implementation("io.github.sceneview:arsceneview:4.9.0") // AR (includes sceneview)
 }
 ```
 
@@ -1949,6 +1949,10 @@ fun ARFaceTracking() {
 
     ARSceneView(
         sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
+        // REQUIRED: FRONT_CAMERA alone only makes the front camera eligible — the session
+        // stays on the default BACK camera until sessionCameraConfig selects a FRONT config.
+        // Without ::frontCameraConfig, AugmentedFaceMode.MESH3D yields no faces and no mesh.
+        sessionCameraConfig = ::frontCameraConfig,
         sessionConfiguration = { _, config ->
             config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D
         },
@@ -2338,7 +2342,7 @@ React Native (Turbo Module / Fabric), KMP Compose iOS (UIKitView).
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.5.0")
+    .package(url: "https://github.com/sceneview/sceneview.git", from: "4.9.0")
 ]
 ```
 
@@ -3081,7 +3085,7 @@ Renderer: **RealityKit**. Requires iOS 17+ / macOS 14+ / visionOS 1+.
 
 SPM dependency (Package.swift or Xcode):
 ```swift
-.package(url: "https://github.com/sceneview/sceneview.git", from: "4.5.0")
+.package(url: "https://github.com/sceneview/sceneview.git", from: "4.9.0")
 ```
 
 Import: `import SceneViewSwift`
@@ -3688,7 +3692,7 @@ Install:
 ```yaml
 # pubspec.yaml
 dependencies:
-  sceneview_flutter: ^4.5.0
+  sceneview_flutter: ^4.9.0
 ```
 
 Widgets: `SceneView` (3D), `ARSceneView` (AR).

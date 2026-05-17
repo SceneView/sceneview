@@ -25,6 +25,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -113,9 +114,12 @@ fun MaterialsDemo(onBack: () -> Unit) {
         rememberModelInstance(modelLoader, path)
     }
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_materials_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Row(
                 modifier = Modifier
@@ -164,6 +168,7 @@ fun MaterialsDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

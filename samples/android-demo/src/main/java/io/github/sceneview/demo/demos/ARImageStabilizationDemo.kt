@@ -20,8 +20,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,6 +39,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.ar.arcore.configure
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
@@ -64,16 +65,19 @@ import io.github.sceneview.rememberOnGestureListener
  * demo wires it up end-to-end so the toggle is discoverable in-app.
  *
  * Wiring summary:
- * 1. `sessionConfiguration` queries [Session.isImageStabilizationModeSupported] to detect
- *    whether the device supports [Config.ImageStabilizationMode.EIS]. Some devices report
- *    `false` — the toggle is disabled and a banner explains why.
- * 2. When supported and the user toggle is ON, [Config.setImageStabilizationMode] is called
- *    with `EIS`; otherwise `OFF`. ARCore re-applies this every session reconfigure.
- * 3. The whole [ARSceneView] is wrapped in `key(eisOn)`. ARCore *accepts* runtime
- *    [Session.configure] calls for EIS, but the camera background stream can briefly stutter
- *    while the stabilization buffers re-prime. Re-keying the scene is the boring-and-correct
- *    path: tear down the engine + session and rebuild with the new config. The cost (one
- *    engine restart per toggle) is paid only on user interaction and matches a cold launch.
+ * 1. `sessionConfiguration` applies the *initial* EIS state on session creation. ARCore's
+ *    [Config.ImageStabilizationMode] is a **runtime-reconfigurable** flag, so we don't tear
+ *    the session down to flip it.
+ * 2. A [LaunchedEffect] keyed on the user toggle calls [Session.configure] live whenever the
+ *    switch flips. It first queries [Session.isImageStabilizationModeSupported] — if the
+ *    device (or an AR recording played back) doesn't support [Config.ImageStabilizationMode.EIS],
+ *    [eisSupported] is set `false`, the switch is disabled, and a banner explains why. This
+ *    replaces the previous `key(eisOn)` full-session-rebuild, which silently invalidated the
+ *    placed anchor on every toggle — the helmet (the demo's whole reference object) vanished
+ *    the instant the user switched EIS, so the on/off comparison was impossible (#1475).
+ * 3. The status pill reflects what ARCore *actually applied* (the result of the last
+ *    reconfigure), not just the requested toggle — so an unsupported device honestly reads
+ *    "EIS OFF" with the banner rather than a misleading "ON".
  * 4. Tap-to-place a single helmet GLB on a detected plane, mirroring [ARDepthOcclusionDemo].
  *    The fixed reference object is what makes the stabilization difference visible: the
  *    model stays glued to its world pose while the camera image around it goes from shaky
@@ -99,6 +103,16 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
     // controls drawer can disable the switch and surface a banner.
     var eisSupported by remember { mutableStateOf<Boolean?>(null) }
 
+    // What ARCore *actually* applied after the last (re)configure. Drives the status pill so
+    // it reflects the real session state, never just the requested toggle. Starts `false`
+    // because the session boots with EIS OFF.
+    var eisApplied by remember { mutableStateOf(false) }
+
+    // Live ARCore session, captured from `onSessionUpdated`. Used by the LaunchedEffect below
+    // to reconfigure EIS at runtime when the user flips the switch — no session teardown, so
+    // the placed helmet anchor stays valid across toggles.
+    var arSession by remember { mutableStateOf<Session?>(null) }
+
     var placedAnchor by remember { mutableStateOf<Anchor?>(null) }
     var trackingFailureReason by remember { mutableStateOf<TrackingFailureReason?>(null) }
     var isTracking by remember { mutableStateOf(false) }
@@ -116,10 +130,35 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
     // Latest Frame for hit testing in the gesture callback.
     var latestFrame by remember { mutableStateOf<Frame?>(null) }
 
-    // The toggle ultimately drives ARCore's session config. Snapshot the value so the keyed
-    // scope below sees a stable boolean. We force-OFF when the device doesn't support EIS
-    // so the status pill reflects what ARCore actually applies.
-    val eisOn = eisEnabled && (eisSupported != false)
+    // Reconfigure ARCore's EIS mode live whenever the user flips the switch (or once the
+    // session first becomes available). [Config.ImageStabilizationMode] is runtime-mutable,
+    // so a single `Session.configure` call is enough — no session/anchor teardown.
+    LaunchedEffect(arSession, eisEnabled) {
+        val session = arSession ?: return@LaunchedEffect
+        val supported = runCatching {
+            session.isImageStabilizationModeSupported(Config.ImageStabilizationMode.EIS)
+        }.getOrDefault(false)
+        eisSupported = supported
+
+        val wantEis = eisEnabled && supported
+        runCatching {
+            session.configure { config ->
+                config.imageStabilizationMode = if (wantEis) {
+                    Config.ImageStabilizationMode.EIS
+                } else {
+                    Config.ImageStabilizationMode.OFF
+                }
+            }
+            // Read back what ARCore committed so the pill never over-promises.
+            eisApplied = session.config.imageStabilizationMode ==
+                Config.ImageStabilizationMode.EIS
+        }.onFailure {
+            // ARCore rejected the reconfigure (e.g. EIS unsupported on a recording
+            // playback). Surface it honestly rather than leaving a stuck pill.
+            eisSupported = false
+            eisApplied = false
+        }
+    }
 
     DemoScaffold(
         title = stringResource(R.string.demo_ar_image_stabilization_title),
@@ -199,130 +238,124 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
         }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Re-keying the whole scene on toggle is the boring-and-correct strategy:
-            // ARCore accepts runtime `Session.configure` calls to flip EIS, but the camera
-            // background stream can briefly stutter while the stabilization buffers
-            // re-prime. Tearing down + rebuilding ARSceneView matches a cold launch and
-            // keeps the EIS-on / EIS-off paths identical.
-            key(eisOn) {
-                ARSceneView(
-                    modifier = Modifier.fillMaxSize(),
-                    engine = engine,
-                    modelLoader = modelLoader,
-                    materialLoader = materialLoader,
-                    planeRenderer = true,
-                    sessionConfiguration = { session: Session, config: Config ->
-                        config.planeFindingMode =
-                            Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                        config.lightEstimationMode =
-                            Config.LightEstimationMode.ENVIRONMENTAL_HDR
+            // Single, stable ARSceneView — NOT re-keyed on the EIS toggle. ARCore's
+            // `imageStabilizationMode` is runtime-reconfigurable, so the LaunchedEffect
+            // above flips it live via `Session.configure`. The previous `key(eisOn)`
+            // rebuilt the whole session on every toggle, which invalidated the placed
+            // helmet anchor — the demo's only reference object — making the on/off
+            // comparison impossible (#1475).
+            ARSceneView(
+                modifier = Modifier.fillMaxSize(),
+                engine = engine,
+                modelLoader = modelLoader,
+                materialLoader = materialLoader,
+                planeRenderer = true,
+                sessionConfiguration = { _: Session, config: Config ->
+                    config.planeFindingMode =
+                        Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                    config.lightEstimationMode =
+                        Config.LightEstimationMode.ENVIRONMENTAL_HDR
+                    // Boot with EIS OFF — the LaunchedEffect reconfigures it (and probes
+                    // device support) as soon as the session is captured.
+                    config.imageStabilizationMode = Config.ImageStabilizationMode.OFF
+                },
+                onSessionUpdated = { session: Session, frame: Frame ->
+                    arSession = session
+                    latestFrame = frame
+                    isTracking = frame.camera.trackingState == TrackingState.TRACKING
 
-                        // Probe device support exactly once per session reconfigure.
-                        // Requesting EIS on an unsupported device would throw, so we gate
-                        // on the capability check first and surface the result so the UI
-                        // can disable the toggle + show the unsupported banner.
-                        val supported = session.isImageStabilizationModeSupported(
-                            Config.ImageStabilizationMode.EIS
+                    // Auto-place the helmet ~1 m in front of the camera on the
+                    // first stable TRACKING frame. We don't wait for plane
+                    // detection — the EIS demo doesn't need a plane-anchored
+                    // pose to demonstrate "model stays glued while bg
+                    // stabilizes", and waiting for ARCore's plane finder
+                    // (5–10 s indoors) eats the first impression.
+                    //
+                    // The pose is built from the camera's world pose
+                    // composed with a -1 m Z translation in the camera's
+                    // local frame, so the helmet appears straight ahead at
+                    // eye-level regardless of camera tilt.
+                    if (!autoPlaced &&
+                        placedAnchor == null &&
+                        frame.camera.trackingState == TrackingState.TRACKING
+                    ) {
+                        val anchorPose = frame.camera.pose.compose(
+                            Pose.makeTranslation(0f, 0f, -1.0f)
                         )
-                        eisSupported = supported
+                        runCatching { session.createAnchor(anchorPose) }
+                            .onSuccess { anchor ->
+                                placedAnchor = anchor
+                                autoPlaced = true
+                            }
+                    }
+                },
+                onTrackingFailureChanged = { reason ->
+                    trackingFailureReason = reason
+                },
+                onGestureListener = rememberOnGestureListener(
+                    onSingleTapConfirmed = { event: MotionEvent, node ->
+                        if (node != null) return@rememberOnGestureListener
 
-                        config.imageStabilizationMode = if (eisOn && supported) {
-                            Config.ImageStabilizationMode.EIS
-                        } else {
-                            Config.ImageStabilizationMode.OFF
+                        val frame = latestFrame ?: return@rememberOnGestureListener
+                        if (frame.camera.trackingState != TrackingState.TRACKING) {
+                            return@rememberOnGestureListener
                         }
-                    },
-                    onSessionUpdated = { session: Session, frame: Frame ->
-                        latestFrame = frame
-                        isTracking = frame.camera.trackingState == TrackingState.TRACKING
 
-                        // Auto-place the helmet ~1 m in front of the camera on the
-                        // first stable TRACKING frame. We don't wait for plane
-                        // detection — the EIS demo doesn't need a plane-anchored
-                        // pose to demonstrate "model stays glued while bg
-                        // stabilizes", and waiting for ARCore's plane finder
-                        // (5–10 s indoors) eats the first impression.
-                        //
-                        // The pose is built from the camera's world pose
-                        // composed with a -1 m Z translation in the camera's
-                        // local frame, so the helmet appears straight ahead at
-                        // eye-level regardless of camera tilt.
-                        if (!autoPlaced &&
-                            placedAnchor == null &&
-                            frame.camera.trackingState == TrackingState.TRACKING
-                        ) {
-                            val anchorPose = frame.camera.pose.compose(
-                                Pose.makeTranslation(0f, 0f, -1.0f)
+                        val hit = frame.hitTest(event).firstOrNull { result ->
+                            val trackable = result.trackable
+                            trackable is Plane &&
+                                trackable.isPoseInPolygon(result.hitPose) &&
+                                result.distance <= 5.0f
+                        }
+                        if (hit != null) {
+                            // Replace any previous placement — single-model demo so the
+                            // user has one fixed reference to walk around for testing.
+                            placedAnchor?.let { runCatching { it.detach() } }
+                            placedAnchor = hit.createAnchor()
+                        }
+                    }
+                )
+            ) {
+                // Wait for both the anchor AND the hoisted model instance — the latter
+                // can still be null on the very first frame while the GLB loads in the
+                // background. After that load, the instance is reused across every
+                // re-placement (anchor clear + re-drop) without reloading.
+                placedAnchor?.let { anchor ->
+                    helmetInstance?.let { instance ->
+                        AnchorNode(anchor = anchor) {
+                            ModelNode(
+                                modelInstance = instance,
+                                scaleToUnits = 0.3f,
+                                centerOrigin = Position(0.0f, 0.0f, 0.0f)
                             )
-                            runCatching { session.createAnchor(anchorPose) }
-                                .onSuccess { anchor ->
-                                    placedAnchor = anchor
-                                    autoPlaced = true
-                                }
-                        }
-                    },
-                    onTrackingFailureChanged = { reason ->
-                        trackingFailureReason = reason
-                    },
-                    onGestureListener = rememberOnGestureListener(
-                        onSingleTapConfirmed = { event: MotionEvent, node ->
-                            if (node != null) return@rememberOnGestureListener
-
-                            val frame = latestFrame ?: return@rememberOnGestureListener
-                            if (frame.camera.trackingState != TrackingState.TRACKING) {
-                                return@rememberOnGestureListener
-                            }
-
-                            val hit = frame.hitTest(event).firstOrNull { result ->
-                                val trackable = result.trackable
-                                trackable is Plane &&
-                                    trackable.isPoseInPolygon(result.hitPose) &&
-                                    result.distance <= 5.0f
-                            }
-                            if (hit != null) {
-                                // Replace any previous placement — single-model demo so the
-                                // user has one fixed reference to walk around for testing.
-                                placedAnchor?.let { runCatching { it.detach() } }
-                                placedAnchor = hit.createAnchor()
-                            }
-                        }
-                    )
-                ) {
-                    // Wait for both the anchor AND the hoisted model instance — the latter
-                    // can still be null on the very first frame while the GLB loads in the
-                    // background. After that load, the instance is reused across every
-                    // re-placement (anchor clear + re-drop) without reloading.
-                    placedAnchor?.let { anchor ->
-                        helmetInstance?.let { instance ->
-                            AnchorNode(anchor = anchor) {
-                                ModelNode(
-                                    modelInstance = instance,
-                                    scaleToUnits = 0.3f,
-                                    centerOrigin = Position(0.0f, 0.0f, 0.0f)
-                                )
-                            }
                         }
                     }
                 }
             }
 
-            // Top-center status pill — green tint when EIS is ON, red tint when OFF.
+            // Top-center status pill — reflects what ARCore *actually applied* (the result
+            // of the last reconfigure), so it never over-promises. Green when EIS is live,
+            // grey when the device can't do EIS, red when EIS is off but available.
             // Big enough for a screenshot to read at a glance.
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 8.dp),
-                color = if (eisOn) {
-                    Color(0xFF1B5E20).copy(alpha = 0.85f)
-                } else {
-                    Color(0xFFB71C1C).copy(alpha = 0.85f)
+                color = when {
+                    eisApplied -> Color(0xFF1B5E20).copy(alpha = 0.85f)
+                    eisSupported == false -> Color(0xFF424242).copy(alpha = 0.85f)
+                    else -> Color(0xFFB71C1C).copy(alpha = 0.85f)
                 },
                 contentColor = Color.White,
                 tonalElevation = 4.dp,
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
-                    text = if (eisOn) "EIS ON" else "EIS OFF",
+                    text = when {
+                        eisApplied -> "EIS ON"
+                        eisSupported == false -> "EIS UNSUPPORTED"
+                        else -> "EIS OFF"
+                    },
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelLarge
                 )

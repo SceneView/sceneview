@@ -500,4 +500,140 @@ public struct CameraControls: Sendable {
     }
 }
 
+// MARK: - Content bounds union (#1391)
+
+/// Pure helpers that compute the union axis-aligned bounding box of several
+/// content `BoundingBox`es, so the fit-to-bounds camera pass frames the
+/// *combined* extent of every loaded model rather than a single entity.
+///
+/// #1385 added the single-model fit; multi-model demos (e.g. `Multi-Model
+/// Park`) still mis-framed because they query one entity's `visualBounds`,
+/// which — when content lives under an `AnchorEntity` whose transform the
+/// anchoring system has not resolved yet, or when only some of several
+/// streamed models have populated — does not describe the union the camera
+/// should frame. Walking every child and unioning their boxes is robust to
+/// both cases. The functions are deliberately free of RealityKit *view*
+/// state so they are unit-testable on any platform.
+///
+/// Kept `internal` (reachable from the `@testable import` test target) so
+/// the public API surface stays minimal — the union is an implementation
+/// detail of `SceneView`'s built-in framing, not a consumer-facing knob.
+enum ContentBounds {
+
+    /// Unions a sequence of `BoundingBox`es into one AABB.
+    ///
+    /// Empty / degenerate boxes (RealityKit reports `min = +∞`, `max = -∞`
+    /// for an empty `BoundingBox`, so the per-axis extents are non-finite)
+    /// are skipped — an async model that has not populated its mesh yet
+    /// must not poison the union with infinities.
+    ///
+    /// - Parameter boxes: The per-entity world-space bounding boxes.
+    /// - Returns: The union AABB, or `nil` if no box was finite & non-empty.
+    static func union(of boxes: [BoundingBox]) -> BoundingBox? {
+        var lo = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var hi = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        var found = false
+        for box in boxes {
+            let bmin = box.min
+            let bmax = box.max
+            // Reject empty / non-finite boxes. `bmax >= bmin` per axis also
+            // filters RealityKit's inverted empty box (min +∞, max -∞).
+            guard bmin.x.isFinite, bmin.y.isFinite, bmin.z.isFinite,
+                  bmax.x.isFinite, bmax.y.isFinite, bmax.z.isFinite,
+                  bmax.x >= bmin.x, bmax.y >= bmin.y, bmax.z >= bmin.z
+            else { continue }
+            lo = simd_min(lo, bmin)
+            hi = simd_max(hi, bmax)
+            found = true
+        }
+        guard found else { return nil }
+        return BoundingBox(min: lo, max: hi)
+    }
+}
+
+// MARK: - Framing stability tracker (#1391 retry)
+
+/// Decides when the content-union AABB has been stable *long enough* that the
+/// fit-to-bounds camera pass may stop re-framing and latch.
+///
+/// ### Why a duration-based latch (not "two consecutive ticks")
+///
+/// #1514's first attempt latched as soon as two consecutive framing ticks
+/// (~33 ms apart) saw an unchanged union diagonal. `Multi-Model Park` streams
+/// four glTF models concurrently over **30–70 s** — there is almost always a
+/// multi-second gap between one model landing and the next. Two adjacent ticks
+/// inside such a gap trivially see an unchanged diagonal, so #1514 latched on a
+/// partial 1–2-model union and the camera then framed empty space while the
+/// remaining models streamed in off-screen (issue #1391, reopened).
+///
+/// This tracker instead requires the diagonal to hold steady for a sustained
+/// **wall-clock window** (`stableHoldSeconds`) that comfortably exceeds the
+/// inter-model streaming gap. Any growth resets the hold timer, so every
+/// streamed model that enlarges the union re-arms the latch. Once no model has
+/// grown the union for the full hold window, the scene is genuinely settled.
+///
+/// Pure value type — no RealityKit *view* state — so it is unit-testable on any
+/// platform. Kept `internal` for `@testable import`; it is an implementation
+/// detail of `SceneView`'s built-in framing.
+struct FramingStabilityTracker {
+
+    /// Diagonal of the union AABB the most recent framing pass fitted to.
+    /// `0` until the first valid sample.
+    private(set) var lastDiagonal: Float = 0
+
+    /// Wall-clock timestamp (seconds, monotonic source) at which `lastDiagonal`
+    /// last changed materially — i.e. when a streamed model last grew or
+    /// shrank the union. `nil` until the first sample.
+    private(set) var lastChangeTime: Double?
+
+    /// Relative diagonal change below which two samples count as "the same
+    /// size". Tolerant of sub-millimetre jitter, tight enough that a freshly
+    /// streamed model (which grows the union materially) always registers.
+    let epsilon: Float
+
+    /// How long (seconds) the union diagonal must hold steady before the
+    /// scene counts as stable. Must exceed the worst-case gap between two
+    /// streamed models landing — `Multi-Model Park` loads four models over
+    /// 30–70 s, so a multi-second hold reliably spans the inter-model gaps
+    /// without making single-model demos feel sluggish.
+    let stableHoldSeconds: Double
+
+    init(epsilon: Float = 0.01, stableHoldSeconds: Double = 2.5) {
+        self.epsilon = epsilon
+        self.stableHoldSeconds = stableHoldSeconds
+    }
+
+    /// Feeds a fresh union-diagonal sample taken at `now`.
+    ///
+    /// - Parameters:
+    ///   - diagonal: The current content-union AABB diagonal length.
+    ///   - now: Monotonic wall-clock time in seconds (e.g.
+    ///     `CFAbsoluteTimeGetCurrent()`).
+    /// - Returns: `true` once the diagonal has held steady (within `epsilon`)
+    ///   for at least `stableHoldSeconds`. Any growth/shrink resets the hold
+    ///   timer and returns `false`, so the framing pass keeps re-fitting as
+    ///   each streamed model lands.
+    mutating func register(diagonal: Float, now: Double) -> Bool {
+        guard diagonal.isFinite, diagonal > 0 else { return false }
+        defer { lastDiagonal = diagonal }
+
+        guard let changedAt = lastChangeTime else {
+            // First valid sample — start the hold window now.
+            lastChangeTime = now
+            return false
+        }
+
+        let changed = abs(diagonal - lastDiagonal)
+            > epsilon * max(diagonal, lastDiagonal)
+        if changed {
+            // A streamed model grew/shrank the union — re-arm the hold timer.
+            lastChangeTime = now
+            return false
+        }
+        // Diagonal unchanged since `changedAt`; stable once the full hold
+        // window has elapsed.
+        return (now - changedAt) >= stableHoldSeconds
+    }
+}
+
 #endif // os(iOS) || os(macOS) || os(visionOS)

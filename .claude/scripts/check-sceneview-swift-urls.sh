@@ -25,7 +25,7 @@
 #   - CHANGELOG.md                        — historical version entries (mirror retirement)
 #   - docs/docs/migration.md              — migration guide quoting the old mirror URL
 #   - .claude/scripts/check-sceneview-swift-urls.sh — this detector itself
-#   - .github/workflows/pr-check.yml      — the job comment that documents this detector
+#   - .github/workflows/ci.yml            — the repo-hygiene job comment that documents this detector
 #
 # Usage:
 #   bash .claude/scripts/check-sceneview-swift-urls.sh
@@ -45,7 +45,7 @@ cd "$ROOT"
 
 # Files where a historical `sceneview-swift` reference is allowed. Anchored
 # repo-root-relative paths, alternation joined with '|'.
-ALLOW='^(Package\.swift|\.github/workflows/release\.yml|\.github/workflows/pr-check\.yml|CLAUDE\.md|SceneViewSwift/Sources/SceneViewSwift/SceneView\.swift|CHANGELOG\.md|docs/docs/migration\.md|\.claude/scripts/check-sceneview-swift-urls\.sh)$'
+ALLOW='^(Package\.swift|\.github/workflows/release\.yml|\.github/workflows/ci\.yml|CLAUDE\.md|SceneViewSwift/Sources/SceneViewSwift/SceneView\.swift|CHANGELOG\.md|docs/docs/migration\.md|\.claude/scripts/check-sceneview-swift-urls\.sh)$'
 
 # Grep only tracked files so build output / node_modules can't trip the gate.
 # `git grep` respects .gitignore by definition and is fast on large trees.

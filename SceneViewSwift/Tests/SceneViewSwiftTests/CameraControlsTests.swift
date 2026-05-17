@@ -1,4 +1,5 @@
 import XCTest
+import RealityKit // `BoundingBox` for the #1391 content-bounds union tests
 @testable import SceneViewSwift
 
 #if os(iOS) || os(visionOS)
@@ -320,6 +321,182 @@ final class CameraControlsTests: XCTestCase {
             boundsExtents: SIMD3<Float>(1, 1, 1), fovYDegrees: 60,
             aspect: 1.0, margin: 1.3)
         XCTAssertEqual(padded / tight, 1.3, accuracy: 0.01)
+    }
+
+    // MARK: - Content bounds union (#1391)
+
+    func testUnionOfEmptyArrayIsNil() {
+        XCTAssertNil(ContentBounds.union(of: []))
+    }
+
+    func testUnionOfSingleBoxRoundTrips() {
+        let box = BoundingBox(min: SIMD3<Float>(-1, -2, -3),
+                              max: SIMD3<Float>(1, 2, 3))
+        let union = ContentBounds.union(of: [box])
+        XCTAssertNotNil(union)
+        XCTAssertEqual(union!.min, box.min)
+        XCTAssertEqual(union!.max, box.max)
+    }
+
+    func testUnionOfTwoSeparatedBoxesSpansBoth() {
+        // Mirrors `Multi-Model Park`: models placed apart on the X axis.
+        // The union must span the full extent, not frame a single box.
+        let left = BoundingBox(min: SIMD3<Float>(-2.0, -0.5, -0.5),
+                               max: SIMD3<Float>(-1.0, 0.5, 0.5))
+        let right = BoundingBox(min: SIMD3<Float>(1.0, -0.5, -0.5),
+                                max: SIMD3<Float>(2.0, 0.5, 0.5))
+        let union = ContentBounds.union(of: [left, right])
+        XCTAssertNotNil(union)
+        XCTAssertEqual(union!.min, SIMD3<Float>(-2.0, -0.5, -0.5))
+        XCTAssertEqual(union!.max, SIMD3<Float>(2.0, 0.5, 0.5))
+        // Centre is the midpoint of the combined span — what the camera
+        // pivots on. A single-box frame would centre on -1.5 or +1.5.
+        XCTAssertEqual(union!.center.x, 0.0, accuracy: 0.0001)
+        // Width spans the full 4 m, not a single 1 m box.
+        XCTAssertEqual(union!.extents.x, 4.0, accuracy: 0.0001)
+    }
+
+    func testUnionGrowsAsModelsStreamIn() {
+        // Each entry simulates one streamed park model landing. The union
+        // must strictly grow (or hold) — never shrink — so re-framing
+        // dollies the camera out, never frames a stale subset (#1391).
+        let book = BoundingBox(min: SIMD3<Float>(-0.5, 0, -0.5),
+                               max: SIMD3<Float>(0.5, 1, 0.5))
+        let bird = BoundingBox(min: SIMD3<Float>(1.0, 0.5, -0.5),
+                               max: SIMD3<Float>(1.3, 0.8, -0.2))
+        let figure = BoundingBox(min: SIMD3<Float>(-1.5, 0, -0.5),
+                                 max: SIMD3<Float>(-1.0, 1.8, 0.5))
+        let afterOne = ContentBounds.union(of: [book])!
+        let afterTwo = ContentBounds.union(of: [book, bird])!
+        let afterThree = ContentBounds.union(of: [book, bird, figure])!
+        XCTAssertGreaterThanOrEqual(afterTwo.extents.x, afterOne.extents.x)
+        XCTAssertGreaterThanOrEqual(afterThree.extents.x, afterTwo.extents.x)
+        XCTAssertGreaterThanOrEqual(afterThree.extents.y, afterTwo.extents.y)
+        // Final union spans every model's extreme corner.
+        XCTAssertEqual(afterThree.min, SIMD3<Float>(-1.5, 0, -0.5))
+        XCTAssertEqual(afterThree.max, SIMD3<Float>(1.3, 1.8, 0.5))
+    }
+
+    func testUnionSkipsEmptyInvertedBox() {
+        // RealityKit reports min = +∞, max = -∞ for an entity whose mesh
+        // has not populated yet. Such a box must not poison the union.
+        let real = BoundingBox(min: SIMD3<Float>(-1, -1, -1),
+                               max: SIMD3<Float>(1, 1, 1))
+        let empty = BoundingBox(
+            min: SIMD3<Float>(repeating: .greatestFiniteMagnitude),
+            max: SIMD3<Float>(repeating: -.greatestFiniteMagnitude))
+        let union = ContentBounds.union(of: [empty, real, empty])
+        XCTAssertNotNil(union)
+        XCTAssertEqual(union!.min, real.min)
+        XCTAssertEqual(union!.max, real.max)
+    }
+
+    func testUnionOfOnlyEmptyBoxesIsNil() {
+        let empty = BoundingBox(
+            min: SIMD3<Float>(repeating: .greatestFiniteMagnitude),
+            max: SIMD3<Float>(repeating: -.greatestFiniteMagnitude))
+        XCTAssertNil(ContentBounds.union(of: [empty, empty]))
+    }
+
+    func testUnionSkipsNonFiniteBox() {
+        let real = BoundingBox(min: SIMD3<Float>(-1, -1, -1),
+                               max: SIMD3<Float>(1, 1, 1))
+        let nan = BoundingBox(min: SIMD3<Float>(.nan, 0, 0),
+                              max: SIMD3<Float>(1, 1, 1))
+        let union = ContentBounds.union(of: [nan, real])
+        XCTAssertNotNil(union)
+        XCTAssertEqual(union!.min, real.min)
+        XCTAssertEqual(union!.max, real.max)
+    }
+
+    // MARK: - Framing stability tracker (#1391 retry)
+
+    func testStabilityTrackerNeverStableOnFirstSample() {
+        // The first valid sample just starts the hold window — a single
+        // tick can never be "stable", or a one-model-loaded scene would
+        // latch instantly (the #1514 bug).
+        var tracker = FramingStabilityTracker(stableHoldSeconds: 2.5)
+        XCTAssertFalse(tracker.register(diagonal: 1.0, now: 0.0))
+    }
+
+    func testStabilityTrackerNotStableBeforeHoldWindowElapses() {
+        // Diagonal unchanged but the hold window has not elapsed yet —
+        // must NOT latch. This is the exact scenario #1514 mishandled:
+        // two adjacent ticks inside a streaming gap saw an equal diagonal
+        // and latched on a partial union.
+        var tracker = FramingStabilityTracker(stableHoldSeconds: 2.5)
+        _ = tracker.register(diagonal: 1.0, now: 0.0)
+        XCTAssertFalse(tracker.register(diagonal: 1.0, now: 0.033))
+        XCTAssertFalse(tracker.register(diagonal: 1.0, now: 1.0))
+        XCTAssertFalse(tracker.register(diagonal: 1.0, now: 2.4))
+    }
+
+    func testStabilityTrackerLatchesAfterSustainedHold() {
+        // Once the diagonal holds steady for the full hold window the
+        // scene is genuinely settled and the latch fires.
+        var tracker = FramingStabilityTracker(stableHoldSeconds: 2.5)
+        _ = tracker.register(diagonal: 1.0, now: 0.0)
+        XCTAssertFalse(tracker.register(diagonal: 1.0, now: 1.0))
+        XCTAssertTrue(tracker.register(diagonal: 1.0, now: 2.5))
+    }
+
+    func testStabilityTrackerGrowthResetsHoldTimer() {
+        // A streamed model that grows the union must re-arm the hold timer
+        // so the camera re-frames for it. This is the core #1391 fix:
+        // model #2 lands well after model #1, and the latch must wait.
+        var tracker = FramingStabilityTracker(stableHoldSeconds: 2.5)
+        _ = tracker.register(diagonal: 1.0, now: 0.0)
+        // Model #1 union held steady for 3 s — would have latched...
+        XCTAssertTrue(tracker.register(diagonal: 1.0, now: 3.0))
+        // ...but then model #2 streams in and grows the union. Re-arm.
+        XCTAssertFalse(tracker.register(diagonal: 5.0, now: 5.0))
+        // Still streaming — model #3 grows it again at t=30 s.
+        XCTAssertFalse(tracker.register(diagonal: 5.0, now: 6.0))
+        XCTAssertFalse(tracker.register(diagonal: 8.0, now: 30.0))
+        // No more models for 2.5 s — now genuinely stable.
+        XCTAssertFalse(tracker.register(diagonal: 8.0, now: 31.0))
+        XCTAssertTrue(tracker.register(diagonal: 8.0, now: 32.5))
+    }
+
+    func testStabilityTrackerSimulatesMultiModelParkStreaming() {
+        // End-to-end: four park models stream in over ~60 s with
+        // multi-second gaps. The latch must fire ONLY after the fourth
+        // model has landed and held — never on a partial union.
+        var tracker = FramingStabilityTracker(stableHoldSeconds: 2.5)
+        // t=2 s: tree lands (union diagonal ~3 m).
+        XCTAssertFalse(tracker.register(diagonal: 3.0, now: 2.0))
+        // t=4 s: still just the tree — #1514 would latch here.
+        XCTAssertFalse(tracker.register(diagonal: 3.0, now: 4.0))
+        // t=18 s: bench lands, union grows.
+        XCTAssertFalse(tracker.register(diagonal: 3.4, now: 18.0))
+        // t=39 s: dog lands.
+        XCTAssertFalse(tracker.register(diagonal: 3.6, now: 39.0))
+        // t=62 s: bird lands — the last model.
+        XCTAssertFalse(tracker.register(diagonal: 3.7, now: 62.0))
+        // t=63 s: still inside the hold window.
+        XCTAssertFalse(tracker.register(diagonal: 3.7, now: 63.0))
+        // t=64.5 s: union has held 2.5 s since the bird — latch.
+        XCTAssertTrue(tracker.register(diagonal: 3.7, now: 64.5))
+    }
+
+    func testStabilityTrackerRejectsNonFiniteDiagonal() {
+        var tracker = FramingStabilityTracker()
+        XCTAssertFalse(tracker.register(diagonal: .nan, now: 0.0))
+        XCTAssertFalse(tracker.register(diagonal: .infinity, now: 0.0))
+        XCTAssertFalse(tracker.register(diagonal: 0.0, now: 0.0))
+        // A rejected sample must not start the hold window.
+        XCTAssertNil(tracker.lastChangeTime)
+    }
+
+    func testStabilityTrackerSingleModelLatchesAfterHold() {
+        // A single-model demo (Model Viewer): one bounds sample, then the
+        // diagonal never changes. It must still latch after the hold
+        // window — no regression vs the streamed path, just one extra
+        // sustained-hold delay before the camera settles.
+        var tracker = FramingStabilityTracker(stableHoldSeconds: 2.5)
+        XCTAssertFalse(tracker.register(diagonal: 2.0, now: 0.0))
+        XCTAssertFalse(tracker.register(diagonal: 2.0, now: 1.0))
+        XCTAssertTrue(tracker.register(diagonal: 2.0, now: 2.5))
     }
 }
 #endif

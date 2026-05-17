@@ -40,6 +40,7 @@ import com.google.ar.core.TrackingState
 import dev.romainguy.kotlin.math.Quaternion
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.TerrainAnchorNode
+import io.github.sceneview.demo.ARCameraInitScrim
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.math.Position
@@ -148,6 +149,10 @@ fun ARTerrainAnchorDemo(onBack: () -> Unit) {
     }
 
     var arSession by remember { mutableStateOf<Session?>(null) }
+    // Flipped true on the first onSessionUpdated — i.e. once ARCore has opened the
+    // camera and delivered a frame. Until then the ARSceneView surface is bare black,
+    // so we cover it with ARCameraInitScrim instead of leaving a frozen-looking screen.
+    var cameraReady by remember { mutableStateOf(false) }
     var isTracking by remember { mutableStateOf(false) }
     var earthTracking by remember { mutableStateOf(false) }
     // Tracked alongside `earthTracking` because `Earth.resolveAnchorOnTerrainAsync`
@@ -343,6 +348,7 @@ fun ARTerrainAnchorDemo(onBack: () -> Unit) {
                     sessionError = exception.message ?: exception.javaClass.simpleName
                 },
                 onSessionUpdated = { session: Session, frame: Frame ->
+                    cameraReady = true
                     isTracking = frame.camera.trackingState == TrackingState.TRACKING
                     val earth = session.earth
                     earthTracking = earth?.trackingState == TrackingState.TRACKING
@@ -404,6 +410,10 @@ fun ARTerrainAnchorDemo(onBack: () -> Unit) {
                     )
                     .padding(horizontal = 20.dp, vertical = 10.dp)
             )
+
+            // Cover the still-black ARSceneView surface until ARCore delivers its
+            // first camera frame, so the entry doesn't read as a frozen screen (#1473).
+            ARCameraInitScrim(initializing = !cameraReady && sessionError == null)
         }
     }
 }

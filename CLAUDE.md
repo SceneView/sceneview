@@ -18,7 +18,7 @@ the documentation until it can.
 
 ### Before EVERY push to main:
 1. **Compile check**: `./gradlew :sceneview:compileReleaseKotlin :arsceneview:compileReleaseKotlin`
-2. **Unit tests**: `./gradlew :sceneview:test :arsceneview:testDebugUnitTest`
+2. **Unit tests**: `./gradlew :sceneview:testDebugUnitTest :arsceneview:testDebugUnitTest`
 3. **Bundle build** (if store-affecting): `./gradlew :samples:android-demo:bundleRelease`
 4. **Website JS** (if website changed): `node -c website-static/js/sceneview.js`
 5. **Full gate**: `bash .claude/scripts/pre-push-check.sh`
@@ -30,9 +30,62 @@ the documentation until it can.
 - NEVER deploy to stores without verifying the bundle builds locally first
 - When an agent modifies code, ALWAYS verify compilation before committing
 - If a review finds blockers, fix them ALL before pushing — no exceptions
-- If you bump `gradle/libs.versions.toml` → `filament = "X.Y.Z"`, you MUST recompile every `.filamat` blob in the same PR with the matching `matc` toolchain — see [CONTRIBUTING.md "Filament runtime ↔ .filamat ABI invariant"](CONTRIBUTING.md#filament-runtime--filamat-abi-invariant). v4.1.0 shipped split halves and crashed 10 demos at runtime.
+- If you bump `gradle/libs.versions.toml` → `filament = "X.Y.Z"`, you MUST recompile every `.filamat` blob in the same PR with the matching `matc` toolchain — see [CONTRIBUTING.md "Filament runtime ↔ .filamat ABI invariant"](CONTRIBUTING.md#filament-runtime---filamat-abi-invariant). v4.1.0 shipped split halves and crashed 10 demos at runtime.
 
 ### Quality plan: `.claude/plans/v4.0-quality-plan.md`
+
+## Device QA
+
+The **autonomous device-QA harness** (umbrella [#1560](https://github.com/sceneview/sceneview/issues/1560))
+drives the demo apps **like a real user** — taps, swipes, camera-orbit drags,
+navigation — and asserts no crash across every platform, unattended (no
+screenshot-by-screenshot loop). CI-green plus self-review is not enough: a demo
+can compile, pass unit tests, and still crash the moment it renders on a device.
+
+### Run it
+
+```bash
+# Full cross-platform pass — every platform feasible on this host.
+bash .claude/scripts/device-qa.sh --platform=all
+
+# One platform, or a fast per-category subset.
+bash .claude/scripts/device-qa.sh --platform=android
+bash .claude/scripts/device-qa.sh --platform=web --fast
+```
+
+`device-qa.sh` is the single orchestrator entrypoint. It boots the
+emulator/simulator each leg needs, builds + installs the demo app, delegates to
+the per-platform harness, and aggregates every verdict into one
+`device-qa-report.json` at the repo root (override the directory with `--out`).
+Exit status is non-zero if any selected platform failed. Flags: `--platform=android|ios|web|ar|all`,
+`--fast` (per-category subset, not the full catalog), `--ci` (treat a skipped
+platform as a failure), `--out <dir>`.
+
+### What each leg covers
+
+| Leg | Harness | Drives | Report |
+|---|---|---|---|
+| `android` | Maestro flows `.maestro/android/` via `qa-android-demos.sh` | All 42 demos on an emulator | `device-qa-report.json` |
+| `ios` | Maestro flows `.maestro/ios/` via `ios-device-qa.sh` | 24 deep-linkable demos on a simulator (AR = launch-only smoke) | `device-qa-report.json` |
+| `web` | Playwright suite `samples/web-demo/tests/` | Browser 3D viewer + every catalog tab | `web-qa-summary.json` |
+| `ar` | `ar-replay-qa.sh` + `ARReplayHarnessTest` | Every Android AR demo replayed against recorded ARCore sessions — no physical device | `ar-qa-summary.json` |
+
+See [`.maestro/README.md`](.maestro/README.md) for the Maestro flow layout and
+known limitations (no pinch gesture → 3D zoom is driven via deep-link param).
+
+### Release-checkpoint mandate
+
+**A full device-QA pass runs at every release checkpoint, before tagging.**
+No release ships without a green `device-qa-report.json`. The gate is enforced
+in two places — keep both honest:
+
+- `release-checklist.sh` **section 14** fails the checklist if
+  `device-qa-report.json` is missing or reports a failed platform.
+- The `/release` skill (**Step 6.5**) runs `device-qa.sh --platform=all`
+  before the tag step.
+
+A red device-QA pass means a demo crashes for a real user — fix it before
+tagging, no exceptions.
 
 ## About
 
@@ -61,8 +114,8 @@ To set up: `npm install @google/stitch-sdk`, then add the Stitch MCP server in C
 
 ## When writing any SceneView code
 
-- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.5.0`)
-- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.5.0`)
+- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.9.0`)
+- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.9.0`)
 - Declare nodes as composables inside the trailing content block — not imperatively
 - Load models with `rememberModelInstance(modelLoader, "models/file.glb")` — returns `null`
   while loading, always handle the null case
@@ -225,6 +278,17 @@ Every file below MUST be updated when bumping the version. Use `/version-bump` o
 | | `sceneview/Module.md` | version ref |
 | **Swift** | `SceneViewSwift/` uses git tag `vX.Y.Z` | not a file version |
 
+> ⚠️ **Do NOT bump the Flutter/RN plugins' *consumed* SceneView dependency.**
+> The `io.github.sceneview:(ar)sceneview:X.Y.Z` lines in
+> `flutter/.../android/build.gradle` and
+> `react-native/.../android/build.gradle.kts` are dependencies on the
+> **published** Maven Central artifact — they must lag to the **last released**
+> version and cannot point at the in-flight release (it isn't on Maven Central
+> yet; pointing at it breaks the `Build flutter-demo APK` CI check). Only the
+> plugins' OWN package versions (`version 'X.Y.Z'`, `pubspec.yaml`, podspec,
+> `package.json`) bump to the release version. `sync-versions.sh` reports these
+> consumed-dep coordinates WARN-only and never auto-bumps them (issue #1494).
+
 **Automation:**
 - `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations
 - `bash .claude/scripts/sync-versions.sh --fix` — auto-fixes mismatches
@@ -242,9 +306,9 @@ Every Claude Code session MUST read this section first to stay in sync.
 **NOTE FOR OTHER SESSIONS:** Always run `/sync-check` at the start and end of every session.
 Never say "everything is good" without verifying published packages.
 
-### Latest release: v4.4.0
+### Latest release: see `gradle.properties`
 
-**Current source-of-truth version is `4.4.0`** (`gradle.properties:VERSION_NAME`). Any AI bootstrapping from this file should treat `4.4.0` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `v4.4.0`, web CDN). The dated session logs below are historical context only — do not infer the latest version from them.
+**The source-of-truth version is always `VERSION_NAME` in the root `gradle.properties`** — read that file, never hardcode a version here. Any AI bootstrapping from this file should treat the `gradle.properties` `VERSION_NAME` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `vX.Y.Z`, web CDN). At the time of writing this is `4.8.0`, but `gradle.properties` is authoritative if they ever disagree. The dated session logs below are historical context only — do not infer the latest version from them.
 
 ### Historical state (last updated: 2026-05-14 night, session upbeat-kare-a31ed4 — v4.2.0 SHIPPED end-to-end + handoff for new session)
 
@@ -557,6 +621,8 @@ Hooks trigger automatically on specific Claude Code actions:
 | `install-sceneview-ios-skill.sh` | Copies `agents/sceneview-ios/` (Apple skill) to `~/.android/cli/skills/xr/sceneview-ios/` |
 | `install-sceneview-web-skill.sh` | Copies `agents/sceneview-web/` (Web skill) to `~/.android/cli/skills/xr/sceneview-web/` |
 | `check-sceneview-skill.sh` | Verifies all three `agents/sceneview*/` skills (API identifiers, demo refs, frontmatter) are in sync with the library source. Runs in `quality-gate.sh`, `pr-check.yml`, and daily via `maintenance.yml` |
+| `worktree-auto-prune.sh` | Safe GC for `.claude/worktrees/*` — removes worktrees whose branch is merged (`--dry-run`, `--yes`, `--keep <path>`). Never touches dirty or unmerged trees |
+| `cleanup-branches-worktrees.sh` | One-shot GC for stale `claude/*` branches **and** worktrees: deletes merged local + remote branches (single `git push --delete`, no bot-burst) and delegates worktree pruning to `worktree-auto-prune.sh`. Defaults to dry-run; `--yes` to act, `--keep <branch\|path>`, `--no-worktrees`. Current-branch / unmerged / open-PR guarded. Runs daily in `maintenance.yml` |
 
 ### Version location map
 

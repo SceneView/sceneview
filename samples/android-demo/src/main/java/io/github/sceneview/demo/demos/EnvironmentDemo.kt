@@ -25,6 +25,7 @@ import io.github.sceneview.createEnvironment
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.rememberEngine
@@ -101,9 +102,12 @@ fun EnvironmentDemo(onBack: () -> Unit) {
         staticYaw = 30f,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_environment_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             Text(
                 text = "HDR Environment",
@@ -147,6 +151,7 @@ fun EnvironmentDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

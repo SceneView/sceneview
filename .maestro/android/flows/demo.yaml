@@ -1,0 +1,91 @@
+# Reusable Maestro subflow — exercises ONE SceneView demo like a real user.
+#
+# Called by the per-category flows and by catalog.yaml via `runFlow` with an
+# `env:` block. It never appears in a flow runner by itself.
+#
+# Required parameters (passed by the caller):
+#   DEMO_ID    Stable demo id from ALL_DEMOS (e.g. "model-viewer", "ar-pose").
+#   DEMO_NAME  Human label, used only for screenshot file naming / readable logs.
+#
+# Strategy:
+#   - launchApp with the public `sceneview://demo/<id>` deep link so we jump
+#     straight to the demo screen — no tab navigation, no list scrolling. This
+#     is the same ingress the deep-link router validates (DeepLinkRouter.parse).
+#   - `qa_mode` extra freezes auto-rotation / orbit / animations so the single
+#     screenshot is deterministic frame-to-frame.
+#   - Exercise REAL interaction: drag to orbit the camera, swipe to pan, tap
+#     the centre of the viewport (hits demo controls / picks nodes). 3D zoom
+#     has no Maestro pinch gesture — see the catalog header note; zoom is a
+#     documented follow-up via a deep-link param.
+#   - Capture exactly ONE screenshot per demo (no screenshot-by-screenshot
+#     loop — that was the slow pattern in the old qa-android-demos.sh).
+#   - Assert the app process is still foregrounded afterwards. A crash would
+#     drop us out of the app; `assertVisible` on any app element then fails the
+#     flow. A FATAL/ANR sweep of logcat is done once, globally, by catalog.yaml.
+appId: io.github.sceneview.demo
+---
+# Cold-launch straight into the demo via the validated deep link.
+- launchApp:
+    appId: io.github.sceneview.demo
+    clearState: false
+    stopApp: true
+    arguments:
+      qa_mode: true
+    deepLink: "sceneview://demo/${DEMO_ID}"
+
+# Let the first frame render. The demo scaffold shows a scrim for up to 12 s
+# while the engine warms up; 6 s is plenty for the deep-linked demo to be
+# interactive on the ARCore emulator.
+- waitForAnimationToEnd:
+    timeout: 6000
+
+# --- Real user interaction -------------------------------------------------
+# Orbit the camera: drag across the viewport. Two opposite drags so we exercise
+# the manipulator in both directions and return roughly to the start framing.
+- swipe:
+    start: 30%, 55%
+    end: 70%, 55%
+    duration: 600
+- swipe:
+    start: 70%, 55%
+    end: 30%, 55%
+    duration: 600
+
+# Vertical drag — tilts the orbit camera / pans 2D-content demos.
+- swipe:
+    start: 50%, 65%
+    end: 50%, 40%
+    duration: 600
+
+# Tap the centre of the viewport: in interaction demos this picks a node, in
+# control-strip demos it is a harmless empty-space tap. Either way it must not
+# crash.
+- tapOn:
+    point: 50%, 55%
+
+# Give any tap-triggered work (node selection, gesture handlers, AR hit-test)
+# a moment to settle before the screenshot.
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# --- One screenshot per demo ----------------------------------------------
+# Maestro writes screenshots to its output dir; the file name keys off DEMO_ID
+# so a category run produces one PNG per demo with no overwrites.
+- takeScreenshot: "demo-${DEMO_ID}"
+
+# --- Liveness assertion ----------------------------------------------------
+# If the demo had crashed, the process would be gone and we'd be on the
+# launcher / a system dialog — the back button's content description would not
+# be present. This is the per-demo crash gate.
+- assertVisible:
+    id: "io.github.sceneview.demo:id/decor_content_parent"
+    optional: true
+# Belt-and-braces: the demo scaffold always renders a "Navigate back" button.
+# Its presence proves the demo Activity is still foregrounded and composed.
+- assertVisible: "Navigate back"
+
+# --- Navigate back ---------------------------------------------------------
+# Return to the demo list so a subsequent flow step starts from a known state.
+- tapOn: "Navigate back"
+- waitForAnimationToEnd:
+    timeout: 2000

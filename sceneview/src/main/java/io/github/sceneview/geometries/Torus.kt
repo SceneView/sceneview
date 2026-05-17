@@ -12,6 +12,15 @@ import io.github.sceneview.math.Position
 import kotlin.math.cos
 import kotlin.math.sin
 
+/**
+ * A torus (donut) [Geometry] generated from a major/minor segment grid, with smooth
+ * per-vertex normals and UV coordinates, suitable for use as a renderable mesh.
+ *
+ * [majorRadius] is the distance from the torus center to the center of the tube;
+ * [minorRadius] is the radius of the tube itself. Instances are immutable once built;
+ * create one with the [Builder] and mutate it afterwards through [update]. All Filament
+ * buffer operations run synchronously and must be called on the main thread.
+ */
 class Torus private constructor(
     primitiveType: PrimitiveType,
     vertices: List<Vertex>,
@@ -34,24 +43,50 @@ class Torus private constructor(
     primitivesOffsets,
     boundingBox
 ) {
+    /**
+     * Builder for [Torus]. Configure [majorRadius], [minorRadius], [center] and the
+     * [majorSegments]/[minorSegments] tessellation, then call [build].
+     */
     class Builder : Geometry.Builder(PrimitiveType.TRIANGLES) {
+        /** Distance from the torus center to the tube center, in scene units. Defaults to [DEFAULT_MAJOR_RADIUS]. */
         var majorRadius: Float = DEFAULT_MAJOR_RADIUS
             private set
+
+        /** Radius of the tube cross-section, in scene units. Defaults to [DEFAULT_MINOR_RADIUS]. */
         var minorRadius: Float = DEFAULT_MINOR_RADIUS
             private set
+
+        /** Local-space position of the torus center. Defaults to [DEFAULT_CENTER] (the origin). */
         var center: Position = DEFAULT_CENTER
             private set
+
+        /** Number of segments around the main ring. Higher is smoother. Defaults to [DEFAULT_MAJOR_SEGMENTS]. */
         var majorSegments: Int = DEFAULT_MAJOR_SEGMENTS
             private set
+
+        /** Number of segments around the tube cross-section. Higher is smoother. Defaults to [DEFAULT_MINOR_SEGMENTS]. */
         var minorSegments: Int = DEFAULT_MINOR_SEGMENTS
             private set
 
+        /** Sets the major radius in scene units. Returns this builder for chaining. */
         fun majorRadius(majorRadius: Float) = apply { this.majorRadius = majorRadius }
+
+        /** Sets the minor (tube) radius in scene units. Returns this builder for chaining. */
         fun minorRadius(minorRadius: Float) = apply { this.minorRadius = minorRadius }
+
+        /** Sets the local-space center of the torus. Returns this builder for chaining. */
         fun center(center: Position) = apply { this.center = center }
+
+        /** Sets the number of segments around the main ring. Returns this builder for chaining. */
         fun majorSegments(majorSegments: Int) = apply { this.majorSegments = majorSegments }
+
+        /** Sets the number of segments around the tube cross-section. Returns this builder for chaining. */
         fun minorSegments(minorSegments: Int) = apply { this.minorSegments = minorSegments }
 
+        /**
+         * Builds the [Torus], allocating its Filament vertex and index buffers on [engine].
+         * Must be called on the main thread.
+         */
         override fun build(engine: Engine): Torus {
             vertices(getVertices(majorRadius, minorRadius, center, majorSegments, minorSegments))
             primitivesIndices(getIndices(majorSegments, minorSegments))
@@ -64,17 +99,31 @@ class Torus private constructor(
         }
     }
 
+    /** Current distance from the torus center to the tube center, in scene units. */
     var majorRadius: Float = majorRadius
         private set
+
+    /** Current radius of the tube cross-section, in scene units. */
     var minorRadius: Float = minorRadius
         private set
+
+    /** Current local-space center of the torus. */
     var center: Position = center
         private set
+
+    /** Current number of segments around the main ring. */
     var majorSegments: Int = majorSegments
         private set
+
+    /** Current number of segments around the tube cross-section. */
     var minorSegments: Int = minorSegments
         private set
 
+    /**
+     * Regenerates the torus vertices in place and re-uploads them to the existing Filament
+     * vertex buffer. The index buffer is rebuilt only when [majorSegments] or [minorSegments]
+     * change. Must be called on the main thread. Returns this geometry for chaining.
+     */
     fun update(
         engine: Engine,
         majorRadius: Float = this.majorRadius,

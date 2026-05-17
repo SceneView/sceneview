@@ -134,19 +134,26 @@ fun createView(engine: Engine): View = engine.createView().apply {
  * depends on Filament — no ARCore types are involved. The `arsceneview` module calls it via
  * [rememberARView]. This avoids duplicating Filament View configuration across modules.
  *
- * The key difference from [createView] is the tone mapper: AR uses [ToneMapper.Linear] (identity)
- * instead of [ToneMapper.Filmic].
+ * The AR camera stream material (`camera_stream_flat.mat` / `camera_stream_depth.mat`) draws the
+ * live camera feed by calling Filament's `inverseTonemapSRGB()` in its fragment shader. Despite
+ * the name, that helper is **not** a plain sRGB→linear decode — the compiled shader expands to:
  *
- * The AR camera stream material applies `inverseTonemapSRGB()` in its fragment shader to convert
- * the camera image from sRGB gamma space into Filament's linear working space. If a non-linear
- * tone mapper (e.g. Filmic) is then applied as a post-process step, the camera feed gets
- * additionally curved — resulting in oversaturation, high contrast, and vignetting (issue #657).
+ *   inverseTonemapSRGB(c) = Inverse_Tonemap_Filmic(pow(c, 2.2))
  *
- * With [ToneMapper.Linear] the post-process step is a passthrough, so the full pipeline for the
- * camera background becomes:
+ * i.e. it (1) decodes sRGB gamma **and** (2) inverts Filament's *Filmic* tone-map curve. It only
+ * round-trips back to the original camera pixels if the View then re-applies the **Filmic** tone
+ * mapper as its post-process step. The full pipeline for the camera background is therefore:
  *
- *   camera sRGB → inverseTonemapSRGB → linear → ToneMapper.Linear (passthrough) → sRGB output
- *                                                                              = original image ✓
+ *   camera sRGB → pow(2.2) → Inverse_Tonemap_Filmic → working space
+ *               → ToneMapper.Filmic → sRGB output  = original camera image ✓
+ *
+ * Using [ToneMapper.Linear] here (as a previous fix for #657 did) leaves the inverse-Filmic curve
+ * baked into the feed with nothing to cancel it — the camera background comes out washed-out and
+ * low-contrast (issue #1434). [ToneMapper.Filmic] is the only tone mapper that correctly cancels
+ * the shader's `inverseTonemapSRGB`, and it is also the right curve for the virtual 3D content.
+ *
+ * Unlike [createView], the AR view keeps bloom and ambient occlusion **off** so they cannot tint
+ * the camera background — those were the real source of the oversaturation/vignetting in #657.
  *
  * Shadows are enabled by default because AR users commonly want 3D content to cast shadows on
  * detected planes. Disable via `View.setShadowingEnabled(false)` when not needed.
@@ -167,10 +174,12 @@ fun createARView(engine: Engine): View = engine.createView().apply {
     ambientOcclusionOptions = ambientOcclusionOptions.apply {
         enabled = false
     }
-    // Linear tone mapper: passthrough, preserves the camera background unchanged.
-    // See KDoc above for the full explanation.
+    // Filmic tone mapper: the AR camera-stream shader pre-applies Inverse_Tonemap_Filmic, so the
+    // Filmic post-process re-applies the matching forward curve and the camera background round-
+    // trips back to the original pixels. Using ToneMapper.Linear here leaves the inverse curve
+    // uncancelled and washes the camera feed out (issue #1434). See KDoc above for the full chain.
     colorGrading = ColorGrading.Builder()
-        .toneMapper(ToneMapper.Linear())
+        .toneMapper(ToneMapper.Filmic())
         .build(engine)
     // Shadows on by default for AR: models casting shadows onto detected planes.
     setShadowingEnabled(true)
@@ -229,13 +238,15 @@ fun createCollisionSystem(view: View) = CollisionSystem(view)
 class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     init {
         // 3/4 view: slightly elevated and pulled back so a typical 0.3–1 m model placed
-        // at the world origin is fully framed and centered (#1080). The previous
-        // `(0, 0, 1)` placement sat the camera 1 m dead-ahead of origin — too close for
-        // anything but a tiny object and, with no Y elevation, produced a flat,
-        // under-framed front-on view. `(0, DEFAULT_Y, DEFAULT_Z)` + `lookAt(origin)`
-        // mirrors iOS RealityKit's `look(at: .zero, from: [0, 0.3, 2])` default
-        // (`SceneViewSwift/.../SceneView.swift`) so the same scene frames identically
-        // on both platforms. Pinned in `SceneFactoriesTest.defaultCameraNodePositionIsPinned()`.
+        // at the world origin is fully framed and centered (#1080, re-tuned in #1427).
+        // The original `(0, 0, 1)` placement sat the camera 1 m dead-ahead of origin —
+        // too close for anything but a tiny object and, with no Y elevation, produced a
+        // flat, under-framed front-on view. The #1080 `(0, 0.3, 2)` placement was still
+        // "beaucoup trop zoomé" in the 2026-05-16 on-device QA, so #1427 pulls the camera
+        // further back to `(0, DEFAULT_Y, DEFAULT_Z)` + `lookAt(origin)` for more headroom.
+        // iOS RealityKit still uses `[0, 0.3, 2]` (`SceneViewSwift/.../SceneView.swift`) —
+        // a matching iOS bump is tracked alongside the auto-framing work (#1439). Pinned
+        // in `SceneFactoriesTest.defaultCameraNodePositionIsPinned()`.
         position = Position(0.0f, DEFAULT_Y, DEFAULT_Z)
         lookAt(Position(0.0f, 0.0f, 0.0f))
         // Neutral, less photographic exposure.
@@ -252,15 +263,18 @@ class DefaultCameraNode(engine: Engine) : CameraNode(engine) {
     companion object {
         /**
          * Default camera Y elevation. Small positive lift gives a natural 3/4 angle
-         * looking slightly down on origin-placed content. Matches iOS `[0, 0.3, 2]`.
+         * looking slightly down on origin-placed content. Re-tuned in #1427 from `0.3`
+         * to keep the 3/4 angle proportional to the larger [DEFAULT_Z] dolly-back.
          */
-        const val DEFAULT_Y = 0.3f
+        const val DEFAULT_Y = 0.4f
 
         /**
          * Default camera Z distance from origin. Pulls the camera back far enough to
-         * frame a typical 0.3–1 m model. Matches iOS `[0, 0.3, 2]`.
+         * frame a typical 0.3–1 m model with comfortable headroom. Re-tuned in #1427
+         * from `2.0` — the pre-#1427 value framed origin-placed models too tight
+         * ("beaucoup trop zoomé", 2026-05-16 on-device QA).
          */
-        const val DEFAULT_Z = 2.0f
+        const val DEFAULT_Z = 2.75f
 
         /** Aperture (f-stop). AR mirrors via `ARDefaultCameraNode.DEFAULT_APERTURE`. */
         const val DEFAULT_APERTURE = 12.0f

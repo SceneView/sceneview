@@ -163,9 +163,9 @@ import java.util.concurrent.atomic.AtomicReference
  *                                 inside this callback to choose a different mode if needed (#1063).
  * @param planeRenderer            Whether to render the AR plane grid overlay.
  * @param cameraStream             [ARCameraStream] for camera texture rendering and occlusion.
- * @param view                     Filament [View] for this scene. Use [rememberARView] (default)
- *                                 which applies [ToneMapper.Linear] to prevent the camera
- *                                 background from being over-processed by Filamic tone mapping.
+ * @param view                     Filament [View] for this scene. Use [rememberARView] (default),
+ *                                 which is tuned so the live camera background round-trips back to
+ *                                 the original camera pixels (see `createARView`).
  * @param isOpaque                 Whether the render target is opaque. Default `true`.
  * @param renderer                 Filament [Renderer]. Use [rememberRenderer].
  * @param scene                    Filament [SceneView] graph. Use [rememberScene].
@@ -902,6 +902,47 @@ fun highestResolutionCameraConfig(session: Session): CameraConfig =
         val filter = CameraConfigFilter(session)
             .setFacingDirection(CameraConfig.FacingDirection.BACK)
             .setTargetFps(EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30))
+        session.getSupportedCameraConfigs(filter).maxByOrNull {
+            it.imageSize.width.toLong() * it.imageSize.height.toLong()
+        }
+    }.getOrNull() ?: session.cameraConfig
+
+/**
+ * Picks a FRONT-facing [CameraConfig] for the [session].
+ *
+ * **Required for Augmented Faces.** Passing `Session.Feature.FRONT_CAMERA` to the ARCore
+ * [Session] constructor only makes the front camera *eligible* — it does NOT switch the camera.
+ * ARCore keeps the session on its default BACK config until [Session.setCameraConfig] is called
+ * with a config whose [CameraConfig.getFacingDirection] is
+ * [FRONT][CameraConfig.FacingDirection.FRONT]. [ARSceneView]'s default `sessionCameraConfig` is
+ * [highestResolutionCameraConfig], which is **BACK-facing** — so an Augmented Faces scene that
+ * only sets `sessionFeatures = setOf(Session.Feature.FRONT_CAMERA)` ends up running the back
+ * camera, `AugmentedFaceMode.MESH3D` produces no trackables, and no face mesh ever appears.
+ *
+ * Pass this helper as `sessionCameraConfig` whenever the session enables the front camera:
+ *
+ * ```kotlin
+ * ARSceneView(
+ *     sessionFeatures = setOf(Session.Feature.FRONT_CAMERA),
+ *     sessionCameraConfig = ::frontCameraConfig,
+ *     sessionConfiguration = { _, config ->
+ *         config.augmentedFaceMode = Config.AugmentedFaceMode.MESH3D
+ *     },
+ * )
+ * ```
+ *
+ * Falls back to the session's current [CameraConfig][Session.getCameraConfig] when ARCore
+ * exposes no FRONT-facing config (e.g. a device without a front camera) or when
+ * [Session.getSupportedCameraConfigs] throws — the call must never crash session creation.
+ *
+ * @param session The ARCore [Session] being configured. Must have been created with
+ *                [Session.Feature.FRONT_CAMERA] for a FRONT config to be available.
+ * @return The chosen FRONT-facing [CameraConfig]; never throws.
+ */
+fun frontCameraConfig(session: Session): CameraConfig =
+    runCatching {
+        val filter = CameraConfigFilter(session)
+            .setFacingDirection(CameraConfig.FacingDirection.FRONT)
         session.getSupportedCameraConfigs(filter).maxByOrNull {
             it.imageSize.width.toLong() * it.imageSize.height.toLong()
         }

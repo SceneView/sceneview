@@ -53,11 +53,15 @@ This single `car.glb` is the source of truth for every platform.
 ## Step 2a — Android: drop the `.glb` in and load it
 
 `.glb` is native on Android. There is **no Reality Converter step** — copy the file
-straight into the app's assets:
+straight into your app's `assets/` directory, e.g.:
 
 ```
-samples/android-demo/src/main/assets/models/car.glb
+src/main/assets/models/car.glb
 ```
+
+> The path above is illustrative — `car.glb` is the file you exported in Step 1, not a
+> model that ships with this repo. SceneView's own samples live under
+> `samples/android-demo/src/main/assets/models/` (`khronos_toy_car.glb`, `shiba.glb`, …).
 
 Load it in a composable with `rememberModelInstance`:
 

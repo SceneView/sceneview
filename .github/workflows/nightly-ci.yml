@@ -20,7 +20,10 @@ name: Nightly full CI
 #
 # It REUSES the existing workflows via `workflow_call` instead of
 # duplicating their job bodies — `ci.yml` is invoked with `force-all: true`
-# so its per-job path filter is bypassed.
+# so its per-job path filter is bypassed. Since #1370 consolidated
+# `ci.yml` + `pr-check.yml` + `quality-gate.yml` into a single `ci.yml`,
+# the forced `ci.yml` run already covers the full quality gate, KMP compile,
+# and repo-hygiene jobs — no separate `quality-gate.yml` call is needed.
 #
 # It is deliberately NOT part of the `CI Gate` aggregator and is NOT a
 # required check — it is a scheduled safety net, not a PR gate.
@@ -39,18 +42,15 @@ permissions:
   contents: read
 
 jobs:
-  # ── Full CI build/lint/test (path filter bypassed) ────────────────────────
+  # ── Full CI build/lint/test + quality gate (path filter bypassed) ─────────
+  # Since #1370 the consolidated ci.yml also runs the quality-gate,
+  # compile-kmp and repo-hygiene jobs, so `force-all: true` exercises the
+  # entire PR validation surface in one reusable-workflow call.
   full-ci:
     name: Full CI (forced)
     uses: ./.github/workflows/ci.yml
     with:
       force-all: true
-    secrets: inherit
-
-  # ── Quality gate (version sync, security, asset/website rules, MCP tests) ─
-  quality-gate:
-    name: Quality gate
-    uses: ./.github/workflows/quality-gate.yml
     secrets: inherit
 
   # ── Render tests (emulator + iOS Simulator + Playwright web) ──────────────
@@ -59,17 +59,29 @@ jobs:
     uses: ./.github/workflows/render-tests.yml
     secrets: inherit
 
+  # ── Device-QA harness (Maestro Android + Playwright web) ──────────────────
+  # The autonomous cross-platform device-QA orchestrator (umbrella #1560,
+  # slice #1566). Path-gated on `main` so it does not run per-push for
+  # unrelated changes; the nightly run forces it so a harness/demo regression
+  # still surfaces within 24h. Its Android leg is `continue-on-error`
+  # internally (SwiftShader/Maestro flake), so it does not spam issues.
+  device-qa:
+    name: Device QA
+    uses: ./.github/workflows/device-qa.yml
+    secrets: inherit
+
   # ── Failure surfacing ─────────────────────────────────────────────────────
   # If any of the reused workflows fail, open (or update) a tracking issue so
   # the regression is visible without anyone watching the Actions tab.
   # `render-tests` jobs are `continue-on-error` internally, so a reused
   # render-test failure does not by itself flip this job — that is intended:
   # SwiftShader render flake should not spam issues. A genuine compile/test
-  # regression in `full-ci` or `quality-gate` does flip it.
+  # regression in `full-ci` (which since #1370 also runs the quality gate)
+  # does flip it.
   report-failure:
     name: Report nightly failure
-    needs: [full-ci, quality-gate, render-tests]
-    if: always() && (needs.full-ci.result == 'failure' || needs.quality-gate.result == 'failure')
+    needs: [full-ci, render-tests]
+    if: always() && needs.full-ci.result == 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -82,7 +94,6 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           FULL_CI_RESULT: ${{ needs.full-ci.result }}
-          QG_RESULT: ${{ needs.quality-gate.result }}
         run: |
           set -euo pipefail
           BODY=$(printf '%s\n' \
@@ -90,8 +101,7 @@ jobs:
             "" \
             "| Reused workflow | Result |" \
             "|---|---|" \
-            "| Full CI (forced) | $FULL_CI_RESULT |" \
-            "| Quality gate | $QG_RESULT |" \
+            "| Full CI (forced, incl. quality gate) | $FULL_CI_RESULT |" \
             "" \
             "Run: $RUN_URL" \
             "" \

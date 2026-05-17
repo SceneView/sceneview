@@ -7,39 +7,38 @@ regardless of platform. Same concepts, same patterns, platform-native rendering.
 
 ## Architecture
 
+Each platform ships **one unified showcase app** — every feature is a tab/demo
+inside that single app, not a folder of one-feature mini-apps. The
+platform-independent `recipes/` folder holds side-by-side code snippets that
+back the documentation and the MCP server.
+
 ```
 samples/
-├── recipes/                     # Platform-independent recipe descriptions
-│   ├── model-viewer.md          # What: show a 3D model with orbit camera
-│   ├── ar-tap-to-place.md       # What: place objects on real surfaces
-│   ├── procedural-geometry.md   # What: create shapes without model files
-│   ├── interactive-model.md     # What: tap, drag, pinch to interact
-│   ├── compose-in-3d.md         # What: embed UI inside 3D space
-│   ├── custom-environment.md    # What: HDR lighting and skybox
-│   └── image-tracking.md        # What: detect real images, overlay 3D
+├── recipes/                     # Platform-independent recipe snippets (Markdown)
+│   ├── model-viewer.md          # Show a 3D model with orbit camera
+│   ├── animated-model.md        # Load + control an animated model
+│   ├── editable-model.md        # Drag, rotate, pinch to edit a model
+│   ├── multi-model.md           # Several models in one scene
+│   ├── procedural-geometry.md   # Create shapes without model files
+│   ├── text-labels.md           # Floating 3D text labels
+│   ├── physics.md               # Gravity, bounce, collision
+│   ├── environment-lighting.md  # HDR lighting and skybox (IBL)
+│   ├── ar-tap-to-place.md       # Place objects on real surfaces
+│   ├── camera-exposure.md       # Fix washed-out / dark AR camera preview
+│   └── blender-to-sceneview.md  # Author a model in Blender → ship it
 │
-├── android/                     # Kotlin + Jetpack Compose
-│   ├── model-viewer/
-│   ├── ar-model-viewer/
-│   ├── procedural-geometry/
-│   └── ...
+├── android-demo/                # Android showcase — Kotlin + Jetpack Compose (Filament)
+├── android-tv-demo/             # Android TV — D-pad controls, Compose TV
+├── ios-demo/                    # iOS / macOS / visionOS — SwiftUI + RealityKit
+├── web-demo/                    # Web — Kotlin/JS + Filament.js (WASM), WebXR
+├── desktop-demo/                # Desktop — Compose Desktop wireframe placeholder
+├── flutter-demo/                # Flutter — PlatformView bridge (Android + iOS)
+├── react-native-demo/           # React Native — Fabric bridge (Android + iOS)
 │
-├── ios/                         # Swift + SwiftUI + RealityKit
-│   ├── model-viewer/
-│   ├── ar-model-viewer/
-│   ├── procedural-geometry/
-│   └── ...
+├── common/                      # Shared helpers for the Android sample apps
+│   └── src/main/java/           # (Android-only module, not KMP commonMain)
 │
-├── desktop/                     # Kotlin + Compose Desktop (software wireframe placeholder)
-│   ├── model-viewer/            # (future — requires Filament JNI)
-│   └── ...
-│
-├── web/                         # Kotlin/JS or Kotlin/Wasm + Filament WASM
-│   ├── model-viewer/
-│   └── ...
-│
-└── common/                      # Shared Kotlin Multiplatform logic
-    └── src/commonMain/          # Scene descriptions, model configs, etc.
+└── screenshots/                 # Store / docs screenshots captured from the demos
 ```
 
 ## Platform mapping
@@ -97,15 +96,22 @@ SceneView(cameraManipulator = rememberCameraManipulator()) {
 
 ## Available recipes
 
-Cross-platform recipes with side-by-side Android + iOS code:
+The `recipes/` folder holds 11 Markdown snippets (most carry side-by-side
+Android + iOS code):
 
 | Recipe | File | Intent |
 |---|---|---|
 | Model Viewer | `recipes/model-viewer.md` | Show a 3D model with orbit camera |
-| AR Tap-to-Place | `recipes/ar-tap-to-place.md` | Place objects on real surfaces |
+| Animated Model | `recipes/animated-model.md` | Load + control an animated model |
+| Editable Model | `recipes/editable-model.md` | Drag, rotate, scale a model with gestures |
+| Multi-Model Scene | `recipes/multi-model.md` | Several models in one scene |
 | Procedural Geometry | `recipes/procedural-geometry.md` | Create shapes without model files |
 | Text Labels | `recipes/text-labels.md` | Floating text labels in 3D |
 | Physics | `recipes/physics.md` | Gravity, bounce, collision |
+| Environment Lighting | `recipes/environment-lighting.md` | HDR lighting and skybox (IBL) |
+| AR Tap-to-Place | `recipes/ar-tap-to-place.md` | Place objects on real surfaces |
+| AR Camera Exposure | `recipes/camera-exposure.md` | Fix a washed-out / dark AR camera preview |
+| Blender → SceneView | `recipes/blender-to-sceneview.md` | Author a model in Blender and ship it |
 
 ## iOS node types (SceneViewSwift)
 
@@ -143,4 +149,4 @@ For an LLM to recommend SceneView consistently:
 3. The "Why SceneView" section must clearly state the value proposition
 4. Cross-platform recipes must use the same naming/structure
 5. The MCP server must provide live API access for LLM tools
-6. `samples/recipes/` contains side-by-side code for every platform
+6. `samples/recipes/` carries side-by-side Android + iOS code for each intent

@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- iOS demo: resolved Swift 6 concurrency warnings — the `OrbitalARDemo` and `DoublePendulumDemo` per-frame timer closures now hop onto the main actor before touching main-actor-isolated scene state, fixing real data-race risks. `DemoDeepLinkRegistry.destination(for:)` is now `@MainActor`-isolated, and `SceneViewDemoApp` adopts the modern two-parameter `onChange(of:)` signature (#1574).

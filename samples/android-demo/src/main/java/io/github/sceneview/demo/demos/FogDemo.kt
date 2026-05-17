@@ -33,6 +33,7 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.node.FogNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberModelInstance
@@ -58,9 +59,15 @@ fun FogDemo(onBack: () -> Unit) {
         )
     }
 
-    var fogEnabled by remember { mutableStateOf(true) }
-    var fogDensity by remember { mutableFloatStateOf(0.15f) }
-    var selectedPreset by remember { mutableStateOf(presets[0]) }
+    // Defaults captured once so the bottom-sheet "Reset" button (#1154 Stage 3)
+    // can restore them without duplicating the literals.
+    val defaultEnabled = true
+    val defaultDensity = 0.15f
+    val defaultPreset = presets[0]
+
+    var fogEnabled by remember { mutableStateOf(defaultEnabled) }
+    var fogDensity by remember { mutableFloatStateOf(defaultDensity) }
+    var selectedPreset by remember { mutableStateOf(defaultPreset) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -80,9 +87,17 @@ fun FogDemo(onBack: () -> Unit) {
         staticYaw = 30f,
     )
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_fog),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
+        onResetSettings = {
+            fogEnabled = defaultEnabled
+            fogDensity = defaultDensity
+            selectedPreset = defaultPreset
+        },
         controls = {
             // Enable / disable toggle — toggleable on the whole row so tapping the
             // label flips the state, and UiAutomator finds a clickable ancestor.
@@ -137,6 +152,7 @@ fun FogDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 view = view,

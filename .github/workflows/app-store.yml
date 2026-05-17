@@ -13,7 +13,10 @@ name: Deploy iOS App to App Store
 
 on:
   push:
-    tags: ['v*']
+    # Strict semver glob, matching release.yml / play-store.yml. A broader
+    # `v*` would let a pre-release (`v4.8.0-rc1`) or stray (`vtest`) tag
+    # trigger an App Store / TestFlight deploy with no matching release run.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       submit_for_review:
@@ -132,7 +135,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: samples/ios-demo/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          # Hash the checked-in `Package.resolved` (#1360) — the nested
+          # `xcshareddata/swiftpm/Package.resolved` does not exist until
+          # Xcode resolves packages, so it yields a constant empty hash.
+          key: spm-${{ runner.os }}-${{ hashFiles('samples/ios-demo/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
       - name: Resolve Swift Package dependencies
@@ -552,7 +558,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: samples/ios-demo/SourcePackages
-          key: spm-macos-${{ runner.os }}-${{ hashFiles('samples/ios-demo/SceneViewDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          # Hash the checked-in `Package.resolved` (#1360) — the nested
+          # `xcshareddata/swiftpm/Package.resolved` does not exist until
+          # Xcode resolves packages, so it yields a constant empty hash.
+          key: spm-macos-${{ runner.os }}-${{ hashFiles('samples/ios-demo/Package.resolved') }}
           restore-keys: spm-macos-${{ runner.os }}-
 
       - name: Resolve Swift Package dependencies

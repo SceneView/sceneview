@@ -44,6 +44,7 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.DemoSettings
 import io.github.sceneview.demo.LoadingScrim
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
 import io.github.sceneview.demo.sketchfab.SketchfabSlug
@@ -58,6 +59,7 @@ import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
 import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
+import io.github.sceneview.sample.LifecyclePausingLaunchedEffect
 import java.io.File
 import kotlin.math.cos
 import kotlin.math.sin
@@ -196,9 +198,11 @@ fun AnimationDemo(onBack: () -> Unit) {
     // dramatic intro and pairs naturally with a walking subject.
     var cameraMode by remember { mutableStateOf(CameraMode.REVEAL) }
     // IBL intensity — exposed as a slider so users can dial atmospheric vs neutral.
-    // Default 5_000 lux balances the rooftop_night HDR's warm tint without bleeding
-    // into the model's albedo. Range 0–10_000 covers pitch-black to over-exposed.
-    var iblIntensity by remember { mutableFloatStateOf(5_000f) }
+    // Default 10_000 lux matches SceneView's balanced IBL default (#1075). The
+    // rooftop_night skybox renders at full HDR luminance, so a lower IBL left the
+    // model reading as a black silhouette against the bright sky (#1468). Range
+    // 0–10_000 still lets users dial down to a darker, atmospheric look.
+    var iblIntensity by remember { mutableFloatStateOf(10_000f) }
 
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -251,11 +255,11 @@ fun AnimationDemo(onBack: () -> Unit) {
     val fallbackEnvironment = rememberEnvironment(environmentLoader)
     val activeEnvironment = hdrEnvironment ?: fallbackEnvironment
 
-    // The rooftop_night HDR is over-bright and saturates the soldier's albedo with the
-    // dusk's warm/violet tint. The default ~30k lux from cmgen is far too hot — we
-    // expose the IBL intensity as a slider so users can dial atmospheric (low values)
-    // vs neutral (high values). Re-runs whenever the active environment OR the slider
-    // value change, so dragging the slider updates the lighting in real time.
+    // Pin the IBL intensity to the slider value. The rooftop_night skybox renders at
+    // full HDR luminance, so the IBL must stay near SceneView's balanced 10k default
+    // to keep the soldier lit in step with the bright sky behind it (#1468) — a lower
+    // value left the model looking like an unlit black silhouette. Re-runs whenever the
+    // active environment OR the slider value change, so dragging it updates in real time.
     LaunchedEffect(activeEnvironment, iblIntensity) {
         activeEnvironment.indirectLight?.intensity = iblIntensity
     }
@@ -323,21 +327,23 @@ fun AnimationDemo(onBack: () -> Unit) {
     // Mode driver: each case below is a self-contained cinematic loop. We
     // canonicalize all Animatable values at entry, then run a `while (true)`
     // sequence of `animateTo` calls. Cancellation comes for free because Compose
-    // tears down the LaunchedEffect when `cameraMode` changes.
+    // tears down the effect when `cameraMode` changes.
     //
-    // NOTE: this LaunchedEffect intentionally does NOT use
-    // `LifecycleAwareLaunchedEffect` even though the cinematic loops are the
-    // heaviest battery draw in the app. The reason: every `when (cameraMode)`
-    // arm begins with `xAnim.snapTo(initialValue)` to canonicalize state, and
-    // `repeatOnLifecycle(STARTED)` re-runs the block from the top on every
-    // foreground — so a user who Alt-Tabs mid-orbit would see the camera
-    // teleport back to yaw=0 on return. The Filament render thread already
-    // stops drawing when the SceneView surface backgrounds, so the visible
-    // CPU/GPU cost of "loop keeps animating in background" is limited to
-    // the Compose snapshot updates on the Animatable values. Acceptable
-    // until we wire a state-preserving lifecycle pattern. See #936 review.
+    // Lifecycle pausing (#974): this uses `LifecyclePausingLaunchedEffect`, the
+    // STATE-PRESERVING lifecycle helper — not `LifecycleAwareLaunchedEffect`.
+    // The plain `repeatOnLifecycle` helper re-runs the block from the top on
+    // every `onStart`, and every `when (cameraMode)` arm begins with
+    // `xAnim.snapTo(initialValue)`, so a user who Alt-Tabs mid-orbit would see
+    // the camera teleport back to yaw=0 on return (#936 review → migration
+    // reverted in `de692709`). `LifecyclePausingLaunchedEffect` instead hands
+    // the body a `gate` whose `awaitResumed()` SUSPENDS the running coroutine
+    // in place while backgrounded: the coroutine is never cancelled, every
+    // `Animatable.value` is preserved, and the loop resumes exactly where it
+    // paused. We drop one `gate.awaitResumed()` before each tween/delay so the
+    // loop parks on a clean boundary — stopping the per-frame Compose snapshot
+    // writes that were the residual background drain (~5-10 mW, #936).
     // ---------------------------------------------------------------------------
-    LaunchedEffect(cameraMode, DemoSettings.qaMode) {
+    LifecyclePausingLaunchedEffect(cameraMode, DemoSettings.qaMode) { gate ->
         // QA freeze — match the hero-orbit helper so screenshot tests stay stable.
         if (DemoSettings.qaMode) {
             yawAnim.snapTo(45f)
@@ -345,7 +351,7 @@ fun AnimationDemo(onBack: () -> Unit) {
             yHeightAnim.snapTo(baseYHeight)
             fovAnim.snapTo(defaultFovDegrees)
             trackingEye.value = null
-            return@LaunchedEffect
+            return@LifecyclePausingLaunchedEffect
         }
 
         // Reset overrides on every mode switch so previous mode state doesn't bleed in.
@@ -366,14 +372,19 @@ fun AnimationDemo(onBack: () -> Unit) {
                 yHeightAnim.snapTo(0.55f)
                 while (true) {
                     yawAnim.snapTo(0f)
-                    // Quarter 1: 0° → 45° (front-3/4) over 5 s, ease-in-out
+                    // Quarter 1: 0° → 45° (front-3/4) over 5 s, ease-in-out.
+                    // gate.awaitResumed() parks on a clean boundary while the
+                    // app is backgrounded — yaw is preserved, no teleport.
+                    gate.awaitResumed()
                     yawAnim.animateTo(45f, tween(5_000, easing = easeInOutCubic))
                     // Hold the front-3/4 angle for 2 s (the cinematic beat).
                     // animateTo to the same value returns immediately, so use delay.
                     kotlinx.coroutines.delay(2_000)
                     // Quarter 2: 45° → 180° over 8 s, ease-out
+                    gate.awaitResumed()
                     yawAnim.animateTo(180f, tween(8_000, easing = easeOutQuart))
                     // Half: 180° → 360° over 10 s, ease-in-out
+                    gate.awaitResumed()
                     yawAnim.animateTo(360f, tween(10_000, easing = easeInOutCubic))
                 }
             }
@@ -396,6 +407,8 @@ fun AnimationDemo(onBack: () -> Unit) {
                     // Snap to the close-up start
                     radiusAnim.snapTo(1.5f)
                     yHeightAnim.snapTo(0.9f)
+                    // Park on the close-up boundary while backgrounded.
+                    gate.awaitResumed()
                     // 6 s pull-back to wide, ease-in-out — matches a real dolly-out
                     val pullBack = tween<Float>(6_000, easing = FastOutSlowInEasing)
                     val sync = launch { radiusAnim.animateTo(5.0f, pullBack) }
@@ -416,6 +429,8 @@ fun AnimationDemo(onBack: () -> Unit) {
                 while (true) {
                     radiusAnim.snapTo(2.0f)
                     fovAnim.snapTo(60f)
+                    // Park on the vertigo-start boundary while backgrounded.
+                    gate.awaitResumed()
                     // Vertigo IN: 10 s. Radius grows 2 → 5, FOV shrinks 60 → 25.
                     // The subject stays roughly the same screen size; the background
                     // appears to crush in. Easing: gentle ease-in-out for the build.
@@ -426,6 +441,7 @@ fun AnimationDemo(onBack: () -> Unit) {
                     // Hold at the extreme for 1 s — lets the eye register the warp.
                     kotlinx.coroutines.delay(1_000)
                     // Vertigo OUT: 8 s. Reverse — radius 5 → 2, FOV 25 → 60.
+                    gate.awaitResumed()
                     val vOut = tween<Float>(8_000, easing = easeInOutCubic)
                     val syncR2 = launch { radiusAnim.animateTo(2.0f, vOut) }
                     fovAnim.animateTo(60f, vOut)
@@ -463,6 +479,8 @@ fun AnimationDemo(onBack: () -> Unit) {
                 try {
                     while (true) {
                         xAnim.snapTo(startX)
+                        // Park on the sweep-start boundary while backgrounded.
+                        gate.awaitResumed()
                         // 8 s lateral sweep, ease-in-out so the pass accelerates
                         // smoothly and decelerates at the end (real dolly track feel).
                         xAnim.animateTo(
@@ -580,9 +598,12 @@ fun AnimationDemo(onBack: () -> Unit) {
     }
     val activeManipulator = if (cameraMode == CameraMode.FREE) freeManipulator else scriptedManipulator
 
+    val firstFrame = rememberFirstFrameState()
+
     DemoScaffold(
         title = stringResource(R.string.demo_animation_title),
         onBack = onBack,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Model carousel — switches the active animated subject. Slot 0 is
             // the bundled threejs soldier; slots 1–4 stream from the `animation`
@@ -734,6 +755,7 @@ fun AnimationDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

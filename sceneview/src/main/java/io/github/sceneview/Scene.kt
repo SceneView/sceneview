@@ -840,10 +840,12 @@ fun rememberView(engine: Engine, creator: () -> View = { createView(engine) }) =
 /**
  * Creates and remembers a Filament [View] tuned for AR (used as the default in `ARScene`).
  *
- * Uses [createARView] instead of [createView] — the key difference is [ToneMapper.Linear] instead
- * of [ToneMapper.Filmic], which prevents the AR camera background from being over-processed.
+ * Uses [createARView] instead of [createView] — the AR view keeps bloom and ambient occlusion off
+ * so the camera background is not tinted, while still applying the Filmic tone mapper that the
+ * camera-stream shader's `inverseTonemapSRGB` needs in order to round-trip back to the original
+ * camera pixels.
  *
- * @see createARView for a full explanation of why AR needs a different tone mapper.
+ * @see createARView for a full explanation of the AR camera-background tone-mapping pipeline.
  */
 @Composable
 fun rememberARView(engine: Engine, creator: () -> View = { createARView(engine) }) =

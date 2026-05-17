@@ -23,6 +23,13 @@ on:
       - 'samples/**'
       - 'SceneViewSwift/**'
       - 'gradle/**'
+      # Build-script changes can alter a rendered frame (dependency bumps,
+      # renderer-affecting module config) just as much as `src/**` does.
+      - 'build.gradle*'
+      - '**/build.gradle*'
+      - 'settings.gradle*'
+      - 'gradle.properties'
+      - '**/gradle.properties'
   workflow_dispatch:
   # Invoked by nightly-ci.yml so the scheduled full-validation run reuses
   # this render-test definition rather than duplicating it. See #1324.
@@ -48,12 +55,14 @@ jobs:
     continue-on-error: true
 
     # The 3-shard emulator matrix (#1119, PR #1145) was REVERTED to a single
-    # job: all 5 render-test classes are class-level `@Ignore`'d on
-    # SwiftShader CI (Filament `readPixels` crash, tracked in #803), so
-    # sharding boots 3 emulators to run 0 tests — strictly more CI cost for
-    # the same 0 coverage. Re-apply the matrix scaffold (DemoParameters
-    # alone; Visual+Geometry paired; Smoke+Lighting paired) once #803 lifts
-    # the `@Ignore`s and real per-class wall-clocks justify the parallelism.
+    # job: the 5 render-test classes cleanly `assumeTrue`-skip on SwiftShader
+    # CI (Filament `readPixels` crash, tracked in #803 — gated by the
+    # `gpuReadback` flag, see #912), so sharding boots 3 emulators to run 0
+    # tests — strictly more CI cost for the same 0 coverage. This SwiftShader
+    # leg deliberately does NOT pass `gpuReadback=true`. Re-apply the matrix
+    # scaffold (DemoParameters alone; Visual+Geometry paired; Smoke+Lighting
+    # paired) once #803 lands a hardware-GPU runner that opts in and real
+    # per-class wall-clocks justify the parallelism.
 
     steps:
       - uses: actions/checkout@v6
@@ -79,8 +88,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            # Run the whole render-test suite in one emulator. Every target
-            # class is currently `@Ignore`'d (#803), so this completes fast.
+            # Run the whole render-test suite in one emulator. The render-test
+            # classes `assumeTrue`-skip on SwiftShader (#803, #912) because this
+            # leg does NOT pass `gpuReadback=true`, so they report as SKIPPED
+            # (not orphan, not failed) and this completes fast. A hardware-GPU
+            # runner can opt in with
+            # `-Pandroid.testInstrumentationRunnerArguments.gpuReadback=true`.
             ./gradlew :sceneview:connectedDebugAndroidTest --stacktrace
 
             # Pull rendered screenshots from device for visual inspection
@@ -199,6 +212,88 @@ jobs:
         with:
           name: android-demo-screenshots
           path: demo-screenshots/
+          if-no-files-found: ignore
+
+  # ── AR demo playback screenshot regression ────────────────────────────────
+  # Frame-indexed AR screenshot pipeline (#1050): replays the bundled ARCore
+  # recording through ARRecordPlaybackDemo and captures the rendered frame at
+  # fixed ARCore frame indices (f=30/60/120/180) for golden comparison.
+  #
+  # Non-blocking by design: until goldens are captured on this pinned emulator
+  # profile and committed under
+  # `samples/android-demo/src/androidTest/assets/ar-screenshot-goldens/`, the
+  # test `assumeTrue`-skips every comparison and uploads the first-run captures
+  # as an artifact. Once a maintainer pulls + reviews + commits those PNGs the
+  # job becomes a real regression gate. See that dir's README for the flow.
+  ar-demo-playback-screenshots:
+    name: AR demo playback screenshots (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # AR emulator playback is inherently flaky (ARCore service init races,
+    # SwiftShader GPU timing). Keep non-blocking — it is NOT a required check.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gradle
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Build demo + androidTest APKs
+        env:
+          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
+        run: ./gradlew :samples:android-demo:assembleDebug :samples:android-demo:assembleDebugAndroidTest --stacktrace
+
+      - name: Run AR playback screenshot pipeline
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          # Pinned emulator profile (#1050 acceptance §4) — goldens MUST be
+          # captured against this exact config or GPU divergence flags false
+          # positives. Re-baseline only after pulling first-run captures from a
+          # run of this same profile.
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb wait-for-device
+            attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
+
+            # ARCore playback still needs the ARCore runtime installed even
+            # though the camera feed comes from the bundled MP4. Sideload the
+            # official multi-arch APK — see samples/android-demo/AR_TESTING.md.
+            # `|| true`: a sideload failure just makes the test assumeTrue-skip.
+            ARCORE_VERSION=1.54.0
+            curl -L --retry 3 --retry-delay 5 -o /tmp/arcore.apk "https://github.com/google-ar/arcore-android-sdk/releases/download/${ARCORE_VERSION}/Google_Play_Services_for_AR_${ARCORE_VERSION}.apk" || true
+            adb install -r /tmp/arcore.apk || true
+
+            # Run only the frame-indexed AR screenshot test class.
+            ./gradlew :samples:android-demo:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.sceneview.demo.ar.ARPlaybackScreenshotTest --stacktrace || true
+
+            # Pull the captures the test wrote (first-run goldens, diffs, actuals).
+            mkdir -p ar-screenshot-output
+            adb pull /sdcard/Download/SceneView/test-captures/ ar-screenshot-output/ || true
+
+      - name: Upload AR screenshot captures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ar-demo-playback-screenshots
+          path: ar-screenshot-output/
+          if-no-files-found: ignore
+
+      - name: Upload AR test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ar-demo-playback-results
+          path: samples/android-demo/build/reports/androidTests/
           if-no-files-found: ignore
 
   # ── iOS render tests ──────────────────────────────────────────────────────

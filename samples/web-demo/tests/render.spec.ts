@@ -1,13 +1,18 @@
 import { test, expect } from '@playwright/test';
+import { sampleCanvas } from './helpers';
 
 /**
- * SceneView Web Demo — visual regression tests.
+ * SceneView Web Demo — visual regression / smoke tests.
  *
  * These tests load the web demo page, wait for the Filament engine to
  * initialize, and capture screenshots for visual comparison.
  *
  * Screenshots are stored in `tests/render.spec.ts-snapshots/` and compared
  * on subsequent runs. Update baselines with `--update-snapshots`.
+ *
+ * Full per-tab / per-demo catalog coverage lives in `catalog.spec.ts`
+ * (issue #1564). This file stays as the lightweight load + branding +
+ * tab-regression smoke layer.
  */
 
 test.describe('SceneView Web Demo Rendering', () => {
@@ -40,32 +45,9 @@ test.describe('SceneView Web Demo Rendering', () => {
     // Give Filament a moment to render frames
     await page.waitForTimeout(2000);
 
-    // Check that the canvas is not all-black by sampling pixel data
-    const canvasHasContent = await page.evaluate(() => {
-      const canvas = document.getElementById('scene-canvas') as HTMLCanvasElement;
-      if (!canvas) return false;
-      const ctx = canvas.getContext('2d') || canvas.getContext('webgl2') || canvas.getContext('webgl');
-      if (!ctx) return false;
-
-      // For WebGL contexts, read pixels
-      if ('readPixels' in ctx) {
-        const gl = ctx as WebGL2RenderingContext;
-        const pixels = new Uint8Array(4 * 100);
-        gl.readPixels(
-          Math.floor(canvas.width / 2) - 5,
-          Math.floor(canvas.height / 2) - 5,
-          10, 10,
-          gl.RGBA, gl.UNSIGNED_BYTE, pixels
-        );
-        // Check if any pixel is non-zero (not all black)
-        let nonZero = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-          if (pixels[i] > 5 || pixels[i+1] > 5 || pixels[i+2] > 5) nonZero++;
-        }
-        return nonZero > 0;
-      }
-      return true; // 2D context — assume content
-    });
+    // Check that the canvas is not all-black by sampling pixel data via the
+    // shared helper (also used by the catalog-coverage suite).
+    const { hasContent, headlessGpuOk } = await sampleCanvas(page);
 
     // Capture screenshot regardless of content check
     await page.screenshot({
@@ -73,30 +55,65 @@ test.describe('SceneView Web Demo Rendering', () => {
       fullPage: false,
     });
 
-    // This assertion may be soft — WebGL in headless mode may not produce
-    // visible output depending on the GPU driver
-    if (!canvasHasContent) {
+    // This assertion stays soft — headless WebGL on a GPU-less runner may not
+    // produce a readable framebuffer (`headlessGpuOk: false`).
+    if (headlessGpuOk && !hasContent) {
       console.warn('Canvas appears blank — headless WebGL may not produce visible output');
     }
   });
 
-  test('model selector is visible', async ({ page }) => {
+  test('model results panel is visible', async ({ page }) => {
     await page.goto('/');
 
     const overlay = page.locator('#loading-overlay');
     await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
 
-    // Model selector should have chips
-    const selector = page.locator('#model-selector');
-    await expect(selector).toBeVisible();
+    // The Models panel lists CDN model cards.
+    const panel = page.locator('#panel-models');
+    await expect(panel).toBeVisible();
 
-    const chips = selector.locator('.model-chip');
-    const count = await chips.count();
-    expect(count).toBeGreaterThan(0);
+    const cards = page.locator('#model-results .result-card');
+    expect(await cards.count()).toBeGreaterThan(0);
 
     // Screenshot with UI visible
     await page.screenshot({
-      path: 'test-results/03_model_selector.png',
+      path: 'test-results/03_model_results.png',
+      fullPage: false,
+    });
+  });
+
+  test('every tab activates its matching panel', async ({ page }) => {
+    await page.goto('/');
+
+    const overlay = page.locator('#loading-overlay');
+    await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
+
+    // Regression guard for issue #1503: switchTab() must toggle every
+    // `panel-*` div, not just `panel-models`/`panel-geometry`. A blank side
+    // panel on Models / Physics / Settings shipped because the panel-ID list
+    // drifted out of sync with the `data-tab` attributes.
+    const tabs = ['models', 'geometry', 'physics', 'settings'];
+
+    for (const tab of tabs) {
+      await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
+
+      // The clicked tab button is active.
+      await expect(page.locator(`.tab-btn[data-tab="${tab}"]`)).toHaveClass(/active/);
+
+      // Its matching panel is active and visible.
+      const panel = page.locator(`#panel-${tab}`);
+      await expect(panel).toHaveClass(/active/);
+      await expect(panel).toBeVisible();
+
+      // No other panel is left active.
+      for (const other of tabs) {
+        if (other === tab) continue;
+        await expect(page.locator(`#panel-${other}`)).not.toHaveClass(/active/);
+      }
+    }
+
+    await page.screenshot({
+      path: 'test-results/06_tabs.png',
       fullPage: false,
     });
   });
@@ -108,17 +125,15 @@ test.describe('SceneView Web Demo Rendering', () => {
     await expect(overlay).toHaveClass(/hidden/, { timeout: 45_000 });
     await page.waitForTimeout(1000);
 
-    // Capture initial state
-    const screenshot1 = await page.screenshot();
+    // The CDN gallery renders `.result-card` entries — the demo has no
+    // `.model-chip` element (the old selector silently matched nothing).
+    const cards = page.locator('#model-results .result-card');
+    const count = await cards.count();
+    expect(count, 'CDN model gallery should list models').toBeGreaterThan(1);
 
-    // Click the second model chip if available
-    const chips = page.locator('#model-selector .model-chip');
-    const count = await chips.count();
-    if (count > 1) {
-      await chips.nth(1).click();
-      // Wait for model loading
-      await page.waitForTimeout(3000);
-    }
+    // Click the second model card and wait for the model to load.
+    await cards.nth(1).click();
+    await page.waitForTimeout(3000);
 
     // Capture after switch
     await page.screenshot({
@@ -132,11 +147,11 @@ test.describe('SceneView Web Demo Rendering', () => {
 
     // Check logo text
     const logoText = page.locator('.logo-text');
-    await expect(logoText).toHaveText('SceneView');
+    await expect(logoText).toHaveText('SceneView Web Demo');
 
-    // Check badge
-    const badge = page.locator('.logo-badge');
-    await expect(badge).toHaveText('Web');
+    // Check version badge
+    const version = page.locator('.logo-version');
+    await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/);
 
     await page.screenshot({
       path: 'test-results/05_branding.png',

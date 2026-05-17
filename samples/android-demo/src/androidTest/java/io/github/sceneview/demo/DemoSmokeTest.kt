@@ -129,19 +129,19 @@ class DemoSmokeTest {
 
     @Test
     fun a01_arCloudAnchor_smokeOpen() {
-        openDemoTolerant("ar-cloud-anchor", "Cloud Anchor")
+        openDemoTolerant("ar-cloud-anchor", "Cloud Anchors")
         screenshot("s01_ar_cloud_anchor")
     }
 
     @Test
     fun a02_arFace_smokeOpen() {
-        openDemoTolerant("ar-face", "Face Mesh")
+        openDemoTolerant("ar-face", "Augmented Faces")
         screenshot("s02_ar_face")
     }
 
     @Test
     fun a03_arImage_smokeOpen() {
-        openDemoTolerant("ar-image", "Augmented Image")
+        openDemoTolerant("ar-image", "Image Tracking")
         screenshot("s03_ar_image")
     }
 

@@ -188,6 +188,30 @@ jobs:
             -PversionCode=${{ steps.version.outputs.code }} \
             -PversionName=${{ steps.version.outputs.name }}
 
+      # Manifest validation gate (#1301) — fail fast on a stale or wrong-variant
+      # AAB before it reaches the Play Store. Asserts the built bundle's
+      # package / versionName / versionCode match what gradle was told to build,
+      # so a misconfigured artifact is caught here (~1 s) instead of as a Play
+      # Console rejection minutes later.
+      #
+      # An `.aab` is an Android App Bundle, NOT an APK — `aapt2` cannot read
+      # one (it reads APKs), so the validator uses `bundletool dump manifest`,
+      # the correct tool for bundles. A pre-upload guard must never block a
+      # release: `continue-on-error: true` guarantees that even a script crash
+      # or a tooling gap can never veto the upload (#1416). The script itself
+      # also only exits non-zero on a genuine manifest mismatch and skips
+      # cleanly when its tooling is unavailable.
+      - name: Validate AAB manifest before upload
+        continue-on-error: true
+        env:
+          EXPECT_PKG: io.github.sceneview.demo
+          EXPECT_NAME: ${{ steps.version.outputs.name }}
+          EXPECT_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          AAB=$(ls samples/android-demo/build/outputs/bundle/release/*.aab | head -n1)
+          bash .claude/scripts/validate-release-artifact.sh \
+            "$AAB" "$EXPECT_PKG" "$EXPECT_NAME" "$EXPECT_CODE"
+
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v7
         with:
@@ -437,6 +461,15 @@ jobs:
     needs: [build, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Best-effort: the listing-text sync is NOT a release gate. The AAB
+    # rollout (build + publish) is the release; this job only refreshes the
+    # store-listing copy. `continue-on-error: true` means a failure here
+    # (notably a 403 Forbidden on `edits:commit` when the deploy service
+    # account lacks the Play Console 'Edit store listing' permission —
+    # tracked in #1386) is TOLERATED and must never mark a green deploy red.
+    # The real fix is granting that permission in the Play Console, which is
+    # a separate manual maintainer task.
+    continue-on-error: true
     # Match `vX.Y.0` exactly — drops `4.0.0-rc.1` (pre-release), `4.3.1`
     # (patch), AND `4.3.10` (would slip past a naive `endsWith('.0')`
     # check). The gate is computed via bash regex on `VERSION_NAME` in
@@ -525,9 +558,30 @@ jobs:
               r = sess.post(f"{BASE}/edits/{edit_id}:commit")
               r.raise_for_status()
               print(f"[listing] commit OK")
-          except Exception:
+          except requests.HTTPError as e:
               # Best-effort rollback — abandon the edit so we don't leave a
               # dangling Edit ID in Play Console.
+              try:
+                  sess.delete(f"{BASE}/edits/{edit_id}")
+              except Exception:
+                  pass
+              status = e.response.status_code if e.response is not None else None
+              if status == 403:
+                  # The deploy service account lacks the Play Console
+                  # 'Edit store listing' permission (#1386). The app deploy
+                  # already succeeded — a listing-sync 403 is best-effort and
+                  # must not fail the release. Warn and exit cleanly; the
+                  # job is also `continue-on-error: true` as a safety net.
+                  print(
+                      "::warning::Play Store listing sync got 403 Forbidden — "
+                      "the deploy service account lacks the 'Edit store "
+                      "listing' permission. Listing copy NOT updated; the app "
+                      "deploy is unaffected. Grant the permission in the Play "
+                      "Console to enable listing sync (see #1386)."
+                  )
+                  sys.exit(0)
+              raise
+          except Exception:
               try:
                   sess.delete(f"{BASE}/edits/{edit_id}")
               except Exception:

@@ -26,6 +26,7 @@ import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.sketchfab.SketchfabConfig
 import io.github.sceneview.demo.LoadingScrim
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberFirstFrameState
 import io.github.sceneview.demo.rememberHeroOrbitCameraManipulator
 import io.github.sceneview.demo.sketchfab.SampleAssets
 import io.github.sceneview.demo.sketchfab.SketchfabAssetResolver
@@ -112,19 +113,26 @@ fun SceneGalleryDemo(onBack: () -> Unit) {
 
     // Per-demo offline indicator chip (#1152 Stage 3). When no API key is
     // configured we know up-front the resolver will fall back to bundled
-    // GLBs; while a slug is selected and `resolvedPath` is still null we
-    // surface a "Streaming…" pill; otherwise "Streamed (cached)".
+    // GLBs; otherwise the chip mirrors the centre LoadingScrim exactly so the
+    // two never contradict each other (#1465): it stays "Streaming…" until the
+    // model is fully parsed into a `ModelInstance` — not merely while the file
+    // path resolves — and only then flips to "Streamed (cached)". Gating on
+    // `modelInstance` (the same signal the LoadingScrim uses) keeps the chip
+    // and the spinner in lockstep.
     val assetSource = when {
         slugs.isEmpty() -> null
         SketchfabConfig.apiKey == null -> AssetSourceState.Bundled
-        resolvedPath == null -> AssetSourceState.Streaming
+        modelInstance == null -> AssetSourceState.Streaming
         else -> AssetSourceState.Streamed
     }
+
+    val firstFrame = rememberFirstFrameState()
 
     DemoScaffold(
         title = stringResource(R.string.demo_scene_gallery_title),
         onBack = onBack,
         assetSource = assetSource,
+        firstFrameRendered = firstFrame.rendered,
         controls = {
             // Category chips along the top of the controls sheet. We expose
             // them as a horizontally scrolling row so the four labels never
@@ -169,6 +177,7 @@ fun SceneGalleryDemo(onBack: () -> Unit) {
         Box(modifier = Modifier.fillMaxSize()) {
             SceneView(
                 modifier = Modifier.fillMaxSize(),
+                onFrame = firstFrame.onFrame,
                 engine = engine,
                 modelLoader = modelLoader,
                 environmentLoader = environmentLoader,

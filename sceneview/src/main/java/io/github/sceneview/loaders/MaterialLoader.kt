@@ -410,15 +410,26 @@ class MaterialLoader(
     }
 
     fun destroyMaterialInstance(materialInstance: MaterialInstance) {
-        if (materialInstance in materialInstances) {
+        // `List.remove` on the `synchronizedList` is atomic: the contains-check and the removal
+        // happen under a single lock, so only ONE caller ever observes `true`. A non-atomic
+        // `if (mi in materialInstances) { ...; materialInstances -= mi }` would let two threads
+        // (e.g. a VideoNode `materialInstance` setter on the main thread + a `destroy()` sweep)
+        // both pass the guard and call `Engine.destroyMaterialInstance` twice → native abort.
+        if (materialInstances.remove(materialInstance)) {
             // Same tolerance as destroyMaterial — a MaterialInstance can be orphaned by a
             // prior Material.destroy (which cascades to its defaultInstance and, during
             // Engine teardown, effectively to all instances tied to destroyed materials).
             runCatching { engine.safeDestroyMaterialInstance(materialInstance) }
-            materialInstances -= materialInstance
         }
     }
 
+    /**
+     * Destroys this loader and cancels its coroutine scope.
+     *
+     * Cancelling the scope stops any in-flight [loadMaterialAsync] job so it cannot touch a
+     * destroyed [Engine] after disposal (#933). Wired to `rememberMaterialLoader`'s
+     * `DisposableEffect.onDispose`, so launched jobs never outlive the owning composition.
+     */
     fun destroy() {
         coroutineScope.cancel()
 
