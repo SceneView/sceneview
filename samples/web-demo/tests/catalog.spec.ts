@@ -6,6 +6,7 @@ import {
   sampleCanvas,
   dragCanvas,
   switchTab,
+  waitForModelChipIdle,
 } from './helpers';
 
 /**
@@ -72,6 +73,11 @@ async function assertRendered(
 test.describe('Web Demo — catalog coverage', () => {
 
   test('Models tab — CDN gallery loads and model chips switch the scene', async ({ page }) => {
+    // Heavy WebGL-interaction test: 3 model downloads + WASM uploads + camera
+    // orbits, each Filament-rendered. On a GPU-less CI runner software
+    // rasterisation makes every frame several times slower, so the default
+    // 60s budget is too tight — `test.slow()` triples it (harness #1560).
+    test.slow();
     const diag = captureDiagnostics(page);
     await page.goto('/');
     await waitForEngineReady(page);
@@ -87,7 +93,10 @@ test.describe('Web Demo — catalog coverage', () => {
     const indices = [...new Set([0, Math.floor(count / 2), count - 1])];
     for (const i of indices) {
       await cards.nth(i).click();
-      await page.waitForTimeout(2500); // model download + upload
+      // Wait for the demo's real load-completion signal (the inline loading
+      // chip clearing) instead of a blind sleep — deterministic across a fast
+      // local GPU and a slow software-rasterised CI runner.
+      await waitForModelChipIdle(page);
       await dragCanvas(page);
       await assertRendered(page, `Models tab — card #${i}`);
     }
@@ -115,6 +124,9 @@ test.describe('Web Demo — catalog coverage', () => {
   });
 
   test('Geometry tab — every primitive adds, recolours and renders', async ({ page }) => {
+    // Heavy WebGL-interaction test: 4 primitives added + camera orbits, each
+    // Filament-rendered. Triple the budget for GPU-less CI runners (#1560).
+    test.slow();
     const diag = captureDiagnostics(page);
     await page.goto('/');
     await waitForEngineReady(page);
@@ -182,6 +194,10 @@ test.describe('Web Demo — catalog coverage', () => {
   });
 
   test('Settings tab — quality, bloom, auto-rotate and background all apply', async ({ page }) => {
+    // Heavy WebGL-interaction test: cycling render quality rebuilds the
+    // Filament pipeline 3×, plus bloom/rotate/background each force re-renders.
+    // Triple the budget for GPU-less CI runners (#1560).
+    test.slow();
     const diag = captureDiagnostics(page);
     await page.goto('/');
     await waitForEngineReady(page);

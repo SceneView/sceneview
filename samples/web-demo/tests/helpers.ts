@@ -201,6 +201,30 @@ export async function dragCanvas(page: Page): Promise<void> {
   await page.mouse.wheel(0, 240);
 }
 
+/**
+ * Wait for the demo's inline model-loading chip (`#loading-chip`) to clear.
+ *
+ * `loadModel()` in the demo shows `#loading-chip.visible` while a model
+ * downloads + uploads to Filament, then removes `.visible` on success/failure.
+ * Catalog tests previously used a blind `waitForTimeout(2500)` after a model
+ * chip click — which both wastes budget when the GPU is fast AND, more
+ * importantly, under-waits on a GPU-less CI runner where the WASM model
+ * upload is several times slower (the cause of the device-QA web-leg timeouts,
+ * harness umbrella #1560). Waiting on the real completion signal makes the
+ * step deterministic across runners.
+ *
+ * The chip may never appear at all if the load finished before the poll — so
+ * we only wait for the *hidden* state, with a generous ceiling for slow
+ * software-rasterised CI.
+ */
+export async function waitForModelChipIdle(
+  page: Page,
+  timeout = 30_000,
+): Promise<void> {
+  const chip = page.locator('#loading-chip');
+  await expect(chip).not.toHaveClass(/visible/, { timeout });
+}
+
 /** Switch to a catalog tab and assert its panel becomes active. */
 export async function switchTab(page: Page, tab: string): Promise<void> {
   await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
