@@ -73,8 +73,16 @@ fi
 # --- Optional build + install ---------------------------------------------
 if $INSTALL; then
   if [[ ! -f "$APK" ]]; then
-    echo "[qa] building demo APK..."
-    ./gradlew :samples:android-demo:assembleDebug -q
+    echo "[qa] building demo APK (this is a cold build — streams progress)..."
+    # `--console=plain` (NOT -q): a quiet build emits zero output, so a slow
+    # cold build on a 2-core CI runner looked like a 40-min silent hang.
+    # `timeout` bounds it so a genuinely stuck build/daemon fails fast with a
+    # clear diagnostic instead of eating the whole CI job budget (#1560).
+    timeout "${ANDROID_BUILD_TIMEOUT:-1800}" \
+      ./gradlew :samples:android-demo:assembleDebug --console=plain || {
+        echo "[qa] ERROR: APK build failed or timed out (>${ANDROID_BUILD_TIMEOUT:-1800}s)" >&2
+        exit 1
+      }
   fi
   echo "[qa] installing $APK"
   android_cli_ensure || true
@@ -95,6 +103,21 @@ adb logcat -c 2>/dev/null || true
 echo "[qa] running Maestro flow: $FLOW_FILE"
 MAESTRO_RC=0
 maestro_run "$FLOW_FILE" || MAESTRO_RC=$?
+
+# One-shot retry on an emulator-transport drop ("device offline" — the CI
+# emulator going unstable mid-flow, #1643). A transport drop is intermittent;
+# one retry rescues a flaky run without masking a genuine demo failure (a real
+# crash fails again the same way). Only retried for offline/transport errors.
+if [[ "$MAESTRO_RC" -ne 0 ]]; then
+  if adb get-state >/dev/null 2>&1; then
+    echo "[qa] device still online — Maestro failure is genuine, not retrying." >&2
+  else
+    echo "[qa] device offline after flow — emulator transport dropped; one retry..." >&2
+    adb wait-for-device 2>/dev/null || true
+    MAESTRO_RC=0
+    maestro_run "$FLOW_FILE" || MAESTRO_RC=$?
+  fi
+fi
 
 # --- FATAL / ANR logcat sweep ---------------------------------------------
 # Maestro's per-demo "Navigate back" assertion already fails on a hard crash,

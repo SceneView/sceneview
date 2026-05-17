@@ -103,8 +103,12 @@ omit `--install` and reuse an installed build.
 **Android** — `android/flows/demo.yaml` runs once per demo with `DEMO_ID` /
 `DEMO_NAME` env vars:
 
-1. `launchApp` with the validated `sceneview://demo/<id>` deep link plus the
-   `qa_mode` argument (freezes auto-rotation for a deterministic screenshot).
+1. `launchApp` with `demo` / `qa_mode` `arguments` — Maestro delivers these as
+   intent extras on the launch intent (`--es demo <id>`, `--ez qa_mode true`).
+   `MainActivity` routes the `demo` extra through `DeepLinkRouter.validate`
+   (the same closed-registry allow-list as the `sceneview://demo/<id>` scheme),
+   and `qa_mode` freezes auto-rotation for a deterministic screenshot. Maestro
+   `launchApp` has no `deepLink` property — that key aborts flow parsing.
 2. Orbit the camera (two opposite horizontal drags + one vertical drag).
 3. Tap the viewport centre (node pick / harmless empty-space tap).
 4. Capture **exactly one** screenshot (`demo-<id>`).

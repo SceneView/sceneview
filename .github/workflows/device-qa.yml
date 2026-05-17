@@ -10,6 +10,12 @@ name: Device QA
 # orchestrator for the platforms feasible on GitHub-hosted runners so a demo
 # regression that crashes on a real emulator / browser surfaces in CI.
 #
+# Three legs run here: web (Playwright), android (Maestro), and ar (ARCore
+# MP4 replay). The iOS Maestro leg has no GitHub-hosted equivalent (it needs a
+# macOS runner + simulator) and is covered by the local device-QA pass. The
+# `ar` leg was added in #1592 — until then the AR replay harness had no
+# automated coverage.
+#
 # COST CONTROL
 # ------------
 # Device-QA boots emulators and a browser — it is expensive. It is therefore
@@ -24,6 +30,32 @@ name: Device QA
 # runner cannot produce a falsely-green report. The aggregated
 # `device-qa-report.json` is uploaded as an artifact for the release
 # checkpoint (`release-checklist.sh` reads its `status`).
+#
+# FOUR-LEG SPLIT — PER-PUSH vs NIGHTLY-ONLY (#1601)
+# -------------------------------------------------
+# `device-qa.sh` orchestrates FOUR platform legs: web / android / ios / ar.
+# This workflow deliberately defines only the `web` and `android` jobs:
+#
+#   web      — Playwright on ubuntu-latest. Cheap, always feasible. Per-push.
+#   android  — Maestro on a KVM-accelerated emulator (ubuntu-latest). Heavy
+#              but feasible on GitHub-hosted runners. Per-push.
+#   ios      — Maestro on an iOS Simulator. NIGHTLY-ONLY: needs a `macos-*`
+#              runner, which is ~10x the per-minute cost and has no KVM —
+#              not worth spending on every demo-source push.
+#   ar       — ARCore replay harness. NIGHTLY-ONLY: needs an ARCore-capable
+#              emulator plus committed AR recordings; setup is too slow and
+#              flaky to gate routine pushes on.
+#
+# The `ios` and `ar` legs therefore run ONLY via the nightly `workflow_call`
+# (nightly-ci.yml), which executes `device-qa.sh --platform=all` on the
+# appropriate runners. A broken / always-skipped iOS or AR job in THIS
+# workflow would be worse than documenting the split, so they are omitted
+# here by design rather than stubbed.
+#
+# Path trigger consequence: `samples/ios-demo/**` is intentionally absent
+# from the `paths:` filter below — adding it would spin up the web+android
+# jobs for an iOS-only change while no iOS job exists to actually exercise
+# it. iOS demo changes are covered by the nightly run instead.
 
 on:
   push:
@@ -34,11 +66,15 @@ on:
       - '.claude/scripts/ios-device-qa.sh'
       - '.claude/scripts/ar-replay-qa.sh'
       - '.claude/scripts/setup-ar-emulator.sh'
+      - '.claude/scripts/sideload-arcore.sh'
       - '.claude/scripts/lib/maestro.sh'
       - '.claude/scripts/lib/android-cli.sh'
+      - '.github/workflows/device-qa.yml'
       - '.maestro/**'
       - 'samples/android-demo/**'
       - 'samples/web-demo/**'
+      # NOTE: `samples/ios-demo/**` is deliberately NOT listed — the iOS leg
+      # is nightly-only (see the FOUR-LEG SPLIT block above, #1601).
   workflow_dispatch:
   # Reused by nightly-ci.yml so the scheduled full-validation run exercises
   # the device-QA legs too — see #1324.
@@ -86,7 +122,11 @@ jobs:
   android:
     name: Device QA — android (Maestro)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 60 min: a cold `:samples:android-demo:assembleDebug` on a 2-core runner
+    # plus emulator boot plus the Maestro flow needs headroom. The per-step
+    # `timeout` guards inside qa-android-demos.sh / maestro.sh still abort a
+    # genuine hang fast (build 30 min, Maestro 15 min) — see #1560.
+    timeout-minutes: 60
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
@@ -104,8 +144,21 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Install Maestro
+        # `curl … | bash`: the curl exit status is masked by the pipe — `bash`
+        # on the right side exits 0 even when curl wrote nothing — so a DNS /
+        # network failure here would silently "succeed". The qa-android-demos.sh
+        # step would then fail much later with the opaque
+        # `rc=1 (flow=3d-basics)` because maestro.sh found no `maestro` binary
+        # (it never auto-installs in CI). `set -o pipefail` makes the curl
+        # failure abort THIS step where the error is obvious, and the explicit
+        # `test -x` catches an installer that ran but produced no binary.
+        # The canonical installer host is `get.maestro.mobile.dev` —
+        # `get.maestro.dev` does not resolve (run 25979438767: `curl: (6)
+        # Could not resolve host: get.maestro.dev`).
         run: |
-          curl -fsSL "https://get.maestro.dev" | bash
+          set -euo pipefail
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          test -x "$HOME/.maestro/bin/maestro"
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Run device-qa.sh (android leg) on emulator
@@ -114,7 +167,10 @@ jobs:
           api-level: 30
           target: google_apis
           arch: x86_64
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          # -memory 4096: the SceneView Filament 3D demo is GPU/RAM-heavy; the
+          # default emulator RAM let the device go offline mid-Maestro-flow on
+          # the software-GPU CI runner (#1643).
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
           disable-animations: true
           script: |
             export PATH="$HOME/.maestro/bin:$PATH"
@@ -128,6 +184,69 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: device-qa-report-android
+          path: |
+            device-qa-report.json
+            device-qa-artifacts/
+          if-no-files-found: ignore
+
+  # ── AR leg — ARCore MP4 replay on the KVM-accelerated emulator ────────────
+  # The AR replay harness (#1565: ar-replay-qa.sh + ARReplayHarnessTest) was
+  # the one device-QA leg with no CI coverage (#1592) — a per-release device-QA
+  # pass effectively skipped AR. This job closes that gap.
+  #
+  # It mirrors the `android` job's emulator setup, with one extra requirement:
+  # the AR replay harness needs Google Play Services for AR (com.google.ar.core)
+  # on the emulator. The ReactiveCircus action provides its own AVD (no Play
+  # Store, so ARCore is absent), so the `sideload-arcore.sh` helper fetches the
+  # x86 emulator build of ARCore from the public google-ar SDK GitHub release
+  # and `adb install`s it before we delegate to `device-qa.sh --platform=ar`.
+  # device-qa.sh detects the already-booted device and skips its own boot.
+  #
+  # Like the android job this is continue-on-error: the SwiftShader emulator +
+  # ARCore replay timing is flaky and this workflow is not a required PR check.
+  ar:
+    name: Device QA — ar (ARCore replay)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gradle
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run device-qa.sh (ar leg) on ARCore emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          # -memory 4096: the SceneView Filament 3D demo is GPU/RAM-heavy; the
+          # default emulator RAM let the device go offline mid-Maestro-flow on
+          # the software-GPU CI runner (#1643).
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
+          disable-animations: true
+          # NOTE: ReactiveCircus/android-emulator-runner runs each LINE of this
+          # `script:` as a separate `sh -c` invocation — env vars do NOT persist
+          # across lines and a multi-line `if … fi` block is a syntax error
+          # ("end of file unexpected"). Every step below must therefore be a
+          # single self-contained logical line (matching the `android` job).
+          script: |
+            adb wait-for-device
+            attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
+            bash .claude/scripts/sideload-arcore.sh || echo "[ar-leg] ARCore sideload failed — harness will assumeTrue-skip"
+            bash .claude/scripts/device-qa.sh --platform=ar --ci
+
+      - name: Upload ar device-QA report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-qa-report-ar
           path: |
             device-qa-report.json
             device-qa-artifacts/

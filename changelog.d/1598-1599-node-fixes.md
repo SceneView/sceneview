@@ -1,0 +1,2 @@
+<!-- category: Changed -->
+- `sceneview` node API honesty (#1598, #1599): verified `MeshNode` does not leak its `RenderableManager` component — `RenderableNode.destroy()` already releases the renderable built on `entity` (#1598 confirmed stale, no code change needed). Deprecated the `PhysicsNode` / `PhysicsBody` `mass` parameter — the Euler integration applies only gravity, which is mass-independent, so `mass` was a silent no-op; it is now `@Deprecated` with a clear message and the mass-free overload is the canonical one (#1599).

@@ -142,6 +142,15 @@ extract_refs() {
         case "$file" in
             *Tests.swift|*+Tests.swift|*Test.swift) continue ;;
         esac
+        # Skip the vendored Filament/SceneView engine bundled under the web
+        # demo's resources/js/ — these are byte-identical copies of
+        # website-static/js/ (self-hosted per issue #1586), not demo asset
+        # references. sceneview.js carries a JSDoc usage example
+        # (`SceneView.modelViewer("canvas", "model.glb")`) that is not a real
+        # asset path.
+        case "$file" in
+            */web-demo/src/jsMain/resources/js/*) continue ;;
+        esac
         # 1. Quoted literals with a known extension ("models/foo.glb", "bar.hdr")
         # Skip strings containing `$`, `\` (Swift `\(slug.uid).usdz`
         # interpolation), or `<` (placeholder docs like `Models/<name>.usdz`) —
