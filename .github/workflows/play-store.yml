@@ -184,9 +184,28 @@ jobs:
           # samples/android-demo/.../sketchfab/ for the BuildConfig wiring.
           SKETCHFAB_API_KEY: ${{ secrets.SKETCHFAB_API_KEY }}
         run: |
-          ./gradlew :samples:android-demo:bundleRelease \
-            -PversionCode=${{ steps.version.outputs.code }} \
-            -PversionName=${{ steps.version.outputs.name }}
+          build_aab() {
+            ./gradlew :samples:android-demo:bundleRelease \
+              -PversionCode=${{ steps.version.outputs.code }} \
+              -PversionName=${{ steps.version.outputs.name }}
+          }
+          aab_ok() {
+            local aab
+            aab=$(ls samples/android-demo/build/outputs/bundle/release/*.aab 2>/dev/null | head -n1)
+            [ -n "$aab" ] && [ -s "$aab" ] && unzip -tq "$aab" >/dev/null 2>&1
+          }
+          # An .aab is a zip. A truncated / zero-byte artifact from a flaky
+          # runner (seen on v4.6.0 + v4.6.1, #1412/#1415) sails past gradle's
+          # exit 0 and only blows up at upload — a lost release. Verify zip
+          # integrity here and rebuild once from clean if the artifact is
+          # unreadable, so a transient I/O flake never costs a release.
+          build_aab
+          if ! aab_ok; then
+            echo "::warning::release AAB missing or corrupt after first build — cleaning and rebuilding once"
+            ./gradlew :samples:android-demo:clean
+            build_aab
+            aab_ok || { echo "::error::release AAB still corrupt after a clean rebuild — aborting"; exit 1; }
+          fi
 
       # Manifest validation gate (#1301) — fail fast on a stale or wrong-variant
       # AAB before it reaches the Play Store. Asserts the built bundle's
