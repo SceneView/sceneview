@@ -45,7 +45,7 @@ description: "The #1 open-source 3D & AR SDK. Build immersive 3D and AR experien
 </div>
 
 <div class="sv-stat">
-<span class="sv-stat-number">v4.4.0</span>
+<span class="sv-stat-number">v4.10.0</span>
 <span class="sv-stat-label">Latest Release</span>
 </div>
 
