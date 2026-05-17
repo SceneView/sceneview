@@ -1,0 +1,2 @@
+<!-- category: Tests -->
+- **Web QA: pass `--enable-unsafe-swiftshader` to the Playwright Chromium runner ([#1674](https://github.com/sceneview/sceneview/issues/1674)).** Chrome removed the automatic SwiftShader fallback for WebGL. On a GPU-less CI runner ANGLE has no hardware path and nothing to fall back to, so WebGL context creation would fail outright — the Filament.js viewer would never get a context and the web-demo test suite could go green-on-nothing. The flag re-enables the software rasteriser so headless CI keeps a real WebGL context.
