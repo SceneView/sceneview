@@ -133,7 +133,8 @@ detect_target_data_gb() {
   (( data > 8 )) && data=8
   echo "$data"
 }
-TARGET_DATA_PARTITION="$(detect_target_data_gb)G"
+TARGET_DATA_GB="$(detect_target_data_gb)"
+TARGET_DATA_PARTITION="${TARGET_DATA_GB}G"
 # Most-capable recent Pixel profile actually installed in the SDK. Pixel 9 ships
 # no `avdmanager` profile yet; pixel_8 has the same 1080x2400 @ 420dpi geometry
 # as pixel_7a (so the screenshot-crop math in capture-play-store-screenshots.sh
@@ -223,7 +224,7 @@ recreate_avd() {
   # error five minutes into the boot.
   local free_gb need_gb
   free_gb="$(df -g "$AVD_HOME" 2>/dev/null | awk 'NR==2{print $4}')"
-  need_gb=$(( ${TARGET_DATA_PARTITION%G} + 3 ))
+  need_gb=$(( TARGET_DATA_GB + 3 ))
   if [[ "$free_gb" =~ ^[0-9]+$ ]] && (( free_gb < need_gb )); then
     log "WARNING: only ${free_gb} GB free on the AVD volume; a fresh AVD needs"
     log "  ~${need_gb} GB — the emulator may refuse to create the userdata"
@@ -282,8 +283,9 @@ elif avd_is_stale; then
 fi
 
 # --- step 4: patch config.ini for ARCore --------------------------------------
-# Pinned values: host-sized RAM / 1 GB heap / 6 cores / 12 GB data (ANR-resistant
-# QA), virtualscene back camera (ARCore can drive it), emulated front (Augmented
+# Pinned values: host-sized RAM / 1 GB heap / 6 cores / free-disk-adaptive data
+# partition ([4G,8G], see detect_target_data_gb) — ANR-resistant QA —
+# virtualscene back camera (ARCore can drive it), emulated front (Augmented
 # Faces), host GPU mode.
 patch_kv() {
   local key="$1"
@@ -541,8 +543,10 @@ else:
   log "downloading $apk_url"
   curl -fsSL -o "$tmp_apk" "$apk_url" || { log "ARCore download failed"; return 1; }
   log "installing ARCore on $serial"
-  # Retry: right after boot the package manager can still reject installs while
-  # it settles, so a single attempt is flaky.
+  # `wait_for_pm` (called before this step) is the primary guard against the
+  # post-boot package-manager settling race. This short retry is a cheap
+  # belt-and-braces backstop for the residual flake `pm path android` can't
+  # fully rule out (e.g. a transient install-service hiccup).
   local attempt err
   for attempt in 1 2 3; do
     err="$("$ADB_BIN" -s "$serial" install -r "$tmp_apk" 2>&1)" && return 0
