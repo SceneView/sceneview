@@ -15,6 +15,11 @@ import org.junit.Test
  * The previous first-stable-frame latch froze the framing on whichever model loaded first, leaving
  * later async models bunched in the corner — the multi-model bug #1391 fixed on web / iOS.
  * [deferredAsyncModelReFramesAfterFirstModelFramed] pins that.
+ *
+ * The second headline case is the **Tier-2 #1596 review** bug: a scene whose union diagonal jitters
+ * above the stability epsilon on every frame (animated model, physics demo) never satisfies the
+ * diagonal-stability latch, so the gate must latch via the [FramingGate.MAX_FRAMING_PASSES] ceiling
+ * instead of re-framing forever. [perpetuallyJitteringSceneLatchesWithinTheCeiling] pins that.
  */
 class FramingGateTest {
 
@@ -168,6 +173,70 @@ class FramingGateTest {
         gate.recordFraming(10f)
         // 10.0 -> 10.5 is 5% — well above the 1% epsilon.
         assertTrue("a supra-epsilon diagonal change must re-frame", gate.shouldFrame(10.5f))
+    }
+
+    /**
+     * Tier-2 #1596 review regression: a scene whose union diagonal jitters by *more* than
+     * [FramingGate.STABILITY_EPSILON] on **every** frame — an animated / skeletal model, a physics
+     * demo, or two async models alternately growing the union — never satisfies the
+     * diagonal-stability latch. Without the [FramingGate.MAX_FRAMING_PASSES] ceiling the gate would
+     * re-frame forever, fighting user interaction and burning a `computeContentBounds` walk per
+     * frame. The ceiling must force a deterministic latch.
+     */
+    @Test
+    fun perpetuallyJitteringSceneLatchesWithinTheCeiling() {
+        val gate = FramingGate()
+        // A diagonal that swings ~5% (well above the 1% epsilon) every frame — never settles.
+        var diagonal = 2f
+        var grow = true
+        var passes = 0
+        // Drive far more frames than the ceiling: the gate MUST latch before we run out.
+        repeat(FramingGate.MAX_FRAMING_PASSES * 4) {
+            if (!gate.latched && gate.shouldRun(hasContent = true)) {
+                // Every frame `shouldFrame` is true because the jitter exceeds the epsilon.
+                assertTrue(
+                    "a supra-epsilon jitter must always want to re-frame while unlatched",
+                    gate.shouldFrame(diagonal)
+                )
+                gate.recordFraming(diagonal)
+                passes++
+                diagonal = if (grow) diagonal * 1.05f else diagonal / 1.05f
+                grow = !grow
+            }
+        }
+        assertTrue(
+            "a perpetually-jittering scene must latch via the MAX_FRAMING_PASSES ceiling",
+            gate.latched
+        )
+        assertEquals(
+            "the gate must latch exactly at the framing-pass ceiling, not run unbounded",
+            FramingGate.MAX_FRAMING_PASSES,
+            passes
+        )
+        assertFalse(
+            "once the ceiling latches the gate, later frames must be a no-op",
+            gate.shouldRun(hasContent = true)
+        )
+    }
+
+    /**
+     * The ceiling must not punish a scene that legitimately needs a few staggered re-frames (the
+     * #1391 async-model case): a handful of growing-then-settling frames — fewer than the ceiling —
+     * must still latch via the *stability* path, not the ceiling.
+     */
+    @Test
+    fun aFewStaggeredLoadsStillLatchViaStabilityNotTheCeiling() {
+        val gate = FramingGate()
+        // 5 growing frames + a settled repeat — 6 passes total, under the 10-pass ceiling.
+        val diagonals = listOf(1f, 1.5f, 2.1f, 2.8f, 3.5f, 3.5f)
+        for (d in diagonals) {
+            gate.shouldFrame(d)
+            gate.recordFraming(d)
+        }
+        assertTrue(
+            "a scene that settles within the ceiling must latch via the stability path",
+            gate.latched
+        )
     }
 
     @Test
