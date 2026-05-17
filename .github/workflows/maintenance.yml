@@ -252,8 +252,13 @@ jobs:
           fi
 
   # ── 6. Stale claude/* branch cleanup ──────────────────────────────────────
-  # An orchestrator marathon leaves dozens of merged `claude/*` branches on
-  # `origin`. This job deletes the ones that are provably dead — fully merged
+  # PRIMARY mechanism is the repo's "Automatically delete head branches"
+  # setting (deleteBranchOnMerge) — every PR branch is dropped the instant
+  # its PR merges, so no backlog accumulates in normal operation.
+  # This job is the BACKSTOP for the cases that setting can't reach:
+  # branches whose PR merged before the setting was on, orphan branches
+  # fully merged into main with no PR (ahead=0), and merged-PR branches
+  # left over from API merges. It deletes the provably-dead ones — merged
   # into origin/main (ahead=0) OR carrying a MERGED PR (squash-merge case) —
   # in a SINGLE `git push --delete` call. Branches with an OPEN PR or genuine
   # unmerged commits are never touched. Worktrees are skipped (they only

@@ -1,0 +1,2 @@
+<!-- category: Changed -->
+- Repo hygiene: stale `claude/*` branches no longer pile up on the remote. The `Automatically delete head branches` setting is now enabled, so every PR branch is dropped the instant its PR merges. The `cleanup-branches-worktrees.sh` backstop was reworked to fetch PR status with two bulk `gh pr list` calls instead of one `gh pr view` per branch — the per-branch form fired hundreds of sequential API calls and timed the daily `branch-cleanup` job out before it could delete anything, which had let the remote grow to ~190 branches.
