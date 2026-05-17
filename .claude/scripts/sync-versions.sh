@@ -256,6 +256,55 @@ if [ -f "$LLMS" ] && [ -f "$DOCS_LLMS" ]; then
     fi
 fi
 
+# ─── 5c. Free-form docs version refs missed by the Maven-coordinate scans (#1693) ──
+# The section-5 docfile loop only matches `io.github.sceneview:sceneview:X.Y.Z`
+# lines. Several docs carry the release version in prose / HTML stats that the
+# Maven scan never sees, so v4.10.0 shipped with these stale (#1693):
+#   * docs/docs/index.md   — landing-page "Latest Release" stat <span> (was v4.4.0)
+#   * docs/docs/llms-full.txt — "**SceneView:** X.Y.Z" prose line (was 4.0.9)
+# Both are auto-fixed below in the fix-mode block.
+DOCS_INDEX="$REPO_ROOT/docs/docs/index.md"
+if [ -f "$DOCS_INDEX" ]; then
+    V=$(grep -A1 'sv-stat-number' "$DOCS_INDEX" | grep -B1 'Latest Release' \
+        | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' \
+        | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "docs/docs/index.md (Latest Release stat)" "$V"
+    fi
+fi
+DOCS_LLMS_FULL="$REPO_ROOT/docs/docs/llms-full.txt"
+if [ -f "$DOCS_LLMS_FULL" ]; then
+    V=$(grep -m1 -E '^\s*-\s*\*\*SceneView:\*\*' "$DOCS_LLMS_FULL" \
+        | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "docs/docs/llms-full.txt (SceneView prose)" "$V"
+    fi
+fi
+# docs/docs/faq.md — "SceneViewSwift (vX.Y.Z)" prose. No Maven coordinate and
+# no SPM `from:` URL on the line, so every other scan misses it (#1693).
+DOCS_FAQ="$REPO_ROOT/docs/docs/faq.md"
+if [ -f "$DOCS_FAQ" ]; then
+    V=$(grep -m1 -oE 'SceneViewSwift \(v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' "$DOCS_FAQ" \
+        | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+    if [ "$V" != "NOT FOUND" ]; then
+        add_check "docs/docs/faq.md (SceneViewSwift prose)" "$V"
+    fi
+fi
+# iOS codelabs — the SPM "version rule … from `X.Y.Z`" instruction sits on a
+# prose-backtick line separate from the package URL, so the section-10b SPM
+# `from:` scan (which requires `sceneview/sceneview` on the same line) misses
+# it. Match the backtick-quoted version after a `from` keyword instead (#1693).
+for codelab in docs/docs/codelabs/codelab-3d-swiftui.md docs/docs/codelabs/codelab-ar-swiftui.md; do
+    F="$REPO_ROOT/$codelab"
+    if [ -f "$F" ]; then
+        V=$(grep -m1 -E 'from .?`[0-9]+\.[0-9]+\.[0-9]+' "$F" \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "NOT FOUND")
+        if [ "$V" != "NOT FOUND" ]; then
+            add_check "$codelab (SPM version rule)" "$V"
+        fi
+    fi
+done
+
 # Flutter snippet inside llms.txt (`sceneview_flutter: ^X.Y.Z`) — separate
 # from the maven `sceneview:` line, so the existing -m1 check misses it.
 if [ -f "$LLMS" ]; then
@@ -395,6 +444,11 @@ SPM_FILES=(
     docs/docs/platforms.md
     docs/docs/samples-ios.md
     docs/docs/quickstart-ios.md
+    docs/docs/faq.md
+    # iOS codelabs ship an SPM "version rule … from `X.Y.Z`" instruction in
+    # prose-backtick form; #1693 found them 6 minors stale after v4.10.0.
+    docs/docs/codelabs/codelab-3d-swiftui.md
+    docs/docs/codelabs/codelab-ar-swiftui.md
     docs/docs/llms.txt
     website-static/llms.txt
     website-static/.well-known/llms.txt
@@ -658,6 +712,48 @@ with open('$PKG_JSON', 'w') as f:
                 echo -e "  Fixed: $docfile (artifact refs $OLD_V -> $SOURCE_VERSION)"
             fi
         done
+    done
+
+    # Fix free-form docs version refs missed by the Maven-coordinate sweep (#1693).
+    # Each substitution is scoped to its exact surrounding text so an unrelated
+    # version string elsewhere in the file is never touched.
+    #   docs/docs/index.md — the "Latest Release" stat <span>
+    if [ -f "$DOCS_INDEX" ]; then
+        CURRENT=$(grep -A1 'sv-stat-number' "$DOCS_INDEX" | grep -B1 'Latest Release' \
+            | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "v$SOURCE_VERSION" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            _sed_inplace "s|<span class=\"sv-stat-number\">$CURRENT</span>|<span class=\"sv-stat-number\">v$SOURCE_VERSION</span>|" "$DOCS_INDEX"
+            echo -e "  Fixed: docs/docs/index.md (Latest Release stat $CURRENT -> v$SOURCE_VERSION)"
+        fi
+    fi
+    #   docs/docs/llms-full.txt — the "**SceneView:** X.Y.Z" prose line
+    if [ -f "$DOCS_LLMS_FULL" ]; then
+        CURRENT=$(grep -m1 -E '^\s*-\s*\*\*SceneView:\*\*' "$DOCS_LLMS_FULL" \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            _sed_inplace "s/\(\*\*SceneView:\*\* \)$CURRENT/\1$SOURCE_VERSION/" "$DOCS_LLMS_FULL"
+            echo -e "  Fixed: docs/docs/llms-full.txt (SceneView prose $CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+    #   docs/docs/faq.md — the "SceneViewSwift (vX.Y.Z)" prose ref
+    if [ -f "$DOCS_FAQ" ]; then
+        CURRENT=$(grep -m1 -oE 'SceneViewSwift \(v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' "$DOCS_FAQ" \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            _sed_inplace "s/SceneViewSwift (v$CURRENT/SceneViewSwift (v$SOURCE_VERSION/g" "$DOCS_FAQ"
+            echo -e "  Fixed: docs/docs/faq.md (SceneViewSwift prose $CURRENT -> $SOURCE_VERSION)"
+        fi
+    fi
+    #   iOS codelabs — the SPM "version rule … from `X.Y.Z`" backtick instruction
+    for codelab in docs/docs/codelabs/codelab-3d-swiftui.md docs/docs/codelabs/codelab-ar-swiftui.md; do
+        F="$REPO_ROOT/$codelab"
+        [ -f "$F" ] || continue
+        CURRENT=$(grep -m1 -E 'from .?`[0-9]+\.[0-9]+\.[0-9]+' "$F" \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' | head -1 || echo "")
+        if [ -n "$CURRENT" ] && [ "$CURRENT" != "$SOURCE_VERSION" ]; then
+            _sed_inplace "s/from \`$CURRENT\`/from \`$SOURCE_VERSION\`/g" "$F"
+            echo -e "  Fixed: $codelab (SPM version rule $CURRENT -> $SOURCE_VERSION)"
+        fi
     done
 
     # Fix website-static/index.html version refs

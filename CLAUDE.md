@@ -136,8 +136,8 @@ To set up: `npm install @google/stitch-sdk`, then add the Stitch MCP server in C
 
 ## When writing any SceneView code
 
-- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.9.0`)
-- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.9.0`)
+- Use `SceneView { }` for 3D-only scenes (`io.github.sceneview:sceneview:4.10.0`)
+- Use `ARSceneView { }` for augmented reality (`io.github.sceneview:arsceneview:4.10.0`)
 - Declare nodes as composables inside the trailing content block — not imperatively
 - Load models with `rememberModelInstance(modelLoader, "models/file.glb")` — returns `null`
   while loading, always handle the null case
@@ -216,6 +216,20 @@ state read-only; `--clean` wipes and recreates. The emulator covers all 3D demos
 and AR UI/state QA. AR features that need real world tracking (Cloud Anchor,
 Streetscape/VPS, face mesh against a live face) still need a physical-device
 AR Record — request one rather than driving someone's personal phone over USB.
+
+**Visible (windowed) emulator — opt-in (#1660).** The emulator boots **headless
+by default** (`-no-window`), which is marginally lighter on the host (skips the
+skin-window draw + window-server compositing). To watch it locally, opt in:
+
+```bash
+bash .claude/scripts/setup-ar-emulator.sh --window   # windowed, this run
+EMU_VISIBLE=1 bash .claude/scripts/setup-ar-emulator.sh   # equivalent env var
+```
+
+`--window` simply sets `EMU_VISIBLE=1`. The guest VM cost (RAM, pool, leases) is
+identical either way — only the host window draw differs — so the default stays
+headless and resource-safe. **Local only:** CI (`device-qa.yml`) never sets this
+and stays headless (GitHub runners have no display).
 
 **RAM-budgeted adaptive emulator pool (#1647 → #1654).** The harness runs an
 **adaptive pool** of emulators — as many as live host RAM safely allows, with a

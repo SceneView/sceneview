@@ -12,8 +12,10 @@
 # pieces around `maestro test`:
 #   1. boot an iOS simulator (if none is booted)
 #   2. (optional) build + install the SceneViewDemo app on it
-#   3. run the Maestro catalog (or a single category subflow)
-#   4. sweep the simulator log for crash markers (Maestro 1.39 cannot read the
+#   3. (best-effort) screen-record the run for visual review — parity with the
+#      Android leg; skipped silently if the host lacks hardware Metal
+#   4. run the Maestro catalog (or a single category subflow)
+#   5. sweep the simulator log for crash markers (Maestro 1.39 cannot read the
 #      device log from a flow — same gap the Android wrapper covers with adb).
 #
 # Usage:
@@ -135,6 +137,27 @@ if $INSTALL; then
   rm -rf "$DERIVED_DATA"
 fi
 
+# --- Optional screen recording (best-effort) -------------------------------
+# Record the whole QA run for visual review — parity with the Android leg.
+# `simctl io recordVideo` needs hardware Metal, which CI VMs may lack, so this
+# is strictly best-effort: a recording failure never fails the QA run. h264
+# (not the hevc default) sidesteps the recordVideo frame-glitch artefacts. The
+# .mov lands under tools/qa-screenshots/ios/ (gitignored).
+REC_PID=""
+QA_VIDEO_DIR="${IOS_QA_VIDEO_DIR:-tools/qa-screenshots/ios}"
+QA_VIDEO="$QA_VIDEO_DIR/ios-qa-${FLOW}.mov"
+mkdir -p "$QA_VIDEO_DIR"
+xcrun simctl io "$BOOTED_UDID" recordVideo --codec h264 --force "$QA_VIDEO" \
+  >/dev/null 2>&1 &
+REC_PID=$!
+sleep 1
+if kill -0 "$REC_PID" 2>/dev/null; then
+  echo "[ios-qa] recording the QA run -> $QA_VIDEO"
+else
+  REC_PID=""
+  echo "[ios-qa] screen recording unavailable (recordVideo needs hardware Metal) — continuing without it"
+fi
+
 # --- Crash gate: spawn a log tail so the post-run sweep is scoped ----------
 # Maestro's per-demo `assertVisible` already fails on a hard crash, but a
 # background NSException or a watchdog kill can be missed — so we also grep the
@@ -145,13 +168,25 @@ xcrun simctl spawn "$BOOTED_UDID" log stream \
   --predicate "process == \"SceneViewDemo\"" --style compact \
   > "$LOG_FILE" 2>/dev/null &
 LOG_PID=$!
-# Make sure the log tail dies with the script.
-trap 'kill "$LOG_PID" 2>/dev/null || true; rm -f "$LOG_FILE"' EXIT
+# Make sure the log tail — and the screen recording — die with the script.
+# The recording is stopped with SIGINT (not the default SIGKILL) so the .mov
+# is finalised rather than left truncated.
+trap 'kill -INT "${REC_PID:-}" 2>/dev/null || true; kill "$LOG_PID" 2>/dev/null || true; rm -f "$LOG_FILE"' EXIT
 
 # --- Run the Maestro flow --------------------------------------------------
 echo "[ios-qa] running Maestro flow: $FLOW_FILE"
 MAESTRO_RC=0
 maestro_run "$FLOW_FILE" || MAESTRO_RC=$?
+
+# Stop the screen recording cleanly — SIGINT, never SIGKILL, or the .mov is
+# left truncated/unplayable. `wait` lets recordVideo finalise the container.
+if [[ -n "$REC_PID" ]]; then
+  kill -INT "$REC_PID" 2>/dev/null || true
+  wait "$REC_PID" 2>/dev/null || true
+  if [[ -s "$QA_VIDEO" ]]; then
+    echo "[ios-qa] recording saved: $QA_VIDEO"
+  fi
+fi
 
 # Give the log stream a moment to flush, then stop it.
 sleep 1

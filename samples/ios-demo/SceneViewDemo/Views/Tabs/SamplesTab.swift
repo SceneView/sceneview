@@ -158,7 +158,6 @@ struct SamplesTab: View {
                         SceneRow(scene: scene)
                     }
                     .buttonStyle(.plain)
-                    .disabled(!scene.status.isAvailable && scene.status.comingSoonVersion != nil ? false : !scene.status.isAvailable)
                     .accessibilityLabel(accessibilityLabel(for: scene))
                 }
             }
@@ -187,12 +186,11 @@ struct SamplesTab: View {
                 #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
-        case let .comingSoon(version):
+        case .comingSoon:
             ComingSoonScreen(
                 title: scene.title,
                 subtitle: scene.subtitle,
-                icon: scene.icon,
-                version: version
+                icon: scene.icon
             )
         }
     }
@@ -201,8 +199,8 @@ struct SamplesTab: View {
         switch scene.status {
         case .available:
             return "\(scene.title): \(scene.subtitle)"
-        case let .comingSoon(version):
-            return "\(scene.title): \(scene.subtitle). Coming soon in version \(version)."
+        case .comingSoon:
+            return "\(scene.title): \(scene.subtitle). Coming soon."
         }
     }
 
@@ -330,8 +328,7 @@ struct SamplesTab: View {
                 comingSoonTitle: "Secondary Camera (PiP)",
                 icon: "pip.fill",
                 subtitle: "Picture-in-picture camera view",
-                category: .advanced,
-                version: "4.4"
+                category: .advanced
             ),
         ]
 
@@ -453,8 +450,8 @@ private struct SceneRow: View {
                         .foregroundStyle(scene.status.isAvailable ? Color.primary : Color.secondary)
                         .lineLimit(1)
 
-                    if let version = scene.status.comingSoonVersion {
-                        Text("v\(version)")
+                    if scene.status.isComingSoon {
+                        Text("Soon")
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)

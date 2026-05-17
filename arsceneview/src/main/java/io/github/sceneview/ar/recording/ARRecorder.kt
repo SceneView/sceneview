@@ -8,6 +8,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Size
+import android.view.Surface
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -172,7 +173,11 @@ public class ARRecorder {
      * @param recordingRotation  Optional [android.view.Display] rotation (`Surface.ROTATION_0` …
      *                           `Surface.ROTATION_270`) so the MP4 plays back upright when
      *                           captured in landscape. Pass the current display rotation from
-     *                           the calling context. Default `null` keeps ARCore's default of 0.
+     *                           the calling context (`display.rotation`). The value is converted
+     *                           to degrees via [surfaceRotationToDegrees] before being handed to
+     *                           [RecordingConfig.setRecordingRotation], which expects degrees
+     *                           (`0`/`90`/`180`/`270`) — not the `Surface.ROTATION_*` ordinal
+     *                           (`0`/`1`/`2`/`3`). Default `null` keeps ARCore's default of 0.
      * @param recordingResolution Optional target CPU-image resolution for the recording. ARCore
      *                           writes the **CPU image stream** into the MP4, whose default is
      *                           the lowest-resolution config the device exposes (often 640×480 on
@@ -257,7 +262,11 @@ public class ARRecorder {
             val config = RecordingConfig(session)
                 .setMp4DatasetFilePath(file.absolutePath)
                 .setAutoStopOnPause(true)
-            recordingRotation?.let { config.setRecordingRotation(it) }
+            // ARCore's RecordingConfig.setRecordingRotation(int) expects the display rotation in
+            // DEGREES (0/90/180/270). Callers pass a Surface.ROTATION_* constant (ordinals
+            // 0/1/2/3) — forwarding it verbatim records a 90° capture as 1° and leaves the
+            // dataset sideways (#1648). Convert to degrees before the ARCore call.
+            recordingRotation?.let { config.setRecordingRotation(surfaceRotationToDegrees(it)) }
             session.startRecording(config)
             _recordingFile = file
             _errorMessage = null
@@ -363,6 +372,25 @@ public class ARRecorder {
 
     public companion object {
         private const val TAG = "ARRecorder"
+
+        /**
+         * Convert an `android.view.Display` rotation — a [Surface.ROTATION_0] … [Surface.ROTATION_270]
+         * constant whose underlying ordinals are `0`/`1`/`2`/`3` — to the **degrees** value
+         * (`0`/`90`/`180`/`270`) expected by ARCore's [RecordingConfig.setRecordingRotation].
+         *
+         * Passing the `Surface.ROTATION_*` ordinal straight through records a 90° physical
+         * rotation as `1°`, so the dataset plays back sideways (#1648). Any unrecognised value
+         * falls back to `0` — the same default ARCore uses when no rotation is set.
+         *
+         * Pure function — no ARCore session interaction — so the mapping is unit-testable.
+         */
+        @JvmStatic
+        public fun surfaceRotationToDegrees(surfaceRotation: Int): Int = when (surfaceRotation) {
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
 
         /**
          * Pick the [CameraConfig] from [configs] whose CPU [image size][CameraConfig.getImageSize]
