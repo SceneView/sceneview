@@ -241,7 +241,12 @@ jobs:
           # Pinned exact versions — this job runs with APP_STORE_CONNECT_API_KEY
           # in env, so a compromised PyPI release must not be pullable here (#1230).
           # Deps live in a requirements file so Dependabot can track/bump them (#1286).
-          $RUNNER_TEMP/asc-venv/bin/pip install -r .github/workflows/requirements/app-store.txt --quiet
+          # Absolute path via $GITHUB_WORKSPACE — this job sets
+          # `working-directory: samples/ios-demo`, so a repo-root-relative
+          # path would not resolve and the pip install would fail (silently,
+          # since this step is `continue-on-error`), skipping every App Store
+          # submission since #1286.
+          $RUNNER_TEMP/asc-venv/bin/pip install -r "$GITHUB_WORKSPACE/.github/workflows/requirements/app-store.txt" --quiet
 
           # Wait for Apple to process the build
           echo "Waiting 120s for Apple to process the build..."
