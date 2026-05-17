@@ -66,6 +66,7 @@ on:
       - '.claude/scripts/ios-device-qa.sh'
       - '.claude/scripts/ar-replay-qa.sh'
       - '.claude/scripts/setup-ar-emulator.sh'
+      - '.claude/scripts/sideload-arcore.sh'
       - '.claude/scripts/lib/maestro.sh'
       - '.claude/scripts/lib/android-cli.sh'
       - '.github/workflows/device-qa.yml'
@@ -188,11 +189,11 @@ jobs:
   #
   # It mirrors the `android` job's emulator setup, with one extra requirement:
   # the AR replay harness needs Google Play Services for AR (com.google.ar.core)
-  # on the emulator. setup-ar-emulator.sh sideloads it from the public
-  # google-ar SDK GitHub release, but the ReactiveCircus action provides its
-  # own AVD, so we sideload ARCore directly in the runner script before
-  # delegating to `device-qa.sh --platform=ar`. device-qa.sh detects the
-  # already-booted device and skips its own boot.
+  # on the emulator. The ReactiveCircus action provides its own AVD (no Play
+  # Store, so ARCore is absent), so the `sideload-arcore.sh` helper fetches the
+  # x86 emulator build of ARCore from the public google-ar SDK GitHub release
+  # and `adb install`s it before we delegate to `device-qa.sh --platform=ar`.
+  # device-qa.sh detects the already-booted device and skips its own boot.
   #
   # Like the android job this is continue-on-error: the SwiftShader emulator +
   # ARCore replay timing is flaky and this workflow is not a required PR check.
@@ -220,21 +221,15 @@ jobs:
           arch: x86_64
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
+          # NOTE: ReactiveCircus/android-emulator-runner runs each LINE of this
+          # `script:` as a separate `sh -c` invocation — env vars do NOT persist
+          # across lines and a multi-line `if … fi` block is a syntax error
+          # ("end of file unexpected"). Every step below must therefore be a
+          # single self-contained logical line (matching the `android` job).
           script: |
             adb wait-for-device
             attempts=0; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ] && [ "$attempts" -lt 60 ]; do sleep 2; attempts=$((attempts + 1)); done
-            # The AR replay harness needs Google Play Services for AR. The
-            # ReactiveCircus AVD has none, so sideload the x86 emulator build
-            # of ARCore straight from the public google-ar SDK release. The
-            # python one-liner picks the asset whose name carries the
-            # `x86_for_emulator` marker (the build with x86 native code).
-            ARCORE_URL="$(curl -fsSL https://api.github.com/repos/google-ar/arcore-android-sdk/releases/latest | python3 -c "import json,sys; print(next((a['browser_download_url'] for a in json.load(sys.stdin).get('assets',[]) if 'x86_for_emulator' in a['name']), ''))")"
-            if [ -n "$ARCORE_URL" ]; then
-              curl -fsSL -o /tmp/arcore.apk "$ARCORE_URL"
-              adb install -r /tmp/arcore.apk || echo "[ar-leg] ARCore install failed — harness will assumeTrue-skip"
-            else
-              echo "[ar-leg] could not resolve ARCore APK URL — harness will assumeTrue-skip"
-            fi
+            bash .claude/scripts/sideload-arcore.sh || echo "[ar-leg] ARCore sideload failed — harness will assumeTrue-skip"
             bash .claude/scripts/device-qa.sh --platform=ar --ci
 
       - name: Upload ar device-QA report
