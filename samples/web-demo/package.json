@@ -1,0 +1,15 @@
+{
+  "name": "sceneview-web-demo-tests",
+  "version": "4.9.0",
+  "private": true,
+  "description": "Playwright device-QA suite for the SceneView web demo",
+  "scripts": {
+    "test": "playwright test",
+    "test:render": "playwright test tests/render.spec.ts",
+    "test:catalog": "playwright test tests/catalog.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "http-server": "^14.1.1"
+  }
+}
