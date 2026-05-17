@@ -16,7 +16,7 @@ description: "Set up SceneViewSwift in your Xcode project in 10 minutes. Build a
 ## Prerequisites
 
 - **Xcode 15** or newer
-- An Apple device or simulator running **iOS 17+**, **macOS 14+**, or **visionOS 1+**
+- An Apple device or simulator running **iOS 18+**, **macOS 15+**, or **visionOS 1+**
 - Basic familiarity with Swift and SwiftUI
 
 ---
@@ -159,8 +159,8 @@ Point the camera at a flat surface, wait for plane detection, then tap to place 
 
 | Platform | Minimum version | Renderer |
 |---|---|---|
-| iOS | 17.0 | RealityKit + ARKit |
-| macOS | 14.0 | RealityKit |
+| iOS | 18.0 | RealityKit + ARKit |
+| macOS | 15.0 | RealityKit |
 | visionOS | 1.0 | RealityKit |
 
 !!! tip "AR is iOS-only"
