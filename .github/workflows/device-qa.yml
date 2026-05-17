@@ -24,6 +24,32 @@ name: Device QA
 # runner cannot produce a falsely-green report. The aggregated
 # `device-qa-report.json` is uploaded as an artifact for the release
 # checkpoint (`release-checklist.sh` reads its `status`).
+#
+# FOUR-LEG SPLIT — PER-PUSH vs NIGHTLY-ONLY (#1601)
+# -------------------------------------------------
+# `device-qa.sh` orchestrates FOUR platform legs: web / android / ios / ar.
+# This workflow deliberately defines only the `web` and `android` jobs:
+#
+#   web      — Playwright on ubuntu-latest. Cheap, always feasible. Per-push.
+#   android  — Maestro on a KVM-accelerated emulator (ubuntu-latest). Heavy
+#              but feasible on GitHub-hosted runners. Per-push.
+#   ios      — Maestro on an iOS Simulator. NIGHTLY-ONLY: needs a `macos-*`
+#              runner, which is ~10x the per-minute cost and has no KVM —
+#              not worth spending on every demo-source push.
+#   ar       — ARCore replay harness. NIGHTLY-ONLY: needs an ARCore-capable
+#              emulator plus committed AR recordings; setup is too slow and
+#              flaky to gate routine pushes on.
+#
+# The `ios` and `ar` legs therefore run ONLY via the nightly `workflow_call`
+# (nightly-ci.yml), which executes `device-qa.sh --platform=all` on the
+# appropriate runners. A broken / always-skipped iOS or AR job in THIS
+# workflow would be worse than documenting the split, so they are omitted
+# here by design rather than stubbed.
+#
+# Path trigger consequence: `samples/ios-demo/**` is intentionally absent
+# from the `paths:` filter below — adding it would spin up the web+android
+# jobs for an iOS-only change while no iOS job exists to actually exercise
+# it. iOS demo changes are covered by the nightly run instead.
 
 on:
   push:
@@ -39,6 +65,8 @@ on:
       - '.maestro/**'
       - 'samples/android-demo/**'
       - 'samples/web-demo/**'
+      # NOTE: `samples/ios-demo/**` is deliberately NOT listed — the iOS leg
+      # is nightly-only (see the FOUR-LEG SPLIT block above, #1601).
   workflow_dispatch:
   # Reused by nightly-ci.yml so the scheduled full-validation run exercises
   # the device-QA legs too — see #1324.
