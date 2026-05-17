@@ -458,20 +458,25 @@ fun OrbitalARDemo(onBack: () -> Unit) {
                 if (anchor != null) {
                     AnchorNode(anchor = anchor) {
                         ORBITAL_PLANETS.forEachIndexed { index, planet ->
-                            // For bundled planets we pass the asset path directly;
-                            // for streamed planets we pass the resolved File as a
-                            // `file://` URI (rememberModelInstance dispatches via
-                            // ModelLoader.loadModelInstance for non-asset schemes).
-                            // While the streamed File is still null (download in
-                            // flight) we render nothing for that slot — the orbit
-                            // formation rebuilds the moment the resolver returns.
-                            val fileLocation: String? = when {
-                                planet.bundledAssetPath != null -> planet.bundledAssetPath
-                                else -> streamedFiles.getOrNull(index)?.let { "file://${it.absolutePath}" }
+                            // Bundled planets read straight from `assets/` via the
+                            // asset-path overload of `rememberModelInstance`. Streamed
+                            // planets resolve to an on-disk `File` and must be loaded
+                            // through `ModelLoader.loadModelInstance` — the two-arg
+                            // `rememberModelInstance(modelLoader, String)` would bind to
+                            // the asset-path overload and feed the `file://` URI to
+                            // `AssetManager.open`, throwing `FileNotFoundException` (#1422).
+                            // The bundled / streamed split is a stable `val` per slot, so
+                            // the conditional keeps Compose's positional memoisation valid.
+                            // While the streamed File is still null (download in flight)
+                            // we render nothing for that slot — the orbit formation
+                            // rebuilds the moment the resolver returns.
+                            val instance = if (planet.bundledAssetPath != null) {
+                                rememberModelInstance(modelLoader, planet.bundledAssetPath)
+                            } else {
+                                rememberFileModelInstance(
+                                    modelLoader, streamedFiles.getOrNull(index)
+                                )
                             }
-                            val instance = if (fileLocation != null) {
-                                rememberModelInstance(modelLoader, fileLocation)
-                            } else null
                             if (instance != null) {
                                 // Modulo before sin/cos so a long-running session
                                 // (~290 h+) doesn't lose Float precision (#978).
@@ -544,6 +549,38 @@ fun OrbitalARDemo(onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Load a [io.github.sceneview.model.ModelInstance] from a nullable streamed [File],
+ * returning `null` until the file is ready.
+ *
+ * The resolver always hands back a real on-disk [File] (streamed GLB or staged
+ * bundled fallback), so the model must be loaded through
+ * [io.github.sceneview.loaders.ModelLoader.loadModelInstance], which understands
+ * `file://` URIs. The two-argument `rememberModelInstance(modelLoader, String)`
+ * call is **not** usable here: Kotlin overload resolution binds it to the
+ * asset-path overload (the one without a defaulted `resourceResolver`), which
+ * feeds the `file://` string straight to `AssetManager.open` — that throws
+ * `FileNotFoundException`, the instance stays `null`, and the streamed planet
+ * never renders (#1422). Loading via `produceState` + `loadModelInstance` keeps
+ * the Filament JNI work on the loader's own Main-thread hop.
+ */
+@Composable
+private fun rememberFileModelInstance(
+    modelLoader: io.github.sceneview.loaders.ModelLoader,
+    file: File?,
+): io.github.sceneview.model.ModelInstance? {
+    if (file == null) return null
+    return produceState<io.github.sceneview.model.ModelInstance?>(
+        initialValue = null,
+        key1 = modelLoader,
+        key2 = file.absolutePath,
+    ) {
+        value = runCatching {
+            modelLoader.loadModelInstance("file://${file.absolutePath}")
+        }.getOrNull()
+    }.value
 }
 
 /**
