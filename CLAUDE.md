@@ -76,16 +76,38 @@ known limitations (no pinch gesture → 3D zoom is driven via deep-link param).
 ### Release-checkpoint mandate
 
 **A full device-QA pass runs at every release checkpoint, before tagging.**
-No release ships without a green `device-qa-report.json`. The gate is enforced
-in two places — keep both honest:
+No release ships with a red *blocking* leg in `device-qa-report.json`. The
+gate is enforced in two places — keep both honest:
 
-- `release-checklist.sh` **section 14** fails the checklist if
-  `device-qa-report.json` is missing or reports a failed platform.
+- `release-checklist.sh` **section 14** reads the report's graded
+  `releaseGate.verdict` and fails the checklist on a `blocked` verdict (or a
+  missing report).
 - The `/release` skill (**Step 6.5**) runs `device-qa.sh --platform=all`
   before the tag step.
 
-A red device-QA pass means a demo crashes for a real user — fix it before
-tagging, no exceptions.
+#### Release-gate policy for `continue-on-error` legs (#1651)
+
+The legs are **graded**, because they are not equally reliable:
+
+| Leg | CI behaviour | Release gate |
+|---|---|---|
+| `web` | NOT `continue-on-error` — a red leg fails the workflow | **BLOCKING** — a red web leg is a release `FAIL` |
+| `android`, `ar` | `continue-on-error: true` (flaky SwiftShader emulator, #1643) | **ADVISORY** — a red leg is a `WARN`, never a silent pass, never a hard block |
+
+`device-qa.sh` tags each leg `advisory: true|false` (default advisory set:
+`android,ar`, override with `--advisory=<csv>`) and pre-computes
+`releaseGate.verdict` in `device-qa-report.json`:
+
+- `clear` — every leg passed → checklist `PASS`.
+- `warn` — an advisory leg (android/ar) did not pass → checklist `WARN`
+  ("advisory leg(s) did not pass: … — review before tagging"). A human sees
+  it, but it does not block the release.
+- `blocked` — a blocking leg (web) failed → checklist `FAIL`, hard block.
+
+Advisory legs stay non-blocking until #1643/#1645 make the emulator reliably
+green; then promote them to blocking by shrinking the `--advisory=` set. A red
+*blocking* leg means a demo crashes for a real user — fix it before tagging,
+no exceptions.
 
 ## About
 
@@ -194,6 +216,52 @@ state read-only; `--clean` wipes and recreates. The emulator covers all 3D demos
 and AR UI/state QA. AR features that need real world tracking (Cloud Anchor,
 Streetscape/VPS, face mesh against a live face) still need a physical-device
 AR Record — request one rather than driving someone's personal phone over USB.
+
+**Visible (windowed) emulator — opt-in (#1660).** The emulator boots **headless
+by default** (`-no-window`), which is marginally lighter on the host (skips the
+skin-window draw + window-server compositing). To watch it locally, opt in:
+
+```bash
+bash .claude/scripts/setup-ar-emulator.sh --window   # windowed, this run
+EMU_VISIBLE=1 bash .claude/scripts/setup-ar-emulator.sh   # equivalent env var
+```
+
+`--window` simply sets `EMU_VISIBLE=1`. The guest VM cost (RAM, pool, leases) is
+identical either way — only the host window draw differs — so the default stays
+headless and resource-safe. **Local only:** CI (`device-qa.yml`) never sets this
+and stays headless (GitHub runners have no display).
+
+**RAM-budgeted adaptive emulator pool (#1647 → #1654).** The harness runs an
+**adaptive pool** of emulators — as many as live host RAM safely allows, with a
+floor of 1 and never a rigid barrier. #1647's strict-single design is superseded:
+parallel sessions / agents no longer serialise behind one emulator when the host
+has RAM to spare. `setup-ar-emulator.sh` (via `lib/emulator-select.sh`):
+- **computes a RAM-budgeted cap** —
+  `max_emulators = floor((free_RAM − EMU_HOST_HEADROOM_MB) / EMU_RAM_BUDGET_PER_EMU_MB)`,
+  clamped to `[1, EMU_POOL_MAX]` (defaults: headroom 2048 MB, budget 3072 MB/emu,
+  `EMU_POOL_MAX=3`). On a RAM-tight host this resolves to 1 naturally — physics,
+  not policy;
+- **leases from a per-emulator pool** — each running emulator has a lease file
+  (`${TMPDIR:-/tmp}/sceneview-device-qa-emu/<serial>.lease`, owner pid inside). A
+  caller leases a free running emulator; else, if the running count is below the
+  live cap, boots a new one on a distinct `-port` (5554, 5556, …) so emulators
+  coexist; else waits (bounded) for a lease to free;
+- **re-gates RAM before every boot** — free RAM is re-read immediately before
+  each boot and the boot is refused below `EMU_MIN_FREE_RAM_MB` (default 3072 MB)
+  even when the cap said there was room. Memory safety is the hard invariant —
+  the pool never pushes the host into RAM exhaustion;
+- **right-sizes `-memory`** — scales the guest memory flag to RAM headroom,
+  clamped to `[EMU_MEMORY_FLOOR_MB, EMU_MEMORY_CEILING_MB]` (2048–4096 MB);
+- **reclaims stale leases** — a lease whose owner pid is dead AND whose serial is
+  gone from `adb devices` is reclaimed automatically.
+Every threshold is env-overridable. `setup-ar-emulator.sh --check` reports pool
+state (running count, computed cap, free RAM, active leases). The QA scripts
+(`device-qa.sh`, `qa-android-demos.sh`, `ar-replay-qa.sh`) pin `ANDROID_SERIAL`
+to the leased emulator so the right device is targeted when the pool has several.
+
+`--check` now also reports host free RAM and whether a running emulator would be
+reused. This is why parallel Claude Code sessions running device-QA on the same
+RAM-constrained Mac no longer contend for emulator resources.
 
 ## Samples
 
@@ -308,7 +376,7 @@ Never say "everything is good" without verifying published packages.
 
 ### Latest release: see `gradle.properties`
 
-**The source-of-truth version is always `VERSION_NAME` in the root `gradle.properties`** — read that file, never hardcode a version here. Any AI bootstrapping from this file should treat the `gradle.properties` `VERSION_NAME` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `vX.Y.Z`, web CDN). At the time of writing this is `4.8.0`, but `gradle.properties` is authoritative if they ever disagree. The dated session logs below are historical context only — do not infer the latest version from them.
+**The source-of-truth version is always `VERSION_NAME` in the root `gradle.properties`** — read that file, never hardcode a version here. Any AI bootstrapping from this file should treat the `gradle.properties` `VERSION_NAME` as the latest published version across all surfaces (Maven Central, npm `sceneview-web`/`@sceneview-sdk/react-native`, SPM tag `vX.Y.Z`, web CDN). At the time of writing this is `4.9.0`, but `gradle.properties` is authoritative if they ever disagree. The dated session logs below are historical context only — do not infer the latest version from them.
 
 ### Historical state (last updated: 2026-05-14 night, session upbeat-kare-a31ed4 — v4.2.0 SHIPPED end-to-end + handoff for new session)
 
@@ -612,7 +680,8 @@ Hooks trigger automatically on specific Claude Code actions:
 | `cross-platform-check.sh` | Compare Android vs iOS vs Web API surface, report gaps |
 | `release-checklist.sh` | Pre-release validation (versions, changelog, tests, etc.) |
 | `lib/android-cli.sh` | Shared helpers for Google's `android` CLI (screenshot, layout, install+launch) with `adb` fallback |
-| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only), `--clean` (wipe+recreate). **Use this for routine QA — never QA on a personal device.** |
+| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only, reports pool state), `--clean` (wipe+recreate). RAM-budgeted adaptive emulator pool (#1647 → #1654): leases a free running emulator, or boots a new one on a distinct `-port` when the live RAM-budgeted cap has room and free RAM clears the hard safety gate, or waits for a lease to free. **Use this for routine QA — never QA on a personal device.** |
+| `lib/emulator-select.sh` | Sourced helper for `setup-ar-emulator.sh` / `device-qa.sh` / `qa-android-demos.sh` — RAM monitoring (`vm_stat`/`/proc/meminfo`), RAM-budgeted pool-cap computation, a per-emulator lease registry, RAM-scaled `-memory`, multi-port boot, and stale-lease reclaim. The adaptive pool runs as many emulators as live host RAM safely allows (floor 1, `EMU_POOL_MAX` ceiling), superseding #1647's strict-single design (#1654). |
 | `qa-android-demos.sh` | QA loop over every demo — uses `android layout`/`screen capture` for the UI dump and screenshots |
 | `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |

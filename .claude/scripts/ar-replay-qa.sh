@@ -11,6 +11,12 @@
 #      session, and asserts no crash. The one demo that consumes
 #      `playbackDataset` (`ar-record-playback`) additionally proves the
 #      recorded dataset advanced frames.
+#
+#      Honesty gate (#1645): ARCore dataset playback needs camera-stream
+#      support the x86 software-GPU CI emulator does not provide. When
+#      `ar-record-playback` advances 0 frames the harness reports it as
+#      `skipped` (with a reason) — NOT a misleading `pass` — and this script
+#      exits 3 so the device-QA orchestrator records the AR leg as `skipped`.
 #   3. Pulls the machine-readable verdict `ar-qa-summary.json` the test wrote
 #      to `/sdcard/Download/SceneView/` and echoes its path.
 #
@@ -34,9 +40,13 @@
 #   -h | --help    Show this help.
 #
 # Exit status:
-#   0  every AR demo survived recorded-session replay
+#   0  every AR demo survived recorded-session replay AND the recorded ARCore
+#      dataset genuinely replayed frames (verdict `replayed`)
 #   1  one or more demos crashed, or the harness could not run
 #   2  no device / emulator connected
+#   3  SKIPPED — no demo crashed, but `ar-record-playback` advanced 0 frames:
+#      ARCore dataset playback is unsupported on this emulator. An environment
+#      limitation reported honestly — the AR leg is NOT a pass (#1645).
 
 set -euo pipefail
 
@@ -59,7 +69,7 @@ while [[ $# -gt 0 ]]; do
     --no-install) INSTALL=0; shift ;;
     --out) OUT_DIR="${2:?--out needs a directory}"; shift 2 ;;
     -h|--help)
-      sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,49p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "[ar-replay-qa] unknown option: $1" >&2; exit 1 ;;
@@ -107,7 +117,9 @@ fi
 mkdir -p "$OUT_DIR"
 LOCAL_SUMMARY="$OUT_DIR/ar-qa-summary.json"
 
+SUMMARY_PULLED=0
 if adb -s "$SERIAL" pull "$DEVICE_SUMMARY" "$LOCAL_SUMMARY" >/dev/null 2>&1; then
+  SUMMARY_PULLED=1
   echo "[ar-replay-qa] verdict summary:"
   cat "$LOCAL_SUMMARY"
   echo
@@ -118,8 +130,49 @@ else
   echo "[ar-replay-qa] or Google Play Services for AR missing). See test output." >&2
 fi
 
+# ── Verdict ────────────────────────────────────────────────────────────────
+# A non-zero instrumentation status means a demo crashed (the harness asserts
+# no crash) -> hard FAIL. Note the harness also ends the test with assumeTrue
+# when the replay demo advanced 0 frames; an assumeTrue-skip is NOT an
+# instrumentation failure, so HARNESS_STATUS stays 0 in that case and we fall
+# through to the summary-based skip detection below.
 if [[ "$HARNESS_STATUS" -ne 0 ]]; then
   echo "[ar-replay-qa] FAIL — one or more AR demos crashed during replay." >&2
   exit 1
 fi
-echo "[ar-replay-qa] PASS — every AR demo survived recorded-session replay."
+
+# Honesty gate (#1645): inspect the machine-readable summary. If the replay
+# demo (`ar-record-playback`) advanced 0 frames it is graded `skipped` — the
+# CI emulator cannot do ARCore dataset playback. Surface that as exit 3 so the
+# AR leg is recorded `skipped`, never a misleading `pass`. The `passed` count
+# in the summary already excludes `skipped` demos (see writeSummary()).
+SKIPPED_COUNT=0
+if [[ "$SUMMARY_PULLED" -eq 1 ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    SKIPPED_COUNT="$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+except Exception:
+    print(0); sys.exit(0)
+print(int(data.get("skipped", 0)))
+' "$LOCAL_SUMMARY" 2>/dev/null || echo 0)"
+  else
+    # Fallback for hosts without python3: the summary's top-level "skipped"
+    # key is the count we need. The first `"skipped":` line is the header
+    # field (per-demo objects carry `"verdict": "skipped"`, not `"skipped":`).
+    SKIPPED_COUNT="$(grep -m1 -oE '"skipped"[[:space:]]*:[[:space:]]*[0-9]+' "$LOCAL_SUMMARY" 2>/dev/null \
+      | grep -oE '[0-9]+$' || echo 0)"
+  fi
+fi
+if [[ "$SKIPPED_COUNT" =~ ^[0-9]+$ ]] && [[ "$SKIPPED_COUNT" -gt 0 ]]; then
+  echo "[ar-replay-qa] SKIPPED — no AR demo crashed, but $SKIPPED_COUNT demo(s)" >&2
+  echo "[ar-replay-qa] (incl. ar-record-playback) replayed 0 frames: ARCore dataset" >&2
+  echo "[ar-replay-qa] playback is not supported on this emulator. The recorded" >&2
+  echo "[ar-replay-qa] session was NOT exercised — this is not a pass (#1645)." >&2
+  exit 3
+fi
+
+echo "[ar-replay-qa] PASS — every AR demo survived recorded-session replay" \
+  "and the recorded ARCore dataset replayed frames."

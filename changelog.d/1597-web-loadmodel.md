@@ -1,0 +1,2 @@
+<!-- category: Fixed -->
+- `sceneview-web` `SceneView.loadModel` (#1597): the auto-center pass no longer frames the scene on a model whose `loadResources()` is still in flight (premature/wrong framing on an unreadable bounding box), and reloading the same model URL now destroys the prior `FilamentAsset` instead of orphaning it on the GPU — mirroring the `EnvironmentResourceTracker` leak-free-swap pattern from the IBL/skybox fix (#1496).

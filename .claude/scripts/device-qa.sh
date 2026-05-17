@@ -18,8 +18,9 @@
 # simulator each leg needs, builds + installs the demo app, delegates to the
 # platform script, and collects the per-platform result. The aggregated
 # verdict is written to `device-qa-report.json` and printed as a human
-# summary. Exit status is non-zero if ANY selected platform failed — this is
-# the gate the release checkpoint hangs on (#1566 "done means").
+# summary. Exit status is non-zero only when a REQUIRED (non-advisory) leg did
+# not pass — this is the gate the release checkpoint hangs on (#1566 "done
+# means"). A non-passing ADVISORY leg (#1651/#1670) is a WARN, exit 0.
 #
 # Usage:
 #   bash .claude/scripts/device-qa.sh [--platform=android|ios|web|ar|all]
@@ -33,17 +34,32 @@
 #                    catalog: each platform runs one representative category
 #                    flow (Android/iOS: `3d-basics`; web: a single spec; AR:
 #                    the replay harness is already the full minimal set).
-#   --ci             CI mode: a `skipped` platform (missing emulator /
+#   --ci             CI mode: a `skipped` REQUIRED platform (missing emulator /
 #                    simulator / toolchain) is treated as a FAILURE, not a
 #                    soft skip. Outside --ci a skip is non-fatal — a dev box
 #                    rarely has every runtime, and a partial pass is useful.
+#                    A skipped ADVISORY leg is a WARN even under --ci (#1670):
+#                    an honest #1645 skip on `ar` is expected on a CI emulator
+#                    and must never hard-block the release gate.
 #   --out <dir>      Directory for the aggregated report + per-platform
 #                    artifacts. Default: repo-root (`device-qa-report.json`).
+#   --advisory=<csv> Comma-separated platforms whose result is ADVISORY for the
+#                    release gate — a failure on an advisory leg surfaces as a
+#                    WARN (not a hard block) in release-checklist.sh section 14
+#                    (#1651). Default: `android,ar` — these legs run on the
+#                    chronically flaky SwiftShader emulator (#1643) and are
+#                    `continue-on-error: true` in device-qa.yml, so the release
+#                    gate must not be hard-blocked by them. The `web` leg is
+#                    intentionally NOT advisory: it is reliable and BLOCKING.
+#                    Pass `--advisory=` (empty) to make every leg blocking.
 #   -h | --help      Show this help.
 #
 # Exit status:
-#   0  every SELECTED platform passed (or, outside --ci, was skipped)
-#   1  one or more selected platforms failed; under --ci a skip also fails
+#   0  every REQUIRED leg passed. Includes the WARN case where only advisory
+#      legs are non-passing (failed or skipped), and — outside --ci — the case
+#      where a required leg was skipped (soft partial pass).
+#   1  a REQUIRED (non-advisory) leg failed, or — under --ci — a required leg
+#      was skipped. A non-passing advisory leg alone never produces exit 1.
 #   2  bad invocation / disk gate tripped before any platform ran
 #
 # Disk hygiene:
@@ -58,11 +74,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# RAM-budgeted adaptive emulator pool helpers (#1647 → #1654). The android and
+# ar legs lease an emulator from the pool: whichever leg runs first leases a
+# free running one (or boots a new pool member, RAM-gated, inside
+# setup-ar-emulator.sh) and the next leg leases its own — as many emulators as
+# live host RAM safely allows, floor 1.
+# shellcheck source=lib/emulator-select.sh
+source "$SCRIPT_DIR/lib/emulator-select.sh"
+
+# Release every emulator lease this orchestrator owns when it exits.
+trap 'emu_lease_release_all' EXIT
+
 # --- Flags -----------------------------------------------------------------
 PLATFORM="all"
 FAST=false
 CI_MODE=false
 OUT_DIR="$REPO_ROOT"
+# Advisory legs (#1651): a failure here is a release-gate WARN, not a block.
+# `android,ar` ride the flaky SwiftShader emulator and are continue-on-error
+# in device-qa.yml; `web` is reliable and stays BLOCKING.
+ADVISORY="android,ar"
+ADVISORY_SET=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -72,13 +104,24 @@ while [[ $# -gt 0 ]]; do
     --ci)         CI_MODE=true; shift ;;
     --out=*)      OUT_DIR="${1#--out=}"; shift ;;
     --out)        OUT_DIR="${2:?--out needs a directory}"; shift 2 ;;
+    --advisory=*) ADVISORY="${1#--advisory=}"; ADVISORY_SET=true; shift ;;
+    --advisory)   ADVISORY="${2-}"; ADVISORY_SET=true; shift 2 ;;
     -h|--help)
-      sed -n '2,52p' "$SCRIPT_DIR/device-qa.sh" | sed 's/^# \{0,1\}//'
+      sed -n '2,62p' "$SCRIPT_DIR/device-qa.sh" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "[device-qa] unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+: "$ADVISORY_SET"  # silence unused-var warnings; reserved for future strictness
+
+# Is platform $1 in the advisory CSV?
+is_advisory() {
+  case ",$ADVISORY," in
+    *",$1,"*) return 0 ;;
+    *)        return 1 ;;
+  esac
+}
 
 case "$PLATFORM" in
   android|ios|web|ar|all) ;;
@@ -149,9 +192,53 @@ record() {
   log "$1 -> $2 ${3:+($3)}"
 }
 
+# --- Pool emulator acquisition ---------------------------------------------
+# acquire_pool_emulator — lease an emulator from the RAM-budgeted adaptive pool
+# (#1654) for the android / ar legs. Strategy:
+#   1. Lease a free already-running emulator if one exists.
+#   2. Else delegate to setup-ar-emulator.sh, which leases or boots a new pool
+#      member (RAM-gated, multi-port) and publishes its serial; re-lease it
+#      here so the lease outlives that subprocess.
+# Echoes the leased serial on stdout; returns 1 if no emulator could be obtained.
+acquire_pool_emulator() {
+  emu_pool_reclaim_stale adb
+  local serial
+  # Step 1: lease a free running emulator outright.
+  if serial="$(emu_lease_free_serial adb)" && emu_lease_acquire "$serial"; then
+    echo "$serial"
+    return 0
+  fi
+  # Step 2: setup-ar-emulator.sh leases or boots a pool member, RAM-gated. It
+  # prints `EMU_SERIAL=<serial>` as its last stdout line — capture that to learn
+  # exactly which pool emulator it obtained (no race on a shared file). Its log
+  # lines are surfaced to our stderr so the run stays visible.
+  local setup_out setup_rc=0
+  setup_out="$(bash "$SCRIPT_DIR/setup-ar-emulator.sh" 2>&1)" || setup_rc=$?
+  printf '%s\n' "$setup_out" | grep -v '^EMU_SERIAL=' >&2 || true
+  if [[ "$setup_rc" -ne 0 ]]; then
+    return 1
+  fi
+  serial="$(printf '%s\n' "$setup_out" | sed -n 's/^EMU_SERIAL=//p' | tail -n1)"
+  # Fallbacks: the published-serial file, then the first running emulator.
+  if [[ -z "${serial:-}" ]] && [[ -f "$EMU_LEASE_DIR/last-booted.serial" ]]; then
+    serial="$(cat "$EMU_LEASE_DIR/last-booted.serial" 2>/dev/null || true)"
+  fi
+  if [[ -z "${serial:-}" ]] || ! emu_serial_alive "$serial" adb; then
+    serial="$(emu_running_serial adb || true)"
+  fi
+  [[ -n "${serial:-}" ]] || return 1
+  # Re-lease under this orchestrator's pid (setup-ar-emulator.sh dropped its own
+  # lease in its EXIT trap). Best-effort: even if a peer grabbed the lease, the
+  # emulator is up and we still target it via ANDROID_SERIAL.
+  emu_lease_acquire "$serial" || true
+  echo "$serial"
+  return 0
+}
+
 # --- Android leg -----------------------------------------------------------
 run_android() {
   local started; started=$(date +%s)
+  local serial=""
   log "=== Android leg ==="
 
   if ! command -v adb >/dev/null 2>&1; then
@@ -159,17 +246,19 @@ run_android() {
     return 0
   fi
 
-  # Boot an emulator if none is connected. setup-ar-emulator.sh is idempotent
-  # and reuses an already-booted device.
-  if ! adb get-state >/dev/null 2>&1; then
-    log "no Android device — booting emulator via setup-ar-emulator.sh"
-    if ! bash "$SCRIPT_DIR/setup-ar-emulator.sh" >/dev/null 2>&1; then
-      record android skipped "could not boot an Android emulator" "" "$(( $(date +%s) - started ))"
-      return 0
-    fi
+  # Lease an emulator from the RAM-budgeted adaptive pool (#1654): a free
+  # running one, or a freshly-booted pool member if live RAM has room, or wait
+  # for a lease to free. All RAM-gating happens inside the pool helpers.
+  if ! serial="$(acquire_pool_emulator)"; then
+    record android skipped "could not lease/boot a pool emulator (RAM too tight or pool full)" "" "$(( $(date +%s) - started ))"
+    return 0
   fi
-  if ! adb get-state >/dev/null 2>&1; then
-    record android skipped "no Android device after emulator boot" "" "$(( $(date +%s) - started ))"
+  log "Android leg using pool emulator: $serial"
+  # Pin every downstream adb / android-CLI / Maestro call to the leased serial.
+  export ANDROID_SERIAL="$serial"
+
+  if ! adb -s "$serial" get-state >/dev/null 2>&1; then
+    record android skipped "leased emulator $serial not responding" "" "$(( $(date +%s) - started ))"
     return 0
   fi
 
@@ -177,9 +266,14 @@ run_android() {
   $FAST && flow="3d-basics"
 
   local rc=0
-  bash "$SCRIPT_DIR/qa-android-demos.sh" --install --flow "$flow" \
-    > "$ARTIFACTS/android-output.txt" 2>&1 || rc=$?
-  cat "$ARTIFACTS/android-output.txt"
+  # Stream live via `tee` — a plain `> file` redirect kept the whole Android
+  # leg silent in CI until the wrapper returned, so a slow APK build (or a
+  # genuine hang) showed 40+ min of nothing before the job timed out and was
+  # cancelled. `pipefail` (set above) makes `|| rc=$?` capture the wrapper's
+  # exit code, not tee's. ANDROID_SERIAL (exported above) targets the leased
+  # emulator throughout the wrapper.
+  bash "$SCRIPT_DIR/qa-android-demos.sh" --install --flow "$flow" 2>&1 \
+    | tee "$ARTIFACTS/android-output.txt" || rc=$?
 
   # Maestro has no flat summary JSON; the wrapper's exit code is the verdict.
   if [[ $rc -eq 0 ]]; then
@@ -277,6 +371,7 @@ run_web() {
 # --- AR leg ----------------------------------------------------------------
 run_ar() {
   local started; started=$(date +%s)
+  local serial=""
   log "=== AR leg ==="
 
   if ! command -v adb >/dev/null 2>&1; then
@@ -284,17 +379,24 @@ run_ar() {
     return 0
   fi
 
-  # The AR replay harness needs an ARCore-capable emulator. setup-ar-emulator.sh
-  # both boots one and sideloads Google Play Services for AR.
-  if ! adb get-state >/dev/null 2>&1; then
-    log "no Android device — booting ARCore emulator via setup-ar-emulator.sh"
-    if ! bash "$SCRIPT_DIR/setup-ar-emulator.sh" >/dev/null 2>&1; then
-      record ar skipped "could not boot an ARCore emulator" "" "$(( $(date +%s) - started ))"
-      return 0
-    fi
+  # The AR replay harness needs an ARCore-capable emulator. The android leg
+  # usually ran first in this same process and still holds a pool lease — reuse
+  # that emulator directly (no extra lease, no boot). Otherwise lease one from
+  # the RAM-budgeted pool (#1654): a free running emulator, or a fresh pool
+  # member if RAM has room. setup-ar-emulator.sh also sideloads ARCore.
+  if [[ -n "${ANDROID_SERIAL:-}" ]] && emu_serial_alive "$ANDROID_SERIAL" adb; then
+    serial="$ANDROID_SERIAL"
+    log "AR leg reusing the Android leg's pool emulator: $serial"
+  elif ! serial="$(acquire_pool_emulator)"; then
+    record ar skipped "could not lease/boot an ARCore pool emulator (RAM too tight or pool full)" "" "$(( $(date +%s) - started ))"
+    return 0
   fi
-  if ! adb get-state >/dev/null 2>&1; then
-    record ar skipped "no Android device after emulator boot" "" "$(( $(date +%s) - started ))"
+  log "AR leg using pool emulator: $serial"
+  # Pin every downstream adb / android-CLI call to the leased serial.
+  export ANDROID_SERIAL="$serial"
+
+  if ! adb -s "$serial" get-state >/dev/null 2>&1; then
+    record ar skipped "leased emulator $serial not responding" "" "$(( $(date +%s) - started ))"
     return 0
   fi
 
@@ -310,6 +412,10 @@ run_ar() {
   case $rc in
     0) record ar passed "ar-replay-qa.sh" "$kept" "$(( $(date +%s) - started ))" ;;
     2) record ar skipped "no device for ar-replay-qa.sh" "$kept" "$(( $(date +%s) - started ))" ;;
+    # rc=3 (#1645): no demo crashed, but `ar-record-playback` replayed 0 frames
+    # — ARCore dataset playback is unsupported on this emulator. The recorded
+    # session was not exercised, so the AR leg is `skipped`, never a pass.
+    3) record ar skipped "ARCore dataset playback unsupported on emulator (ar-record-playback replayed 0 frames)" "$kept" "$(( $(date +%s) - started ))" ;;
     *) record ar failed "ar-replay-qa.sh rc=$rc" "$kept" "$(( $(date +%s) - started ))" ;;
   esac
 }
@@ -344,21 +450,63 @@ for leg in "${LEGS[@]}"; do
 done
 
 # --- Aggregate the report --------------------------------------------------
+# A leg's weight in the verdict depends on whether it is ADVISORY (#1651/#1652).
+# An advisory leg (default: android, ar) that `failed` or `skipped` is only a
+# WARN — never a hard block. A REQUIRED leg (e.g. web) that did not `pass`
+# blocks the release gate. This split is what keeps an honest #1645 `skipped`
+# on the advisory `ar` leg from false-failing the gate (#1670).
 PASSED=0; FAILED=0; SKIPPED=0
-for s in "${RESULT_STATUSES[@]}"; do
+REQUIRED_FAILED=0    # failed legs that are NOT advisory  -> hard block
+REQUIRED_SKIPPED=0   # skipped legs that are NOT advisory -> block under --ci
+ADVISORY_FAILED=0    # failed/skipped advisory legs       -> WARN, never a block
+ADVISORY_NONPASS=0   # advisory legs that did not pass    -> WARN
+for i in "${!RESULT_STATUSES[@]}"; do
+  s="${RESULT_STATUSES[$i]}"
+  advisory=false
+  is_advisory "${RESULT_PLATFORMS[$i]}" && advisory=true
   case "$s" in
     passed)  PASSED=$((PASSED + 1)) ;;
-    failed)  FAILED=$((FAILED + 1)) ;;
-    skipped) SKIPPED=$((SKIPPED + 1)) ;;
+    failed)
+      FAILED=$((FAILED + 1))
+      if $advisory; then
+        ADVISORY_FAILED=$((ADVISORY_FAILED + 1))
+        ADVISORY_NONPASS=$((ADVISORY_NONPASS + 1))
+      else
+        REQUIRED_FAILED=$((REQUIRED_FAILED + 1))
+      fi
+      ;;
+    skipped)
+      SKIPPED=$((SKIPPED + 1))
+      if $advisory; then
+        ADVISORY_NONPASS=$((ADVISORY_NONPASS + 1))
+      else
+        REQUIRED_SKIPPED=$((REQUIRED_SKIPPED + 1))
+      fi
+      ;;
   esac
 done
 
-# Overall verdict. A skip is a failure under --ci, a soft pass otherwise.
+# Overall verdict.
+#   failed  -> exit 1: a REQUIRED leg failed, OR (under --ci) a REQUIRED leg
+#              was skipped. A real crash on ANY leg also counts as failed
+#              only when that leg is required; an advisory crash is a WARN.
+#   warn    -> exit 0: every required leg passed, but an advisory leg did not
+#              pass (failed or skipped) — surfaced loudly, never blocking.
+#   passed  -> exit 0: every selected leg passed.
+# An all-skipped run made entirely of advisory legs lands in `warn` (exit 0),
+# never `failed` — the #1670 fix.
 OVERALL="passed"
-if [[ $FAILED -gt 0 ]]; then
+if [[ $REQUIRED_FAILED -gt 0 ]]; then
   OVERALL="failed"
-elif [[ $SKIPPED -gt 0 ]]; then
-  if $CI_MODE; then OVERALL="failed"; else OVERALL="passed"; fi
+elif $CI_MODE && [[ $REQUIRED_SKIPPED -gt 0 ]]; then
+  # A required leg could not run in CI — that is a gate failure.
+  OVERALL="failed"
+elif [[ $ADVISORY_NONPASS -gt 0 ]]; then
+  # Only advisory legs are non-passing -> WARN, exit 0 (#1670).
+  OVERALL="warn"
+elif [[ $REQUIRED_SKIPPED -gt 0 ]]; then
+  # Outside --ci, a skipped required leg is a soft (partial) pass.
+  OVERALL="passed"
 fi
 
 # Emit device-qa-report.json. Built with python3 so per-platform summary
@@ -366,12 +514,18 @@ fi
 # The per-platform records are exported as DQ_* environment variables — far
 # more robust across shells than argv quoting for arbitrary reason strings.
 export DQ_N="${#RESULT_PLATFORMS[@]}"
+export DQ_ADVISORY="$ADVISORY"
 for i in "${!RESULT_PLATFORMS[@]}"; do
   export "DQ_PLATFORM_$i=${RESULT_PLATFORMS[$i]}"
   export "DQ_STATUS_$i=${RESULT_STATUSES[$i]}"
   export "DQ_REASON_$i=${RESULT_REASONS[$i]}"
   export "DQ_SUMMARY_$i=${RESULT_SUMMARIES[$i]}"
   export "DQ_DURATION_$i=${RESULT_DURATIONS[$i]}"
+  if is_advisory "${RESULT_PLATFORMS[$i]}"; then
+    export "DQ_ADVISORY_$i=true"
+  else
+    export "DQ_ADVISORY_$i=false"
+  fi
 done
 
 python3 - "$REPORT" "$RUN_STARTED" "$PLATFORM" "$FAST" "$CI_MODE" "$OVERALL" \
@@ -382,6 +536,9 @@ import json, sys, os
  passed, failed, skipped) = sys.argv[1:10]
 
 n = int(os.environ["DQ_N"])
+advisory_csv = os.environ.get("DQ_ADVISORY", "")
+advisory_set = {p for p in advisory_csv.split(",") if p}
+
 platforms = []
 for i in range(n):
     summary_path = os.environ.get(f"DQ_SUMMARY_{i}", "")
@@ -395,19 +552,62 @@ for i in range(n):
     platforms.append({
         "platform": os.environ[f"DQ_PLATFORM_{i}"],
         "status":   os.environ[f"DQ_STATUS_{i}"],
+        # advisory=true → a failure on this leg is a release-gate WARN, not a
+        # hard block (#1651). Mirrors `continue-on-error` in device-qa.yml.
+        "advisory": os.environ.get(f"DQ_ADVISORY_{i}", "false") == "true",
         "reason":   os.environ.get(f"DQ_REASON_{i}", ""),
         "durationSec": int(os.environ.get(f"DQ_DURATION_{i}", "0") or 0),
         "summary":  embedded,
     })
 
+# --- Release-gate verdict (#1651 / #1670) ----------------------------------
+# The aggregated `status` above answers "did every leg pass". The release gate
+# needs a finer signal: a non-passing ADVISORY leg (android/ar) is only a WARN,
+# while a non-passing BLOCKING leg (web) hard-blocks. Pre-compute that split so
+# release-checklist.sh section 14 reads an explicit field instead of
+# re-deriving the policy.
+#
+# A `skipped` leg counts as "did not pass" too — an honest #1645 skip on the
+# advisory `ar` leg must surface as `warn`, never `blocked` (#1670). A skipped
+# REQUIRED leg blocks only under --ci (where every required leg is expected to
+# run); outside --ci a skipped required leg is a soft partial pass.
+def _nonpass(p):
+    return p["status"] != "passed"
+
+blocking_failed = [p["platform"] for p in platforms
+                   if p["status"] == "failed" and not p["advisory"]]
+blocking_skipped = [p["platform"] for p in platforms
+                    if p["status"] == "skipped" and not p["advisory"]]
+advisory_failed = [p["platform"] for p in platforms
+                   if _nonpass(p) and p["advisory"]]
+ci_mode = ci == "true"
+if blocking_failed or (ci_mode and blocking_skipped):
+    gate = "blocked"
+elif advisory_failed:
+    gate = "warn"
+else:
+    gate = "clear"
+
 report = {
     "harness": "device-qa",
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "startedAt": started,
     "platformSelection": platform,
     "fast": fast == "true",
     "ci": ci == "true",
     "status": overall,
+    "advisoryPlatforms": sorted(advisory_set),
+    # releaseGate: "clear" (tag freely) | "warn" (advisory leg red — human
+    # should see it before tagging) | "blocked" (a blocking leg is red).
+    "releaseGate": {
+        "verdict": gate,
+        "blockingFailed": blocking_failed,
+        # Advisory legs that did not pass (failed OR skipped) — surfaced as a
+        # WARN, never a block (#1670). Kept under the legacy key for the
+        # release-checklist consumer; an honest skip belongs here just like a
+        # crash, because neither blocks the gate.
+        "advisoryFailed": advisory_failed,
+    },
     "totals": {
         "passed": int(passed),
         "failed": int(failed),
@@ -429,19 +629,38 @@ echo "  selection : $PLATFORM   fast=$FAST   ci=$CI_MODE"
 echo "  report    : $REPORT"
 echo "───────────────────────────────────────────────────────"
 for i in "${!RESULT_PLATFORMS[@]}"; do
-  printf "  %-9s %-8s %4ss  %s\n" \
+  tag=""
+  if is_advisory "${RESULT_PLATFORMS[$i]}"; then
+    tag="[advisory]"
+    # A non-passing advisory leg (failed OR skipped) is a release-gate WARN,
+    # not a block — flag it so it is never silent (#1651 / #1670).
+    case "${RESULT_STATUSES[$i]}" in
+      failed|skipped) tag="[advisory — WARN, not a release blocker]" ;;
+    esac
+  fi
+  printf "  %-9s %-8s %4ss  %s %s\n" \
     "${RESULT_PLATFORMS[$i]}" \
     "${RESULT_STATUSES[$i]}" \
     "${RESULT_DURATIONS[$i]}" \
+    "$tag" \
     "${RESULT_REASONS[$i]}"
 done
 echo "───────────────────────────────────────────────────────"
 echo "  passed=$PASSED  failed=$FAILED  skipped=$SKIPPED  ->  $OVERALL"
+echo "  advisory legs: ${ADVISORY:-(none)}  (a red advisory leg is a release WARN, not a block — #1651)"
 echo "═══════════════════════════════════════════════════════"
 
 if [[ "$OVERALL" == "passed" ]]; then
   [[ $SKIPPED -gt 0 ]] && warn "$SKIPPED platform(s) skipped — pass is partial (not a --ci pass)."
   log "device-QA PASSED."
+  exit 0
+elif [[ "$OVERALL" == "warn" ]]; then
+  # Every REQUIRED leg passed; only advisory legs are non-passing (failed or
+  # an honest #1645 skip). This is a WARN, not a release blocker (#1670) —
+  # exit 0 so the release gate is not falsely hard-blocked.
+  warn "device-QA WARN — $ADVISORY_NONPASS advisory leg(s) did not pass."
+  warn "advisory legs are non-blocking (#1651/#1670); a human should still review the report."
+  log "device-QA passed-with-warnings (advisory legs only) — release checkpoint may tag."
   exit 0
 else
   echo "[device-qa] device-QA FAILED — release checkpoint must NOT tag." >&2

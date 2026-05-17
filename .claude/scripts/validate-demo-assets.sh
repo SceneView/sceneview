@@ -142,13 +142,37 @@ extract_refs() {
         case "$file" in
             *Tests.swift|*+Tests.swift|*Test.swift) continue ;;
         esac
+        # The vendored Filament/SceneView engine bundled under the web demo's
+        # resources/js/ (byte-identical copies of website-static/js/, self-hosted
+        # per issue #1586) carries exactly one false-positive: the JSDoc usage
+        # example `SceneView.modelViewer("canvas", "model.glb")` in sceneview.js,
+        # where `model.glb` is a placeholder, not a real asset path. We narrowly
+        # filter that single literal (issue #1631) instead of skipping the whole
+        # tree — a real broken asset literal in a vendored js file must still be
+        # caught. The filter is applied to the extracted refs below.
+        local skip_placeholder=""
+        case "$file" in
+            */web-demo/src/jsMain/resources/js/*) skip_placeholder="model.glb" ;;
+        esac
         # 1. Quoted literals with a known extension ("models/foo.glb", "bar.hdr")
         # Skip strings containing `$`, `\` (Swift `\(slug.uid).usdz`
         # interpolation), or `<` (placeholder docs like `Models/<name>.usdz`) —
         # those are runtime/template references, not static asset paths.
         # `|| true` so files with no match (grep exit 1) don't abort pipefail.
         grep -oE "\"[^\"\$\\\\<]*\.($ext_pattern)\"" "$file" 2>/dev/null |
-            awk -v f="$file" '{ gsub(/"/, "", $0); printf "%s|%s\n", $0, f }' || true
+            awk -v f="$file" -v skip="$skip_placeholder" \
+                '{ gsub(/"/, "", $0); if (skip != "" && $0 == skip) next; printf "%s|%s\n", $0, f }' || true
+
+        # 1b. Single-quoted literals — JS/HTML commonly quote with `'…'`
+        #     (e.g. the web demo's `file: 'khronos_damaged_helmet.glb'`
+        #     catalog). Only .html/.js/.jsx so we don't mis-parse other langs.
+        case "$file" in
+            *.html|*.js|*.jsx)
+                grep -oE "'[^'\$\\\\<]*\.($ext_pattern)'" "$file" 2>/dev/null |
+                    awk -v f="$file" -v skip="$skip_placeholder" \
+                        '{ gsub(/'"'"'/, "", $0); if (skip != "" && $0 == skip) next; printf "%s|%s\n", $0, f }' || true
+                ;;
+        esac
 
         # 2. iOS Swift pattern — `asset: "name"` without extension. We emit the
         #    name with an implicit .usdz suffix so check_bundled_ref can find
@@ -289,11 +313,17 @@ if [ "$platforms" = "all" ] || [ "$platforms" = "ios" ]; then
 fi
 
 if [ "$platforms" = "all" ] || [ "$platforms" = "web" ]; then
+    # The web demo self-hosts its curated GLB catalog + IBL under
+    # src/jsMain/resources/{models,environments}/ — that directory is both the
+    # Playwright dev-server root (playwright.config.ts: `http-server
+    # src/jsMain/resources`) and what Kotlin/JS copies into
+    # jsBrowserDistribution. check_bundled_ref also probes the models/ and
+    # environments/ sub-roots, so a bare `khronos_damaged_helmet.glb` resolves.
     process_platform_refs \
         "web-demo" \
         "samples/web-demo/src" \
-        "samples/web-demo/public" \
-        "glb|gltf|hdr"
+        "samples/web-demo/src/jsMain/resources" \
+        "glb|gltf|hdr|ktx"
 fi
 
 if [ "$platforms" = "all" ] || [ "$platforms" = "flutter" ]; then

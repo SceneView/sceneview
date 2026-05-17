@@ -234,37 +234,80 @@ echo ""
 
 # ─── 14. Device-QA gate ─────────────────────────────────────────────────
 # The autonomous cross-platform device-QA harness (umbrella #1560, slice
-# #1566) must have produced a GREEN `device-qa-report.json` before a release
-# is tagged — a red device-QA pass means a demo crashes on a real device for
-# at least one platform.
+# #1566) must have produced a `device-qa-report.json` before a release is
+# tagged — a red device-QA pass means a demo crashes on a real device.
 #
-# This is a release BLOCKER. To satisfy it, run before tagging:
+# RELEASE-GATE POLICY FOR continue-on-error LEGS (#1651)
+# ------------------------------------------------------
+# Not every leg is equal. device-qa.yml runs the `android` and `ar` legs as
+# `continue-on-error: true` on a chronically flaky SwiftShader emulator
+# (#1643); the `web` leg is reliable. So the gate is graded:
+#   - web        — BLOCKING. A red web leg is a release FAIL (hard block).
+#   - android/ar — ADVISORY. A red android/ar leg is a WARN: a human must see
+#                  "android leg: WARN — did not pass" before tagging, but it
+#                  does NOT hard-block (#1643/#1645 must make it reliably
+#                  green first — then promote it to blocking).
+# device-qa.sh tags each leg `advisory: true|false` and pre-computes a
+# `releaseGate.verdict` (clear|warn|blocked); this check reads that field so
+# the policy is explicit, not an accident of which legs happened to be red.
+#
+# To satisfy this check, run before tagging:
 #   bash .claude/scripts/device-qa.sh --platform=all
-# That produces `device-qa-report.json` at the repo root; this check reads
-# its aggregated `status` field. `DEVICE_QA_REPORT=<path>` overrides the
-# location (e.g. a CI artifact downloaded into the workspace).
+# That produces `device-qa-report.json` at the repo root; `DEVICE_QA_REPORT=
+# <path>` overrides the location (e.g. a CI artifact downloaded into the
+# workspace). An older report without `releaseGate` (schemaVersion 1) falls
+# back to the legacy all-or-nothing `status` reading.
 echo -e "${CYAN}--- Device-QA Gate ---${NC}"
 
 DQ_REPORT="${DEVICE_QA_REPORT:-device-qa-report.json}"
 if [ -f "$DQ_REPORT" ]; then
-    DQ_STATUS=$(python3 -c "import json,sys; print(json.load(open('$DQ_REPORT')).get('status','?'))" 2>/dev/null || echo "?")
+    DQ_STATUS=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('status','?'))" 2>/dev/null || echo "?")
     DQ_FAILED=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('totals',{}).get('failed','?'))" 2>/dev/null || echo "?")
     DQ_SKIPPED=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('totals',{}).get('skipped','?'))" 2>/dev/null || echo "?")
-    case "$DQ_STATUS" in
-        passed)
-            if [ "$DQ_SKIPPED" = "0" ]; then
-                check "device-qa-report.json" "PASS" "all platforms green"
-            else
-                check "device-qa-report.json" "WARN" "green but $DQ_SKIPPED platform(s) skipped — re-run device-qa.sh --ci"
-            fi
-            ;;
-        failed)
-            check "device-qa-report.json" "FAIL" "$DQ_FAILED platform(s) failed — fix before tagging"
-            ;;
-        *)
-            check "device-qa-report.json" "FAIL" "unreadable status ($DQ_STATUS)"
-            ;;
-    esac
+    # releaseGate is present from schemaVersion 2 (#1651); empty on older reports.
+    DQ_GATE=$(python3 -c "import json; print(json.load(open('$DQ_REPORT')).get('releaseGate',{}).get('verdict',''))" 2>/dev/null || echo "")
+    DQ_BLOCKING=$(python3 -c "import json; print(','.join(json.load(open('$DQ_REPORT')).get('releaseGate',{}).get('blockingFailed',[])))" 2>/dev/null || echo "")
+    DQ_ADVISORY=$(python3 -c "import json; print(','.join(json.load(open('$DQ_REPORT')).get('releaseGate',{}).get('advisoryFailed',[])))" 2>/dev/null || echo "")
+
+    if [ -n "$DQ_GATE" ]; then
+        # schemaVersion >= 2 — graded gate.
+        case "$DQ_GATE" in
+            clear)
+                if [ "$DQ_SKIPPED" = "0" ]; then
+                    check "device-qa-report.json" "PASS" "all platforms green"
+                else
+                    check "device-qa-report.json" "WARN" "green but $DQ_SKIPPED platform(s) skipped — re-run device-qa.sh --ci"
+                fi
+                ;;
+            warn)
+                # Advisory leg(s) red — never silent, never a hard block (#1651).
+                check "device-qa-report.json" "WARN" "advisory leg(s) did not pass: $DQ_ADVISORY — review before tagging (non-blocking, flaky emulator #1643)"
+                ;;
+            blocked)
+                check "device-qa-report.json" "FAIL" "blocking leg(s) failed: $DQ_BLOCKING — fix before tagging"
+                ;;
+            *)
+                check "device-qa-report.json" "FAIL" "unreadable releaseGate verdict ($DQ_GATE)"
+                ;;
+        esac
+    else
+        # schemaVersion 1 — legacy all-or-nothing reading.
+        case "$DQ_STATUS" in
+            passed)
+                if [ "$DQ_SKIPPED" = "0" ]; then
+                    check "device-qa-report.json" "PASS" "all platforms green (legacy report — no releaseGate)"
+                else
+                    check "device-qa-report.json" "WARN" "green but $DQ_SKIPPED platform(s) skipped — re-run device-qa.sh --ci"
+                fi
+                ;;
+            failed)
+                check "device-qa-report.json" "FAIL" "$DQ_FAILED platform(s) failed — fix before tagging"
+                ;;
+            *)
+                check "device-qa-report.json" "FAIL" "unreadable status ($DQ_STATUS)"
+                ;;
+        esac
+    fi
 else
     check "device-qa-report.json" "FAIL" "missing — run: bash .claude/scripts/device-qa.sh --platform=all"
 fi
