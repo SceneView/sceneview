@@ -57,6 +57,13 @@ export default defineConfig({
     /* Capture trace on first retry */
     trace: 'on-first-retry',
 
+    /* Screen-record every test — parity with the Android / iOS device-QA legs
+     * so a 3D regression can be reviewed frame-by-frame. In headless Chromium
+     * the video is software-rendered (the real "did it render" assertion is
+     * helpers.ts:sampleCanvas, a compositor screenshot); the recording is for
+     * human review. Videos land under outputDir (./test-results, gitignored). */
+    video: 'on',
+
     /* Viewport size for consistent screenshots */
     viewport: { width: 1280, height: 720 },
   },
