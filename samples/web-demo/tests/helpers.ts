@@ -49,10 +49,12 @@ export function captureDiagnostics(page: Page): PageDiagnostics {
  * auth (the demo handles that path gracefully). Filter only Sketchfab-domain
  * noise so the suite stays deterministic.
  *
- * NOTE: the catalog models are now self-hosted under `models/` (issue #1573),
- * so a model HTTP 403/404 is a REAL demo regression and must NOT be filtered —
- * that is precisely the failure mode #1573 was about. Only genuinely
- * external (Sketchfab) errors are treated as ignorable noise.
+ * NOTE: the catalog models are now self-hosted under `models/` (issue #1573)
+ * and the engine (filament.js / filament.wasm / sceneview.js) under `js/`
+ * (issue #1586). So a model OR engine HTTP 403/404 is a REAL demo regression
+ * and must NOT be filtered — that is precisely the failure mode #1573 and
+ * #1586 were about. Only genuinely external (Sketchfab) errors are treated as
+ * ignorable noise.
  */
 function isIgnorableNoise(text: string): boolean {
   const t = text.toLowerCase();
