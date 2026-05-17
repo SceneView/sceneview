@@ -195,18 +195,33 @@ and AR UI/state QA. AR features that need real world tracking (Cloud Anchor,
 Streetscape/VPS, face mesh against a live face) still need a physical-device
 AR Record — request one rather than driving someone's personal phone over USB.
 
-**One shared emulator — RAM-aware, parallel-session-safe (#1647).** The harness
-keeps a **single** shared emulator; it never spins up a multi-emulator pool. Before
-any fresh boot, `setup-ar-emulator.sh` (via `lib/emulator-select.sh`):
-- **reuses a running emulator** — if an `emulator-*` device is already up (this
-  session, a parallel agent, or a previous device-QA leg), it is reused, no boot;
-- **gates on host RAM** — refuses to boot when free RAM is under the threshold
-  (`EMU_MIN_FREE_RAM_MB`, default 3072 MB) instead of crashing mid-boot;
+**RAM-budgeted adaptive emulator pool (#1647 → #1654).** The harness runs an
+**adaptive pool** of emulators — as many as live host RAM safely allows, with a
+floor of 1 and never a rigid barrier. #1647's strict-single design is superseded:
+parallel sessions / agents no longer serialise behind one emulator when the host
+has RAM to spare. `setup-ar-emulator.sh` (via `lib/emulator-select.sh`):
+- **computes a RAM-budgeted cap** —
+  `max_emulators = floor((free_RAM − EMU_HOST_HEADROOM_MB) / EMU_RAM_BUDGET_PER_EMU_MB)`,
+  clamped to `[1, EMU_POOL_MAX]` (defaults: headroom 2048 MB, budget 3072 MB/emu,
+  `EMU_POOL_MAX=3`). On a RAM-tight host this resolves to 1 naturally — physics,
+  not policy;
+- **leases from a per-emulator pool** — each running emulator has a lease file
+  (`${TMPDIR:-/tmp}/sceneview-device-qa-emu/<serial>.lease`, owner pid inside). A
+  caller leases a free running emulator; else, if the running count is below the
+  live cap, boots a new one on a distinct `-port` (5554, 5556, …) so emulators
+  coexist; else waits (bounded) for a lease to free;
+- **re-gates RAM before every boot** — free RAM is re-read immediately before
+  each boot and the boot is refused below `EMU_MIN_FREE_RAM_MB` (default 3072 MB)
+  even when the cap said there was room. Memory safety is the hard invariant —
+  the pool never pushes the host into RAM exhaustion;
 - **right-sizes `-memory`** — scales the guest memory flag to RAM headroom,
   clamped to `[EMU_MEMORY_FLOOR_MB, EMU_MEMORY_CEILING_MB]` (2048–4096 MB);
-- **takes an advisory lock** (`${TMPDIR:-/tmp}/sceneview-device-qa-emulator.lock`)
-  so two concurrent sessions cooperate: the first boots, the rest reuse — never
-  two emulators at once. Stale locks (owner gone, no emulator alive) self-reclaim.
+- **reclaims stale leases** — a lease whose owner pid is dead AND whose serial is
+  gone from `adb devices` is reclaimed automatically.
+Every threshold is env-overridable. `setup-ar-emulator.sh --check` reports pool
+state (running count, computed cap, free RAM, active leases). The QA scripts
+(`device-qa.sh`, `qa-android-demos.sh`, `ar-replay-qa.sh`) pin `ANDROID_SERIAL`
+to the leased emulator so the right device is targeted when the pool has several.
 
 `--check` now also reports host free RAM and whether a running emulator would be
 reused. This is why parallel Claude Code sessions running device-QA on the same
@@ -629,8 +644,8 @@ Hooks trigger automatically on specific Claude Code actions:
 | `cross-platform-check.sh` | Compare Android vs iOS vs Web API surface, report gaps |
 | `release-checklist.sh` | Pre-release validation (versions, changelog, tests, etc.) |
 | `lib/android-cli.sh` | Shared helpers for Google's `android` CLI (screenshot, layout, install+launch) with `adb` fallback |
-| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only), `--clean` (wipe+recreate). RAM-aware single-emulator selection (#1647): reuses a running emulator, gates fresh boots on free host RAM, scales `-memory` to headroom, advisory-locks against parallel sessions. **Use this for routine QA — never QA on a personal device.** |
-| `lib/emulator-select.sh` | Sourced helper for `setup-ar-emulator.sh` / `device-qa.sh` — RAM monitoring (`vm_stat`/`/proc/meminfo`), running-emulator reuse detection, RAM-scaled `-memory`, and a mkdir-based advisory lock so concurrent sessions share ONE emulator (#1647). |
+| `setup-ar-emulator.sh` | Bootstrap a reusable ARCore-ready `Pixel_7a` emulator (virtualscene camera, 4 GB RAM, host GPU, ARCore APK). Idempotent — `--check` (read-only, reports pool state), `--clean` (wipe+recreate). RAM-budgeted adaptive emulator pool (#1647 → #1654): leases a free running emulator, or boots a new one on a distinct `-port` when the live RAM-budgeted cap has room and free RAM clears the hard safety gate, or waits for a lease to free. **Use this for routine QA — never QA on a personal device.** |
+| `lib/emulator-select.sh` | Sourced helper for `setup-ar-emulator.sh` / `device-qa.sh` / `qa-android-demos.sh` — RAM monitoring (`vm_stat`/`/proc/meminfo`), RAM-budgeted pool-cap computation, a per-emulator lease registry, RAM-scaled `-memory`, multi-port boot, and stale-lease reclaim. The adaptive pool runs as many emulators as live host RAM safely allows (floor 1, `EMU_POOL_MAX` ceiling), superseding #1647's strict-single design (#1654). |
 | `qa-android-demos.sh` | QA loop over every demo — uses `android layout`/`screen capture` for the UI dump and screenshots |
 | `capture-play-store-screenshots.sh` | Play Store screenshot capture — `android screen capture` (no LF/CRLF corruption) |
 | `visual-check.sh` | Before/after baseline capture — Android via `android` CLI, iOS via `xcrun simctl` |
