@@ -175,13 +175,19 @@ fun PhysicsNode(
     }
 
     DisposableEffect(node) {
+        // Save the caller's existing onFrame so PhysicsNode does not clobber it.
+        val previousOnFrame = node.onFrame
         var prevFrameTime: Long? = null
         node.onFrame = { frameTimeNanos ->
             body.step(frameTimeNanos, prevFrameTime)
             prevFrameTime = frameTimeNanos
+            // Chain-call any caller-provided callback (runs synchronously on the
+            // render/main thread, like onFrame itself).
+            previousOnFrame?.invoke(frameTimeNanos)
         }
         onDispose {
-            node.onFrame = null
+            // Restore exactly what was there before instead of nulling unconditionally.
+            node.onFrame = previousOnFrame
         }
     }
 }
