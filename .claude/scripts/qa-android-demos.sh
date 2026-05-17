@@ -73,8 +73,16 @@ fi
 # --- Optional build + install ---------------------------------------------
 if $INSTALL; then
   if [[ ! -f "$APK" ]]; then
-    echo "[qa] building demo APK..."
-    ./gradlew :samples:android-demo:assembleDebug -q
+    echo "[qa] building demo APK (this is a cold build — streams progress)..."
+    # `--console=plain` (NOT -q): a quiet build emits zero output, so a slow
+    # cold build on a 2-core CI runner looked like a 40-min silent hang.
+    # `timeout` bounds it so a genuinely stuck build/daemon fails fast with a
+    # clear diagnostic instead of eating the whole CI job budget (#1560).
+    timeout "${ANDROID_BUILD_TIMEOUT:-1800}" \
+      ./gradlew :samples:android-demo:assembleDebug --console=plain || {
+        echo "[qa] ERROR: APK build failed or timed out (>${ANDROID_BUILD_TIMEOUT:-1800}s)" >&2
+        exit 1
+      }
   fi
   echo "[qa] installing $APK"
   android_cli_ensure || true

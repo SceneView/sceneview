@@ -122,7 +122,11 @@ jobs:
   android:
     name: Device QA — android (Maestro)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 60 min: a cold `:samples:android-demo:assembleDebug` on a 2-core runner
+    # plus emulator boot plus the Maestro flow needs headroom. The per-step
+    # `timeout` guards inside qa-android-demos.sh / maestro.sh still abort a
+    # genuine hang fast (build 30 min, Maestro 15 min) — see #1560.
+    timeout-minutes: 60
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6

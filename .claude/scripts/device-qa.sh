@@ -177,9 +177,13 @@ run_android() {
   $FAST && flow="3d-basics"
 
   local rc=0
-  bash "$SCRIPT_DIR/qa-android-demos.sh" --install --flow "$flow" \
-    > "$ARTIFACTS/android-output.txt" 2>&1 || rc=$?
-  cat "$ARTIFACTS/android-output.txt"
+  # Stream live via `tee` — a plain `> file` redirect kept the whole Android
+  # leg silent in CI until the wrapper returned, so a slow APK build (or a
+  # genuine hang) showed 40+ min of nothing before the job timed out and was
+  # cancelled. `pipefail` (set above) makes `|| rc=$?` capture the wrapper's
+  # exit code, not tee's.
+  bash "$SCRIPT_DIR/qa-android-demos.sh" --install --flow "$flow" 2>&1 \
+    | tee "$ARTIFACTS/android-output.txt" || rc=$?
 
   # Maestro has no flat summary JSON; the wrapper's exit code is the verdict.
   if [[ $rc -eq 0 ]]; then
