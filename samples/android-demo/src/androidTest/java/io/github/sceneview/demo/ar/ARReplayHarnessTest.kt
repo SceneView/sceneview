@@ -49,6 +49,26 @@ import java.io.FileOutputStream
  * (see [writeSummary]) so the slice-5 orchestrator can pull one file instead
  * of scraping instrumentation stdout.
  *
+ * ## Honest reporting of `replayedFrames == 0` ([#1645](https://github.com/sceneview/sceneview/issues/1645))
+ *
+ * ARCore dataset playback (`Session.setPlaybackDataset`) needs camera-stream
+ * capabilities the x86 software-GPU CI emulator does not provide — on that
+ * host the recorded session never advances a frame. That is an *environment*
+ * limitation, not a product regression, so the replay demo must NOT be graded
+ * a green `alive` (which the device-QA orchestrator counts as a pass): a pass
+ * would falsely claim "the recorded ARCore session replayed".
+ *
+ * The harness therefore distinguishes:
+ *
+ * - `ar-record-playback` with `replayedFrames == 0` -> [VERDICT_SKIPPED] with
+ *   a `reason` ("ARCore dataset playback not supported on this emulator").
+ *   `ar-replay-qa.sh` reads the summary's `skipped` count, surfaces it as a
+ *   dedicated exit code, and the device-QA AR leg records `skipped`, never
+ *   `passed`.
+ * - any live-only demo with `replayedFrames == 0` -> [VERDICT_ALIVE]: those
+ *   demos build a live `ARSceneView` and never consume `playbackDataset`, so
+ *   surviving the launch IS their contract — that stays a pass.
+ *
  * ## Relationship to the sibling AR tests
  *
  * - [ARDemoPlaybackSmokeTest] — sweeps `androidTest/assets/ar-recordings/`
@@ -149,6 +169,25 @@ class ARReplayHarnessTest {
                 "Full machine-readable verdict: $summaryPath",
             crashed.isEmpty(),
         )
+
+        // Honesty gate (#1645): `ar-record-playback` is the one demo that MUST
+        // actually replay the recorded ARCore dataset. If it advanced 0 frames
+        // the harness is `skipped`, not `passed` — ARCore dataset playback is
+        // unsupported on this (CI software-GPU) emulator. `assumeTrue` makes
+        // JUnit/instrumentation report the test as skipped rather than green;
+        // `ar-replay-qa.sh` reads the summary's `skipped` count to surface the
+        // same verdict to the device-QA orchestrator.
+        val replayDemo = results.firstOrNull { it.demoId == REPLAY_DEMO_ID }
+        if (replayDemo != null) {
+            assumeTrue(
+                "AR replay harness SKIPPED: `$REPLAY_DEMO_ID` replayed " +
+                    "${replayDemo.replayedFrames} ARCore frame(s) (need " +
+                    "$MIN_REPLAYED_FRAMES) — $REASON_PLAYBACK_UNSUPPORTED. " +
+                    "This is an environment limitation, not a product bug; the " +
+                    "AR leg cannot be graded a pass. Full verdict: $summaryPath",
+                replayDemo.verdict != VERDICT_SKIPPED,
+            )
+        }
     }
 
     // ── Per-demo replay ─────────────────────────────────────────────────────
@@ -158,9 +197,14 @@ class ARReplayHarnessTest {
      *
      * - [VERDICT_REPLAYED] — the demo consumed recorded ARCore frames (the
      *   frame counter advanced past [MIN_REPLAYED_FRAMES]).
-     * - [VERDICT_ALIVE] — the demo's process stayed alive for the replay
-     *   window but did not advance the frame counter (a live-only AR demo
-     *   that does not yet honour `playbackDataset`).
+     * - [VERDICT_ALIVE] — a live-only AR demo (one that does NOT consume
+     *   `playbackDataset`) whose process stayed alive for the replay window.
+     *   Surviving a recorded-session launch IS the contract for these, so
+     *   this is a pass.
+     * - [VERDICT_SKIPPED] — the replay demo ([REPLAY_DEMO_ID]) survived but
+     *   advanced 0 frames: ARCore dataset playback is unsupported on this
+     *   emulator (#1645). An environment limitation, reported honestly with a
+     *   `reason` — never a misleading green.
      * - [VERDICT_CRASHED] — the demo's process died during replay.
      */
     private fun replayDemo(demoId: String, recording: File): DemoResult {
@@ -175,13 +219,19 @@ class ARReplayHarnessTest {
 
         val frames = DemoSettings.arPlaybackFrameCount
         val alive = isDemoProcessAlive()
+        // Only `ar-record-playback` mounts `ARSceneView(playbackDataset = …)`,
+        // so it is the only demo for which a 0-frame run is a problem rather
+        // than expected live-only behaviour.
+        val isReplayDemo = demoId == REPLAY_DEMO_ID
 
         val verdict = when {
             !alive -> VERDICT_CRASHED
             frames >= MIN_REPLAYED_FRAMES -> VERDICT_REPLAYED
+            isReplayDemo -> VERDICT_SKIPPED
             else -> VERDICT_ALIVE
         }
-        return DemoResult(demoId, verdict, frames)
+        val reason = if (verdict == VERDICT_SKIPPED) REASON_PLAYBACK_UNSUPPORTED else null
+        return DemoResult(demoId, verdict, frames, reason)
     }
 
     /**
@@ -203,27 +253,37 @@ class ARReplayHarnessTest {
      * `adb pull` it.
      *
      * The shape mirrors the device-QA harness convention (umbrella #1560): a
-     * top-level `harness` / `passed` / `total` header plus a `demos` array of
-     * `{ id, verdict, replayedFrames }`. Slice #1564's `web-qa-summary.json`
-     * is expected to follow the same `{ harness, passed, total, <items> }`
-     * skeleton so the slice-5 orchestrator can merge platform reports without
-     * special-casing each.
+     * top-level `harness` / `passed` / `skipped` / `failed` / `total` header
+     * plus a `demos` array of `{ id, verdict, replayedFrames, reason? }`.
+     * Slice #1564's `web-qa-summary.json` follows the same
+     * `{ harness, passed, total, <items> }` skeleton so the slice-5
+     * orchestrator can merge platform reports without special-casing each.
+     *
+     * `passed` counts only genuine passes — `replayed` and live-only `alive`.
+     * A `skipped` demo (#1645: replay demo that advanced 0 frames because the
+     * emulator cannot do ARCore dataset playback) is reported in its own
+     * `skipped` count and is NOT folded into `passed`, so a green AR leg
+     * genuinely means the recorded session replayed.
      */
     private fun writeSummary(results: List<DemoResult>): File {
         val demos = JSONArray()
         for (r in results) {
-            demos.put(
-                JSONObject()
-                    .put("id", r.demoId)
-                    .put("verdict", r.verdict)
-                    .put("replayedFrames", r.replayedFrames),
-            )
+            val obj = JSONObject()
+                .put("id", r.demoId)
+                .put("verdict", r.verdict)
+                .put("replayedFrames", r.replayedFrames)
+            if (r.reason != null) obj.put("reason", r.reason)
+            demos.put(obj)
         }
-        val passed = results.count { it.verdict != VERDICT_CRASHED }
+        val passed = results.count { it.verdict == VERDICT_REPLAYED || it.verdict == VERDICT_ALIVE }
+        val skipped = results.count { it.verdict == VERDICT_SKIPPED }
+        val failed = results.count { it.verdict == VERDICT_CRASHED }
         val root = JSONObject()
             .put("harness", "ar-replay")
             .put("recording", BUNDLED_RECORDING)
             .put("passed", passed)
+            .put("skipped", skipped)
+            .put("failed", failed)
             .put("total", results.size)
             .put("demos", demos)
 
@@ -237,6 +297,8 @@ class ARReplayHarnessTest {
         val demoId: String,
         val verdict: String,
         val replayedFrames: Int,
+        /** Human-readable reason — set only for [VERDICT_SKIPPED]. */
+        val reason: String? = null,
     )
 
     // ── Fixture plumbing ────────────────────────────────────────────────────
@@ -305,6 +367,24 @@ class ARReplayHarnessTest {
 
         const val VERDICT_REPLAYED = "replayed"
         const val VERDICT_ALIVE = "alive"
+        const val VERDICT_SKIPPED = "skipped"
         const val VERDICT_CRASHED = "crashed"
+
+        /**
+         * The one demo that mounts `ARSceneView(playbackDataset = …)` and so
+         * MUST advance the recorded ARCore frame counter. Matches the slug in
+         * `DemoRegistry.kt`. Live-only AR demos never consume the playback
+         * dataset and are graded `alive`, not `skipped`.
+         */
+        const val REPLAY_DEMO_ID = "ar-record-playback"
+
+        /**
+         * Reason surfaced for a [VERDICT_SKIPPED] replay demo: ARCore dataset
+         * playback (`Session.setPlaybackDataset`) needs camera-stream support
+         * the x86 software-GPU CI emulator does not provide.
+         */
+        const val REASON_PLAYBACK_UNSUPPORTED =
+            "ARCore dataset playback not supported on this emulator " +
+                "(software-GPU CI emulator has no replayable camera stream)"
     }
 }
