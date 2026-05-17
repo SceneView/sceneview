@@ -1,2 +1,0 @@
-<!-- category: Changed -->
-- device-QA harness (#1654): the emulator-selection layer is now a RAM-budgeted adaptive pool — it leases a free running emulator or boots a new one on a distinct `-port` whenever live host RAM safely allows (cap `floor((free_RAM − headroom) / per-emu budget)`, clamped `[1, EMU_POOL_MAX]`), re-gates free RAM as a hard memory-safety check before every boot, reclaims stale per-emulator leases, and pins `ANDROID_SERIAL` to the leased device — superseding the strict-single emulator of #1647 while keeping the floor at 1 on RAM-tight hosts.

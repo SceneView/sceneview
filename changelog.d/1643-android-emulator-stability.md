@@ -1,2 +1,0 @@
-<!-- category: Fixed -->
-- **Device-QA Android leg — CI emulator stability ([#1643](https://github.com/sceneview/sceneview/issues/1643)).** The Maestro flow ran correctly (app launch + camera-orbit swipes) but the CI emulator went offline mid-flow under the SceneView Filament 3D demo's GPU/RAM load. The `android` and `ar` device-QA jobs now boot the emulator with `-memory 4096`, and `qa-android-demos.sh` retries the Maestro flow once when — and only when — the device drops offline (a genuine demo failure, where the device stays online, is not retried).

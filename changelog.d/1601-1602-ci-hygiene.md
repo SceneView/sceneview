@@ -1,2 +1,0 @@
-<!-- category: Changed -->
-- CI workflow hygiene (#1601, #1602): documented the device-qa.yml four-leg split (per-push web+android vs nightly-only ios+ar) and why `samples/ios-demo/**` is deliberately absent from its path trigger; unified telemetry-ci.yml on `node-version: 20` to match device-qa.yml and docs.yml; deleted the orphan top-level `docs/screenshots/` directory (a byte-identical, unreferenced duplicate of `docs/docs/screenshots/`, which MkDocs actually serves).
