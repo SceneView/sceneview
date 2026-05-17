@@ -118,5 +118,8 @@ maestro_run() {
     return 2
   fi
   maestro_ensure || return 1
-  "$MAESTRO_BIN" test "$flow" "$@"
+  # Bound the run: a flow that hangs (e.g. waiting on an element that never
+  # appears) must fail fast instead of silently eating the CI job budget
+  # (#1560). `timeout` exit 124 propagates as a normal non-zero failure.
+  timeout "${MAESTRO_TEST_TIMEOUT:-900}" "$MAESTRO_BIN" test "$flow" "$@"
 }
