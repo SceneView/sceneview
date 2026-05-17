@@ -7,14 +7,31 @@
 #   can crash and need manual recovery). #1241 mandates emulator-first QA.
 #
 # What it does:
-#   1. Ensures the AVD `Pixel_7a` exists (creates if missing).
-#   2. Patches its config.ini for ARCore: 4 GB RAM, virtualscene back camera,
+#   1. Ensures the AVD `Pixel_7a` exists. The AVD *name* is kept for back-compat
+#      with the QA scripts that hard-code it; the underlying device profile is
+#      now pixel_8 (see DEVICE_PROFILE_PREFS below).
+#   2. Builds it to an ANR-resistant QA spec: 6 CPU cores, 1 GB VM heap, 12 GB
+#      data partition, host-sized RAM (see below), virtualscene back camera,
 #      emulated front camera (front cam is needed for Augmented Faces demos),
-#      host GPU mode.
+#      host GPU mode. An AVD still on the old 4-core / 4 GB spec is rebuilt.
 #   3. Boots the emulator headless.
 #   4. Waits for `sys.boot_completed`.
 #   5. Verifies Google Play Services for AR (com.google.ar.core) is installed;
 #      if not, opens the Play Store to the listing (one-time manual click).
+#
+# Why the higher spec:
+#   A SceneView 3D demo renders through Filament (host GPU) while QA runs
+#   `adb shell screenrecord` at the same time — the recorder's H.264 encoder is
+#   a software thread on the *guest*. On the stock 4-core / 4 GB AVD the guest
+#   `system_server` gets CPU/memory-starved and ANRs ("System UI isn't
+#   responding"), aborting the recording. More cores + RAM give it headroom.
+#
+#   RAM is sized to the *host*, not pinned at 8 GB: an 8 GB guest on a 16 GB Mac
+#   that is also running the Gradle build + agent tooling gets SIGTERM'd by
+#   macOS under memory pressure mid-QA — which aborts the recording just as
+#   surely as an ANR. detect_target_ram_mb() reserves 10 GB for the host and
+#   clamps the guest to [4 GB, 8 GB]: ~6 GB on a 16 GB Mac, the full 8 GB on a
+#   24 GB+ Mac. The load-bearing ANR fix is the core count, not raw RAM.
 #
 # Flags:
 #   --check   Read-only inspection: prints current AVD config + ARCore state. No mutation.
@@ -45,6 +62,33 @@ case "$HOST_ARCH" in
   *) echo "[setup-ar] unsupported host arch $HOST_ARCH" >&2; exit 1 ;;
 esac
 SYSTEM_IMAGE="system-images;android-36;google_apis_playstore;$IMG_ARCH"
+
+# --- ANR-resistant QA spec ----------------------------------------------------
+# Guest RAM is sized to the host so macOS never SIGTERMs the emulator under
+# memory pressure (that kills a QA recording exactly like an ANR does). Reserve
+# 10 GB for the host (macOS + the Gradle build + the agent driving QA), clamp
+# the guest to [4 GB, 8 GB]. 16 GB Mac -> ~6 GB guest; 24 GB+ Mac -> 8 GB.
+detect_target_ram_mb() {
+  local host_bytes host_mb ram
+  host_bytes="$(sysctl -n hw.memsize 2>/dev/null || echo '')"
+  if [[ -z "$host_bytes" ]]; then
+    echo 6144; return            # detection failed — safe middle value
+  fi
+  host_mb=$(( host_bytes / 1024 / 1024 ))
+  ram=$(( host_mb - 10240 ))
+  (( ram < 4096 )) && ram=4096
+  (( ram > 8192 )) && ram=8192
+  echo "$ram"
+}
+TARGET_RAM_MB="$(detect_target_ram_mb)"
+TARGET_HEAP_MB=1024
+TARGET_NCORE=6
+TARGET_DATA_PARTITION="12G"
+# Most-capable recent Pixel profile actually installed in the SDK. Pixel 9 ships
+# no `avdmanager` profile yet; pixel_8 has the same 1080x2400 @ 420dpi geometry
+# as pixel_7a (so the screenshot-crop math in capture-play-store-screenshots.sh
+# is unchanged) but is the newer reference device. Falls down the list if absent.
+DEVICE_PROFILE_PREFS=(pixel_9_pro pixel_9 pixel_8 pixel_8a pixel_7a pixel_7)
 
 CHECK_ONLY=false
 CLEAN=false
@@ -88,18 +132,34 @@ fi
 
 # --- step 3: create or recreate the AVD ---------------------------------------
 recreate_avd() {
-  log "creating AVD $AVD_NAME with image $SYSTEM_IMAGE"
-  # Some hosts don't have pixel_7a in `avdmanager list device`; fall back to pixel_7.
-  local device_arg="pixel_7a"
-  if ! "$AVDMANAGER_BIN" list device 2>/dev/null | grep -q "id: .*pixel_7a"; then
-    device_arg="pixel_7"
-    log "device profile pixel_7a not found, falling back to pixel_7"
-  fi
+  # Pick the most-capable device profile this SDK actually has installed.
+  local avail device_arg=""
+  avail="$("$AVDMANAGER_BIN" list device 2>/dev/null || true)"
+  for cand in "${DEVICE_PROFILE_PREFS[@]}"; do
+    if grep -qE "id: [0-9]+ or \"$cand\"" <<<"$avail"; then
+      device_arg="$cand"; break
+    fi
+  done
+  [[ -z "$device_arg" ]] && device_arg="pixel_7"
+  log "creating AVD $AVD_NAME (device=$device_arg, image=$SYSTEM_IMAGE)"
   echo "no" | "$AVDMANAGER_BIN" create avd \
     --name "$AVD_NAME" \
     --package "$SYSTEM_IMAGE" \
     --device "$device_arg" \
     --force >/dev/null
+}
+
+# True if the AVD is absent or built on the old low-spec config, so a full run
+# rebuilds it into the ANR-resistant spec. RAM + cores are the load-bearing keys
+# (a fresh recreate also clears accumulated userdata cruft and the larger data
+# partition only takes effect on a clean image).
+avd_is_stale() {
+  [[ -f "$AVD_CONFIG" ]] || return 0
+  local ram ncore
+  ram="$(awk -F'=' '/^hw\.ramSize/{gsub(/ /,"",$2);print $2}' "$AVD_CONFIG")"
+  ncore="$(awk -F'=' '/^hw\.cpu\.ncore/{gsub(/ /,"",$2);print $2}' "$AVD_CONFIG")"
+  [[ "${ram:-0}" -ge "$TARGET_RAM_MB" && "${ncore:-0}" -ge "$TARGET_NCORE" ]] && return 1
+  return 0
 }
 
 if $CLEAN; then
@@ -110,17 +170,24 @@ if $CLEAN; then
   "$AVDMANAGER_BIN" delete avd --name "$AVD_NAME" 2>/dev/null || true
 fi
 
-if [[ ! -f "$AVD_CONFIG" ]]; then
-  if $CHECK_ONLY; then
+if $CHECK_ONLY; then
+  if [[ ! -f "$AVD_CONFIG" ]]; then
     log "MISSING AVD $AVD_NAME (would create on full run)"
     exit 1
+  fi
+  avd_is_stale && log "AVD $AVD_NAME is below the ANR-resistant spec (RAM/cores) — a full run would rebuild it"
+elif avd_is_stale; then
+  if [[ -f "$AVD_CONFIG" ]]; then
+    log "AVD $AVD_NAME is below the ANR-resistant spec — rebuilding"
+    "$AVDMANAGER_BIN" delete avd --name "$AVD_NAME" 2>/dev/null || true
   fi
   recreate_avd
 fi
 
 # --- step 4: patch config.ini for ARCore --------------------------------------
-# Pinned values: 4GB RAM, virtualscene back camera (ARCore can drive it),
-# emulated front (Augmented Faces), host GPU mode, persistent disk.
+# Pinned values: host-sized RAM / 1 GB heap / 6 cores / 12 GB data (ANR-resistant
+# QA), virtualscene back camera (ARCore can drive it), emulated front (Augmented
+# Faces), host GPU mode.
 patch_kv() {
   local key="$1"
   local value="$2"
@@ -136,22 +203,25 @@ patch_kv() {
 }
 
 apply_ar_config() {
-  log "patching $AVD_CONFIG for ARCore"
+  log "patching $AVD_CONFIG for ARCore + ANR-resistant QA"
   patch_kv "PlayStore.enabled" "yes" "$AVD_CONFIG"
   patch_kv "hw.camera.back"   "virtualscene" "$AVD_CONFIG"
   patch_kv "hw.camera.front"  "emulated"     "$AVD_CONFIG"
   patch_kv "hw.gpu.enabled"   "yes"          "$AVD_CONFIG"
   patch_kv "hw.gpu.mode"      "host"         "$AVD_CONFIG"
-  patch_kv "hw.ramSize"       "4096"         "$AVD_CONFIG"
-  patch_kv "vm.heapSize"      "576"          "$AVD_CONFIG"
+  # Headroom so a Filament render + screenrecord don't starve system_server.
+  patch_kv "hw.ramSize"       "$TARGET_RAM_MB"         "$AVD_CONFIG"
+  patch_kv "vm.heapSize"      "$TARGET_HEAP_MB"        "$AVD_CONFIG"
+  patch_kv "hw.cpu.ncore"     "$TARGET_NCORE"          "$AVD_CONFIG"
+  patch_kv "disk.dataPartition.size" "$TARGET_DATA_PARTITION" "$AVD_CONFIG"
   patch_kv "hw.sensors.orientation" "yes"    "$AVD_CONFIG"
   patch_kv "hw.sensors.proximity"   "yes"    "$AVD_CONFIG"
   patch_kv "hw.gps"           "yes"          "$AVD_CONFIG"
 }
 
 show_config() {
-  log "current AVD config (ARCore-relevant keys):"
-  grep -E "^(PlayStore|hw\.camera|hw\.gpu|hw\.ramSize|vm\.heapSize|hw\.gps|image\.sysdir)" "$AVD_CONFIG" | sed 's/^/  /'
+  log "current AVD config (QA-relevant keys):"
+  grep -E "^(PlayStore|hw\.camera|hw\.gpu|hw\.ramSize|vm\.heapSize|hw\.cpu\.ncore|disk\.dataPartition\.size|hw\.device\.name|hw\.gps|image\.sysdir)" "$AVD_CONFIG" | sed 's/^/  /'
 }
 
 if $CHECK_ONLY; then
@@ -177,7 +247,9 @@ boot_emulator() {
   local emu_log="/tmp/sceneview-emulator-$AVD_NAME.log"
   nohup "$EMULATOR_BIN" -avd "$AVD_NAME" \
     -gpu host \
+    -cores "$TARGET_NCORE" \
     -no-snapshot-load \
+    -no-snapshot-save \
     -no-audio \
     -no-boot-anim \
     -netdelay none -netspeed full \
@@ -186,16 +258,18 @@ boot_emulator() {
 }
 
 wait_for_boot() {
-  log "waiting for boot complete (up to 180s)"
+  log "waiting for boot complete (a fresh cold boot of the recreated AVD can take 5+ min)"
   local serial
-  # Poll for first emulator-* device showing up
-  for _ in $(seq 1 60); do
+  # Poll for first emulator-* device showing up. A fresh-userdata cold boot of
+  # the heavier AVD genuinely takes minutes — keep this window generous so the
+  # script doesn't bail while the emulator is still legitimately booting.
+  for _ in $(seq 1 180); do
     serial="$("$ADB_BIN" devices | awk '/^emulator-[0-9]+/ && $2=="device" {print $1; exit}')"
     [[ -n "$serial" ]] && break
     sleep 2
   done
   if [[ -z "$serial" ]]; then
-    log "no emulator-* device appeared after 120s — boot failed"
+    log "no emulator-* device appeared after 360s — boot failed"
     return 1
   fi
   log "device $serial online, waiting for sys.boot_completed"
@@ -203,8 +277,8 @@ wait_for_boot() {
   local i=0
   while [[ "$("$ADB_BIN" -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')" != "1" ]]; do
     i=$((i+1))
-    if [[ $i -gt 90 ]]; then
-      log "sys.boot_completed not set after 180s"
+    if [[ $i -gt 150 ]]; then
+      log "sys.boot_completed not set after 300s"
       return 1
     fi
     sleep 2
