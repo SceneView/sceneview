@@ -480,8 +480,21 @@ private struct SceneViewRepresentation: View {
     // Reactive light-slot caches — compared in `update:` closure to detect when the
     // caller mutated `.mainLight(_:)` / `.fillLight(_:)` so the corresponding entity
     // can be swapped in-place without a full RealityView teardown. Closes #1017.
-    @State private var appliedMainSlot: LightSlot? = nil
-    @State private var appliedFillSlot: LightSlot? = nil
+    //
+    // `appliedCache.skyboxResource` mirrors the discipline above for the HDR skybox:
+    // compared against `loadedSkyboxResource` so `content.environment` is only
+    // reassigned when the resource identity actually changes (~10-50 µs/frame saved).
+    //
+    // All three are held in a reference-type class so mutations inside
+    // `RealityView.update:` don't trigger SwiftUI's "Modifying state during view
+    // update" warning. A class property mutation never changes the @State value
+    // (the reference), so SwiftUI never detects a state change during body evaluation.
+    private final class AppliedCache {
+        var mainSlot: LightSlot? = nil
+        var fillSlot: LightSlot? = nil
+        var skyboxResource: EnvironmentResource? = nil
+    }
+    @State private var appliedCache = AppliedCache()
 
     /// Loaded HDR resource cached for the `RealityView.update:` closure so
     /// it can apply `content.environment = .skybox(resource)` every frame
@@ -489,19 +502,6 @@ private struct SceneViewRepresentation: View {
     /// when the IBL should light the scene but not render as a background.
     /// Ported from Eliott Radcliffe's sceneview-swift PR #1.
     @State private var loadedSkyboxResource: EnvironmentResource? = nil
-
-    /// Identity of the environment resource currently bound on the
-    /// `RealityViewContent.environment` setter — compared against
-    /// `loadedSkyboxResource` in `update:` so we only assign when the
-    /// value actually changes. Without the diff, every frame would
-    /// re-write the descriptor and bump the resource's reference count
-    /// (~10-50 µs/frame + ARC churn). Mirrors the `appliedMainSlot` /
-    /// `appliedFillSlot` cache discipline above. Also fixes the
-    /// cross-environment stale-skybox flash: clearing this on the new
-    /// task tick triggers a single `.default` write while the next IBL
-    /// is loading, instead of letting the OLD skybox show under the
-    /// NEW IBL for the load duration.
-    @State private var appliedSkyboxResource: EnvironmentResource? = nil
 
     #if os(visionOS)
     /// visionOS-only: the equirectangular HDR texture loaded for the
@@ -516,7 +516,7 @@ private struct SceneViewRepresentation: View {
     /// HDR resource name of the immersive skybox host currently attached to
     /// the scene — compared against the loaded environment in `update:` so
     /// the inverted-sphere host is rebuilt only when the resource changes.
-    /// Same diff-write discipline as `appliedSkyboxResource` / the light
+    /// Same diff-write discipline as `appliedCache.skyboxResource` / the light
     /// slots. Closes #1235.
     @State private var appliedImmersiveSkyboxResource: String? = nil
     #endif
@@ -716,13 +716,13 @@ private struct SceneViewRepresentation: View {
             // bump + descriptor re-validation per frame (`content.environment`
             // is not a free no-op — internally re-wraps the resource
             // even when assigned an equal value).
-            if loadedSkyboxResource !== appliedSkyboxResource {
+            if loadedSkyboxResource !== appliedCache.skyboxResource {
                 if let resource = loadedSkyboxResource {
                     content.environment = .skybox(resource)
                 } else {
                     content.environment = .default
                 }
-                appliedSkyboxResource = loadedSkyboxResource
+                appliedCache.skyboxResource = loadedSkyboxResource
             }
         }
         #endif
@@ -786,8 +786,8 @@ private struct SceneViewRepresentation: View {
         // them when the caller's modifier value changes. Closes #1017.
         provisionLightSlot(.main, slot: mainLightSlot)
         provisionLightSlot(.fill, slot: fillLightSlot)
-        appliedMainSlot = mainLightSlot
-        appliedFillSlot = fillLightSlot
+        appliedCache.mainSlot = mainLightSlot
+        appliedCache.fillSlot = fillLightSlot
 
         // Populate user content. Goes into `contentRoot` (a child of root)
         // instead of `root` directly so the auto-center translation in
@@ -866,7 +866,7 @@ private struct SceneViewRepresentation: View {
     /// content; we go through the entity hierarchy via `removeFromParent()`).
     @MainActor
     private func refreshLightSlot(_ which: LightSlotMarker.Slot, slot: LightSlot) {
-        let applied: LightSlot? = (which == .main) ? appliedMainSlot : appliedFillSlot
+        let applied: LightSlot? = (which == .main) ? appliedCache.mainSlot : appliedCache.fillSlot
         guard applied != slot else { return }   // no change since last frame
         // Remove the old tagged entity if present.
         let toRemove = entities.root.children.first { entity in
@@ -877,9 +877,9 @@ private struct SceneViewRepresentation: View {
         provisionLightSlot(which, slot: slot)
         // Update the cache so the next frame's diff is a no-op.
         if which == .main {
-            appliedMainSlot = slot
+            appliedCache.mainSlot = slot
         } else {
-            appliedFillSlot = slot
+            appliedCache.fillSlot = slot
         }
     }
 
