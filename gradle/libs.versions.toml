@@ -35,7 +35,7 @@ kotlinMath = "1.8.0"
 # Session #800 / #961 track future Filament bumps with the same paired-update
 # guarantee.
 filament = "1.71.0"
-arCore = "1.53.0"
+arCore = "1.54.0"
 
 # Networking
 fuel = "2.3.1"
