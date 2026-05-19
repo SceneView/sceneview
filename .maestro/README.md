@@ -115,6 +115,14 @@ omit `--install` and reuse an installed build.
 5. Assert the "Navigate back" affordance is still visible — a process crash
    makes this fail.
 6. Navigate back to the demo list.
+7. **Optional zoom QA** ([#1571](https://github.com/sceneview/sceneview/issues/1571)):
+   when the caller sets the `CAMERA_DISTANCE` env var, `flows/demo.yaml`
+   additionally re-launches the demo at a near + far framing via the
+   `camera_distance` float extra (`--ef`). That extra feeds
+   `DemoSettings.cameraDistance` through `DeepLinkRouter`, overriding the 3D
+   hero-orbit camera distance — the only way to exercise 3D zoom, since Maestro
+   has no pinch gesture. `3d-basics.yaml` sets it on `model-viewer`, producing
+   `demo-model-viewer-zoom-near` / `-zoom-far` screenshots.
 
 **iOS** — `ios/flows/demo.yaml` runs once per demo with `DEMO_ID` /
 `DEMO_NAME` / `ASSERT_TEXT` env vars:
@@ -133,11 +141,16 @@ omit `--install` and reuse an installed build.
 
 ## Known limitations
 
-- **No pinch gesture.** Maestro cannot pinch, so 3D camera zoom is not
-  exercised on either platform. The demo deep-link registry exposes only
-  `demo` / `qa_mode` / `ar_playback_file` — there is no zoom parameter yet.
-  Adding one is a tracked follow-up so a future `flows/demo.yaml` can deep-link
-  a zoomed framing.
+- **No pinch gesture.** Maestro cannot pinch, so 3D camera zoom cannot be
+  driven by touch. On **Android** this is solved by the `camera_distance`
+  deep-link param ([#1571](https://github.com/sceneview/sceneview/issues/1571),
+  see step 7 above): the demo registry exposes a `camera_distance` float extra
+  (`--ef`) and a `sceneview://demo/<id>?cameraDistance=<f>` query parameter that
+  override the hero-orbit camera distance, so `flows/demo.yaml` can deep-link a
+  near + far framing. The matching iOS and web deep-link params are tracked in
+  [#1563](https://github.com/sceneview/sceneview/issues/1563) /
+  [#1564](https://github.com/sceneview/sceneview/issues/1564) — until they land,
+  zoom is not exercised on iOS or web.
 - **Device-log crash sweep** is not a Maestro primitive in 1.39. The
   orchestrator runner (`device-qa.sh`, umbrella slice
   [#1566](https://github.com/sceneview/sceneview/issues/1566)) clears / tails

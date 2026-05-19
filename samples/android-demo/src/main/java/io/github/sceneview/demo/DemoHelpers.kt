@@ -468,6 +468,14 @@ class HeroOrbitCameraManipulator(
  * animator. Returns the manipulator ready to drop into a `SceneView(cameraManipulator = ...)`.
  *
  * In [DemoSettings.qaMode] the yaw is frozen at [staticYaw] so screenshot tests stay stable.
+ *
+ * ### Deep-link zoom override (#1571)
+ *
+ * When [DemoSettings.cameraDistance] is non-null — set from the `--ef camera_distance <f>`
+ * intent extra or the `sceneview://demo/<id>?cameraDistance=<f>` deep link — it replaces
+ * [radius] as the orbit distance, so the device-QA harness can launch a demo at a near or
+ * far framing without a pinch gesture (Maestro has none). When `null` the caller's [radius]
+ * (typically per-demo auto-fit) is used unchanged, so showcase behaviour is unaffected.
  */
 @Composable
 fun rememberHeroOrbitCameraManipulator(
@@ -493,10 +501,15 @@ fun rememberHeroOrbitCameraManipulator(
             }
         }
     }
-    return androidx.compose.runtime.remember(radius, yHeight, target) {
+    // Deep-link zoom override (#1571): a non-null DemoSettings.cameraDistance wins over the
+    // caller's auto-fit `radius`. Reading the Compose state here (not inside remember{})
+    // keeps it a recomposition input; it is also a remember{} key so the manipulator is
+    // rebuilt with the new orbit distance if the zoom changes (e.g. a warm-start onNewIntent).
+    val effectiveRadius = DemoSettings.cameraDistance ?: radius
+    return androidx.compose.runtime.remember(effectiveRadius, yHeight, target) {
         HeroOrbitCameraManipulator(
             yawProvider = { if (DemoSettings.qaMode) staticYaw else anim.value },
-            radius = radius,
+            radius = effectiveRadius,
             yHeight = yHeight,
             target = target,
         )
