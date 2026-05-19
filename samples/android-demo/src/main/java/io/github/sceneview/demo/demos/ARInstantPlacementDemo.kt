@@ -46,6 +46,7 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
+import io.github.sceneview.demo.rememberArPlaybackDataset
 import io.github.sceneview.demo.demos.internal.ArPlacement
 import io.github.sceneview.demo.demos.internal.rememberTexturesSettled
 import io.github.sceneview.demo.R
@@ -104,6 +105,13 @@ fun ARInstantPlacementDemo(onBack: () -> Unit) {
     // means "Bundled cycle" (the v4.3.1 default behaviour).
     val placementSlugs = remember { SampleAssets.byCategory["ar_placement"].orEmpty() }
     var selectedSlug by remember { mutableStateOf<SketchfabSlug?>(null) }
+
+    // Replay a recorded ARCore dataset when the device-QA harness deep-links this demo
+    // with `--es ar_playback_file <path>` (#1576). Resolved once in the parent composable
+    // (not inside `InstantPlacementScene`, which `key(instantEnabled)` remounts) so the
+    // dataset survives the instant-placement toggle. `null` for every normal launch - see
+    // `rememberArPlaybackDataset` - so live AR is completely unchanged for real users.
+    val arPlaybackDataset = rememberArPlaybackDataset()
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -210,6 +218,7 @@ fun ARInstantPlacementDemo(onBack: () -> Unit) {
                 instantEnabled = instantEnabled,
                 selectedSlug = selectedSlug,
                 selectedFile = selectedFile,
+                playbackDataset = arPlaybackDataset,
             )
         }
     }
@@ -220,6 +229,7 @@ private fun InstantPlacementScene(
     instantEnabled: Boolean,
     selectedSlug: SketchfabSlug?,
     selectedFile: File?,
+    playbackDataset: File?,
 ) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
@@ -261,6 +271,7 @@ private fun InstantPlacementScene(
             engine = engine,
             modelLoader = modelLoader,
             materialLoader = materialLoader,
+            playbackDataset = playbackDataset,
             planeRenderer = !instantEnabled,
             sessionConfiguration = { _: Session, config: Config ->
                 config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL

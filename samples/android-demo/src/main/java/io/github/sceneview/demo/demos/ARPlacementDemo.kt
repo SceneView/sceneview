@@ -43,6 +43,7 @@ import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.AssetSourceState
+import io.github.sceneview.demo.rememberArPlaybackDataset
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.demos.internal.ArPlacement
 import io.github.sceneview.demo.demos.internal.DemoMath
@@ -117,6 +118,10 @@ fun ARPlacementDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    // Replay a recorded ARCore dataset when the device-QA harness deep-links this demo
+    // with `--es ar_playback_file <path>` (#1576). `null` for every normal launch - see
+    // `rememberArPlaybackDataset` - so live AR is completely unchanged for real users.
+    val arPlaybackDataset = rememberArPlaybackDataset()
     val context = LocalContext.current
 
     val placedModels = remember { mutableStateListOf<PlacedModel>() }
@@ -261,6 +266,7 @@ fun ARPlacementDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
+                playbackDataset = arPlaybackDataset,
                 planeRenderer = true,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL

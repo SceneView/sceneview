@@ -42,6 +42,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.arcore.configure
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberArPlaybackDataset
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -88,6 +89,10 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    // Replay a recorded ARCore dataset when the device-QA harness deep-links this demo
+    // with `--es ar_playback_file <path>` (#1576). `null` for every normal launch - see
+    // `rememberArPlaybackDataset` - so live AR is completely unchanged for real users.
+    val arPlaybackDataset = rememberArPlaybackDataset()
 
     // Hoisted so the model loads once for the whole demo, not on every re-placement.
     // The remember slot survives anchor clears + re-drops, so re-tapping is instant
@@ -249,6 +254,7 @@ fun ARImageStabilizationDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
+                playbackDataset = arPlaybackDataset,
                 planeRenderer = true,
                 sessionConfiguration = { _: Session, config: Config ->
                     config.planeFindingMode =
