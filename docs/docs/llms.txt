@@ -815,6 +815,43 @@ ARSceneView(modifier = Modifier.fillMaxSize()) {
 }
 ```
 
+### Depth hit test — place on any real surface
+
+`HitResultNode` / `Frame.hitTest` resolve only against **detected planes / feature points**.
+`Frame.hitTestDepth` instead raycasts the **ARCore depth image**, so it lands on *any* real-world
+geometry (a sofa, a slope, a cluttered desk) without waiting for a plane to grow there — and it
+returns the **surface normal**, so a placed object can be aligned to whatever it lands on.
+
+Requires the session depth mode set to `Config.DepthMode.AUTOMATIC` or `RAW_DEPTH_ONLY`.
+Returns `null` when depth is unavailable (not supported, not yet computed, camera not tracking,
+or no valid depth at that pixel). Cheap enough for tap-driven placement — do not call it per-pixel.
+
+```kotlin
+data class DepthHitResult(
+    val position: Position,   // world-space point on the real surface
+    val normal: Direction,    // unit surface normal, facing the camera
+    val distance: Float       // camera-to-point distance, meters
+)
+
+fun Frame.hitTestDepth(xPx: Float, yPx: Float): DepthHitResult?
+```
+
+```kotlin
+ARSceneView(
+    modifier = Modifier.fillMaxSize(),
+    sessionConfiguration = { session, config ->
+        config.depthMode = Config.DepthMode.AUTOMATIC
+    },
+    onGestureListener = rememberOnGestureListener(
+        onSingleTapConfirmed = { e, _ ->
+            arSceneView.frame?.hitTestDepth(e.x, e.y)?.let { hit ->
+                // hit.position / hit.normal — place & orient a node on the real surface
+            }
+        }
+    )
+)
+```
+
 ### AugmentedImageNode — image tracking
 ```kotlin
 @Composable fun AugmentedImageNode(
