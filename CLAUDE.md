@@ -323,9 +323,7 @@ Every file below MUST be updated when bumping the version. Use `/version-bump` o
 | | `sceneview/gradle.properties` | `VERSION_NAME=X.Y.Z` |
 | | `arsceneview/gradle.properties` | `VERSION_NAME=X.Y.Z` |
 | | `sceneview-core/gradle.properties` | `VERSION_NAME=X.Y.Z` |
-| **npm** | `mcp/package.json` | `"version": "X.Y.Z"` |
-| | `mcp/src/index.ts` | version in server info |
-| | `sceneview-web/package.json` | `"version": "X.Y.Z"` |
+| **npm** | `sceneview-web/package.json` | `"version": "X.Y.Z"` |
 | | `react-native/react-native-sceneview/package.json` | `"version": "X.Y.Z"` |
 | **Flutter** | `flutter/sceneview_flutter/pubspec.yaml` | `version: X.Y.Z` |
 | | `flutter/.../android/build.gradle` | `version 'X.Y.Z'` |
@@ -356,6 +354,16 @@ Every file below MUST be updated when bumping the version. Use `/version-bump` o
 > plugins' OWN package versions (`version 'X.Y.Z'`, `pubspec.yaml`, podspec,
 > `package.json`) bump to the release version. `sync-versions.sh` reports these
 > consumed-dep coordinates WARN-only and never auto-bumps them (issue #1494).
+
+> ⚠️ **`mcp/package.json` and `mcp/src/index.ts` follow an INDEPENDENT version
+> track — do NOT sync them to `VERSION_NAME`.**
+> `sceneview-mcp` (npm) has its own release cadence (e.g. `4.0.12` while the
+> SDK is at `4.10.0`) and is published independently of the Maven Central
+> artifacts. `sync-versions.sh` deliberately **excludes** `mcp/package.json`
+> from the version check — forcing them to match once caused a regression
+> where the sync agent downgraded `mcp/package.json` behind the published npm
+> `@next` tag. When releasing `sceneview-mcp`, bump these two files to the
+> next *MCP* version, never to the SDK `VERSION_NAME` (issue #1705).
 
 **Automation:**
 - `bash .claude/scripts/sync-versions.sh` — checks all 30+ locations
@@ -703,10 +711,13 @@ Source of truth: `gradle.properties` → `VERSION_NAME=X.Y.Z`
 | `sceneview/gradle.properties` | `VERSION_NAME=` |
 | `arsceneview/gradle.properties` | `VERSION_NAME=` |
 | `sceneview-core/gradle.properties` | `VERSION_NAME=` |
-| `mcp/package.json` | `"version":` |
 | `llms.txt` | Artifact version references |
 | `README.md` | Install snippets |
 | `CLAUDE.md` | "Latest release" in session state |
+
+> ⚠️ `mcp/package.json` / `mcp/src/index.ts` are **not** in this map —
+> `sceneview-mcp` has its own independent npm version track. `sync-versions.sh`
+> excludes it on purpose. See the Version Location Map note above (issue #1705).
 
 ### Published artifact registry
 
