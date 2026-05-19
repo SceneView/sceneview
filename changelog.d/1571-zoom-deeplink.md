@@ -1,0 +1,2 @@
+<!-- category: Added -->
+- Android demo: added a `cameraDistance` zoom deep-link parameter — a `--ef camera_distance <f>` intent extra and a `sceneview://demo/<id>?cameraDistance=<f>` query parameter that override the 3D hero-orbit camera distance. This lets the Maestro device-QA flows exercise 3D camera zoom, which Maestro cannot do by pinch; `.maestro/android/flows/demo.yaml` now captures a near + far framing for `model-viewer`. Invalid or out-of-range values fall back to the demo's default framing (#1571).

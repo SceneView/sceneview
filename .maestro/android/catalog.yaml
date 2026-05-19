@@ -29,12 +29,15 @@
 #     afterwards. Run this flow through that runner for the full crash gate;
 #     run it directly for a quick interactive smoke.
 #
-# Zoom limitation:
-#   Maestro has no pinch gesture, so 3D camera zoom is not exercised here.
-#   The demo deep-link registry (DeepLinkRouter / the `--es` intent extras)
-#   currently exposes only `demo`, `qa_mode` and `ar_playback_file` — there is
-#   no zoom/camera-distance parameter. Adding one is filed as a follow-up so a
-#   future revision of flows/demo.yaml can deep-link a zoomed framing.
+# Zoom QA (#1571):
+#   Maestro has no pinch gesture, so 3D camera zoom cannot be driven by touch.
+#   It is driven by a deep-link param instead: the demo registry (DeepLinkRouter
+#   / the intent extras) exposes a `camera_distance` float extra (`--ef`) and a
+#   `sceneview://demo/<id>?cameraDistance=<f>` query parameter that override the
+#   3D hero-orbit camera distance. flows/demo.yaml has an optional zoom section
+#   (gated on the CAMERA_DISTANCE env var) that re-launches a demo at a near +
+#   far framing; 3d-basics.yaml sets CAMERA_DISTANCE on model-viewer so this
+#   master flow exercises zoom on exactly one representative 3D demo.
 #
 # AR demos require the ARCore-friendly emulator from
 # `.claude/scripts/setup-ar-emulator.sh`.

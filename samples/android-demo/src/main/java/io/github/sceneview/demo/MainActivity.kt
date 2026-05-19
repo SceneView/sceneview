@@ -122,6 +122,12 @@ class MainActivity : ComponentActivity() {
         // `ARRecordPlaybackDemo` then nulled.
         DemoSettings.arPendingPlaybackFile = intent?.getStringExtra("ar_playback_file")
             ?.takeIf { isWithinAppFilesDir(it) }
+        // Optional camera-to-model distance (zoom level). Maestro has no pinch gesture, so
+        // the device-QA flows drive 3D zoom by deep link instead (#1571). Same dual-ingress
+        // policy: the `--ef camera_distance <f>` QA extra wins over the URL query parameter.
+        // Both go through DeepLinkRouter.validateCameraDistance, so a non-finite or
+        // out-of-range value is dropped to null (default framing) rather than crashing.
+        DemoSettings.cameraDistance = resolveCameraDistance(intent)
         setContent {
             SceneViewDemoTheme {
                 SceneViewDemoApp(activity = this)
@@ -142,6 +148,31 @@ class MainActivity : ComponentActivity() {
         DemoSettings.qaMode = intent.getBooleanExtra("qa_mode", false)
         DemoSettings.arPendingPlaybackFile = intent.getStringExtra("ar_playback_file")
             ?.takeIf { isWithinAppFilesDir(it) }
+        DemoSettings.cameraDistance = resolveCameraDistance(intent)
+    }
+
+    /**
+     * Resolves the optional camera-to-model distance (zoom level) from an incoming intent.
+     *
+     * Two ingress channels, mirroring the `demo` extra's dual-channel policy:
+     *  1. `--ef camera_distance <f>` — the QA extra, used by the Maestro device-QA flows
+     *     and `adb shell am`. Takes precedence.
+     *  2. `?cameraDistance=<f>` query parameter on a `sceneview://demo/<id>` URL deep link.
+     *
+     * Both are clamped by [DeepLinkRouter.validateCameraDistance] / [parseCameraDistance] to
+     * a finite, in-range value; anything absent, unparseable, or out of range resolves to
+     * `null` so the launched demo keeps its own auto-fit framing and never crashes.
+     *
+     * `Float.NaN` is the sentinel for "extra absent" — `getFloatExtra` has no nullable
+     * overload — and `validateCameraDistance` rejects NaN, so an absent extra correctly
+     * falls through to the URL channel.
+     */
+    private fun resolveCameraDistance(intent: Intent?): Float? {
+        if (intent == null) return null
+        val fromExtra = DeepLinkRouter.validateCameraDistance(
+            intent.getFloatExtra("camera_distance", Float.NaN),
+        )
+        return fromExtra ?: DeepLinkRouter.parseCameraDistance(intent.data)
     }
 
     fun consumePendingDemo() {
