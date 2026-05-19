@@ -779,8 +779,15 @@ class SceneView private constructor(
         assetLoader?.delete()
         models.clear()
 
-        // Destroy light entities
-        lightEntities.forEach { engine.destroyEntity(it) }
+        // Destroy light entities. The LightManager component is a separately
+        // managed native allocation — destroying the entity alone leaks it
+        // (#1700), mirroring the Android LightNode.destroy() teardown. Destroy
+        // the component first, then the entity.
+        val lightManager = engine.getLightManager()
+        lightEntities.forEach { entity ->
+            if (lightManager.hasComponent(entity)) lightManager.destroy(entity)
+            engine.destroyEntity(entity)
+        }
         lightEntities.clear()
 
         // Destroy the environment GPU resources — IBL + skybox (issue #1496).
@@ -846,14 +853,11 @@ class SceneView private constructor(
                         // Loop the animation
                         model.animationTime = model.animationTime % duration
                     }
-                    // In Filament.js, applyAnimation only takes the index.
-                    // The animation time is set by calling the animator at the right moment.
-                    // Actually, the gltfio$Animator.applyAnimation(index) applies the animation
-                    // at the CURRENT time set internally -- we need to advance it.
-                    // The proper way is: animator.applyAnimation(index) after setting time
-                    // via the asset's animation system.
-                    // For Filament.js, we use the asset instance animator which tracks time internally.
-                    animator.applyAnimation(0)
+                    // Apply animation 0 at the accumulated (looped) time so
+                    // skeletal/keyframe animations actually advance. The time
+                    // argument is mandatory — without it the animator re-applies
+                    // every frame at t=0 and the model renders frozen (#1697).
+                    animator.applyAnimation(0, model.animationTime)
                     animator.updateBoneMatrices()
                 }
             }
