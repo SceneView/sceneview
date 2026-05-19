@@ -46,6 +46,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
 import io.github.sceneview.demo.SceneViewColors
+import io.github.sceneview.demo.rememberArPlaybackDataset
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberModelLoader
@@ -200,6 +201,10 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    // Replay a recorded ARCore dataset when the device-QA harness deep-links this demo
+    // with `--es ar_playback_file <path>` (#1576). `null` for every normal launch - see
+    // `rememberArPlaybackDataset` - so live AR is completely unchanged for real users.
+    val arPlaybackDataset = rememberArPlaybackDataset()
 
     val geometries = remember { mutableStateListOf<StreetscapeGeometry>() }
     var isTracking by remember { mutableStateOf(false) }
@@ -249,6 +254,7 @@ fun ARStreetscapeDemo(onBack: () -> Unit) {
                 engine = engine,
                 modelLoader = modelLoader,
                 materialLoader = materialLoader,
+                playbackDataset = arPlaybackDataset,
                 planeRenderer = false,
                 sessionConfiguration = { session: Session, config: Config ->
                     // ACCESS_FINE_LOCATION + CAMERA are guaranteed granted at this

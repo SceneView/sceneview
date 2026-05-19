@@ -42,6 +42,7 @@ import io.github.sceneview.ar.createARCameraStream
 import io.github.sceneview.ar.rememberARCameraStream
 import io.github.sceneview.demo.DemoScaffold
 import io.github.sceneview.demo.R
+import io.github.sceneview.demo.rememberArPlaybackDataset
 import io.github.sceneview.demo.demos.internal.DemoMath
 import io.github.sceneview.math.Position
 import io.github.sceneview.rememberEngine
@@ -85,6 +86,12 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
     val engine = rememberEngine()
     val modelLoader = rememberModelLoader(engine)
     val materialLoader = rememberMaterialLoader(engine)
+    // Replay a recorded ARCore dataset when the device-QA harness deep-links this demo
+    // with `--es ar_playback_file <path>` (#1576). `null` for every normal launch - see
+    // `rememberArPlaybackDataset` - so live AR is completely unchanged for real users.
+    // Hoisted above the `key(depthOn)` block so the resolved dataset is captured once and
+    // survives the camera-stream rebuild on the depth toggle.
+    val arPlaybackDataset = rememberArPlaybackDataset()
 
     // Hoisted so the model loads once for the whole demo, not on every re-placement.
     // The remember slot survives anchor clears + re-drops, so re-tapping is instant
@@ -193,6 +200,7 @@ fun ARDepthOcclusionDemo(onBack: () -> Unit) {
                     engine = engine,
                     modelLoader = modelLoader,
                     materialLoader = materialLoader,
+                    playbackDataset = arPlaybackDataset,
                     planeRenderer = true,
                     sessionConfiguration = { session: Session, config: Config ->
                         config.planeFindingMode =
